@@ -9,7 +9,244 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      agencies: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+          website: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+          website?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
+      ai_insights: {
+        Row: {
+          campaign_id: string
+          created_at: string
+          description: string
+          id: string
+          insight_type: string
+          is_read: boolean
+          priority: string
+          title: string
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string
+          description: string
+          id?: string
+          insight_type: string
+          is_read?: boolean
+          priority?: string
+          title: string
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string
+          description?: string
+          id?: string
+          insight_type?: string
+          is_read?: boolean
+          priority?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_insights_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaigns: {
+        Row: {
+          activecampaign_list_id: string | null
+          budget: number | null
+          clickfunnels_funnel_id: string | null
+          client_id: string
+          created_at: string
+          end_date: string | null
+          facebook_campaign_id: string | null
+          funnel_type: Database["public"]["Enums"]["funnel_type"]
+          id: string
+          name: string
+          start_date: string | null
+          status: Database["public"]["Enums"]["campaign_status"]
+          updated_at: string
+        }
+        Insert: {
+          activecampaign_list_id?: string | null
+          budget?: number | null
+          clickfunnels_funnel_id?: string | null
+          client_id: string
+          created_at?: string
+          end_date?: string | null
+          facebook_campaign_id?: string | null
+          funnel_type: Database["public"]["Enums"]["funnel_type"]
+          id?: string
+          name: string
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["campaign_status"]
+          updated_at?: string
+        }
+        Update: {
+          activecampaign_list_id?: string | null
+          budget?: number | null
+          clickfunnels_funnel_id?: string | null
+          client_id?: string
+          created_at?: string
+          end_date?: string | null
+          facebook_campaign_id?: string | null
+          funnel_type?: Database["public"]["Enums"]["funnel_type"]
+          id?: string
+          name?: string
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["campaign_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clients: {
+        Row: {
+          agency_id: string
+          created_at: string
+          email: string | null
+          id: string
+          industry: string | null
+          name: string
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          industry?: string | null
+          name: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          industry?: string | null
+          name?: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clients_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      daily_metrics: {
+        Row: {
+          campaign_id: string
+          created_at: string
+          date: string
+          id: string
+          metric_type: Database["public"]["Enums"]["metric_type"]
+          value: number
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string
+          date: string
+          id?: string
+          metric_type: Database["public"]["Enums"]["metric_type"]
+          value: number
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string
+          date?: string
+          id?: string
+          metric_type?: Database["public"]["Enums"]["metric_type"]
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_metrics_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integrations: {
+        Row: {
+          agency_id: string
+          created_at: string
+          id: string
+          is_connected: boolean
+          last_sync: string | null
+          platform: string
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          created_at?: string
+          id?: string
+          is_connected?: boolean
+          last_sync?: string | null
+          platform: string
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          created_at?: string
+          id?: string
+          is_connected?: boolean
+          last_sync?: string | null
+          platform?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integrations_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -18,7 +255,17 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      campaign_status: "active" | "paused" | "completed" | "draft"
+      funnel_type: "low-ticket" | "webinar" | "book-call"
+      metric_type:
+        | "impressions"
+        | "clicks"
+        | "conversions"
+        | "spend"
+        | "revenue"
+        | "leads"
+        | "cost_per_lead"
+        | "conversion_rate"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -133,6 +380,19 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      campaign_status: ["active", "paused", "completed", "draft"],
+      funnel_type: ["low-ticket", "webinar", "book-call"],
+      metric_type: [
+        "impressions",
+        "clicks",
+        "conversions",
+        "spend",
+        "revenue",
+        "leads",
+        "cost_per_lead",
+        "conversion_rate",
+      ],
+    },
   },
 } as const

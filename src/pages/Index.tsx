@@ -1,5 +1,6 @@
 
 import { useState } from "react";
+import { Navbar } from "@/components/Navbar";
 import { MetricCard } from "@/components/MetricCard";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { FunnelSelector } from "@/components/FunnelSelector";
@@ -9,7 +10,8 @@ import { BookCallFunnel } from "@/components/BookCallFunnel";
 import { ConversionChart } from "@/components/ConversionChart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, DollarSign, Users, MousePointer } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { TrendingUp, DollarSign, Users, MousePointer, Plus } from "lucide-react";
 
 const generateOverviewData = () => {
   const dates = [];
@@ -55,11 +57,13 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Navbar />
+      
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Conversion Rate Optimization Dashboard</h1>
+            <h2 className="text-xl font-semibold text-gray-900">Campaign Analytics</h2>
             <p className="text-gray-600">Monitor and optimize your marketing funnels</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-4">
@@ -71,6 +75,10 @@ const Index = () => {
               onFunnelChange={handleFunnelChange}
               className="w-full sm:w-[200px]"
             />
+            <Button className="flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Add Campaign
+            </Button>
           </div>
         </div>
       </div>
@@ -84,7 +92,7 @@ const Index = () => {
                 <TrendingUp className="h-5 w-5 text-analytics-primary" />
                 Key Performance Metrics
               </CardTitle>
-              <Badge variant="secondary" className="bg-analytics-primary/10 text-analytics-primary">
+              <Badge variant="secondary" className="bg-green-100 text-green-700">
                 Live Data
               </Badge>
             </div>
