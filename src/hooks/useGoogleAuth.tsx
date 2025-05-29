@@ -36,15 +36,9 @@ export const useGoogleAuth = () => {
     setLoading(true);
     try {
       console.log('Initiating Google OAuth...');
-      
-      const requestBody = JSON.stringify({ action: 'get_auth_url' });
-      console.log('Request body:', requestBody);
 
       const { data, error } = await supabase.functions.invoke('google-oauth', {
-        body: requestBody,
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        body: { action: 'get_auth_url' }
       });
 
       console.log('Auth URL response:', { data, error });
@@ -126,17 +120,11 @@ export const useGoogleAuth = () => {
     try {
       console.log('Exchanging code for tokens...');
       
-      const requestBody = JSON.stringify({ 
-        action: 'exchange_code', 
-        code 
-      });
-      console.log('Token exchange request body:', requestBody);
-      
       const { data, error } = await supabase.functions.invoke('google-oauth', {
-        body: requestBody,
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        body: { 
+          action: 'exchange_code', 
+          code 
+        }
       });
 
       console.log('Token exchange response:', { data, error });
@@ -189,16 +177,12 @@ export const useGoogleAuth = () => {
 
     const { data: { session } } = await supabase.auth.getSession();
     
-    const requestBody = JSON.stringify({ 
-      action: 'list_sheets', 
-      accessToken 
-    });
-    console.log('List sheets request body:', requestBody);
-    
     const { data, error } = await supabase.functions.invoke('google-oauth', {
-      body: requestBody,
+      body: { 
+        action: 'list_sheets', 
+        accessToken 
+      },
       headers: {
-        'Content-Type': 'application/json',
         'Authorization': `Bearer ${session?.access_token}`,
       },
     });
@@ -220,18 +204,14 @@ export const useGoogleAuth = () => {
 
     const { data: { session } } = await supabase.auth.getSession();
 
-    const requestBody = JSON.stringify({ 
-      action: 'get_sheet_data', 
-      accessToken, 
-      spreadsheetId, 
-      range 
-    });
-    console.log('Get sheet data request body:', requestBody);
-
     const { data, error } = await supabase.functions.invoke('google-oauth', {
-      body: requestBody,
+      body: { 
+        action: 'get_sheet_data', 
+        accessToken, 
+        spreadsheetId, 
+        range 
+      },
       headers: {
-        'Content-Type': 'application/json',
         'Authorization': `Bearer ${session?.access_token}`,
       },
     });

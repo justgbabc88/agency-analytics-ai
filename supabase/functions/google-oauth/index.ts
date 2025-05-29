@@ -26,40 +26,15 @@ serve(async (req) => {
     let requestData: OAuthRequest
 
     if (req.method === 'POST') {
-      const text = await req.text()
-      console.log('Raw request body:', text)
-      
-      if (!text || text.trim() === '') {
-        console.error('Empty request body received')
-        throw new Error('Request body is required for POST requests')
-      }
-      
       try {
-        requestData = JSON.parse(text)
+        requestData = await req.json()
         console.log('Parsed request data:', JSON.stringify(requestData, null, 2))
       } catch (parseError) {
         console.error('Failed to parse JSON:', parseError)
-        console.error('Raw text that failed to parse:', text)
         throw new Error(`Invalid JSON in request body: ${parseError.message}`)
       }
     } else {
-      // Handle GET requests with URL parameters
-      const url = new URL(req.url)
-      const action = url.searchParams.get('action')
-      console.log('GET request, action parameter:', action)
-      
-      if (!action) {
-        throw new Error('Action parameter is required')
-      }
-      
-      requestData = { 
-        action: action as OAuthRequest['action'],
-        code: url.searchParams.get('code') || undefined,
-        accessToken: url.searchParams.get('accessToken') || undefined,
-        spreadsheetId: url.searchParams.get('spreadsheetId') || undefined,
-        range: url.searchParams.get('range') || undefined
-      }
-      console.log('GET request data:', JSON.stringify(requestData, null, 2))
+      throw new Error('Only POST requests are supported')
     }
 
     const { action, code, accessToken, spreadsheetId, range } = requestData
@@ -75,7 +50,6 @@ serve(async (req) => {
     const authRequiredActions = ['list_sheets', 'get_sheet_data']
     
     if (authRequiredActions.includes(action)) {
-      // Check for authorization header for protected actions
       const authHeader = req.headers.get('authorization')
       console.log('Auth header present:', !!authHeader)
       
@@ -83,7 +57,6 @@ serve(async (req) => {
         throw new Error('Authentication required for this action')
       }
       
-      // Verify the JWT token
       const supabase = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -304,7 +277,7 @@ serve(async (req) => {
 
     console.log('Request processed successfully, returning result')
     return new Response(
-      JSON.stringify({ success: true, ...result }),
+      JSON.stringify(result),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
