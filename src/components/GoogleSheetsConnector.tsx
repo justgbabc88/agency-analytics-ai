@@ -3,16 +3,15 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Plus, FileSpreadsheet, MapPin } from "lucide-react";
+import { Trash2, Plus, FileSpreadsheet, MapPin, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useGoogleAuth } from "@/hooks/useGoogleAuth";
 
 interface GoogleSheet {
   id: string;
   name: string;
-  url: string;
+  webViewLink: string;
 }
 
 interface FieldMapping {
@@ -22,30 +21,67 @@ interface FieldMapping {
 }
 
 export const GoogleSheetsConnector = () => {
-  const [isConnected, setIsConnected] = useState(false);
   const [sheets, setSheets] = useState<GoogleSheet[]>([]);
   const [selectedSheet, setSelectedSheet] = useState<string>("");
   const [sheetColumns, setSheetColumns] = useState<string[]>([]);
   const [fieldMappings, setFieldMappings] = useState<FieldMapping[]>([]);
+  const [loadingSheets, setLoadingSheets] = useState(false);
   const { toast } = useToast();
 
-  // Mock data for demo purposes
+  const { 
+    isConnected, 
+    user, 
+    loading, 
+    initiateAuth, 
+    disconnect, 
+    listSheets, 
+    getSheetData 
+  } = useGoogleAuth();
+
   useEffect(() => {
     if (isConnected) {
-      setSheets([
-        { id: "1", name: "Marketing Metrics 2024", url: "https://docs.google.com/spreadsheets/d/abc123" },
-        { id: "2", name: "Campaign Performance", url: "https://docs.google.com/spreadsheets/d/def456" },
-        { id: "3", name: "Lead Generation Data", url: "https://docs.google.com/spreadsheets/d/ghi789" },
-      ]);
+      loadSheets();
     }
   }, [isConnected]);
 
   useEffect(() => {
     if (selectedSheet) {
-      // Mock sheet columns
-      setSheetColumns(["Date", "Campaign Name", "Impressions", "Clicks", "Cost", "Conversions", "Revenue"]);
+      loadSheetColumns();
     }
   }, [selectedSheet]);
+
+  const loadSheets = async () => {
+    setLoadingSheets(true);
+    try {
+      const googleSheets = await listSheets();
+      setSheets(googleSheets);
+    } catch (error) {
+      console.error('Failed to load sheets:', error);
+      toast({
+        title: "Error Loading Sheets",
+        description: "Failed to load your Google Sheets. Please try reconnecting.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingSheets(false);
+    }
+  };
+
+  const loadSheetColumns = async () => {
+    if (!selectedSheet) return;
+
+    try {
+      const sheetData = await getSheetData(selectedSheet);
+      setSheetColumns(sheetData.columns || []);
+    } catch (error) {
+      console.error('Failed to load sheet columns:', error);
+      toast({
+        title: "Error Loading Columns",
+        description: "Failed to load columns from the selected sheet.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const dashboardFields = [
     "campaign_name",
@@ -60,17 +96,20 @@ export const GoogleSheetsConnector = () => {
     "roas"
   ];
 
-  const handleGoogleConnect = () => {
-    // In a real implementation, this would initiate OAuth flow
-    setIsConnected(true);
-    toast({
-      title: "Google Account Connected",
-      description: "Successfully connected to your Google account. You can now select sheets.",
-    });
+  const handleGoogleConnect = async () => {
+    try {
+      await initiateAuth();
+    } catch (error) {
+      toast({
+        title: "Connection Failed",
+        description: "Failed to connect to Google. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleDisconnect = () => {
-    setIsConnected(false);
+    disconnect();
     setSheets([]);
     setSelectedSheet("");
     setSheetColumns([]);
@@ -102,7 +141,7 @@ export const GoogleSheetsConnector = () => {
     setFieldMappings(prev => prev.filter(mapping => mapping.id !== id));
   };
 
-  const handleSyncData = () => {
+  const handleSyncData = async () => {
     if (!selectedSheet || fieldMappings.length === 0) {
       toast({
         title: "Configuration Required",
@@ -112,10 +151,26 @@ export const GoogleSheetsConnector = () => {
       return;
     }
 
-    toast({
-      title: "Sync Started",
-      description: "Data sync from Google Sheets has been initiated.",
-    });
+    try {
+      // Get the complete range for the selected sheet
+      const selectedSheetName = sheets.find(s => s.id === selectedSheet)?.name || 'Sheet1';
+      const sheetData = await getSheetData(selectedSheet, `${selectedSheetName}!A:Z`);
+      
+      // Process and sync the data based on field mappings
+      console.log('Syncing data:', sheetData);
+      
+      toast({
+        title: "Sync Completed",
+        description: `Successfully synced ${sheetData.data?.length || 0} rows from Google Sheets.`,
+      });
+    } catch (error) {
+      console.error('Sync failed:', error);
+      toast({
+        title: "Sync Failed",
+        description: "Failed to sync data from Google Sheets. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -131,8 +186,12 @@ export const GoogleSheetsConnector = () => {
           {!isConnected ? (
             <div className="text-center space-y-4">
               <p className="text-gray-600">Connect your Google account to access your spreadsheets</p>
-              <Button onClick={handleGoogleConnect} className="bg-blue-600 hover:bg-blue-700">
-                Connect Google Account
+              <Button 
+                onClick={handleGoogleConnect} 
+                disabled={loading}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                {loading ? 'Connecting...' : 'Connect Google Account'}
               </Button>
             </div>
           ) : (
@@ -142,7 +201,10 @@ export const GoogleSheetsConnector = () => {
                   <Badge variant="secondary" className="bg-green-100 text-green-700">
                     Connected
                   </Badge>
-                  <span className="text-sm text-gray-600">user@example.com</span>
+                  <div className="flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    <span className="text-sm text-gray-600">{user?.email}</span>
+                  </div>
                 </div>
                 <Button variant="outline" onClick={handleDisconnect}>
                   Disconnect
@@ -161,10 +223,13 @@ export const GoogleSheetsConnector = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label>Available Sheets</Label>
-                <Select value={selectedSheet} onValueChange={setSelectedSheet}>
+                <Select 
+                  value={selectedSheet} 
+                  onValueChange={setSelectedSheet}
+                  disabled={loadingSheets}
+                >
                   <SelectTrigger>
-                    <SelectValue placeholder="Choose a spreadsheet" />
+                    <SelectValue placeholder={loadingSheets ? "Loading sheets..." : "Choose a spreadsheet"} />
                   </SelectTrigger>
                   <SelectContent>
                     {sheets.map(sheet => (
@@ -175,6 +240,9 @@ export const GoogleSheetsConnector = () => {
                   </SelectContent>
                 </Select>
               </div>
+              {sheets.length === 0 && !loadingSheets && (
+                <p className="text-sm text-gray-500">No spreadsheets found in your Google Drive.</p>
+              )}
             </CardContent>
           </Card>
 

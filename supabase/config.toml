@@ -45,3 +45,6 @@ enabled = false
 
 [functions.sync-integrations]
 verify_jwt = true
+
+[functions.google-oauth]
+verify_jwt = true
