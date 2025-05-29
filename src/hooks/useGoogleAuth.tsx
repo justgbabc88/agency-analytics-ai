@@ -38,7 +38,7 @@ export const useGoogleAuth = () => {
       console.log('Initiating Google OAuth...');
       
       const { data, error } = await supabase.functions.invoke('google-oauth', {
-        body: JSON.stringify({ action: 'get_auth_url' }),
+        body: { action: 'get_auth_url' },
         headers: {
           'Content-Type': 'application/json',
         },
@@ -112,7 +112,7 @@ export const useGoogleAuth = () => {
       console.log('Exchanging code for tokens...');
       
       const { data, error } = await supabase.functions.invoke('google-oauth', {
-        body: JSON.stringify({ action: 'exchange_code', code }),
+        body: { action: 'exchange_code', code },
         headers: {
           'Content-Type': 'application/json',
         },
@@ -166,7 +166,7 @@ export const useGoogleAuth = () => {
     const { data: { session } } = await supabase.auth.getSession();
     
     const { data, error } = await supabase.functions.invoke('google-oauth', {
-      body: JSON.stringify({ action: 'list_sheets', accessToken }),
+      body: { action: 'list_sheets', accessToken },
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session?.access_token}`,
@@ -187,12 +187,12 @@ export const useGoogleAuth = () => {
     const { data: { session } } = await supabase.auth.getSession();
 
     const { data, error } = await supabase.functions.invoke('google-oauth', {
-      body: JSON.stringify({ 
+      body: { 
         action: 'get_sheet_data', 
         accessToken, 
         spreadsheetId, 
         range 
-      }),
+      },
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session?.access_token}`,

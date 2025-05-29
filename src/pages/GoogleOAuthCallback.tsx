@@ -11,9 +11,12 @@ export const GoogleOAuthCallbackPage = () => {
     const code = urlParams.get('code');
     const error = urlParams.get('error');
 
+    console.log('OAuth callback received:', { code: !!code, error });
+
     if (code) {
       // Send the code back to the parent window if this is a popup
       if (window.opener) {
+        console.log('Sending success message to parent window');
         window.opener.postMessage({
           type: 'GOOGLE_OAUTH_SUCCESS',
           code
@@ -27,6 +30,7 @@ export const GoogleOAuthCallbackPage = () => {
       // Handle OAuth error
       console.error('OAuth error:', error);
       if (window.opener) {
+        console.log('Sending error message to parent window');
         window.opener.postMessage({
           type: 'GOOGLE_OAUTH_ERROR',
           error

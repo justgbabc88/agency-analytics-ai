@@ -23,8 +23,24 @@ serve(async (req) => {
   try {
     let requestData: OAuthRequest
 
-    // Handle different request methods and body parsing
-    if (req.method === 'GET') {
+    console.log(`Processing ${req.method} request to ${req.url}`)
+
+    if (req.method === 'POST') {
+      const text = await req.text()
+      console.log('Raw request body:', text)
+      
+      if (!text || text.trim() === '') {
+        throw new Error('Request body is required for POST requests')
+      }
+      
+      try {
+        requestData = JSON.parse(text)
+        console.log('Parsed request data:', requestData)
+      } catch (parseError) {
+        console.error('Failed to parse JSON:', parseError)
+        throw new Error('Invalid JSON in request body')
+      }
+    } else {
       // Handle GET requests with URL parameters
       const url = new URL(req.url)
       const action = url.searchParams.get('action')
@@ -39,30 +55,6 @@ serve(async (req) => {
         range: url.searchParams.get('range') || undefined
       }
       console.log('GET request data:', requestData)
-    } else {
-      // Handle POST requests with JSON body
-      try {
-        const text = await req.text()
-        console.log('Raw request body:', text)
-        
-        if (!text || text.trim() === '') {
-          // If no body, try to get action from URL params as fallback
-          const url = new URL(req.url)
-          const action = url.searchParams.get('action')
-          if (action) {
-            requestData = { action: action as OAuthRequest['action'] }
-            console.log('Using URL params as fallback:', requestData)
-          } else {
-            throw new Error('Request body is empty and no action in URL params')
-          }
-        } else {
-          requestData = JSON.parse(text)
-          console.log('Parsed request data:', requestData)
-        }
-      } catch (parseError) {
-        console.error('Failed to parse request body:', parseError)
-        throw new Error('Invalid JSON in request body')
-      }
     }
 
     const { action, code, accessToken, spreadsheetId, range } = requestData
@@ -97,10 +89,14 @@ serve(async (req) => {
 
     const clientId = Deno.env.get('GOOGLE_CLIENT_ID')
     const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET')
-    const redirectUri = Deno.env.get('GOOGLE_REDIRECT_URI') || `${Deno.env.get('SUPABASE_URL')}/functions/v1/google-oauth`
+    const redirectUri = `${new URL(req.url).origin}/google-oauth-callback`
+
+    console.log('Using redirect URI:', redirectUri)
+    console.log('Client ID configured:', !!clientId)
+    console.log('Client Secret configured:', !!clientSecret)
 
     if (!clientId || !clientSecret) {
-      throw new Error('Google OAuth credentials not configured')
+      throw new Error('Google OAuth credentials not configured. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in your Supabase secrets.')
     }
 
     console.log(`Processing action: ${action}`)
