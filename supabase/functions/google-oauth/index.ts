@@ -21,24 +21,22 @@ serve(async (req) => {
   }
 
   try {
-    // Check if request has a body and content-type
-    const contentType = req.headers.get('content-type') || ''
+    // Handle request body parsing more flexibly
     let requestData: OAuthRequest
 
-    if (contentType.includes('application/json')) {
+    try {
       const text = await req.text()
+      console.log('Raw request body:', text)
+      
       if (!text || text.trim() === '') {
         throw new Error('Request body is empty')
       }
       
-      try {
-        requestData = JSON.parse(text)
-      } catch (parseError) {
-        console.error('JSON parse error:', parseError)
-        throw new Error('Invalid JSON in request body')
-      }
-    } else {
-      throw new Error('Content-Type must be application/json')
+      requestData = JSON.parse(text)
+      console.log('Parsed request data:', requestData)
+    } catch (parseError) {
+      console.error('Failed to parse request body:', parseError)
+      throw new Error('Invalid JSON in request body')
     }
 
     const { action, code, accessToken, spreadsheetId, range } = requestData
