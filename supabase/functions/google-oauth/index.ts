@@ -21,7 +21,31 @@ serve(async (req) => {
   }
 
   try {
-    const { action, code, accessToken, spreadsheetId, range }: OAuthRequest = await req.json()
+    // Check if request has a body and content-type
+    const contentType = req.headers.get('content-type') || ''
+    let requestData: OAuthRequest
+
+    if (contentType.includes('application/json')) {
+      const text = await req.text()
+      if (!text || text.trim() === '') {
+        throw new Error('Request body is empty')
+      }
+      
+      try {
+        requestData = JSON.parse(text)
+      } catch (parseError) {
+        console.error('JSON parse error:', parseError)
+        throw new Error('Invalid JSON in request body')
+      }
+    } else {
+      throw new Error('Content-Type must be application/json')
+    }
+
+    const { action, code, accessToken, spreadsheetId, range } = requestData
+
+    if (!action) {
+      throw new Error('Action parameter is required')
+    }
 
     // Actions that require authentication
     const authRequiredActions = ['list_sheets', 'get_sheet_data']
