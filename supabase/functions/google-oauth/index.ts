@@ -85,8 +85,10 @@ serve(async (req) => {
       throw new Error('Google OAuth credentials not configured. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in your Supabase secrets.')
     }
 
-    // Use the correct redirect URI for the OAuth flow
-    const redirectUri = `${new URL(req.url).origin}/google-oauth-callback`
+    // Use the app domain for redirect URI instead of Supabase domain
+    const url = new URL(req.url)
+    const origin = req.headers.get('origin') || `${url.protocol}//${url.host}`
+    const redirectUri = `${origin}/google-oauth-callback`
     console.log('Using redirect URI:', redirectUri)
 
     let result: any = {}
