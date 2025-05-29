@@ -1,0 +1,133 @@
+
+import React, { useState } from "react";
+import { CalendarIcon } from "lucide-react";
+import { format, subDays, subWeeks, subMonths, startOfWeek, startOfMonth, startOfYear } from "date-fns";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+interface AdvancedDateRangePickerProps {
+  onDateChange: (from: Date, to: Date) => void;
+  className?: string;
+}
+
+const datePresets = [
+  { label: "Today", value: "today", getDates: () => ({ from: new Date(), to: new Date() }) },
+  { label: "Yesterday", value: "yesterday", getDates: () => ({ from: subDays(new Date(), 1), to: subDays(new Date(), 1) }) },
+  { label: "Last 7 days", value: "7days", getDates: () => ({ from: subDays(new Date(), 6), to: new Date() }) },
+  { label: "Last 14 days", value: "14days", getDates: () => ({ from: subDays(new Date(), 13), to: new Date() }) },
+  { label: "Last 30 days", value: "30days", getDates: () => ({ from: subDays(new Date(), 29), to: new Date() }) },
+  { label: "This week", value: "thisweek", getDates: () => ({ from: startOfWeek(new Date()), to: new Date() }) },
+  { label: "Last week", value: "lastweek", getDates: () => ({ from: startOfWeek(subWeeks(new Date(), 1)), to: subDays(startOfWeek(new Date()), 1) }) },
+  { label: "This month", value: "thismonth", getDates: () => ({ from: startOfMonth(new Date()), to: new Date() }) },
+  { label: "Last month", value: "lastmonth", getDates: () => ({ from: startOfMonth(subMonths(new Date(), 1)), to: subDays(startOfMonth(new Date()), 1) }) },
+  { label: "This year", value: "thisyear", getDates: () => ({ from: startOfYear(new Date()), to: new Date() }) },
+  { label: "Custom", value: "custom", getDates: () => ({ from: subDays(new Date(), 30), to: new Date() }) },
+];
+
+export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDateRangePickerProps) => {
+  const [dateRange, setDateRange] = useState({
+    from: subDays(new Date(), 30),
+    to: new Date()
+  });
+  const [selectedPreset, setSelectedPreset] = useState("30days");
+  const [isCustom, setIsCustom] = useState(false);
+
+  const handlePresetChange = (preset: string) => {
+    setSelectedPreset(preset);
+    if (preset === "custom") {
+      setIsCustom(true);
+      return;
+    }
+    
+    setIsCustom(false);
+    const presetConfig = datePresets.find(p => p.value === preset);
+    if (presetConfig) {
+      const dates = presetConfig.getDates();
+      setDateRange(dates);
+      onDateChange(dates.from, dates.to);
+    }
+  };
+
+  const handleCustomDateChange = (from: Date | undefined, to: Date | undefined) => {
+    if (from && to) {
+      setDateRange({ from, to });
+      onDateChange(from, to);
+    }
+  };
+
+  return (
+    <div className={cn("grid gap-2", className)}>
+      <div className="flex gap-2">
+        <Select value={selectedPreset} onValueChange={handlePresetChange}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Select date range" />
+          </SelectTrigger>
+          <SelectContent>
+            {datePresets.map((preset) => (
+              <SelectItem key={preset.value} value={preset.value}>
+                {preset.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {isCustom && (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-[280px] justify-start text-left font-normal",
+                  !dateRange && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {dateRange?.from ? (
+                  dateRange.to ? (
+                    <>
+                      {format(dateRange.from, "LLL dd, y")} -{" "}
+                      {format(dateRange.to, "LLL dd, y")}
+                    </>
+                  ) : (
+                    format(dateRange.from, "LLL dd, y")
+                  )
+                ) : (
+                  <span>Pick a date range</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                initialFocus
+                mode="range"
+                defaultMonth={dateRange?.from}
+                selected={{
+                  from: dateRange?.from,
+                  to: dateRange?.to,
+                }}
+                onSelect={(range) => {
+                  handleCustomDateChange(range?.from, range?.to);
+                }}
+                numberOfMonths={2}
+                className="p-3"
+              />
+            </PopoverContent>
+          </Popover>
+        )}
+      </div>
+      
+      {!isCustom && (
+        <div className="text-sm text-gray-600">
+          {format(dateRange.from, "MMM dd, yyyy")} - {format(dateRange.to, "MMM dd, yyyy")}
+        </div>
+      )}
+    </div>
+  );
+};
