@@ -21,12 +21,31 @@ serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
-
     const { action, code, accessToken, spreadsheetId, range }: OAuthRequest = await req.json()
+
+    // Actions that require authentication
+    const authRequiredActions = ['list_sheets', 'get_sheet_data']
+    
+    if (authRequiredActions.includes(action)) {
+      // Check for authorization header for protected actions
+      const authHeader = req.headers.get('authorization')
+      if (!authHeader) {
+        throw new Error('Authentication required for this action')
+      }
+      
+      // Verify the JWT token
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      )
+      
+      const token = authHeader.replace('Bearer ', '')
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+      
+      if (authError || !user) {
+        throw new Error('Invalid authentication token')
+      }
+    }
 
     const clientId = Deno.env.get('GOOGLE_CLIENT_ID')
     const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET')
@@ -35,6 +54,8 @@ serve(async (req) => {
     if (!clientId || !clientSecret) {
       throw new Error('Google OAuth credentials not configured')
     }
+
+    console.log(`Processing action: ${action}`)
 
     let result: any = {}
 
@@ -54,11 +75,14 @@ serve(async (req) => {
           `access_type=offline&` +
           `prompt=consent`
         
+        console.log('Generated auth URL successfully')
         result = { authUrl }
         break
 
       case 'exchange_code':
         if (!code) throw new Error('Authorization code required')
+        
+        console.log('Exchanging authorization code for tokens')
         
         const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
           method: 'POST',
@@ -73,17 +97,25 @@ serve(async (req) => {
         })
 
         if (!tokenResponse.ok) {
+          const errorText = await tokenResponse.text()
+          console.error('Token exchange failed:', errorText)
           throw new Error('Failed to exchange authorization code')
         }
 
         const tokens = await tokenResponse.json()
+        console.log('Token exchange successful')
         
         // Get user info
         const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
           headers: { 'Authorization': `Bearer ${tokens.access_token}` }
         })
         
+        if (!userResponse.ok) {
+          throw new Error('Failed to fetch user information')
+        }
+        
         const userInfo = await userResponse.json()
+        console.log('User info retrieved successfully')
         
         result = { 
           accessToken: tokens.access_token,
@@ -95,6 +127,8 @@ serve(async (req) => {
       case 'list_sheets':
         if (!accessToken) throw new Error('Access token required')
         
+        console.log('Fetching Google Sheets list')
+        
         const sheetsResponse = await fetch(
           'https://www.googleapis.com/drive/v3/files?q=mimeType="application/vnd.google-apps.spreadsheet"&fields=files(id,name,webViewLink)',
           {
@@ -103,10 +137,13 @@ serve(async (req) => {
         )
 
         if (!sheetsResponse.ok) {
+          const errorText = await sheetsResponse.text()
+          console.error('Failed to fetch sheets:', errorText)
           throw new Error('Failed to fetch Google Sheets')
         }
 
         const sheetsData = await sheetsResponse.json()
+        console.log(`Found ${sheetsData.files?.length || 0} sheets`)
         result = { sheets: sheetsData.files || [] }
         break
 
@@ -114,6 +151,8 @@ serve(async (req) => {
         if (!accessToken || !spreadsheetId) {
           throw new Error('Access token and spreadsheet ID required')
         }
+        
+        console.log(`Fetching data for spreadsheet: ${spreadsheetId}`)
         
         // Get spreadsheet metadata
         const metadataResponse = await fetch(
@@ -124,11 +163,14 @@ serve(async (req) => {
         )
 
         if (!metadataResponse.ok) {
+          const errorText = await metadataResponse.text()
+          console.error('Failed to fetch metadata:', errorText)
           throw new Error('Failed to fetch spreadsheet metadata')
         }
 
         const metadata = await metadataResponse.json()
         const firstSheet = metadata.sheets?.[0]?.properties?.title || 'Sheet1'
+        console.log(`First sheet name: ${firstSheet}`)
         
         // Get header row to determine columns
         const headerResponse = await fetch(
@@ -139,15 +181,18 @@ serve(async (req) => {
         )
 
         if (!headerResponse.ok) {
+          console.error('Failed to fetch sheet headers')
           throw new Error('Failed to fetch sheet headers')
         }
 
         const headerData = await headerResponse.json()
         const columns = headerData.values?.[0] || []
+        console.log(`Found ${columns.length} columns`)
 
         // Get data if range is specified
         let data = []
         if (range) {
+          console.log(`Fetching data for range: ${range}`)
           const dataResponse = await fetch(
             `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}`,
             {
@@ -158,6 +203,7 @@ serve(async (req) => {
           if (dataResponse.ok) {
             const sheetData = await dataResponse.json()
             data = sheetData.values || []
+            console.log(`Retrieved ${data.length} rows of data`)
           }
         }
 

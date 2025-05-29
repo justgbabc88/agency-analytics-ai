@@ -47,4 +47,4 @@ enabled = false
 verify_jwt = true
 
 [functions.google-oauth]
-verify_jwt = true
+verify_jwt = false
