@@ -37,23 +37,29 @@ export const useGoogleAuth = () => {
     try {
       console.log('Initiating Google OAuth...');
       
+      const requestBody = JSON.stringify({ action: 'get_auth_url' });
+      console.log('Request body:', requestBody);
+
       const { data, error } = await supabase.functions.invoke('google-oauth', {
-        body: { action: 'get_auth_url' },
+        body: requestBody,
         headers: {
           'Content-Type': 'application/json',
         },
       });
 
-      console.log('Auth URL response:', data, error);
+      console.log('Auth URL response:', { data, error });
 
       if (error) {
         console.error('Error getting auth URL:', error);
-        throw error;
+        throw new Error(`Failed to get auth URL: ${error.message || JSON.stringify(error)}`);
       }
 
       if (!data || !data.authUrl) {
+        console.error('No auth URL in response:', data);
         throw new Error('No auth URL received from server');
       }
+
+      console.log('Opening popup with auth URL:', data.authUrl);
 
       // Open OAuth URL in a popup
       const popup = window.open(
@@ -69,6 +75,7 @@ export const useGoogleAuth = () => {
       // Listen for the OAuth callback
       const checkClosed = setInterval(() => {
         if (popup?.closed) {
+          console.log('Popup was closed');
           clearInterval(checkClosed);
           setLoading(false);
         }
@@ -76,17 +83,24 @@ export const useGoogleAuth = () => {
 
       // Listen for messages from the popup
       const messageListener = (event: MessageEvent) => {
-        if (event.origin !== window.location.origin) return;
+        console.log('Received message from popup:', event.data);
+        
+        if (event.origin !== window.location.origin) {
+          console.log('Message from different origin, ignoring');
+          return;
+        }
         
         if (event.data.type === 'GOOGLE_OAUTH_SUCCESS') {
+          console.log('OAuth success, exchanging code:', event.data.code);
           clearInterval(checkClosed);
           popup?.close();
           handleAuthSuccess(event.data.code);
         } else if (event.data.type === 'GOOGLE_OAUTH_ERROR') {
+          console.error('OAuth error from popup:', event.data.error);
           clearInterval(checkClosed);
           popup?.close();
-          console.error('OAuth error:', event.data.error);
           setLoading(false);
+          throw new Error(`OAuth error: ${event.data.error}`);
         }
       };
 
@@ -94,6 +108,7 @@ export const useGoogleAuth = () => {
 
       // Cleanup listener after 5 minutes
       setTimeout(() => {
+        console.log('Cleaning up OAuth popup listener');
         window.removeEventListener('message', messageListener);
         clearInterval(checkClosed);
         if (popup && !popup.closed) popup.close();
@@ -111,24 +126,32 @@ export const useGoogleAuth = () => {
     try {
       console.log('Exchanging code for tokens...');
       
+      const requestBody = JSON.stringify({ 
+        action: 'exchange_code', 
+        code 
+      });
+      console.log('Token exchange request body:', requestBody);
+      
       const { data, error } = await supabase.functions.invoke('google-oauth', {
-        body: { action: 'exchange_code', code },
+        body: requestBody,
         headers: {
           'Content-Type': 'application/json',
         },
       });
 
-      console.log('Token exchange response:', data, error);
+      console.log('Token exchange response:', { data, error });
 
       if (error) {
         console.error('Token exchange error:', error);
-        throw error;
+        throw new Error(`Token exchange failed: ${error.message || JSON.stringify(error)}`);
       }
 
       if (!data || !data.accessToken) {
+        console.error('No access token in response:', data);
         throw new Error('No access token received');
       }
 
+      console.log('Successfully received access token and user info');
       setAccessToken(data.accessToken);
       setUser(data.userInfo);
       setIsConnected(true);
@@ -150,6 +173,7 @@ export const useGoogleAuth = () => {
   };
 
   const disconnect = () => {
+    console.log('Disconnecting Google account');
     setIsConnected(false);
     setUser(null);
     setAccessToken(null);
@@ -165,43 +189,60 @@ export const useGoogleAuth = () => {
 
     const { data: { session } } = await supabase.auth.getSession();
     
+    const requestBody = JSON.stringify({ 
+      action: 'list_sheets', 
+      accessToken 
+    });
+    console.log('List sheets request body:', requestBody);
+    
     const { data, error } = await supabase.functions.invoke('google-oauth', {
-      body: { action: 'list_sheets', accessToken },
+      body: requestBody,
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session?.access_token}`,
       },
     });
 
-    console.log('Sheets list response:', data, error);
+    console.log('Sheets list response:', { data, error });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error fetching sheets:', error);
+      throw new Error(`Failed to fetch sheets: ${error.message || JSON.stringify(error)}`);
+    }
+    
     return data.sheets;
   };
 
   const getSheetData = async (spreadsheetId: string, range?: string) => {
     if (!accessToken) throw new Error('Not authenticated');
 
-    console.log('Fetching sheet data...');
+    console.log('Fetching sheet data for:', spreadsheetId, 'range:', range);
 
     const { data: { session } } = await supabase.auth.getSession();
 
+    const requestBody = JSON.stringify({ 
+      action: 'get_sheet_data', 
+      accessToken, 
+      spreadsheetId, 
+      range 
+    });
+    console.log('Get sheet data request body:', requestBody);
+
     const { data, error } = await supabase.functions.invoke('google-oauth', {
-      body: { 
-        action: 'get_sheet_data', 
-        accessToken, 
-        spreadsheetId, 
-        range 
-      },
+      body: requestBody,
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session?.access_token}`,
       },
     });
 
-    console.log('Sheet data response:', data, error);
+    console.log('Sheet data response:', { data, error });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error fetching sheet data:', error);
+      throw new Error(`Failed to fetch sheet data: ${error.message || JSON.stringify(error)}`);
+    }
+    
     return data;
   };
 
