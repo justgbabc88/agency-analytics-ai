@@ -21,22 +21,48 @@ serve(async (req) => {
   }
 
   try {
-    // Handle request body parsing more flexibly
     let requestData: OAuthRequest
 
-    try {
-      const text = await req.text()
-      console.log('Raw request body:', text)
-      
-      if (!text || text.trim() === '') {
-        throw new Error('Request body is empty')
+    // Handle different request methods and body parsing
+    if (req.method === 'GET') {
+      // Handle GET requests with URL parameters
+      const url = new URL(req.url)
+      const action = url.searchParams.get('action')
+      if (!action) {
+        throw new Error('Action parameter is required')
       }
-      
-      requestData = JSON.parse(text)
-      console.log('Parsed request data:', requestData)
-    } catch (parseError) {
-      console.error('Failed to parse request body:', parseError)
-      throw new Error('Invalid JSON in request body')
+      requestData = { 
+        action: action as OAuthRequest['action'],
+        code: url.searchParams.get('code') || undefined,
+        accessToken: url.searchParams.get('accessToken') || undefined,
+        spreadsheetId: url.searchParams.get('spreadsheetId') || undefined,
+        range: url.searchParams.get('range') || undefined
+      }
+      console.log('GET request data:', requestData)
+    } else {
+      // Handle POST requests with JSON body
+      try {
+        const text = await req.text()
+        console.log('Raw request body:', text)
+        
+        if (!text || text.trim() === '') {
+          // If no body, try to get action from URL params as fallback
+          const url = new URL(req.url)
+          const action = url.searchParams.get('action')
+          if (action) {
+            requestData = { action: action as OAuthRequest['action'] }
+            console.log('Using URL params as fallback:', requestData)
+          } else {
+            throw new Error('Request body is empty and no action in URL params')
+          }
+        } else {
+          requestData = JSON.parse(text)
+          console.log('Parsed request data:', requestData)
+        }
+      } catch (parseError) {
+        console.error('Failed to parse request body:', parseError)
+        throw new Error('Invalid JSON in request body')
+      }
     }
 
     const { action, code, accessToken, spreadsheetId, range } = requestData

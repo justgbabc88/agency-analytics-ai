@@ -35,11 +35,25 @@ export const useGoogleAuth = () => {
   const initiateAuth = async () => {
     setLoading(true);
     try {
+      console.log('Initiating Google OAuth...');
+      
       const { data, error } = await supabase.functions.invoke('google-oauth', {
-        body: { action: 'get_auth_url' }
+        body: JSON.stringify({ action: 'get_auth_url' }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
 
-      if (error) throw error;
+      console.log('Auth URL response:', data, error);
+
+      if (error) {
+        console.error('Error getting auth URL:', error);
+        throw error;
+      }
+
+      if (!data || !data.authUrl) {
+        throw new Error('No auth URL received from server');
+      }
 
       // Open OAuth URL in a popup
       const popup = window.open(
@@ -47,6 +61,10 @@ export const useGoogleAuth = () => {
         'google-oauth',
         'width=500,height=600,scrollbars=yes,resizable=yes'
       );
+
+      if (!popup) {
+        throw new Error('Popup blocked. Please allow popups for this site.');
+      }
 
       // Listen for the OAuth callback
       const checkClosed = setInterval(() => {
@@ -64,6 +82,11 @@ export const useGoogleAuth = () => {
           clearInterval(checkClosed);
           popup?.close();
           handleAuthSuccess(event.data.code);
+        } else if (event.data.type === 'GOOGLE_OAUTH_ERROR') {
+          clearInterval(checkClosed);
+          popup?.close();
+          console.error('OAuth error:', event.data.error);
+          setLoading(false);
         }
       };
 
@@ -80,16 +103,31 @@ export const useGoogleAuth = () => {
     } catch (error) {
       console.error('Failed to initiate Google auth:', error);
       setLoading(false);
+      throw error;
     }
   };
 
   const handleAuthSuccess = async (code: string) => {
     try {
+      console.log('Exchanging code for tokens...');
+      
       const { data, error } = await supabase.functions.invoke('google-oauth', {
-        body: { action: 'exchange_code', code }
+        body: JSON.stringify({ action: 'exchange_code', code }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
 
-      if (error) throw error;
+      console.log('Token exchange response:', data, error);
+
+      if (error) {
+        console.error('Token exchange error:', error);
+        throw error;
+      }
+
+      if (!data || !data.accessToken) {
+        throw new Error('No access token received');
+      }
 
       setAccessToken(data.accessToken);
       setUser(data.userInfo);
@@ -105,6 +143,7 @@ export const useGoogleAuth = () => {
 
     } catch (error) {
       console.error('Failed to exchange auth code:', error);
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -122,9 +161,19 @@ export const useGoogleAuth = () => {
   const listSheets = async (): Promise<GoogleSheet[]> => {
     if (!accessToken) throw new Error('Not authenticated');
 
+    console.log('Fetching sheets list...');
+
+    const { data: { session } } = await supabase.auth.getSession();
+    
     const { data, error } = await supabase.functions.invoke('google-oauth', {
-      body: { action: 'list_sheets', accessToken }
+      body: JSON.stringify({ action: 'list_sheets', accessToken }),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token}`,
+      },
     });
+
+    console.log('Sheets list response:', data, error);
 
     if (error) throw error;
     return data.sheets;
@@ -133,14 +182,24 @@ export const useGoogleAuth = () => {
   const getSheetData = async (spreadsheetId: string, range?: string) => {
     if (!accessToken) throw new Error('Not authenticated');
 
+    console.log('Fetching sheet data...');
+
+    const { data: { session } } = await supabase.auth.getSession();
+
     const { data, error } = await supabase.functions.invoke('google-oauth', {
-      body: { 
+      body: JSON.stringify({ 
         action: 'get_sheet_data', 
         accessToken, 
         spreadsheetId, 
         range 
-      }
+      }),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token}`,
+      },
     });
+
+    console.log('Sheet data response:', data, error);
 
     if (error) throw error;
     return data;
