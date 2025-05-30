@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { MetricCard } from "./MetricCard";
@@ -30,7 +29,7 @@ export const LowTicketFunnel = ({ dateRange }: LowTicketFunnelProps) => {
     downsell2: false
   });
 
-  const { syncedData, calculateMetricsFromSyncedData } = useGoogleSheetsData();
+  const { syncedData } = useGoogleSheetsData();
 
   // Get filtered metrics from Google Sheets data
   const getFilteredMetrics = () => {
@@ -40,16 +39,12 @@ export const LowTicketFunnel = ({ dateRange }: LowTicketFunnelProps) => {
     let filteredData = syncedData;
     if (dateRange) {
       const filtered = syncedData.data.filter(row => {
-        const dateField = Object.keys(row).find(key => 
-          key.toLowerCase().includes('date') || 
-          key.toLowerCase().includes('day') ||
-          key.toLowerCase().includes('time')
-        );
+        const dateField = row['Date'] || row['date'];
         
-        if (!dateField || !row[dateField]) return true;
+        if (!dateField) return true;
         
         try {
-          const rowDate = new Date(row[dateField]);
+          const rowDate = new Date(dateField);
           if (!isNaN(rowDate.getTime())) {
             return rowDate >= dateRange.from && rowDate <= dateRange.to;
           }
@@ -67,7 +62,7 @@ export const LowTicketFunnel = ({ dateRange }: LowTicketFunnelProps) => {
 
     const data = filteredData.data;
     
-    // Calculate totals from Google Sheets data
+    // Calculate totals from Google Sheets data using actual column names
     const totals = {
       pageViews: 0,
       optins: 0,
@@ -86,20 +81,23 @@ export const LowTicketFunnel = ({ dateRange }: LowTicketFunnelProps) => {
     };
 
     data.forEach(row => {
-      totals.pageViews += parseInt(row.page_views?.replace(/[^\d]/g, '') || '0') || 0;
-      totals.optins += parseInt(row.optins?.replace(/[^\d]/g, '') || '0') || 0;
-      totals.mainOfferBuyers += parseInt(row.main_offer_buyers?.replace(/[^\d]/g, '') || '0') || 0;
-      totals.bumpProductBuyers += parseInt(row.bump_product_buyers?.replace(/[^\d]/g, '') || '0') || 0;
-      totals.upsell1Buyers += parseInt(row.upsell_1_buyers?.replace(/[^\d]/g, '') || '0') || 0;
-      totals.downsell1Buyers += parseInt(row.downsell_1_buyers?.replace(/[^\d]/g, '') || '0') || 0;
-      totals.upsell2Buyers += parseInt(row.upsell_2_buyers?.replace(/[^\d]/g, '') || '0') || 0;
-      totals.downsell2Buyers += parseInt(row.downsell_2_buyers?.replace(/[^\d]/g, '') || '0') || 0;
-      totals.spend += parseFloat(row.spend?.replace(/[$,]/g, '') || '0') || 0;
-      totals.roas += parseFloat(row.roas?.replace(/[^\d.]/g, '') || '0') || 0;
-      totals.ctrAll += parseFloat(row.ctr_all?.replace(/[%]/g, '') || '0') || 0;
-      totals.ctrLink += parseFloat(row.ctr_link?.replace(/[%]/g, '') || '0') || 0;
-      totals.cpm += parseFloat(row.cpm?.replace(/[$,]/g, '') || '0') || 0;
-      totals.frequency += parseFloat(row.frequency?.replace(/[^\d.]/g, '') || '0') || 0;
+      // Map Google Sheets column names to our metrics
+      totals.pageViews += parseInt(row['Page Views']?.toString().replace(/[^\d]/g, '') || '0') || 0;
+      totals.optins += parseInt(row['Opt-Ins']?.toString().replace(/[^\d]/g, '') || '0') || 0;
+      totals.mainOfferBuyers += parseInt(row['Main Offer']?.toString().replace(/[^\d]/g, '') || '0') || 0;
+      totals.bumpProductBuyers += parseInt(row['Bump']?.toString().replace(/[^\d]/g, '') || '0') || 0;
+      totals.upsell1Buyers += parseInt(row['Upsell 1']?.toString().replace(/[^\d]/g, '') || '0') || 0;
+      totals.downsell1Buyers += parseInt(row['Downsell 1']?.toString().replace(/[^\d]/g, '') || '0') || 0;
+      totals.upsell2Buyers += parseInt(row['Upsell 2']?.toString().replace(/[^\d]/g, '') || '0') || 0;
+      totals.downsell2Buyers += parseInt(row['Downsell 2']?.toString().replace(/[^\d]/g, '') || '0') || 0;
+      totals.roas += parseFloat(row['ROAS']?.toString().replace(/[^\d.]/g, '') || '0') || 0;
+      
+      // These fields might come from Facebook data later
+      totals.spend += parseFloat(row['Spend']?.toString().replace(/[$,]/g, '') || '0') || 0;
+      totals.ctrAll += parseFloat(row['CTR All']?.toString().replace(/[%]/g, '') || '0') || 0;
+      totals.ctrLink += parseFloat(row['CTR Link']?.toString().replace(/[%]/g, '') || '0') || 0;
+      totals.cpm += parseFloat(row['CPM']?.toString().replace(/[$,]/g, '') || '0') || 0;
+      totals.frequency += parseFloat(row['Frequency']?.toString().replace(/[^\d.]/g, '') || '0') || 0;
     });
 
     // Calculate averages for percentage-based metrics
@@ -122,16 +120,12 @@ export const LowTicketFunnel = ({ dateRange }: LowTicketFunnelProps) => {
     let data = syncedData.data;
     if (dateRange) {
       data = data.filter(row => {
-        const dateField = Object.keys(row).find(key => 
-          key.toLowerCase().includes('date') || 
-          key.toLowerCase().includes('day') ||
-          key.toLowerCase().includes('time')
-        );
+        const dateField = row['Date'] || row['date'];
         
-        if (!dateField || !row[dateField]) return true;
+        if (!dateField) return true;
         
         try {
-          const rowDate = new Date(row[dateField]);
+          const rowDate = new Date(dateField);
           if (!isNaN(rowDate.getTime())) {
             return rowDate >= dateRange.from && rowDate <= dateRange.to;
           }
@@ -143,30 +137,24 @@ export const LowTicketFunnel = ({ dateRange }: LowTicketFunnelProps) => {
     }
 
     return data.map((row, index) => {
-      const dateField = Object.keys(row).find(key => 
-        key.toLowerCase().includes('date') || 
-        key.toLowerCase().includes('day') ||
-        key.toLowerCase().includes('time')
-      );
-      
-      const date = dateField ? row[dateField] : `Day ${index + 1}`;
+      const date = row['Date'] || row['date'] || `Day ${index + 1}`;
       
       return {
         date: date,
-        pageViews: parseInt(row.page_views?.replace(/[^\d]/g, '') || '0') || 0,
-        optins: parseInt(row.optins?.replace(/[^\d]/g, '') || '0') || 0,
-        mainOfferBuyers: parseInt(row.main_offer_buyers?.replace(/[^\d]/g, '') || '0') || 0,
-        bumpProductBuyers: parseInt(row.bump_product_buyers?.replace(/[^\d]/g, '') || '0') || 0,
-        upsell1Buyers: parseInt(row.upsell_1_buyers?.replace(/[^\d]/g, '') || '0') || 0,
-        downsell1Buyers: parseInt(row.downsell_1_buyers?.replace(/[^\d]/g, '') || '0') || 0,
-        upsell2Buyers: parseInt(row.upsell_2_buyers?.replace(/[^\d]/g, '') || '0') || 0,
-        downsell2Buyers: parseInt(row.downsell_2_buyers?.replace(/[^\d]/g, '') || '0') || 0,
-        roas: parseFloat(row.roas?.replace(/[^\d.]/g, '') || '0') || 0,
-        spend: parseFloat(row.spend?.replace(/[$,]/g, '') || '0') || 0,
-        ctrAll: parseFloat(row.ctr_all?.replace(/[%]/g, '') || '0') || 0,
-        ctrLink: parseFloat(row.ctr_link?.replace(/[%]/g, '') || '0') || 0,
-        cpm: parseFloat(row.cpm?.replace(/[$,]/g, '') || '0') || 0,
-        frequency: parseFloat(row.frequency?.replace(/[^\d.]/g, '') || '0') || 0
+        pageViews: parseInt(row['Page Views']?.toString().replace(/[^\d]/g, '') || '0') || 0,
+        optins: parseInt(row['Opt-Ins']?.toString().replace(/[^\d]/g, '') || '0') || 0,
+        mainOfferBuyers: parseInt(row['Main Offer']?.toString().replace(/[^\d]/g, '') || '0') || 0,
+        bumpProductBuyers: parseInt(row['Bump']?.toString().replace(/[^\d]/g, '') || '0') || 0,
+        upsell1Buyers: parseInt(row['Upsell 1']?.toString().replace(/[^\d]/g, '') || '0') || 0,
+        downsell1Buyers: parseInt(row['Downsell 1']?.toString().replace(/[^\d]/g, '') || '0') || 0,
+        upsell2Buyers: parseInt(row['Upsell 2']?.toString().replace(/[^\d]/g, '') || '0') || 0,
+        downsell2Buyers: parseInt(row['Downsell 2']?.toString().replace(/[^\d]/g, '') || '0') || 0,
+        roas: parseFloat(row['ROAS']?.toString().replace(/[^\d.]/g, '') || '0') || 0,
+        spend: parseFloat(row['Spend']?.toString().replace(/[$,]/g, '') || '0') || 0,
+        ctrAll: parseFloat(row['CTR All']?.toString().replace(/[%]/g, '') || '0') || 0,
+        ctrLink: parseFloat(row['CTR Link']?.toString().replace(/[%]/g, '') || '0') || 0,
+        cpm: parseFloat(row['CPM']?.toString().replace(/[$,]/g, '') || '0') || 0,
+        frequency: parseFloat(row['Frequency']?.toString().replace(/[^\d.]/g, '') || '0') || 0
       };
     }).slice(0, 30);
   };
