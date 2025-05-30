@@ -1,6 +1,13 @@
 
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
+interface FunnelProductConfig {
+  id: string;
+  label: string;
+  visible: boolean;
+  color: string;
+}
+
 interface ConversionChartProps {
   data: Array<{
     date: string;
@@ -16,31 +23,93 @@ interface ConversionChartProps {
   }>;
   title: string;
   metrics: string[];
+  productConfig?: Record<string, FunnelProductConfig>;
 }
 
-export const ConversionChart = ({ data, title, metrics }: ConversionChartProps) => {
-  const colors = {
+export const ConversionChart = ({ data, title, metrics, productConfig }: ConversionChartProps) => {
+  const defaultColors = {
+    pageViews: '#6B7280',
+    optins: '#8B5CF6',
+    mainOfferBuyers: '#10B981',
+    roas: '#F59E0B',
     conversionRate: '#3B82F6',
-    roas: '#10B981', 
-    pageViews: '#F59E0B',
     revenue: '#8B5CF6',
     cost: '#EF4444',
     impressions: '#06B6D4',
     clicks: '#84CC16',
-    conversions: '#F97316'
+    conversions: '#F97316',
+    spend: '#EF4444',
+    ctrAll: '#3B82F6',
+    ctrLink: '#10B981',
+    cpm: '#F59E0B',
+    frequency: '#8B5CF6',
+    optinRate: '#8B5CF6',
+    mainOfferRate: '#10B981'
+  };
+
+  const getMetricColor = (metric: string) => {
+    // Check if it's a product-specific metric and we have product config
+    if (productConfig) {
+      if (metric === 'bumpProductBuyers' || metric === 'bumpRate') {
+        return productConfig.bump?.color || defaultColors.bumpProductBuyers || '#3B82F6';
+      }
+      if (metric === 'upsell1Buyers' || metric === 'upsell1Rate') {
+        return productConfig.upsell1?.color || defaultColors.upsell1Buyers || '#F59E0B';
+      }
+      if (metric === 'downsell1Buyers' || metric === 'downsell1Rate') {
+        return productConfig.downsell1?.color || defaultColors.downsell1Buyers || '#8B5CF6';
+      }
+      if (metric === 'upsell2Buyers' || metric === 'upsell2Rate') {
+        return productConfig.upsell2?.color || defaultColors.upsell2Buyers || '#EF4444';
+      }
+      if (metric === 'downsell2Buyers' || metric === 'downsell2Rate') {
+        return productConfig.downsell2?.color || defaultColors.downsell2Buyers || '#06B6D4';
+      }
+    }
+    
+    // Default colors for other metrics
+    return defaultColors[metric as keyof typeof defaultColors] || '#6B7280';
   };
 
   const formatTooltipValue = (value: number, name: string) => {
     if (name.includes('Rate') || name.includes('CTR')) {
       return `${value.toFixed(2)}%`;
     }
-    if (name.includes('Revenue') || name.includes('Cost') || name.includes('CPC')) {
+    if (name.includes('Revenue') || name.includes('Cost') || name.includes('CPC') || name.includes('Spend') || name.includes('CPM')) {
       return `$${value.toLocaleString()}`;
     }
     if (name.includes('ROAS')) {
       return value.toFixed(2);
     }
     return value.toLocaleString();
+  };
+
+  const formatMetricName = (metric: string) => {
+    const nameMap = {
+      pageViews: 'Page Views',
+      optins: 'Opt-ins',
+      mainOfferBuyers: 'Main Offer Buyers',
+      bumpProductBuyers: 'Bump Product Buyers',
+      upsell1Buyers: 'Upsell 1 Buyers',
+      downsell1Buyers: 'Downsell 1 Buyers',
+      upsell2Buyers: 'Upsell 2 Buyers',
+      downsell2Buyers: 'Downsell 2 Buyers',
+      roas: 'ROAS',
+      optinRate: 'Opt-in Rate',
+      mainOfferRate: 'Main Offer Rate',
+      bumpRate: 'Bump Rate',
+      upsell1Rate: 'Upsell 1 Rate',
+      downsell1Rate: 'Downsell 1 Rate',
+      upsell2Rate: 'Upsell 2 Rate',
+      downsell2Rate: 'Downsell 2 Rate',
+      spend: 'Spend',
+      ctrAll: 'CTR (All)',
+      ctrLink: 'CTR (Link)',
+      cpm: 'CPM',
+      frequency: 'Frequency'
+    };
+
+    return nameMap[metric as keyof typeof nameMap] || metric.charAt(0).toUpperCase() + metric.slice(1).replace(/([A-Z])/g, ' $1');
   };
 
   return (
@@ -70,10 +139,10 @@ export const ConversionChart = ({ data, title, metrics }: ConversionChartProps) 
                 key={metric}
                 type="monotone" 
                 dataKey={metric} 
-                stroke={colors[metric as keyof typeof colors] || '#6B7280'}
+                stroke={getMetricColor(metric)}
                 strokeWidth={2}
-                dot={{ fill: colors[metric as keyof typeof colors] || '#6B7280', strokeWidth: 2, r: 4 }}
-                name={metric.charAt(0).toUpperCase() + metric.slice(1).replace(/([A-Z])/g, ' $1')}
+                dot={{ fill: getMetricColor(metric), strokeWidth: 2, r: 4 }}
+                name={formatMetricName(metric)}
               />
             )
           ))}
