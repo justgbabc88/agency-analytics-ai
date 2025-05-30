@@ -20,10 +20,17 @@ interface FieldMapping {
   dashboardField: string;
 }
 
+interface SheetInfo {
+  title: string;
+  sheetId: number;
+}
+
 export const GoogleSheetsConnector = () => {
   const [sheets, setSheets] = useState<GoogleSheet[]>([]);
   const [selectedSheet, setSelectedSheet] = useState<string>("");
   const [sheetColumns, setSheetColumns] = useState<string[]>([]);
+  const [availableSheets, setAvailableSheets] = useState<SheetInfo[]>([]);
+  const [selectedSubSheet, setSelectedSubSheet] = useState<string>("");
   const [fieldMappings, setFieldMappings] = useState<FieldMapping[]>([]);
   const [loadingSheets, setLoadingSheets] = useState(false);
   const { toast } = useToast();
@@ -73,6 +80,12 @@ export const GoogleSheetsConnector = () => {
     try {
       const sheetData = await getSheetData(selectedSheet);
       setSheetColumns(sheetData.columns || []);
+      setAvailableSheets(sheetData.sheets || []);
+      
+      // Auto-select the first sheet if available
+      if (sheetData.sheets && sheetData.sheets.length > 0) {
+        setSelectedSubSheet(sheetData.sheets[0].title);
+      }
     } catch (error) {
       console.error('Failed to load sheet columns:', error);
       toast({
@@ -114,6 +127,8 @@ export const GoogleSheetsConnector = () => {
     setSelectedSheet("");
     setSheetColumns([]);
     setFieldMappings([]);
+    setAvailableSheets([]);
+    setSelectedSubSheet("");
     toast({
       title: "Google Account Disconnected",
       description: "Your Google account has been disconnected.",
@@ -142,19 +157,21 @@ export const GoogleSheetsConnector = () => {
   };
 
   const handleSyncData = async () => {
-    if (!selectedSheet || fieldMappings.length === 0) {
+    if (!selectedSheet || !selectedSubSheet || fieldMappings.length === 0) {
       toast({
         title: "Configuration Required",
-        description: "Please select a sheet and configure field mappings.",
+        description: "Please select a sheet, sub-sheet, and configure field mappings.",
         variant: "destructive",
       });
       return;
     }
 
     try {
-      // Get the complete range for the selected sheet
-      const selectedSheetName = sheets.find(s => s.id === selectedSheet)?.name || 'Sheet1';
-      const sheetData = await getSheetData(selectedSheet, `${selectedSheetName}!A:Z`);
+      // Use the selected sub-sheet name with proper range
+      const range = `${selectedSubSheet}!A:Z`;
+      console.log('Syncing with range:', range);
+      
+      const sheetData = await getSheetData(selectedSheet, range);
       
       // Process and sync the data based on field mappings
       console.log('Syncing data:', sheetData);
@@ -240,13 +257,35 @@ export const GoogleSheetsConnector = () => {
                   </SelectContent>
                 </Select>
               </div>
+              
+              {availableSheets.length > 0 && (
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Select Sheet Tab</label>
+                  <Select 
+                    value={selectedSubSheet} 
+                    onValueChange={setSelectedSubSheet}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a sheet tab" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableSheets.map(sheet => (
+                        <SelectItem key={sheet.sheetId} value={sheet.title}>
+                          {sheet.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              
               {sheets.length === 0 && !loadingSheets && (
                 <p className="text-sm text-gray-500">No spreadsheets found in your Google Drive.</p>
               )}
             </CardContent>
           </Card>
 
-          {selectedSheet && (
+          {selectedSheet && selectedSubSheet && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
