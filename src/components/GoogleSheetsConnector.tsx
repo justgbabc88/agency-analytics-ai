@@ -126,16 +126,21 @@ export const GoogleSheetsConnector = () => {
   };
 
   const dashboardFields = [
-    "campaign_name",
-    "impressions",
-    "clicks",
-    "cost",
-    "conversions",
-    "revenue",
-    "date",
-    "ctr",
-    "cpc",
-    "roas"
+    "page_views",
+    "optins", 
+    "main_offer_buyers",
+    "bump_product_buyers",
+    "upsell_1_buyers",
+    "downsell_1_buyers", 
+    "upsell_2_buyers",
+    "downsell_2_buyers",
+    "roas",
+    "spend",
+    "ctr_all",
+    "ctr_link", 
+    "cpm",
+    "frequency",
+    "date"
   ];
 
   const handleGoogleConnect = async () => {
