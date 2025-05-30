@@ -1,7 +1,7 @@
 
 import React, { useState } from "react";
 import { CalendarIcon } from "lucide-react";
-import { format, subDays, subWeeks, subMonths, startOfWeek, startOfMonth, startOfYear } from "date-fns";
+import { format, subDays, subWeeks, subMonths, startOfWeek, startOfMonth, startOfYear, startOfDay, endOfDay } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -18,23 +18,23 @@ interface AdvancedDateRangePickerProps {
 }
 
 const datePresets = [
-  { label: "Today", value: "today", getDates: () => ({ from: new Date(), to: new Date() }) },
-  { label: "Yesterday", value: "yesterday", getDates: () => ({ from: subDays(new Date(), 1), to: subDays(new Date(), 1) }) },
-  { label: "Last 7 days", value: "7days", getDates: () => ({ from: subDays(new Date(), 6), to: new Date() }) },
-  { label: "Last 14 days", value: "14days", getDates: () => ({ from: subDays(new Date(), 13), to: new Date() }) },
-  { label: "Last 30 days", value: "30days", getDates: () => ({ from: subDays(new Date(), 29), to: new Date() }) },
-  { label: "This week", value: "thisweek", getDates: () => ({ from: startOfWeek(new Date()), to: new Date() }) },
-  { label: "Last week", value: "lastweek", getDates: () => ({ from: startOfWeek(subWeeks(new Date(), 1)), to: subDays(startOfWeek(new Date()), 1) }) },
-  { label: "This month", value: "thismonth", getDates: () => ({ from: startOfMonth(new Date()), to: new Date() }) },
-  { label: "Last month", value: "lastmonth", getDates: () => ({ from: startOfMonth(subMonths(new Date(), 1)), to: subDays(startOfMonth(new Date()), 1) }) },
-  { label: "This year", value: "thisyear", getDates: () => ({ from: startOfYear(new Date()), to: new Date() }) },
-  { label: "Custom", value: "custom", getDates: () => ({ from: subDays(new Date(), 30), to: new Date() }) },
+  { label: "Today", value: "today", getDates: () => ({ from: startOfDay(new Date()), to: endOfDay(new Date()) }) },
+  { label: "Yesterday", value: "yesterday", getDates: () => ({ from: startOfDay(subDays(new Date(), 1)), to: endOfDay(subDays(new Date(), 1)) }) },
+  { label: "Last 7 days", value: "7days", getDates: () => ({ from: startOfDay(subDays(new Date(), 6)), to: endOfDay(new Date()) }) },
+  { label: "Last 14 days", value: "14days", getDates: () => ({ from: startOfDay(subDays(new Date(), 13)), to: endOfDay(new Date()) }) },
+  { label: "Last 30 days", value: "30days", getDates: () => ({ from: startOfDay(subDays(new Date(), 29)), to: endOfDay(new Date()) }) },
+  { label: "This week", value: "thisweek", getDates: () => ({ from: startOfWeek(new Date()), to: endOfDay(new Date()) }) },
+  { label: "Last week", value: "lastweek", getDates: () => ({ from: startOfWeek(subWeeks(new Date(), 1)), to: endOfDay(subDays(startOfWeek(new Date()), 1)) }) },
+  { label: "This month", value: "thismonth", getDates: () => ({ from: startOfMonth(new Date()), to: endOfDay(new Date()) }) },
+  { label: "Last month", value: "lastmonth", getDates: () => ({ from: startOfMonth(subMonths(new Date(), 1)), to: endOfDay(subDays(startOfMonth(new Date()), 1)) }) },
+  { label: "This year", value: "thisyear", getDates: () => ({ from: startOfYear(new Date()), to: endOfDay(new Date()) }) },
+  { label: "Custom", value: "custom", getDates: () => ({ from: startOfDay(subDays(new Date(), 30)), to: endOfDay(new Date()) }) },
 ];
 
 export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDateRangePickerProps) => {
   const [dateRange, setDateRange] = useState({
-    from: subDays(new Date(), 30),
-    to: new Date()
+    from: startOfDay(subDays(new Date(), 30)),
+    to: endOfDay(new Date())
   });
   const [selectedPreset, setSelectedPreset] = useState("30days");
   const [isCustom, setIsCustom] = useState(false);
@@ -55,8 +55,16 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
     }
   };
 
-  const handleCustomDateChange = (from: Date | undefined, to: Date | undefined) => {
-    if (from && to) {
+  const handleCustomDateChange = (range: any) => {
+    if (range?.from && range?.to) {
+      const from = startOfDay(range.from);
+      const to = endOfDay(range.to);
+      setDateRange({ from, to });
+      onDateChange(from, to);
+    } else if (range?.from && !range?.to) {
+      // Single date selected, set both from and to to the same date
+      const from = startOfDay(range.from);
+      const to = endOfDay(range.from);
       setDateRange({ from, to });
       onDateChange(from, to);
     }
@@ -112,11 +120,9 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
                   from: dateRange?.from,
                   to: dateRange?.to,
                 }}
-                onSelect={(range) => {
-                  handleCustomDateChange(range?.from, range?.to);
-                }}
+                onSelect={handleCustomDateChange}
                 numberOfMonths={2}
-                className="p-3"
+                className="p-3 pointer-events-auto"
               />
             </PopoverContent>
           </Popover>
