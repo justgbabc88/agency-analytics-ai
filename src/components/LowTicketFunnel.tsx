@@ -5,70 +5,16 @@ import { MetricCard } from "./MetricCard";
 import { ConversionChart } from "./ConversionChart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChevronDown, ChevronUp, TrendingUp, MousePointer } from "lucide-react";
+import { useGoogleSheetsData } from "@/hooks/useGoogleSheetsData";
 
-const generateSampleData = () => {
-  const dates = [];
-  for (let i = 29; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
-    dates.push({
-      date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      pageViews: Math.floor(Math.random() * 1000) + 800,
-      optins: Math.floor(Math.random() * 300) + 200,
-      mainOfferBuyers: Math.floor(Math.random() * 80) + 40,
-      bumpProductBuyers: Math.floor(Math.random() * 20) + 10,
-      upsell1Buyers: Math.floor(Math.random() * 15) + 8,
-      downsell1Buyers: Math.floor(Math.random() * 12) + 6,
-      upsell2Buyers: Math.floor(Math.random() * 8) + 4,
-      downsell2Buyers: Math.floor(Math.random() * 6) + 3,
-      roas: Math.random() * 2 + 2,
-      spend: Math.floor(Math.random() * 500) + 300,
-      ctrAll: Math.random() * 3 + 1,
-      ctrLink: Math.random() * 2 + 0.5,
-      cpm: Math.random() * 10 + 5,
-      frequency: Math.random() * 2 + 1
-    });
-  }
-  return dates;
-};
+interface LowTicketFunnelProps {
+  dateRange?: {
+    from: Date;
+    to: Date;
+  };
+}
 
-// Sample data for current metrics
-const sampleMetrics = {
-  pageViews: 15420,
-  optins: 4850,
-  mainOfferBuyers: 1312,
-  bumpProductBuyers: 198,
-  upsell1Buyers: 145,
-  downsell1Buyers: 87,
-  upsell2Buyers: 52,
-  downsell2Buyers: 34,
-  roas: 3.2,
-  spend: 4850,
-  ctrAll: 2.4,
-  ctrLink: 1.8,
-  cpm: 8.5,
-  frequency: 1.6
-};
-
-// Previous period metrics for comparison
-const previousMetrics = {
-  pageViews: 14850,
-  optins: 4620,
-  mainOfferBuyers: 1156,
-  bumpProductBuyers: 175,
-  upsell1Buyers: 128,
-  downsell1Buyers: 78,
-  upsell2Buyers: 45,
-  downsell2Buyers: 29,
-  roas: 2.9,
-  spend: 5200,
-  ctrAll: 2.1,
-  ctrLink: 1.6,
-  cpm: 9.2,
-  frequency: 1.7
-};
-
-export const LowTicketFunnel = () => {
+export const LowTicketFunnel = ({ dateRange }: LowTicketFunnelProps) => {
   const [expandedSections, setExpandedSections] = useState({
     funnelMetrics: true,
     adMetrics: true,
@@ -84,7 +30,148 @@ export const LowTicketFunnel = () => {
     downsell2: false
   });
 
-  const chartData = generateSampleData();
+  const { syncedData, calculateMetricsFromSyncedData } = useGoogleSheetsData();
+
+  // Get filtered metrics from Google Sheets data
+  const getFilteredMetrics = () => {
+    if (!syncedData) return null;
+
+    // Filter data by date range if provided
+    let filteredData = syncedData;
+    if (dateRange) {
+      const filtered = syncedData.data.filter(row => {
+        const dateField = Object.keys(row).find(key => 
+          key.toLowerCase().includes('date') || 
+          key.toLowerCase().includes('day') ||
+          key.toLowerCase().includes('time')
+        );
+        
+        if (!dateField || !row[dateField]) return true;
+        
+        try {
+          const rowDate = new Date(row[dateField]);
+          if (!isNaN(rowDate.getTime())) {
+            return rowDate >= dateRange.from && rowDate <= dateRange.to;
+          }
+        } catch (error) {
+          return true;
+        }
+        return true;
+      });
+
+      filteredData = {
+        ...syncedData,
+        data: filtered
+      };
+    }
+
+    const data = filteredData.data;
+    
+    // Calculate totals from Google Sheets data
+    const totals = {
+      pageViews: 0,
+      optins: 0,
+      mainOfferBuyers: 0,
+      bumpProductBuyers: 0,
+      upsell1Buyers: 0,
+      downsell1Buyers: 0,
+      upsell2Buyers: 0,
+      downsell2Buyers: 0,
+      roas: 0,
+      spend: 0,
+      ctrAll: 0,
+      ctrLink: 0,
+      cpm: 0,
+      frequency: 0
+    };
+
+    data.forEach(row => {
+      totals.pageViews += parseInt(row.page_views?.replace(/[^\d]/g, '') || '0') || 0;
+      totals.optins += parseInt(row.optins?.replace(/[^\d]/g, '') || '0') || 0;
+      totals.mainOfferBuyers += parseInt(row.main_offer_buyers?.replace(/[^\d]/g, '') || '0') || 0;
+      totals.bumpProductBuyers += parseInt(row.bump_product_buyers?.replace(/[^\d]/g, '') || '0') || 0;
+      totals.upsell1Buyers += parseInt(row.upsell_1_buyers?.replace(/[^\d]/g, '') || '0') || 0;
+      totals.downsell1Buyers += parseInt(row.downsell_1_buyers?.replace(/[^\d]/g, '') || '0') || 0;
+      totals.upsell2Buyers += parseInt(row.upsell_2_buyers?.replace(/[^\d]/g, '') || '0') || 0;
+      totals.downsell2Buyers += parseInt(row.downsell_2_buyers?.replace(/[^\d]/g, '') || '0') || 0;
+      totals.spend += parseFloat(row.spend?.replace(/[$,]/g, '') || '0') || 0;
+      totals.roas += parseFloat(row.roas?.replace(/[^\d.]/g, '') || '0') || 0;
+      totals.ctrAll += parseFloat(row.ctr_all?.replace(/[%]/g, '') || '0') || 0;
+      totals.ctrLink += parseFloat(row.ctr_link?.replace(/[%]/g, '') || '0') || 0;
+      totals.cpm += parseFloat(row.cpm?.replace(/[$,]/g, '') || '0') || 0;
+      totals.frequency += parseFloat(row.frequency?.replace(/[^\d.]/g, '') || '0') || 0;
+    });
+
+    // Calculate averages for percentage-based metrics
+    const dataLength = data.length || 1;
+    totals.roas = totals.roas / dataLength;
+    totals.ctrAll = totals.ctrAll / dataLength;
+    totals.ctrLink = totals.ctrLink / dataLength;
+    totals.cpm = totals.cpm / dataLength;
+    totals.frequency = totals.frequency / dataLength;
+
+    return totals;
+  };
+
+  const metrics = getFilteredMetrics();
+
+  // Generate chart data from Google Sheets
+  const generateChartData = () => {
+    if (!syncedData) return [];
+
+    let data = syncedData.data;
+    if (dateRange) {
+      data = data.filter(row => {
+        const dateField = Object.keys(row).find(key => 
+          key.toLowerCase().includes('date') || 
+          key.toLowerCase().includes('day') ||
+          key.toLowerCase().includes('time')
+        );
+        
+        if (!dateField || !row[dateField]) return true;
+        
+        try {
+          const rowDate = new Date(row[dateField]);
+          if (!isNaN(rowDate.getTime())) {
+            return rowDate >= dateRange.from && rowDate <= dateRange.to;
+          }
+        } catch (error) {
+          return true;
+        }
+        return true;
+      });
+    }
+
+    return data.map((row, index) => {
+      const dateField = Object.keys(row).find(key => 
+        key.toLowerCase().includes('date') || 
+        key.toLowerCase().includes('day') ||
+        key.toLowerCase().includes('time')
+      );
+      
+      const date = dateField ? row[dateField] : `Day ${index + 1}`;
+      
+      return {
+        date: date,
+        pageViews: parseInt(row.page_views?.replace(/[^\d]/g, '') || '0') || 0,
+        optins: parseInt(row.optins?.replace(/[^\d]/g, '') || '0') || 0,
+        mainOfferBuyers: parseInt(row.main_offer_buyers?.replace(/[^\d]/g, '') || '0') || 0,
+        bumpProductBuyers: parseInt(row.bump_product_buyers?.replace(/[^\d]/g, '') || '0') || 0,
+        upsell1Buyers: parseInt(row.upsell_1_buyers?.replace(/[^\d]/g, '') || '0') || 0,
+        downsell1Buyers: parseInt(row.downsell_1_buyers?.replace(/[^\d]/g, '') || '0') || 0,
+        upsell2Buyers: parseInt(row.upsell_2_buyers?.replace(/[^\d]/g, '') || '0') || 0,
+        downsell2Buyers: parseInt(row.downsell_2_buyers?.replace(/[^\d]/g, '') || '0') || 0,
+        roas: parseFloat(row.roas?.replace(/[^\d.]/g, '') || '0') || 0,
+        spend: parseFloat(row.spend?.replace(/[$,]/g, '') || '0') || 0,
+        ctrAll: parseFloat(row.ctr_all?.replace(/[%]/g, '') || '0') || 0,
+        ctrLink: parseFloat(row.ctr_link?.replace(/[%]/g, '') || '0') || 0,
+        cpm: parseFloat(row.cpm?.replace(/[$,]/g, '') || '0') || 0,
+        frequency: parseFloat(row.frequency?.replace(/[^\d.]/g, '') || '0') || 0
+      };
+    }).slice(0, 30);
+  };
+
+  const chartData = generateChartData();
 
   const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections(prev => ({
@@ -102,13 +189,15 @@ export const LowTicketFunnel = () => {
 
   // Calculate conversion rates
   const calculateConversions = () => {
-    const optinRate = (sampleMetrics.optins / sampleMetrics.pageViews) * 100;
-    const mainOfferRate = (sampleMetrics.mainOfferBuyers / sampleMetrics.pageViews) * 100;
-    const bumpRate = (sampleMetrics.bumpProductBuyers / sampleMetrics.mainOfferBuyers) * 100;
-    const upsell1Rate = (sampleMetrics.upsell1Buyers / sampleMetrics.mainOfferBuyers) * 100;
-    const downsell1Rate = (sampleMetrics.downsell1Buyers / sampleMetrics.mainOfferBuyers) * 100;
-    const upsell2Rate = (sampleMetrics.upsell2Buyers / sampleMetrics.mainOfferBuyers) * 100;
-    const downsell2Rate = (sampleMetrics.downsell2Buyers / sampleMetrics.mainOfferBuyers) * 100;
+    if (!metrics) return null;
+    
+    const optinRate = metrics.pageViews > 0 ? (metrics.optins / metrics.pageViews) * 100 : 0;
+    const mainOfferRate = metrics.pageViews > 0 ? (metrics.mainOfferBuyers / metrics.pageViews) * 100 : 0;
+    const bumpRate = metrics.mainOfferBuyers > 0 ? (metrics.bumpProductBuyers / metrics.mainOfferBuyers) * 100 : 0;
+    const upsell1Rate = metrics.mainOfferBuyers > 0 ? (metrics.upsell1Buyers / metrics.mainOfferBuyers) * 100 : 0;
+    const downsell1Rate = metrics.mainOfferBuyers > 0 ? (metrics.downsell1Buyers / metrics.mainOfferBuyers) * 100 : 0;
+    const upsell2Rate = metrics.mainOfferBuyers > 0 ? (metrics.upsell2Buyers / metrics.mainOfferBuyers) * 100 : 0;
+    const downsell2Rate = metrics.mainOfferBuyers > 0 ? (metrics.downsell2Buyers / metrics.mainOfferBuyers) * 100 : 0;
 
     return {
       optinRate,
@@ -122,6 +211,20 @@ export const LowTicketFunnel = () => {
   };
 
   const conversions = calculateConversions();
+
+  // Show message if no data is available
+  if (!syncedData || !metrics) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Low Ticket Funnel Metrics</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-gray-500">No Google Sheets data available. Please connect and sync your Google Sheets to see funnel metrics.</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -168,25 +271,25 @@ export const LowTicketFunnel = () => {
         {expandedSections.funnelMetrics && (
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <MetricCard title="Page Views" value={sampleMetrics.pageViews} previousValue={previousMetrics.pageViews} />
-              <MetricCard title="Optins" value={sampleMetrics.optins} previousValue={previousMetrics.optins} />
-              <MetricCard title="Main Offer Buyers" value={sampleMetrics.mainOfferBuyers} previousValue={previousMetrics.mainOfferBuyers} />
-              <MetricCard title="ROAS" value={sampleMetrics.roas} previousValue={previousMetrics.roas} />
+              <MetricCard title="Page Views" value={metrics.pageViews} />
+              <MetricCard title="Optins" value={metrics.optins} />
+              <MetricCard title="Main Offer Buyers" value={metrics.mainOfferBuyers} />
+              <MetricCard title="ROAS" value={metrics.roas} />
             </div>
             
             {selectedProducts.bump && (
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <MetricCard title="Bump Product Buyers" value={sampleMetrics.bumpProductBuyers} previousValue={previousMetrics.bumpProductBuyers} />
+                <MetricCard title="Bump Product Buyers" value={metrics.bumpProductBuyers} />
               </div>
             )}
 
             {(selectedProducts.upsell1 || selectedProducts.downsell1) && (
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 {selectedProducts.upsell1 && (
-                  <MetricCard title="Upsell 1 Buyers" value={sampleMetrics.upsell1Buyers} previousValue={previousMetrics.upsell1Buyers} />
+                  <MetricCard title="Upsell 1 Buyers" value={metrics.upsell1Buyers} />
                 )}
                 {selectedProducts.downsell1 && (
-                  <MetricCard title="Downsell 1 Buyers" value={sampleMetrics.downsell1Buyers} previousValue={previousMetrics.downsell1Buyers} />
+                  <MetricCard title="Downsell 1 Buyers" value={metrics.downsell1Buyers} />
                 )}
               </div>
             )}
@@ -194,10 +297,10 @@ export const LowTicketFunnel = () => {
             {(selectedProducts.upsell2 || selectedProducts.downsell2) && (
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 {selectedProducts.upsell2 && (
-                  <MetricCard title="Upsell 2 Buyers" value={sampleMetrics.upsell2Buyers} previousValue={previousMetrics.upsell2Buyers} />
+                  <MetricCard title="Upsell 2 Buyers" value={metrics.upsell2Buyers} />
                 )}
                 {selectedProducts.downsell2 && (
-                  <MetricCard title="Downsell 2 Buyers" value={sampleMetrics.downsell2Buyers} previousValue={previousMetrics.downsell2Buyers} />
+                  <MetricCard title="Downsell 2 Buyers" value={metrics.downsell2Buyers} />
                 )}
               </div>
             )}
@@ -231,11 +334,11 @@ export const LowTicketFunnel = () => {
         {expandedSections.adMetrics && (
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-              <MetricCard title="Spend" value={sampleMetrics.spend} previousValue={previousMetrics.spend} format="currency" />
-              <MetricCard title="CTR (All)" value={sampleMetrics.ctrAll} previousValue={previousMetrics.ctrAll} format="percentage" />
-              <MetricCard title="CTR (Link)" value={sampleMetrics.ctrLink} previousValue={previousMetrics.ctrLink} format="percentage" />
-              <MetricCard title="CPM" value={sampleMetrics.cpm} previousValue={previousMetrics.cpm} format="currency" />
-              <MetricCard title="Frequency" value={sampleMetrics.frequency} previousValue={previousMetrics.frequency} />
+              <MetricCard title="Spend" value={metrics.spend} format="currency" />
+              <MetricCard title="CTR (All)" value={metrics.ctrAll} format="percentage" />
+              <MetricCard title="CTR (Link)" value={metrics.ctrLink} format="percentage" />
+              <MetricCard title="CPM" value={metrics.cpm} format="currency" />
+              <MetricCard title="Frequency" value={metrics.frequency} />
             </div>
             
             <ConversionChart 
@@ -248,65 +351,67 @@ export const LowTicketFunnel = () => {
       </Card>
 
       {/* Conversion Stats Section */}
-      <Card>
-        <CardHeader 
-          className="cursor-pointer"
-          onClick={() => toggleSection('conversionStats')}
-        >
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg font-semibold">Conversion Statistics</CardTitle>
-            {expandedSections.conversionStats ? 
-              <ChevronUp className="h-5 w-5" /> : 
-              <ChevronDown className="h-5 w-5" />
-            }
-          </div>
-        </CardHeader>
-        {expandedSections.conversionStats && (
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <MetricCard title="Optin Rate" value={conversions.optinRate} format="percentage" />
-              <MetricCard title="Main Offer Conversion" value={conversions.mainOfferRate} format="percentage" />
-              {selectedProducts.bump && (
-                <MetricCard title="Bump Conversion" value={conversions.bumpRate} format="percentage" />
-              )}
+      {conversions && (
+        <Card>
+          <CardHeader 
+            className="cursor-pointer"
+            onClick={() => toggleSection('conversionStats')}
+          >
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg font-semibold">Conversion Statistics</CardTitle>
+              {expandedSections.conversionStats ? 
+                <ChevronUp className="h-5 w-5" /> : 
+                <ChevronDown className="h-5 w-5" />
+              }
             </div>
-            
-            {(selectedProducts.upsell1 || selectedProducts.downsell1) && (
+          </CardHeader>
+          {expandedSections.conversionStats && (
+            <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                {selectedProducts.upsell1 && (
-                  <MetricCard title="Upsell 1 Conversion" value={conversions.upsell1Rate} format="percentage" />
-                )}
-                {selectedProducts.downsell1 && (
-                  <MetricCard title="Downsell 1 Conversion" value={conversions.downsell1Rate} format="percentage" />
+                <MetricCard title="Optin Rate" value={conversions.optinRate} format="percentage" />
+                <MetricCard title="Main Offer Conversion" value={conversions.mainOfferRate} format="percentage" />
+                {selectedProducts.bump && (
+                  <MetricCard title="Bump Conversion" value={conversions.bumpRate} format="percentage" />
                 )}
               </div>
-            )}
+              
+              {(selectedProducts.upsell1 || selectedProducts.downsell1) && (
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  {selectedProducts.upsell1 && (
+                    <MetricCard title="Upsell 1 Conversion" value={conversions.upsell1Rate} format="percentage" />
+                  )}
+                  {selectedProducts.downsell1 && (
+                    <MetricCard title="Downsell 1 Conversion" value={conversions.downsell1Rate} format="percentage" />
+                  )}
+                </div>
+              )}
 
-            {(selectedProducts.upsell2 || selectedProducts.downsell2) && (
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                {selectedProducts.upsell2 && (
-                  <MetricCard title="Upsell 2 Conversion" value={conversions.upsell2Rate} format="percentage" />
-                )}
-                {selectedProducts.downsell2 && (
-                  <MetricCard title="Downsell 2 Conversion" value={conversions.downsell2Rate} format="percentage" />
-                )}
-              </div>
-            )}
+              {(selectedProducts.upsell2 || selectedProducts.downsell2) && (
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  {selectedProducts.upsell2 && (
+                    <MetricCard title="Upsell 2 Conversion" value={conversions.upsell2Rate} format="percentage" />
+                  )}
+                  {selectedProducts.downsell2 && (
+                    <MetricCard title="Downsell 2 Conversion" value={conversions.downsell2Rate} format="percentage" />
+                  )}
+                </div>
+              )}
 
-            <ConversionChart 
-              data={chartData.map(d => ({
-                ...d,
-                optinRate: (d.optins / d.pageViews) * 100,
-                mainOfferRate: (d.mainOfferBuyers / d.pageViews) * 100,
-                bumpRate: (d.bumpProductBuyers / d.mainOfferBuyers) * 100,
-                upsell1Rate: (d.upsell1Buyers / d.mainOfferBuyers) * 100
-              }))}
-              title="Conversion Rate Trends"
-              metrics={['optinRate', 'mainOfferRate', 'bumpRate', 'upsell1Rate']}
-            />
-          </CardContent>
-        )}
-      </Card>
+              <ConversionChart 
+                data={chartData.map(d => ({
+                  ...d,
+                  optinRate: d.pageViews > 0 ? (d.optins / d.pageViews) * 100 : 0,
+                  mainOfferRate: d.pageViews > 0 ? (d.mainOfferBuyers / d.pageViews) * 100 : 0,
+                  bumpRate: d.mainOfferBuyers > 0 ? (d.bumpProductBuyers / d.mainOfferBuyers) * 100 : 0,
+                  upsell1Rate: d.mainOfferBuyers > 0 ? (d.upsell1Buyers / d.mainOfferBuyers) * 100 : 0
+                }))}
+                title="Conversion Rate Trends"
+                metrics={['optinRate', 'mainOfferRate', 'bumpRate', 'upsell1Rate']}
+              />
+            </CardContent>
+          )}
+        </Card>
+      )}
     </div>
   );
 };

@@ -1,12 +1,11 @@
+
 import { useState } from "react";
 import { Navbar } from "@/components/Navbar";
-import { MetricCard } from "@/components/MetricCard";
 import { AdvancedDateRangePicker } from "@/components/AdvancedDateRangePicker";
 import { FunnelSelector } from "@/components/FunnelSelector";
 import { LowTicketFunnel } from "@/components/LowTicketFunnel";
 import { WebinarFunnel } from "@/components/WebinarFunnel";
 import { BookCallFunnel } from "@/components/BookCallFunnel";
-import { ConversionChart } from "@/components/ConversionChart";
 import { IntegrationsPanel } from "@/components/IntegrationsPanel";
 import { AIInsightsPanel } from "@/components/AIInsightsPanel";
 import { MetricCustomizer } from "@/components/MetricCustomizer";
@@ -14,34 +13,14 @@ import { AlertSystem } from "@/components/AlertSystem";
 import { ExportPanel } from "@/components/ExportPanel";
 import { PredictiveAnalytics } from "@/components/PredictiveAnalytics";
 import { AIChatPanel } from "@/components/AIChatPanel";
-import { GoogleSheetsMetrics } from "@/components/GoogleSheetsMetrics";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TrendingUp, DollarSign, Users, MousePointer, Plus, BarChart3, Settings, Brain, MessageSquare, Download, Target } from "lucide-react";
-
-const generateOverviewData = () => {
-  const dates = [];
-  for (let i = 29; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
-    dates.push({
-      date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      conversionRate: Math.random() * 8 + 4,
-      roas: Math.random() * 3 + 2,
-      pageViews: Math.floor(Math.random() * 2000) + 1000
-    });
-  }
-  return dates;
-};
+import { Plus, BarChart3, Settings, Brain, MessageSquare, Download, Target, TrendingUp } from "lucide-react";
 
 const Index = () => {
   const [selectedFunnel, setSelectedFunnel] = useState("low-ticket");
   const [dateRange, setDateRange] = useState({ from: new Date(), to: new Date() });
   const [customMetrics, setCustomMetrics] = useState([]);
-
-  const overviewData = generateOverviewData();
 
   const handleDateChange = (from: Date, to: Date) => {
     setDateRange({ from, to });
@@ -65,7 +44,7 @@ const Index = () => {
       case "book-call":
         return <BookCallFunnel />;
       default:
-        return <LowTicketFunnel />;
+        return <LowTicketFunnel dateRange={dateRange} />;
     }
   };
 
@@ -78,7 +57,7 @@ const Index = () => {
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
             <h2 className="text-xl font-semibold text-gray-900">AI Marketing Dashboard</h2>
-            <p className="text-gray-600">Monitor and optimize your marketing funnels with AI insights</p>
+            <p className="text-gray-600">Monitor and optimize your marketing funnels with real-time data</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-4">
             <AdvancedDateRangePicker 
@@ -134,10 +113,7 @@ const Index = () => {
             {/* Metric Customizer */}
             <MetricCustomizer onMetricsChange={handleMetricsChange} />
 
-            {/* Google Sheets Synced Data */}
-            <GoogleSheetsMetrics dateRange={dateRange} />
-
-            {/* Funnel-Specific Content */}
+            {/* Funnel-Specific Content with integrated Google Sheets data */}
             {renderFunnelContent()}
           </TabsContent>
 
