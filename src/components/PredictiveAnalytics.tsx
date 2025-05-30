@@ -3,10 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TrendingUp, TrendingDown, Brain, Target, AlertCircle, RefreshCw } from "lucide-react";
+import { TrendingUp, TrendingDown, Brain, Target, AlertCircle, RefreshCw, Calendar, BarChart } from "lucide-react";
 import { useState } from "react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Area, ComposedChart } from "recharts";
 import { useGoogleSheetsData } from "@/hooks/useGoogleSheetsData";
+import { generateForecast, generateScenarioForecasts, parseDateFromSheetData, ForecastResult } from "@/utils/timeSeriesUtils";
+import { format, addDays } from "date-fns";
 
 interface PredictiveAnalyticsProps {
   className?: string;
@@ -15,177 +17,234 @@ interface PredictiveAnalyticsProps {
 export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => {
   const [selectedMetric, setSelectedMetric] = useState('revenue');
   const [forecastPeriod, setForecastPeriod] = useState('30days');
+  const [showScenarios, setShowScenarios] = useState(false);
   const { syncedData, calculateMetricsFromSyncedData } = useGoogleSheetsData();
 
   const currentMetrics = calculateMetricsFromSyncedData();
+  
+  const forecastDays = {
+    '30days': 30,
+    '60days': 60,
+    '90days': 90,
+  }[forecastPeriod] || 30;
 
-  // Generate more realistic forecast data based on actual trends
-  const generateForecastData = () => {
-    if (!syncedData || !currentMetrics) {
-      return [
-        { period: 'Week 1', actual: null, predicted: 87000, confidence: 85 },
-        { period: 'Week 2', actual: null, predicted: 90000, confidence: 82 },
-        { period: 'Week 3', actual: null, predicted: 93000, confidence: 78 },
-      ];
+  // Generate forecast data based on actual historical data
+  const generateEnhancedForecastData = (): ForecastResult => {
+    if (!syncedData || !syncedData.data.length) {
+      // Generate sample forecast if no data
+      const sampleData = Array.from({ length: 15 }, (_, i) => {
+        const date = format(addDays(new Date(), i - 10), 'M/d/yyyy');
+        const isActual = i < 10;
+        let value;
+        
+        if (selectedMetric === 'revenue') {
+          value = isActual ? 85000 + (i * 2000) + (Math.random() * 5000) : 
+                            95000 + (i * 1500) + (Math.random() * 3000);
+        } else if (selectedMetric === 'conversions') {
+          value = isActual ? 180 + (i * 5) + (Math.random() * 15) : 
+                            220 + (i * 4) + (Math.random() * 10);
+        } else {
+          value = isActual ? 8500 + (i * 200) + (Math.random() * 500) : 
+                            9500 + (i * 150) + (Math.random() * 300);
+        }
+        
+        return {
+          date,
+          value: Math.round(value),
+          isActual,
+          confidence: isActual ? 100 : Math.max(60, 90 - (i - 9) * 3),
+        };
+      });
+      
+      return {
+        data: sampleData,
+        trend: 'increasing' as const,
+        accuracy: 78,
+      };
     }
 
     const data = syncedData.data;
     
-    // Calculate actual values from historical data
-    const historicalData = data.map((row, index) => {
-      const dateField = row['Date'] || row['date'] || `Day ${index + 1}`;
+    // Extract historical values for the selected metric
+    const historicalData = data.map(row => {
+      const dateField = row['Date'] || row['date'] || 'Unknown';
+      let value = 0;
       
-      let actualValue = null;
       if (selectedMetric === 'revenue') {
-        const revenueFields = ['Revenue', 'revenue'];
-        for (const field of revenueFields) {
+        // Try to calculate revenue from ROAS and cost, or direct revenue fields
+        const roasFields = ['ROAS', 'roas'];
+        const costFields = ['Cost', 'cost', 'Spend', 'spend'];
+        
+        let roas = 0;
+        let cost = 0;
+        
+        for (const field of roasFields) {
           if (row[field]) {
-            const value = parseFloat(row[field].toString().replace(/[$,]/g, '') || '0');
-            if (value > 0) {
-              actualValue = value;
-              break;
-            }
+            roas = parseFloat(row[field].toString().replace(/[^\d.]/g, '') || '0');
+            if (roas > 0) break;
           }
         }
-        if (!actualValue && row['ROAS'] && row['Cost']) {
-          const roas = parseFloat(row['ROAS'].toString().replace(/[^\d.]/g, '') || '0');
-          const cost = parseFloat(row['Cost'].toString().replace(/[$,]/g, '') || '0');
-          if (roas > 0 && cost > 0) {
-            actualValue = roas * cost;
+        
+        for (const field of costFields) {
+          if (row[field]) {
+            cost = parseFloat(row[field].toString().replace(/[$,]/g, '') || '0');
+            if (cost > 0) break;
+          }
+        }
+        
+        // If we have ROAS and cost, calculate revenue
+        if (roas > 0 && cost > 0) {
+          value = roas * cost;
+        } else {
+          // Try direct revenue fields
+          const revenueFields = ['Revenue', 'revenue'];
+          for (const field of revenueFields) {
+            if (row[field]) {
+              value = parseFloat(row[field].toString().replace(/[$,]/g, '') || '0');
+              if (value > 0) break;
+            }
           }
         }
       } else if (selectedMetric === 'conversions') {
         const conversionFields = ['Main Offer', 'Conversions', 'conversions', 'Opt-Ins'];
         for (const field of conversionFields) {
           if (row[field]) {
-            const value = parseInt(row[field].toString().replace(/[^\d]/g, '') || '0');
-            if (value > 0) {
-              actualValue = value;
-              break;
-            }
+            value = parseInt(row[field].toString().replace(/[^\d]/g, '') || '0');
+            if (value > 0) break;
           }
         }
-      } else {
-        const trafficFields = ['Page Views', 'Impressions', 'impressions', 'traffic'];
+      } else { // traffic
+        const trafficFields = ['Page Views', 'Impressions', 'impressions', 'pageViews'];
         for (const field of trafficFields) {
           if (row[field]) {
-            const value = parseInt(row[field].toString().replace(/[^\d]/g, '') || '0');
-            if (value > 0) {
-              actualValue = value;
-              break;
-            }
+            value = parseInt(row[field].toString().replace(/[^\d]/g, '') || '0');
+            if (value > 0) break;
           }
         }
       }
 
       return {
-        period: typeof dateField === 'string' ? dateField : `Period ${index + 1}`,
-        actual: actualValue,
-        index
+        date: dateField.toString(),
+        value: value || 0
       };
-    });
+    }).filter(d => d.value > 0);
 
-    // Calculate trend from actual data
-    const actualValues = historicalData.filter(d => d.actual !== null).map(d => d.actual);
-    const avgValue = actualValues.length > 0 ? actualValues.reduce((a, b) => a + b, 0) / actualValues.length : 1000;
-    
-    // Calculate growth trend from recent data
-    let growthRate = 0.05; // Default 5% growth
-    if (actualValues.length >= 3) {
-      const recent = actualValues.slice(-3);
-      const older = actualValues.slice(-6, -3);
-      if (older.length > 0) {
-        const recentAvg = recent.reduce((a, b) => a + b, 0) / recent.length;
-        const olderAvg = older.reduce((a, b) => a + b, 0) / older.length;
-        growthRate = olderAvg > 0 ? (recentAvg - olderAvg) / olderAvg : 0.05;
-        growthRate = Math.max(-0.2, Math.min(0.3, growthRate)); // Cap between -20% and 30%
-      }
-    }
-
-    // Generate predictions based on trend
-    const forecastData = historicalData.map((item, index) => {
-      let predictedValue;
-      if (item.actual !== null) {
-        // For historical data, predict close to actual with some variance
-        predictedValue = item.actual * (0.95 + Math.random() * 0.1);
-      } else {
-        // For future data, use trend-based prediction
-        const daysFromLast = index - (actualValues.length - 1);
-        const trendMultiplier = 1 + (growthRate * daysFromLast * 0.1);
-        const variance = 0.9 + Math.random() * 0.2; // ±10% variance
-        predictedValue = avgValue * trendMultiplier * variance;
-      }
-      
-      const confidence = Math.max(60, 95 - index * 2);
-
-      return {
-        ...item,
-        predicted: Math.round(predictedValue),
-        confidence: Math.round(confidence)
-      };
-    });
-
-    return forecastData;
+    return generateForecast(historicalData, forecastDays);
   };
 
-  // Generate more realistic predictions based on trends
-  const generatePredictions = () => {
+  const forecastResult = generateEnhancedForecastData();
+
+  // Generate enhanced predictions with scenarios
+  const generateEnhancedPredictions = () => {
     if (!currentMetrics) {
       return [
-        { metric: 'Revenue', current: 0, predicted: 0, change: 0, confidence: 75, trend: 'up', timeframe: 'Next 30 days' },
-        { metric: 'Conversion Rate', current: 0, predicted: 0, change: 0, confidence: 75, trend: 'up', timeframe: 'Next 30 days' },
-        { metric: 'Ad Spend', current: 0, predicted: 0, change: 0, confidence: 75, trend: 'up', timeframe: 'Next 30 days' },
-        { metric: 'ROAS', current: 0, predicted: 0, change: 0, confidence: 75, trend: 'up', timeframe: 'Next 30 days' },
+        { metric: 'Revenue', current: 0, predicted: 0, change: 0, confidence: 75, trend: 'up', timeframe: `Next ${forecastDays} days` },
+        { metric: 'Conversion Rate', current: 0, predicted: 0, change: 0, confidence: 75, trend: 'up', timeframe: `Next ${forecastDays} days` },
+        { metric: 'Ad Spend', current: 0, predicted: 0, change: 0, confidence: 75, trend: 'up', timeframe: `Next ${forecastDays} days` },
+        { metric: 'ROAS', current: 0, predicted: 0, change: 0, confidence: 75, trend: 'up', timeframe: `Next ${forecastDays} days` },
       ];
     }
 
     const estimatedRevenue = currentMetrics.revenue || (currentMetrics.roas * currentMetrics.cost);
     
-    // Calculate more realistic predictions based on current performance
+    // Use forecast accuracy to determine confidence levels
+    const baseConfidence = Math.max(60, forecastResult.accuracy);
+    
     const predictions = [
       {
         metric: 'Revenue',
         current: estimatedRevenue,
-        predicted: estimatedRevenue * (currentMetrics.roas > 3 ? 1.15 : currentMetrics.roas > 2 ? 1.08 : 1.02),
-        change: currentMetrics.roas > 3 ? 15.0 : currentMetrics.roas > 2 ? 8.0 : 2.0,
-        confidence: currentMetrics.roas > 3 ? 88 : currentMetrics.roas > 2 ? 82 : 75,
-        trend: 'up' as const,
-        timeframe: 'Next 30 days'
+        predicted: estimatedRevenue * (forecastResult.trend === 'increasing' ? 1.12 : forecastResult.trend === 'decreasing' ? 0.95 : 1.03),
+        change: forecastResult.trend === 'increasing' ? 12.0 : forecastResult.trend === 'decreasing' ? -5.0 : 3.0,
+        confidence: Math.round(baseConfidence),
+        trend: forecastResult.trend === 'decreasing' ? 'down' as const : 'up' as const,
+        timeframe: `Next ${forecastDays} days`
       },
       {
         metric: 'Conversion Rate',
         current: currentMetrics.conversionRate,
-        predicted: currentMetrics.conversionRate * (currentMetrics.conversionRate > 5 ? 1.05 : 1.12),
-        change: currentMetrics.conversionRate > 5 ? 5.0 : 12.0,
-        confidence: currentMetrics.conversionRate > 5 ? 85 : 78,
-        trend: 'up' as const,
-        timeframe: 'Next 30 days'
+        predicted: currentMetrics.conversionRate * (forecastResult.trend === 'increasing' ? 1.08 : 0.98),
+        change: forecastResult.trend === 'increasing' ? 8.0 : -2.0,
+        confidence: Math.round(baseConfidence * 0.9),
+        trend: forecastResult.trend === 'decreasing' ? 'down' as const : 'up' as const,
+        timeframe: `Next ${forecastDays} days`
       },
       {
         metric: 'Ad Spend',
         current: currentMetrics.cost,
-        predicted: currentMetrics.cost * (currentMetrics.roas > 3 ? 1.20 : 1.05),
-        change: currentMetrics.roas > 3 ? 20.0 : 5.0,
-        confidence: 90,
+        predicted: currentMetrics.cost * (forecastResult.trend === 'increasing' ? 1.15 : 1.02),
+        change: forecastResult.trend === 'increasing' ? 15.0 : 2.0,
+        confidence: Math.round(baseConfidence * 0.95),
         trend: 'up' as const,
-        timeframe: 'Next 30 days'
+        timeframe: `Next ${forecastDays} days`
       },
       {
         metric: 'ROAS',
         current: currentMetrics.roas,
-        predicted: currentMetrics.roas * (currentMetrics.roas < 2 ? 1.25 : currentMetrics.roas < 3 ? 1.15 : 1.08),
-        change: currentMetrics.roas < 2 ? 25.0 : currentMetrics.roas < 3 ? 15.0 : 8.0,
-        confidence: currentMetrics.roas < 2 ? 70 : currentMetrics.roas < 3 ? 80 : 85,
-        trend: 'up' as const,
-        timeframe: 'Next 30 days'
+        predicted: currentMetrics.roas * (forecastResult.trend === 'increasing' ? 1.05 : 0.97),
+        change: forecastResult.trend === 'increasing' ? 5.0 : -3.0,
+        confidence: Math.round(baseConfidence * 0.85),
+        trend: forecastResult.trend === 'decreasing' ? 'down' as const : 'up' as const,
+        timeframe: `Next ${forecastDays} days`
       },
     ];
 
     return predictions;
   };
 
-  const forecastData = generateForecastData();
-  const predictions = generatePredictions();
+  const predictions = generateEnhancedPredictions();
+
+  // Generate AI insights based on forecast results
+  const generateAIInsights = () => {
+    const accuracy = forecastResult.accuracy;
+    const trend = forecastResult.trend;
+    const dataPoints = forecastResult.data.filter(d => d.isActual).length;
+    
+    if (!currentMetrics) {
+      return "Connect your Google Sheets to see AI-powered insights based on your actual campaign data and advanced forecasting algorithms.";
+    }
+
+    const insights = [];
+    
+    // Data quality insights
+    if (dataPoints < 7) {
+      insights.push(`Limited historical data (${dataPoints} points) may reduce forecast accuracy.`);
+    }
+    
+    // Trend insights
+    if (trend === 'increasing') {
+      insights.push(`Strong upward trend detected with ${accuracy.toFixed(1)}% model accuracy. Your campaigns are performing well.`);
+    } else if (trend === 'decreasing') {
+      insights.push(`Declining trend identified. Consider optimizing targeting and creative to reverse the downward trajectory.`);
+    } else {
+      insights.push(`Stable performance detected. Look for optimization opportunities to drive growth.`);
+    }
+    
+    // Performance insights
+    if (currentMetrics.roas > 3) {
+      insights.push(`Excellent ROAS of ${currentMetrics.roas.toFixed(2)} suggests scaling opportunities.`);
+    } else if (currentMetrics.roas < 2) {
+      insights.push(`ROAS of ${currentMetrics.roas.toFixed(2)} needs improvement. Focus on conversion optimization.`);
+    }
+    
+    // Forecast period insights
+    if (forecastDays > 30) {
+      insights.push(`Long-term forecast shows ${trend} trend, but confidence decreases over time.`);
+    }
+    
+    return insights.join(' ');
+  };
+
+  const formatTooltipValue = (value: number, name: string) => {
+    if (name.includes('confidence')) return `${value}%`;
+    if (selectedMetric === 'revenue') return `$${value.toLocaleString()}`;
+    return value.toLocaleString();
+  };
+
+  const formatYAxisValue = (value: number) => {
+    if (selectedMetric === 'revenue') return `$${(value / 1000).toFixed(0)}k`;
+    return value.toString();
+  };
 
   return (
     <Card className={className}>
@@ -193,77 +252,152 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <Brain className="h-5 w-5 text-purple-600" />
-            Predictive Analytics
+            Advanced Predictive Analytics
             {syncedData && (
               <Badge variant="secondary" className="ml-2">
-                {syncedData.data.length} data points
+                {syncedData.data.length} data points • {forecastResult.accuracy.toFixed(1)}% accuracy
               </Badge>
             )}
           </CardTitle>
-          <Button variant="ghost" size="sm">
-            <RefreshCw className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setShowScenarios(!showScenarios)}>
+              <BarChart className="h-4 w-4" />
+              Scenarios
+            </Button>
+            <Button variant="ghost" size="sm">
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Forecast Chart */}
-        <div>
-          <div className="flex items-center gap-4 mb-4">
-            <Select value={selectedMetric} onValueChange={setSelectedMetric}>
-              <SelectTrigger className="w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="revenue">Revenue Forecast</SelectItem>
-                <SelectItem value="conversions">Conversion Forecast</SelectItem>
-                <SelectItem value="traffic">Traffic Forecast</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={forecastPeriod} onValueChange={setForecastPeriod}>
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="30days">30 Days</SelectItem>
-                <SelectItem value="60days">60 Days</SelectItem>
-                <SelectItem value="90days">90 Days</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={forecastData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="period" />
-                <YAxis />
-                <Tooltip />
-                <Line 
-                  type="monotone" 
-                  dataKey="actual" 
-                  stroke="#3B82F6" 
-                  strokeWidth={2}
-                  name="Actual"
-                  connectNulls={false}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="predicted" 
-                  stroke="#8B5CF6" 
-                  strokeWidth={2}
-                  strokeDasharray="5 5"
-                  name="Predicted"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+        {/* Forecast Controls */}
+        <div className="flex items-center gap-4">
+          <Select value={selectedMetric} onValueChange={setSelectedMetric}>
+            <SelectTrigger className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="revenue">Revenue Forecast</SelectItem>
+              <SelectItem value="conversions">Conversion Forecast</SelectItem>
+              <SelectItem value="traffic">Traffic Forecast</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={forecastPeriod} onValueChange={setForecastPeriod}>
+            <SelectTrigger className="w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="30days">30 Days</SelectItem>
+              <SelectItem value="60days">60 Days</SelectItem>
+              <SelectItem value="90days">90 Days</SelectItem>
+            </SelectContent>
+          </Select>
+          <Badge variant={forecastResult.trend === 'increasing' ? 'default' : forecastResult.trend === 'decreasing' ? 'destructive' : 'secondary'}>
+            {forecastResult.trend === 'increasing' ? (
+              <TrendingUp className="h-3 w-3 mr-1" />
+            ) : forecastResult.trend === 'decreasing' ? (
+              <TrendingDown className="h-3 w-3 mr-1" />
+            ) : (
+              <Calendar className="h-3 w-3 mr-1" />
+            )}
+            {forecastResult.trend.charAt(0).toUpperCase() + forecastResult.trend.slice(1)} Trend
+          </Badge>
         </div>
 
-        {/* Predictions Grid */}
+        {/* Enhanced Forecast Chart */}
+        <div className="h-80">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={forecastResult.data}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis 
+                dataKey="date" 
+                stroke="#6b7280"
+                fontSize={12}
+                angle={-45}
+                textAnchor="end"
+                height={80}
+              />
+              <YAxis 
+                stroke="#6b7280" 
+                fontSize={12}
+                tickFormatter={formatYAxisValue}
+              />
+              <Tooltip 
+                contentStyle={{
+                  backgroundColor: 'white',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                }}
+                formatter={(value: number, name: string) => [
+                  formatTooltipValue(value, name),
+                  name === 'value' ? (selectedMetric.charAt(0).toUpperCase() + selectedMetric.slice(1)) : name
+                ]}
+                labelFormatter={(label) => `Date: ${label}`}
+              />
+              
+              {/* Confidence band for predictions */}
+              <Area
+                dataKey="confidence"
+                stroke="none"
+                fill="rgba(139, 92, 246, 0.1)"
+                fillOpacity={0.3}
+                stackId="confidence"
+              />
+              
+              {/* Actual data line */}
+              <Line 
+                type="monotone" 
+                dataKey="value"
+                stroke="#3B82F6" 
+                strokeWidth={3}
+                dot={(props) => {
+                  const { payload } = props;
+                  return payload?.isActual ? (
+                    <circle {...props} fill="#3B82F6" strokeWidth={2} r={4} />
+                  ) : null;
+                }}
+                connectNulls={false}
+                name="Actual"
+              />
+              
+              {/* Predicted data line */}
+              <Line 
+                type="monotone" 
+                dataKey="value"
+                stroke="#8B5CF6" 
+                strokeWidth={2}
+                strokeDasharray="8 8"
+                dot={(props) => {
+                  const { payload } = props;
+                  return !payload?.isActual ? (
+                    <circle {...props} fill="#8B5CF6" strokeWidth={2} r={3} />
+                  ) : null;
+                }}
+                connectNulls={false}
+                name="Predicted"
+              />
+              
+              {/* Vertical line separating actual vs predicted */}
+              {forecastResult.data.some(d => d.isActual) && forecastResult.data.some(d => !d.isActual) && (
+                <ReferenceLine 
+                  x={forecastResult.data.find(d => d.isActual && forecastResult.data[forecastResult.data.indexOf(d) + 1]?.isActual === false)?.date}
+                  stroke="#ef4444"
+                  strokeDasharray="4 4"
+                  strokeWidth={1}
+                  label={{ value: "Forecast Start", position: "top" }}
+                />
+              )}
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Enhanced Predictions Grid */}
         <div>
           <h4 className="font-medium mb-3 flex items-center gap-2">
             <Target className="h-4 w-4" />
-            Key Predictions
+            {forecastDays}-Day Predictions
           </h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {predictions.map((prediction) => (
@@ -312,24 +446,20 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
           </div>
         </div>
 
-        {/* AI Insights */}
+        {/* Enhanced AI Insights */}
         <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
           <div className="flex items-start gap-3">
             <AlertCircle className="h-5 w-5 text-purple-600 mt-0.5" />
             <div>
-              <h4 className="font-medium text-purple-900 mb-1">AI Forecast Insights</h4>
+              <h4 className="font-medium text-purple-900 mb-1">Advanced AI Forecast Analysis</h4>
               <p className="text-sm text-purple-800">
-                {currentMetrics ? (
-                  `Based on your ${currentMetrics.dataRows} data points and current ROAS of ${currentMetrics.roas.toFixed(2)}, 
-                  ${currentMetrics.roas > 3 ? 'your campaigns are performing excellently. The model predicts continued strong growth.' :
-                    currentMetrics.roas > 2 ? 'your campaigns show good performance with room for optimization. Moderate growth expected.' :
-                    'your campaigns need optimization. Focus on improving targeting and creative to boost ROAS above 2.0.'} 
-                  Current conversion rate of ${currentMetrics.conversionRate.toFixed(1)}% 
-                  ${currentMetrics.conversionRate > 5 ? 'is strong.' : 'has potential for improvement through landing page optimization.'}`
-                ) : (
-                  "Connect your Google Sheets to see personalized AI insights based on your actual campaign data."
-                )}
+                {generateAIInsights()}
               </p>
+              {forecastResult.seasonality && (
+                <p className="text-xs text-purple-600 mt-2">
+                  📊 Detected {forecastResult.seasonality.period}-day seasonality pattern with {(forecastResult.seasonality.strength * 100).toFixed(1)}% strength.
+                </p>
+              )}
             </div>
           </div>
         </div>
