@@ -17,6 +17,7 @@ import Support from "@/pages/Support"
 import Documentation from "@/pages/Documentation"
 import CookiePolicy from "@/pages/CookiePolicy"
 import GdprCompliance from "@/pages/GdprCompliance"
+import LawEnforcementPolicy from "@/pages/LawEnforcementPolicy"
 import { GoogleOAuthCallbackPage } from "@/pages/GoogleOAuthCallback"
 
 const queryClient = new QueryClient()
@@ -40,6 +41,7 @@ function App() {
                 <Route path="/documentation" element={<Documentation />} />
                 <Route path="/cookie-policy" element={<CookiePolicy />} />
                 <Route path="/gdpr-compliance" element={<GdprCompliance />} />
+                <Route path="/law-enforcement-policy" element={<LawEnforcementPolicy />} />
                 <Route path="/google-oauth-callback" element={<GoogleOAuthCallbackPage />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>

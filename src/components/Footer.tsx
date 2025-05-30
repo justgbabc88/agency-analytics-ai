@@ -102,6 +102,14 @@ const Footer = () => {
                   GDPR Compliance
                 </Link>
               </li>
+              <li>
+                <Link 
+                  to="/law-enforcement-policy" 
+                  className="text-gray-300 hover:text-white transition-colors"
+                >
+                  Law Enforcement Policy
+                </Link>
+              </li>
             </ul>
           </div>
         </div>
