@@ -222,8 +222,12 @@ serve(async (req) => {
         console.log(`First sheet name: ${firstSheet}`)
         
         // Get header row to determine columns
+        const quotedSheetName = firstSheet.includes(' ') || firstSheet.includes("'") 
+          ? `'${firstSheet.replace(/'/g, "''")}'` 
+          : firstSheet
+      
         const headerResponse = await fetch(
-          `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${firstSheet}!1:1`,
+          `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${quotedSheetName}!1:1`,
           {
             headers: { 'Authorization': `Bearer ${accessToken}` }
           }
@@ -243,8 +247,21 @@ serve(async (req) => {
         let data = []
         if (range) {
           console.log(`Fetching data for range: ${range}`)
+          
+          // Parse the range to extract sheet name and cell range
+          let formattedRange = range
+          if (range.includes('!')) {
+            const [sheetName, cellRange] = range.split('!')
+            const quotedName = sheetName.includes(' ') || sheetName.includes("'")
+              ? `'${sheetName.replace(/'/g, "''")}'`
+              : sheetName
+            formattedRange = `${quotedName}!${cellRange}`
+          }
+          
+          console.log(`Using formatted range: ${formattedRange}`)
+          
           const dataResponse = await fetch(
-            `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}`,
+            `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${formattedRange}`,
             {
               headers: { 'Authorization': `Bearer ${accessToken}` }
             }
