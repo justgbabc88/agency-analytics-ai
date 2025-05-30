@@ -1,32 +1,31 @@
+
 import { useState } from "react";
-import { Checkbox } from "@/components/ui/checkbox";
 import { MetricCard } from "./MetricCard";
 import { ConversionChart } from "./ConversionChart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChevronDown, ChevronUp, TrendingUp, MousePointer } from "lucide-react";
 import { useGoogleSheetsData } from "@/hooks/useGoogleSheetsData";
 
+interface FunnelProductConfig {
+  id: string;
+  label: string;
+  visible: boolean;
+  color: string;
+}
+
 interface LowTicketFunnelProps {
   dateRange?: {
     from: Date;
     to: Date;
   };
+  selectedProducts: FunnelProductConfig[];
 }
 
-export const LowTicketFunnel = ({ dateRange }: LowTicketFunnelProps) => {
+export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnelProps) => {
   const [expandedSections, setExpandedSections] = useState({
     funnelMetrics: true,
     adMetrics: true,
     conversionStats: true
-  });
-
-  const [selectedProducts, setSelectedProducts] = useState({
-    mainProduct: true,
-    bump: true,
-    upsell1: true,
-    downsell1: true,
-    upsell2: false,
-    downsell2: false
   });
 
   const { syncedData } = useGoogleSheetsData();
@@ -214,31 +213,41 @@ export const LowTicketFunnel = ({ dateRange }: LowTicketFunnelProps) => {
     );
   }
 
+  // Get visible product config for easy lookup
+  const productConfig = selectedProducts.reduce((acc, product) => {
+    acc[product.id] = product;
+    return acc;
+  }, {} as Record<string, FunnelProductConfig>);
+
+  // Build metrics array for charts based on visible products
+  const getFunnelMetrics = () => {
+    const baseMetrics = ['pageViews', 'optins', 'mainOfferBuyers'];
+    const productMetrics = [];
+    
+    if (productConfig.bump?.visible) productMetrics.push('bumpProductBuyers');
+    if (productConfig.upsell1?.visible) productMetrics.push('upsell1Buyers');
+    if (productConfig.downsell1?.visible) productMetrics.push('downsell1Buyers');
+    if (productConfig.upsell2?.visible) productMetrics.push('upsell2Buyers');
+    if (productConfig.downsell2?.visible) productMetrics.push('downsell2Buyers');
+    
+    return [...baseMetrics, ...productMetrics, 'roas'];
+  };
+
+  const getConversionMetrics = () => {
+    const baseMetrics = ['optinRate', 'mainOfferRate'];
+    const conversionMetrics = [];
+    
+    if (productConfig.bump?.visible) conversionMetrics.push('bumpRate');
+    if (productConfig.upsell1?.visible) conversionMetrics.push('upsell1Rate');
+    if (productConfig.downsell1?.visible) conversionMetrics.push('downsell1Rate');
+    if (productConfig.upsell2?.visible) conversionMetrics.push('upsell2Rate');
+    if (productConfig.downsell2?.visible) conversionMetrics.push('downsell2Rate');
+    
+    return [...baseMetrics, ...conversionMetrics];
+  };
+
   return (
     <div className="space-y-6">
-      {/* Product Selection */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold">Funnel Products</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {Object.entries(selectedProducts).map(([product, selected]) => (
-              <div key={product} className="flex items-center space-x-2">
-                <Checkbox
-                  id={product}
-                  checked={selected}
-                  onCheckedChange={() => toggleProduct(product as keyof typeof selectedProducts)}
-                />
-                <label htmlFor={product} className="text-sm font-medium capitalize cursor-pointer">
-                  {product.replace(/([A-Z])/g, ' $1').trim()}
-                </label>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Funnel Metrics Section */}
       <Card>
         <CardHeader 
@@ -265,29 +274,29 @@ export const LowTicketFunnel = ({ dateRange }: LowTicketFunnelProps) => {
               <MetricCard title="ROAS" value={metrics.roas} />
             </div>
             
-            {selectedProducts.bump && (
+            {productConfig.bump?.visible && (
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <MetricCard title="Bump Product Buyers" value={metrics.bumpProductBuyers} />
               </div>
             )}
 
-            {(selectedProducts.upsell1 || selectedProducts.downsell1) && (
+            {(productConfig.upsell1?.visible || productConfig.downsell1?.visible) && (
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                {selectedProducts.upsell1 && (
+                {productConfig.upsell1?.visible && (
                   <MetricCard title="Upsell 1 Buyers" value={metrics.upsell1Buyers} />
                 )}
-                {selectedProducts.downsell1 && (
+                {productConfig.downsell1?.visible && (
                   <MetricCard title="Downsell 1 Buyers" value={metrics.downsell1Buyers} />
                 )}
               </div>
             )}
 
-            {(selectedProducts.upsell2 || selectedProducts.downsell2) && (
+            {(productConfig.upsell2?.visible || productConfig.downsell2?.visible) && (
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                {selectedProducts.upsell2 && (
+                {productConfig.upsell2?.visible && (
                   <MetricCard title="Upsell 2 Buyers" value={metrics.upsell2Buyers} />
                 )}
-                {selectedProducts.downsell2 && (
+                {productConfig.downsell2?.visible && (
                   <MetricCard title="Downsell 2 Buyers" value={metrics.downsell2Buyers} />
                 )}
               </div>
@@ -296,7 +305,7 @@ export const LowTicketFunnel = ({ dateRange }: LowTicketFunnelProps) => {
             <ConversionChart 
               data={chartData}
               title="Funnel Performance Trends"
-              metrics={['pageViews', 'optins', 'mainOfferBuyers', 'roas']}
+              metrics={getFunnelMetrics()}
             />
           </CardContent>
         )}
@@ -358,28 +367,28 @@ export const LowTicketFunnel = ({ dateRange }: LowTicketFunnelProps) => {
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <MetricCard title="Optin Rate" value={conversions.optinRate} format="percentage" />
                 <MetricCard title="Main Offer Conversion" value={conversions.mainOfferRate} format="percentage" />
-                {selectedProducts.bump && (
+                {productConfig.bump?.visible && (
                   <MetricCard title="Bump Conversion" value={conversions.bumpRate} format="percentage" />
                 )}
               </div>
               
-              {(selectedProducts.upsell1 || selectedProducts.downsell1) && (
+              {(productConfig.upsell1?.visible || productConfig.downsell1?.visible) && (
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  {selectedProducts.upsell1 && (
+                  {productConfig.upsell1?.visible && (
                     <MetricCard title="Upsell 1 Conversion" value={conversions.upsell1Rate} format="percentage" />
                   )}
-                  {selectedProducts.downsell1 && (
+                  {productConfig.downsell1?.visible && (
                     <MetricCard title="Downsell 1 Conversion" value={conversions.downsell1Rate} format="percentage" />
                   )}
                 </div>
               )}
 
-              {(selectedProducts.upsell2 || selectedProducts.downsell2) && (
+              {(productConfig.upsell2?.visible || productConfig.downsell2?.visible) && (
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  {selectedProducts.upsell2 && (
+                  {productConfig.upsell2?.visible && (
                     <MetricCard title="Upsell 2 Conversion" value={conversions.upsell2Rate} format="percentage" />
                   )}
-                  {selectedProducts.downsell2 && (
+                  {productConfig.downsell2?.visible && (
                     <MetricCard title="Downsell 2 Conversion" value={conversions.downsell2Rate} format="percentage" />
                   )}
                 </div>
@@ -391,10 +400,13 @@ export const LowTicketFunnel = ({ dateRange }: LowTicketFunnelProps) => {
                   optinRate: d.pageViews > 0 ? (d.optins / d.pageViews) * 100 : 0,
                   mainOfferRate: d.pageViews > 0 ? (d.mainOfferBuyers / d.pageViews) * 100 : 0,
                   bumpRate: d.mainOfferBuyers > 0 ? (d.bumpProductBuyers / d.mainOfferBuyers) * 100 : 0,
-                  upsell1Rate: d.mainOfferBuyers > 0 ? (d.upsell1Buyers / d.mainOfferBuyers) * 100 : 0
+                  upsell1Rate: d.mainOfferBuyers > 0 ? (d.upsell1Buyers / d.mainOfferBuyers) * 100 : 0,
+                  downsell1Rate: d.mainOfferBuyers > 0 ? (d.downsell1Buyers / d.mainOfferBuyers) * 100 : 0,
+                  upsell2Rate: d.mainOfferBuyers > 0 ? (d.upsell2Buyers / d.mainOfferBuyers) * 100 : 0,
+                  downsell2Rate: d.mainOfferBuyers > 0 ? (d.downsell2Buyers / d.mainOfferBuyers) * 100 : 0
                 }))}
                 title="Conversion Rate Trends"
-                metrics={['optinRate', 'mainOfferRate', 'bumpRate', 'upsell1Rate']}
+                metrics={getConversionMetrics()}
               />
             </CardContent>
           )}

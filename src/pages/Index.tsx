@@ -17,10 +17,24 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, BarChart3, Settings, Brain, MessageSquare, Download, Target, TrendingUp } from "lucide-react";
 
+interface FunnelProductConfig {
+  id: string;
+  label: string;
+  visible: boolean;
+  color: string;
+}
+
 const Index = () => {
   const [selectedFunnel, setSelectedFunnel] = useState("low-ticket");
   const [dateRange, setDateRange] = useState({ from: new Date(), to: new Date() });
-  const [customMetrics, setCustomMetrics] = useState([]);
+  const [selectedProducts, setSelectedProducts] = useState<FunnelProductConfig[]>([
+    { id: 'mainProduct', label: 'Main Product', visible: true, color: '#10B981' },
+    { id: 'bump', label: 'Bump Product', visible: true, color: '#3B82F6' },
+    { id: 'upsell1', label: 'Upsell 1', visible: true, color: '#F59E0B' },
+    { id: 'downsell1', label: 'Downsell 1', visible: true, color: '#8B5CF6' },
+    { id: 'upsell2', label: 'Upsell 2', visible: false, color: '#EF4444' },
+    { id: 'downsell2', label: 'Downsell 2', visible: false, color: '#06B6D4' },
+  ]);
 
   const handleDateChange = (from: Date, to: Date) => {
     setDateRange({ from, to });
@@ -32,9 +46,9 @@ const Index = () => {
     console.log("Funnel changed to:", funnelType);
   };
 
-  const handleMetricsChange = (metrics: any[]) => {
-    setCustomMetrics(metrics);
-    console.log("Metrics customized:", metrics);
+  const handleProductsChange = (products: FunnelProductConfig[]) => {
+    setSelectedProducts(products);
+    console.log("Products changed:", products);
   };
 
   const renderFunnelContent = () => {
@@ -44,7 +58,7 @@ const Index = () => {
       case "book-call":
         return <BookCallFunnel />;
       default:
-        return <LowTicketFunnel dateRange={dateRange} />;
+        return <LowTicketFunnel dateRange={dateRange} selectedProducts={selectedProducts} />;
     }
   };
 
@@ -110,10 +124,12 @@ const Index = () => {
           </TabsList>
 
           <TabsContent value="dashboard" className="space-y-6">
-            {/* Metric Customizer */}
-            <MetricCustomizer onMetricsChange={handleMetricsChange} />
+            {/* Funnel Products Customizer - only show for low ticket funnel */}
+            {selectedFunnel === "low-ticket" && (
+              <MetricCustomizer onProductsChange={handleProductsChange} />
+            )}
 
-            {/* Funnel-Specific Content with integrated Google Sheets data */}
+            {/* Funnel-Specific Content */}
             {renderFunnelContent()}
           </TabsContent>
 
