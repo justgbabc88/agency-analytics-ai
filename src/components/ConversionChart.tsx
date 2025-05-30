@@ -31,6 +31,11 @@ export const ConversionChart = ({ data, title, metrics, productConfig }: Convers
     pageViews: '#6B7280',
     optins: '#8B5CF6',
     mainOfferBuyers: '#10B981',
+    bumpProductBuyers: '#3B82F6',
+    upsell1Buyers: '#F59E0B',
+    downsell1Buyers: '#8B5CF6',
+    upsell2Buyers: '#EF4444',
+    downsell2Buyers: '#06B6D4',
     roas: '#F59E0B',
     conversionRate: '#3B82F6',
     revenue: '#8B5CF6',
@@ -44,7 +49,12 @@ export const ConversionChart = ({ data, title, metrics, productConfig }: Convers
     cpm: '#F59E0B',
     frequency: '#8B5CF6',
     optinRate: '#8B5CF6',
-    mainOfferRate: '#10B981'
+    mainOfferRate: '#10B981',
+    bumpRate: '#3B82F6',
+    upsell1Rate: '#F59E0B',
+    downsell1Rate: '#8B5CF6',
+    upsell2Rate: '#EF4444',
+    downsell2Rate: '#06B6D4'
   };
 
   const getMetricColor = (metric: string) => {
