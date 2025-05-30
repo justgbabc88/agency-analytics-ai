@@ -4,9 +4,15 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 interface ConversionChartProps {
   data: Array<{
     date: string;
-    conversionRate: number;
-    roas: number;
-    pageViews: number;
+    conversionRate?: number;
+    roas?: number;
+    pageViews?: number;
+    revenue?: number;
+    cost?: number;
+    impressions?: number;
+    clicks?: number;
+    conversions?: number;
+    [key: string]: any;
   }>;
   title: string;
   metrics: string[];
@@ -16,7 +22,25 @@ export const ConversionChart = ({ data, title, metrics }: ConversionChartProps) 
   const colors = {
     conversionRate: '#3B82F6',
     roas: '#10B981', 
-    pageViews: '#F59E0B'
+    pageViews: '#F59E0B',
+    revenue: '#8B5CF6',
+    cost: '#EF4444',
+    impressions: '#06B6D4',
+    clicks: '#84CC16',
+    conversions: '#F97316'
+  };
+
+  const formatTooltipValue = (value: number, name: string) => {
+    if (name.includes('Rate') || name.includes('CTR')) {
+      return `${value.toFixed(2)}%`;
+    }
+    if (name.includes('Revenue') || name.includes('Cost') || name.includes('CPC')) {
+      return `$${value.toLocaleString()}`;
+    }
+    if (name.includes('ROAS')) {
+      return value.toFixed(2);
+    }
+    return value.toLocaleString();
   };
 
   return (
@@ -38,37 +62,21 @@ export const ConversionChart = ({ data, title, metrics }: ConversionChartProps) 
               borderRadius: '8px',
               boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
             }}
+            formatter={formatTooltipValue}
           />
-          {metrics.includes('conversionRate') && (
-            <Line 
-              type="monotone" 
-              dataKey="conversionRate" 
-              stroke={colors.conversionRate}
-              strokeWidth={2}
-              dot={{ fill: colors.conversionRate, strokeWidth: 2, r: 4 }}
-              name="Conversion Rate (%)"
-            />
-          )}
-          {metrics.includes('roas') && (
-            <Line 
-              type="monotone" 
-              dataKey="roas" 
-              stroke={colors.roas}
-              strokeWidth={2}
-              dot={{ fill: colors.roas, strokeWidth: 2, r: 4 }}
-              name="ROAS"
-            />
-          )}
-          {metrics.includes('pageViews') && (
-            <Line 
-              type="monotone" 
-              dataKey="pageViews" 
-              stroke={colors.pageViews}
-              strokeWidth={2}
-              dot={{ fill: colors.pageViews, strokeWidth: 2, r: 4 }}
-              name="Page Views"
-            />
-          )}
+          {metrics.map(metric => (
+            data[0] && data[0][metric] !== undefined && (
+              <Line 
+                key={metric}
+                type="monotone" 
+                dataKey={metric} 
+                stroke={colors[metric as keyof typeof colors] || '#6B7280'}
+                strokeWidth={2}
+                dot={{ fill: colors[metric as keyof typeof colors] || '#6B7280', strokeWidth: 2, r: 4 }}
+                name={metric.charAt(0).toUpperCase() + metric.slice(1).replace(/([A-Z])/g, ' $1')}
+              />
+            )
+          ))}
         </LineChart>
       </ResponsiveContainer>
     </div>
