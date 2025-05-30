@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MessageSquare, Send, Bot, User, Lightbulb, TrendingUp } from "lucide-react";
 import { useState } from "react";
+import { useGoogleSheetsData } from "@/hooks/useGoogleSheetsData";
 
 interface Message {
   id: string;
@@ -26,20 +27,26 @@ const quickQuestions = [
   "Show me optimization opportunities",
 ];
 
-const initialMessages: Message[] = [
-  {
-    id: '1',
-    type: 'ai',
-    content: "Hi! I'm your AI marketing assistant. I can analyze your dashboard data and provide insights. What would you like to know about your campaigns?",
-    timestamp: new Date(),
-    suggestions: quickQuestions.slice(0, 2)
-  }
-];
-
 export const AIChatPanel = ({ className }: AIChatPanelProps) => {
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const { syncedData, calculateMetricsFromSyncedData } = useGoogleSheetsData();
+
+  // Initialize with welcome message
+  useState(() => {
+    const currentMetrics = calculateMetricsFromSyncedData();
+    const welcomeMessage: Message = {
+      id: '1',
+      type: 'ai',
+      content: currentMetrics ? 
+        `Hi! I'm your AI marketing assistant. I can see you have ${currentMetrics.dataRows} data points in your dashboard with a current ROAS of ${currentMetrics.roas.toFixed(2)}. What would you like to know about your campaigns?` :
+        "Hi! I'm your AI marketing assistant. Connect your Google Sheets to get personalized insights, or ask me general marketing questions!",
+      timestamp: new Date(),
+      suggestions: quickQuestions.slice(0, 2)
+    };
+    setMessages([welcomeMessage]);
+  });
 
   const handleSendMessage = async (content: string) => {
     if (!content.trim()) return;
@@ -72,20 +79,36 @@ export const AIChatPanel = ({ className }: AIChatPanelProps) => {
 
   const generateAIResponse = (question: string): string => {
     const lowerQuestion = question.toLowerCase();
+    const currentMetrics = calculateMetricsFromSyncedData();
     
+    if (!currentMetrics) {
+      return "I'd love to help you analyze your campaign data! Please connect your Google Sheets in the Integrations tab to get personalized insights based on your actual performance metrics.";
+    }
+
     if (lowerQuestion.includes('roas') || lowerQuestion.includes('declining')) {
-      return "Your ROAS has declined by 5.3% to 3.6. This is primarily due to increased ad costs (+$6,000) while revenue growth slowed. I recommend: 1) Review and pause underperforming ad sets, 2) Test new creative variations, 3) Optimize targeting to focus on higher-converting audiences.";
+      const roasStatus = currentMetrics.roas > 3 ? 'strong' : currentMetrics.roas > 2 ? 'moderate' : 'concerning';
+      return `Your current ROAS is ${currentMetrics.roas.toFixed(2)}, which is ${roasStatus}. With ${currentMetrics.cost.toLocaleString()} in ad spend generating ${currentMetrics.revenue.toLocaleString()} in revenue, I recommend: 1) Analyze your top-performing campaigns and scale them, 2) Pause campaigns with ROAS below 2.0, 3) Test new creative variations for underperforming ads.`;
     }
     
     if (lowerQuestion.includes('conversion') || lowerQuestion.includes('improve')) {
-      return "Your current conversion rate is 6.8%. To improve it, consider: 1) A/B testing your landing pages, 2) Optimizing your checkout flow, 3) Adding social proof elements, 4) Implementing exit-intent popups. Your book-call funnel has the highest conversion rate at 12.3%.";
+      return `Your current conversion rate is ${currentMetrics.conversionRate.toFixed(1)}% with ${currentMetrics.conversions.toLocaleString()} conversions from ${currentMetrics.clicks.toLocaleString()} clicks. To improve: 1) A/B test your landing pages, 2) Optimize your checkout flow, 3) Add urgency and social proof elements, 4) Review your traffic quality and targeting.`;
     }
     
     if (lowerQuestion.includes('funnel') || lowerQuestion.includes('performing')) {
-      return "Based on your data, the Book Call funnel is performing best with a 12.3% conversion rate and $4,200 revenue per visitor. The Low Ticket funnel has the highest volume but lower conversion at 4.8%. Consider scaling the Book Call funnel or applying its strategies to other funnels.";
+      const ctr = currentMetrics.clicks > 0 ? (currentMetrics.clicks / currentMetrics.impressions) * 100 : 0;
+      return `Based on your ${currentMetrics.dataRows} data points: Your CTR is ${ctr.toFixed(2)}%, conversion rate is ${currentMetrics.conversionRate.toFixed(1)}%, and ROAS is ${currentMetrics.roas.toFixed(2)}. Focus on scaling campaigns with ROAS above 3.0 and optimizing those below 2.0.`;
+    }
+
+    if (lowerQuestion.includes('optimization') || lowerQuestion.includes('opportunities')) {
+      const suggestions = [];
+      if (currentMetrics.roas < 3) suggestions.push("Improve ROAS by optimizing targeting");
+      if (currentMetrics.conversionRate < 5) suggestions.push("Test landing page variations");
+      if (currentMetrics.ctr < 2) suggestions.push("Refresh ad creatives");
+      
+      return `Based on your current metrics, here are optimization opportunities: ${suggestions.join(', ')}. Your current performance: ROAS ${currentMetrics.roas.toFixed(2)}, Conversion Rate ${currentMetrics.conversionRate.toFixed(1)}%, ${currentMetrics.conversions} total conversions.`;
     }
     
-    return "I can help you analyze your marketing data. Try asking about specific metrics like ROAS, conversion rates, or funnel performance. I can also provide optimization recommendations based on your current data.";
+    return `I can help you analyze your marketing data. Your current metrics show: ROAS of ${currentMetrics.roas.toFixed(2)}, ${currentMetrics.conversions.toLocaleString()} conversions, and ${currentMetrics.conversionRate.toFixed(1)}% conversion rate. Try asking about specific optimization strategies or performance comparisons.`;
   };
 
   const generateSuggestions = (question: string): string[] => {
