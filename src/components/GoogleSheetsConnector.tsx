@@ -1,13 +1,13 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Plus, FileSpreadsheet, MapPin, User, RefreshCw } from "lucide-react";
+import { FileSpreadsheet, User, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useGoogleAuth } from "@/hooks/useGoogleAuth";
 import { useGoogleSheetsData } from "@/hooks/useGoogleSheetsData";
+import { AutoFieldMapper } from "./AutoFieldMapper";
 
 interface GoogleSheet {
   id: string;
@@ -19,6 +19,8 @@ interface FieldMapping {
   id: string;
   sheetColumn: string;
   dashboardField: string;
+  confidence?: number;
+  isAutoMapped?: boolean;
 }
 
 interface SheetInfo {
@@ -49,20 +51,36 @@ export const GoogleSheetsConnector = () => {
 
   const { config, storeSyncedData, storeConfig, clearConfig } = useGoogleSheetsData();
 
+  const dashboardFields = [
+    "page_views",
+    "optins", 
+    "main_offer_buyers",
+    "bump_product_buyers",
+    "upsell_1_buyers",
+    "downsell_1_buyers", 
+    "upsell_2_buyers",
+    "downsell_2_buyers",
+    "roas",
+    "spend",
+    "ctr_all",
+    "ctr_link", 
+    "cpm",
+    "frequency",
+    "date"
+  ];
+
   useEffect(() => {
     if (isConnected) {
       loadSheets();
     }
   }, [isConnected]);
 
-  // Load saved configuration when component mounts
   useEffect(() => {
     if (config && sheets.length > 0) {
       setSelectedSheet(config.selectedSheet);
       setSelectedSubSheet(config.selectedSubSheet);
       setFieldMappings(config.fieldMappings);
       
-      // Load sheet columns if we have a selected sheet
       if (config.selectedSheet) {
         loadSheetColumns(config.selectedSheet);
       }
@@ -83,7 +101,6 @@ export const GoogleSheetsConnector = () => {
     } catch (error: any) {
       console.error('Failed to load sheets:', error);
       
-      // Check if it's an authentication error
       if (error.message?.includes('Authentication expired') || error.message?.includes('reconnect')) {
         toast({
           title: "Authentication Expired",
@@ -111,7 +128,6 @@ export const GoogleSheetsConnector = () => {
       setSheetColumns(sheetData.columns || []);
       setAvailableSheets(sheetData.sheets || []);
       
-      // Auto-select the first sheet if available and no config exists
       if (sheetData.sheets && sheetData.sheets.length > 0 && !config) {
         setSelectedSubSheet(sheetData.sheets[0].title);
       }
@@ -124,24 +140,6 @@ export const GoogleSheetsConnector = () => {
       });
     }
   };
-
-  const dashboardFields = [
-    "page_views",
-    "optins", 
-    "main_offer_buyers",
-    "bump_product_buyers",
-    "upsell_1_buyers",
-    "downsell_1_buyers", 
-    "upsell_2_buyers",
-    "downsell_2_buyers",
-    "roas",
-    "spend",
-    "ctr_all",
-    "ctr_link", 
-    "cpm",
-    "frequency",
-    "date"
-  ];
 
   const handleGoogleConnect = async () => {
     try {
@@ -207,10 +205,8 @@ export const GoogleSheetsConnector = () => {
       
       const sheetData = await getSheetData(selectedSheet, range);
       
-      // Store the synced data
       storeSyncedData(sheetData, fieldMappings);
       
-      // Store the configuration for future use
       const selectedSheetTitle = sheets.find(s => s.id === selectedSheet)?.name || '';
       storeConfig(selectedSheet, selectedSubSheet, fieldMappings, selectedSheetTitle);
       
@@ -223,7 +219,6 @@ export const GoogleSheetsConnector = () => {
     } catch (error: any) {
       console.error('Sync failed:', error);
       
-      // Check if it's an authentication error
       if (error.message?.includes('Authentication expired') || error.message?.includes('reconnect')) {
         toast({
           title: "Authentication Expired",
@@ -388,75 +383,23 @@ export const GoogleSheetsConnector = () => {
           </Card>
 
           {selectedSheet && selectedSubSheet && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MapPin className="h-5 w-5" />
-                  Field Mapping
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-3 gap-4 font-medium text-sm">
-                  <div>Sheet Column</div>
-                  <div>Dashboard Field</div>
-                  <div>Actions</div>
-                </div>
-                
-                {fieldMappings.map(mapping => (
-                  <div key={mapping.id} className="grid grid-cols-3 gap-4 items-center">
-                    <Select 
-                      value={mapping.sheetColumn} 
-                      onValueChange={(value) => updateFieldMapping(mapping.id, 'sheetColumn', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select column" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {sheetColumns.map(column => (
-                          <SelectItem key={column} value={column}>
-                            {column}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    
-                    <Select 
-                      value={mapping.dashboardField} 
-                      onValueChange={(value) => updateFieldMapping(mapping.id, 'dashboardField', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select field" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {dashboardFields.map(field => (
-                          <SelectItem key={field} value={field}>
-                            {field.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeFieldMapping(mapping.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-                
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={addFieldMapping}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Mapping
-                  </Button>
-                  <Button onClick={performSync} disabled={syncing} className="ml-auto">
-                    {syncing ? 'Syncing...' : 'Sync Data'}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <>
+              <AutoFieldMapper
+                sheetColumns={sheetColumns}
+                dashboardFields={dashboardFields}
+                fieldMappings={fieldMappings}
+                onMappingsChange={setFieldMappings}
+                onAddMapping={addFieldMapping}
+                onRemoveMapping={removeFieldMapping}
+                onUpdateMapping={updateFieldMapping}
+              />
+              
+              <div className="flex justify-end">
+                <Button onClick={performSync} disabled={syncing || fieldMappings.length === 0}>
+                  {syncing ? 'Syncing...' : 'Sync Data'}
+                </Button>
+              </div>
+            </>
           )}
         </>
       )}
