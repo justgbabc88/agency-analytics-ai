@@ -12,6 +12,11 @@ import AuthPage from "@/pages/auth"
 import NotFound from "@/pages/NotFound"
 import PrivacyPolicy from "@/pages/PrivacyPolicy"
 import TermsAndConditions from "@/pages/TermsAndConditions"
+import Integrations from "@/pages/Integrations"
+import Support from "@/pages/Support"
+import Documentation from "@/pages/Documentation"
+import CookiePolicy from "@/pages/CookiePolicy"
+import GdprCompliance from "@/pages/GdprCompliance"
 import { GoogleOAuthCallbackPage } from "@/pages/GoogleOAuthCallback"
 
 const queryClient = new QueryClient()
@@ -30,6 +35,11 @@ function App() {
                 <Route path="/auth" element={<AuthPage />} />
                 <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                 <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
+                <Route path="/integrations" element={<Integrations />} />
+                <Route path="/support" element={<Support />} />
+                <Route path="/documentation" element={<Documentation />} />
+                <Route path="/cookie-policy" element={<CookiePolicy />} />
+                <Route path="/gdpr-compliance" element={<GdprCompliance />} />
                 <Route path="/google-oauth-callback" element={<GoogleOAuthCallbackPage />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>

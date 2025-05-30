@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Mail, MapPin } from 'lucide-react';
+import { Mail, MapPin, Facebook, Twitter, Linkedin } from 'lucide-react';
 
 const Footer = () => {
   return (
@@ -40,28 +40,28 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <a 
-                  href="#integrations" 
+                <Link 
+                  to="/integrations" 
                   className="text-gray-300 hover:text-white transition-colors"
                 >
                   Integrations
-                </a>
+                </Link>
               </li>
               <li>
-                <a 
-                  href="#support" 
+                <Link 
+                  to="/support" 
                   className="text-gray-300 hover:text-white transition-colors"
                 >
                   Support
-                </a>
+                </Link>
               </li>
               <li>
-                <a 
-                  href="#documentation" 
+                <Link 
+                  to="/documentation" 
                   className="text-gray-300 hover:text-white transition-colors"
                 >
                   Documentation
-                </a>
+                </Link>
               </li>
             </ul>
           </div>
@@ -87,20 +87,20 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <a 
-                  href="#cookies" 
+                <Link 
+                  to="/cookie-policy" 
                   className="text-gray-300 hover:text-white transition-colors"
                 >
                   Cookie Policy
-                </a>
+                </Link>
               </li>
               <li>
-                <a 
-                  href="#gdpr" 
+                <Link 
+                  to="/gdpr-compliance" 
                   className="text-gray-300 hover:text-white transition-colors"
                 >
                   GDPR Compliance
-                </a>
+                </Link>
               </li>
             </ul>
           </div>
@@ -113,22 +113,28 @@ const Footer = () => {
           </p>
           <div className="flex space-x-6 mt-4 md:mt-0">
             <a 
-              href="#facebook" 
+              href="https://facebook.com" 
+              target="_blank"
+              rel="noopener noreferrer"
               className="text-gray-400 hover:text-white transition-colors"
             >
-              Facebook
+              <Facebook className="h-5 w-5" />
             </a>
             <a 
-              href="#twitter" 
+              href="https://twitter.com" 
+              target="_blank"
+              rel="noopener noreferrer"
               className="text-gray-400 hover:text-white transition-colors"
             >
-              Twitter
+              <Twitter className="h-5 w-5" />
             </a>
             <a 
-              href="#linkedin" 
+              href="https://linkedin.com" 
+              target="_blank"
+              rel="noopener noreferrer"
               className="text-gray-400 hover:text-white transition-colors"
             >
-              LinkedIn
+              <Linkedin className="h-5 w-5" />
             </a>
           </div>
         </div>
