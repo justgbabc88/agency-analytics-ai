@@ -250,8 +250,11 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
     return insights.join(' ');
   };
 
-  const formatTooltipValue = (value: number, name: string) => {
-    if (name.includes('confidence')) return `${value}%`;
+  const formatTooltipValue = (value: number, name: string | number | any) => {
+    // Ensure name is a string before calling string methods
+    const nameStr = String(name || '');
+    
+    if (nameStr.includes('confidence')) return `${value}%`;
     if (selectedMetric === 'revenue') return `$${value.toLocaleString()}`;
     return value.toLocaleString();
   };
@@ -345,10 +348,10 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
                   borderRadius: '8px',
                   boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
                 }}
-                formatter={(value: number, name: string) => [
+                formatter={(value: number, name: string | number | any) => [
                   formatTooltipValue(value, name),
-                  name === 'value' ? (selectedMetric.charAt(0).toUpperCase() + selectedMetric.slice(1)) : 
-                  name === 'trendValue' ? 'Trend Line' : name
+                  String(name) === 'value' ? (selectedMetric.charAt(0).toUpperCase() + selectedMetric.slice(1)) : 
+                  String(name) === 'trendValue' ? 'Trend Line' : String(name)
                 ]}
                 labelFormatter={(label) => `Date: ${label}`}
               />
@@ -419,7 +422,7 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
                   strokeWidth={1}
                   label={{ 
                     value: "Forecast", 
-                    position: "topLeft",
+                    position: "top",
                     style: { fontSize: '11px', fill: '#6b7280' }
                   }}
                 />
