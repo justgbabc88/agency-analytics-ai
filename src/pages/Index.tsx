@@ -136,7 +136,7 @@ const Index = () => {
             <MetricCustomizer onMetricsChange={handleMetricsChange} />
 
             {/* Google Sheets Synced Data */}
-            <GoogleSheetsMetrics />
+            <GoogleSheetsMetrics dateRange={dateRange} />
 
             {/* Key Metrics Overview */}
             <Card>

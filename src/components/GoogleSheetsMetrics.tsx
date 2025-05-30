@@ -6,11 +6,64 @@ import { FileSpreadsheet, RefreshCw, Trash2 } from "lucide-react";
 import { useGoogleSheetsData } from "@/hooks/useGoogleSheetsData";
 import { MetricCard } from "./MetricCard";
 import { ConversionChart } from "./ConversionChart";
+import { isWithinInterval, parseISO, isValid } from "date-fns";
 
-export const GoogleSheetsMetrics = () => {
+interface GoogleSheetsMetricsProps {
+  dateRange?: {
+    from: Date;
+    to: Date;
+  };
+}
+
+export const GoogleSheetsMetrics = ({ dateRange }: GoogleSheetsMetricsProps) => {
   const { syncedData, calculateMetricsFromSyncedData, clearSyncedData } = useGoogleSheetsData();
   
-  const metrics = calculateMetricsFromSyncedData();
+  // Filter data based on date range if provided
+  const getFilteredData = () => {
+    if (!syncedData || !dateRange) return syncedData;
+    
+    const filteredData = syncedData.data.filter(row => {
+      // Try to find a date field in the row
+      const dateField = Object.keys(row).find(key => 
+        key.toLowerCase().includes('date') || 
+        key.toLowerCase().includes('day') ||
+        key.toLowerCase().includes('time')
+      );
+      
+      if (!dateField || !row[dateField]) return true; // Include if no date field
+      
+      try {
+        // Try parsing the date in various formats
+        let rowDate: Date;
+        const dateValue = row[dateField];
+        
+        // Try ISO format first
+        if (dateValue.includes('-') || dateValue.includes('/')) {
+          rowDate = new Date(dateValue);
+        } else {
+          // If it's just a number, might be a day number
+          return true; // Include all non-standard date formats
+        }
+        
+        if (!isValid(rowDate)) return true; // Include if date is invalid
+        
+        return isWithinInterval(rowDate, {
+          start: dateRange.from,
+          end: dateRange.to
+        });
+      } catch (error) {
+        return true; // Include if date parsing fails
+      }
+    });
+    
+    return {
+      ...syncedData,
+      data: filteredData
+    };
+  };
+
+  const filteredSyncedData = getFilteredData();
+  const metrics = calculateMetricsFromSyncedData(filteredSyncedData);
 
   if (!syncedData || !metrics) {
     return (
@@ -28,9 +81,9 @@ export const GoogleSheetsMetrics = () => {
     );
   }
 
-  // Transform the data for charts by creating time series data
+  // Transform the filtered data for charts
   const generateChartData = () => {
-    const data = syncedData.data;
+    const data = filteredSyncedData?.data || [];
     
     // Group data by date if there's a date field, otherwise create sample dates
     const chartData = data.map((row, index) => {
@@ -71,7 +124,7 @@ export const GoogleSheetsMetrics = () => {
             </CardTitle>
             <div className="flex items-center gap-2">
               <Badge variant="secondary" className="bg-green-100 text-green-700">
-                {metrics.dataRows} rows synced
+                {metrics.dataRows} rows {dateRange ? '(filtered)' : 'synced'}
               </Badge>
               <Button
                 variant="ghost"
@@ -85,6 +138,11 @@ export const GoogleSheetsMetrics = () => {
           </div>
           <p className="text-sm text-gray-500">
             Last synced: {new Date(syncedData.syncedAt).toLocaleString()}
+            {dateRange && (
+              <span className="ml-2 text-blue-600">
+                • Filtered: {dateRange.from.toLocaleDateString()} - {dateRange.to.toLocaleDateString()}
+              </span>
+            )}
           </p>
         </CardHeader>
         <CardContent>

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 
 interface GoogleSheetsRow {
@@ -70,10 +69,11 @@ export const useGoogleSheetsData = () => {
     localStorage.setItem('google_sheets_config', JSON.stringify(configObject));
   };
 
-  const calculateMetricsFromSyncedData = () => {
-    if (!syncedData || !syncedData.data.length) return null;
+  const calculateMetricsFromSyncedData = (dataToUse?: SyncedData | null) => {
+    const targetData = dataToUse || syncedData;
+    if (!targetData || !targetData.data.length) return null;
 
-    const data = syncedData.data;
+    const data = targetData.data;
     
     // Calculate totals and averages
     const totals = {
