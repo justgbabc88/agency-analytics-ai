@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +8,7 @@ import { useIntegrations } from "@/hooks/useIntegrations";
 import { useApiKeys } from "@/hooks/useApiKeys";
 import { ApiKeyManager } from "./ApiKeyManager";
 import { GoogleSheetsConnector } from "./GoogleSheetsConnector";
-import { SupermetricsConnector } from "./SupermetricsConnector";
+import { FacebookConnector } from "./FacebookConnector";
 import { Settings, CheckCircle, XCircle, RefreshCw, Key, FileSpreadsheet, BarChart3, ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 
@@ -22,9 +21,9 @@ const integrationPlatforms = [
     icon: FileSpreadsheet
   },
   { 
-    id: 'supermetrics', 
-    name: 'Supermetrics', 
-    description: 'Advanced marketing data analytics',
+    id: 'facebook', 
+    name: 'Facebook Ads', 
+    description: 'Facebook advertising data and analytics',
     color: 'bg-blue-100 text-blue-700',
     icon: BarChart3
   },
@@ -102,7 +101,7 @@ export const IntegrationsPanel = () => {
                 <Badge className={platform.color} variant="secondary">
                   {isConnected ? 'Connected' : 'Not Connected'}
                 </Badge>
-                {hasKeys && !['google_sheets', 'supermetrics'].includes(platform.id) && (
+                {hasKeys && !['google_sheets', 'facebook'].includes(platform.id) && (
                   <Badge variant="outline" className="text-xs">
                     <Key className="h-3 w-3 mr-1" />
                     API Keys Set
@@ -126,7 +125,7 @@ export const IntegrationsPanel = () => {
             <Switch
               checked={isConnected}
               onCheckedChange={(checked) => handleToggleIntegration(platform.id, checked)}
-              disabled={!hasKeys && !['google_sheets', 'supermetrics'].includes(platform.id)}
+              disabled={!hasKeys && !['google_sheets', 'facebook'].includes(platform.id)}
               onClick={(e) => e.stopPropagation()}
             />
           </div>
@@ -139,8 +138,8 @@ export const IntegrationsPanel = () => {
     switch (platform.id) {
       case 'google_sheets':
         return <GoogleSheetsConnector />;
-      case 'supermetrics':
-        return <SupermetricsConnector />;
+      case 'facebook':
+        return <FacebookConnector />;
       default:
         return (
           <ApiKeyManager
