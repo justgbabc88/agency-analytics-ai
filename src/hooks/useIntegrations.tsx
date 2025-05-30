@@ -27,24 +27,6 @@ export const useIntegrations = () => {
     enabled: !!agency,
   });
 
-  // Query for integration data (including Supermetrics data)
-  const { data: integrationData } = useQuery({
-    queryKey: ['integration_data', agency?.id],
-    queryFn: async () => {
-      if (!agency) return [];
-      
-      const { data, error } = await supabase
-        .from('integration_data')
-        .select('*')
-        .eq('agency_id', agency.id)
-        .order('synced_at', { ascending: false });
-
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!agency,
-  });
-
   const updateIntegration = useMutation({
     mutationFn: async ({ platform, isConnected }: { platform: string; isConnected: boolean }) => {
       if (!agency) throw new Error('No agency found');
@@ -86,7 +68,6 @@ export const useIntegrations = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['integrations'] });
-      queryClient.invalidateQueries({ queryKey: ['integration_data'] });
     },
   });
 
@@ -109,21 +90,13 @@ export const useIntegrations = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['integrations'] });
-      queryClient.invalidateQueries({ queryKey: ['integration_data'] });
     },
   });
 
-  // Helper function to get Supermetrics data specifically
-  const getSupermetricsData = () => {
-    return integrationData?.find(data => data.platform === 'supermetrics')?.data;
-  };
-
   return {
     integrations,
-    integrationData,
     isLoading,
     updateIntegration,
     syncIntegration,
-    getSupermetricsData,
   };
 };
