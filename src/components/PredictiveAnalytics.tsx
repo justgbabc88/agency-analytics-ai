@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -7,7 +6,7 @@ import { TrendingUp, TrendingDown, Brain, Target, AlertCircle, RefreshCw, Calend
 import { useState } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Area, ComposedChart } from "recharts";
 import { useGoogleSheetsData } from "@/hooks/useGoogleSheetsData";
-import { generateForecast, generateScenarioForecasts, parseDateFromSheetData, ForecastResult } from "@/utils/timeSeriesUtils";
+import { generateForecast, generateScenarioForecasts, parseDateFromSheetData, ForecastResult, calculateLinearTrend } from "@/utils/timeSeriesUtils";
 import { format, addDays } from "date-fns";
 
 interface PredictiveAnalyticsProps {
@@ -133,6 +132,22 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
   };
 
   const forecastResult = generateEnhancedForecastData();
+
+  // Calculate trend line data for visualization
+  const generateTrendLineData = () => {
+    const actualData = forecastResult.data.filter(d => d.isActual);
+    if (actualData.length < 2) return null;
+
+    const values = actualData.map(d => d.value);
+    const trend = calculateLinearTrend(values);
+
+    return forecastResult.data.map((point, index) => ({
+      ...point,
+      trendValue: trend.slope * index + trend.intercept
+    }));
+  };
+
+  const trendLineData = generateTrendLineData();
 
   // Generate enhanced predictions with scenarios
   const generateEnhancedPredictions = () => {
@@ -305,10 +320,10 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
           </Badge>
         </div>
 
-        {/* Enhanced Forecast Chart */}
+        {/* Enhanced Forecast Chart with Trend Lines */}
         <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={forecastResult.data}>
+            <ComposedChart data={trendLineData || forecastResult.data}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis 
                 dataKey="date" 
@@ -332,65 +347,101 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
                 }}
                 formatter={(value: number, name: string) => [
                   formatTooltipValue(value, name),
-                  name === 'value' ? (selectedMetric.charAt(0).toUpperCase() + selectedMetric.slice(1)) : name
+                  name === 'value' ? (selectedMetric.charAt(0).toUpperCase() + selectedMetric.slice(1)) : 
+                  name === 'trendValue' ? 'Trend Line' : name
                 ]}
                 labelFormatter={(label) => `Date: ${label}`}
               />
               
-              {/* Confidence band for predictions */}
+              {/* Subtle confidence band for predictions only */}
               <Area
-                dataKey="confidence"
+                dataKey={(entry) => entry.isActual ? null : entry.confidence}
                 stroke="none"
-                fill="rgba(139, 92, 246, 0.1)"
-                fillOpacity={0.3}
+                fill="rgba(147, 51, 234, 0.08)"
+                fillOpacity={0.5}
                 stackId="confidence"
               />
               
-              {/* Actual data line */}
+              {/* Trend line - subtle and continuous */}
+              {trendLineData && (
+                <Line 
+                  type="monotone" 
+                  dataKey="trendValue"
+                  stroke="#94a3b8" 
+                  strokeWidth={1.5}
+                  strokeDasharray="4 4"
+                  dot={false}
+                  connectNulls={true}
+                  name="Trend"
+                />
+              )}
+              
+              {/* Historical data line - bold and solid */}
               <Line 
                 type="monotone" 
-                dataKey="value"
-                stroke="#3B82F6" 
+                dataKey={(entry) => entry.isActual ? entry.value : null}
+                stroke="#1f2937" 
                 strokeWidth={3}
                 dot={(props) => {
                   const { payload } = props;
                   return payload?.isActual ? (
-                    <circle {...props} fill="#3B82F6" strokeWidth={2} r={4} />
+                    <circle {...props} fill="#1f2937" strokeWidth={2} r={4} />
                   ) : null;
                 }}
                 connectNulls={false}
-                name="Actual"
+                name="Historical Data"
               />
               
-              {/* Predicted data line */}
+              {/* Predicted data line - lighter and dashed */}
               <Line 
                 type="monotone" 
-                dataKey="value"
-                stroke="#8B5CF6" 
+                dataKey={(entry) => !entry.isActual ? entry.value : null}
+                stroke="#a855f7" 
                 strokeWidth={2}
-                strokeDasharray="8 8"
+                strokeDasharray="6 6"
+                strokeOpacity={0.7}
                 dot={(props) => {
                   const { payload } = props;
                   return !payload?.isActual ? (
-                    <circle {...props} fill="#8B5CF6" strokeWidth={2} r={3} />
+                    <circle {...props} fill="#a855f7" stroke="#a855f7" strokeWidth={1} r={2} fillOpacity={0.7} />
                   ) : null;
                 }}
                 connectNulls={false}
-                name="Predicted"
+                name="Prediction"
               />
               
               {/* Vertical line separating actual vs predicted */}
               {forecastResult.data.some(d => d.isActual) && forecastResult.data.some(d => !d.isActual) && (
                 <ReferenceLine 
                   x={forecastResult.data.find(d => d.isActual && forecastResult.data[forecastResult.data.indexOf(d) + 1]?.isActual === false)?.date}
-                  stroke="#ef4444"
-                  strokeDasharray="4 4"
+                  stroke="#e5e7eb"
+                  strokeDasharray="2 2"
                   strokeWidth={1}
-                  label={{ value: "Forecast Start", position: "top" }}
+                  label={{ 
+                    value: "Forecast", 
+                    position: "topLeft",
+                    style: { fontSize: '11px', fill: '#6b7280' }
+                  }}
                 />
               )}
             </ComposedChart>
           </ResponsiveContainer>
+        </div>
+
+        {/* Legend for chart clarity */}
+        <div className="flex items-center justify-center gap-6 text-xs text-gray-600">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-0.5 bg-gray-800"></div>
+            <span>Historical Data</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-0.5 bg-purple-500 opacity-70" style={{ borderTop: '2px dashed' }}></div>
+            <span>Prediction</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-0.5 bg-slate-400" style={{ borderTop: '1px dashed' }}></div>
+            <span>Trend Line</span>
+          </div>
         </div>
 
         {/* Enhanced Predictions Grid */}
