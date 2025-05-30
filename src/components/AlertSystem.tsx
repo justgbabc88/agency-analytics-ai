@@ -1,10 +1,12 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertTriangle, Bell, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useGoogleSheetsData } from "@/hooks/useGoogleSheetsData";
 
 interface Alert {
   id: string;
@@ -13,22 +15,26 @@ interface Alert {
   threshold: number;
   isActive: boolean;
   lastTriggered?: Date;
+  currentValue?: number;
+  isTriggered?: boolean;
 }
 
 const availableMetrics = [
-  { value: 'conversion_rate', label: 'Conversion Rate (%)' },
+  { value: 'conversionRate', label: 'Conversion Rate (%)' },
   { value: 'roas', label: 'ROAS' },
   { value: 'revenue', label: 'Daily Revenue ($)' },
-  { value: 'leads', label: 'Daily Leads' },
-  { value: 'spend', label: 'Daily Ad Spend ($)' },
+  { value: 'conversions', label: 'Daily Conversions' },
+  { value: 'cost', label: 'Daily Ad Spend ($)' },
   { value: 'cpc', label: 'Cost Per Click ($)' },
+  { value: 'ctr', label: 'Click Through Rate (%)' },
 ];
 
 export const AlertSystem = () => {
+  const { calculateMetricsFromSyncedData } = useGoogleSheetsData();
   const [alerts, setAlerts] = useState<Alert[]>([
     {
       id: '1',
-      metric: 'conversion_rate',
+      metric: 'conversionRate',
       condition: 'below',
       threshold: 3.0,
       isActive: true,
@@ -48,6 +54,30 @@ export const AlertSystem = () => {
     condition: 'below' as 'below' | 'above',
     threshold: 0,
   });
+
+  // Get current metrics and check alerts
+  const currentMetrics = calculateMetricsFromSyncedData();
+
+  // Update alerts with current values and trigger status
+  useEffect(() => {
+    if (currentMetrics) {
+      setAlerts(prevAlerts => 
+        prevAlerts.map(alert => {
+          const currentValue = currentMetrics[alert.metric as keyof typeof currentMetrics] as number || 0;
+          const isTriggered = alert.condition === 'below' 
+            ? currentValue < alert.threshold 
+            : currentValue > alert.threshold;
+          
+          return {
+            ...alert,
+            currentValue,
+            isTriggered: isTriggered && alert.isActive,
+            lastTriggered: isTriggered && alert.isActive ? new Date() : alert.lastTriggered
+          };
+        })
+      );
+    }
+  }, [currentMetrics]);
 
   const addAlert = () => {
     if (!newAlert.metric || newAlert.threshold <= 0) return;
@@ -78,12 +108,30 @@ export const AlertSystem = () => {
     return availableMetrics.find(m => m.value === value)?.label || value;
   };
 
+  const formatMetricValue = (value: number, metric: string) => {
+    if (metric.includes('Rate') || metric === 'ctr') {
+      return `${value.toFixed(1)}%`;
+    }
+    if (metric.includes('cost') || metric.includes('revenue') || metric.includes('cpc')) {
+      return `$${value.toFixed(2)}`;
+    }
+    if (metric === 'roas') {
+      return value.toFixed(2);
+    }
+    return Math.round(value).toLocaleString();
+  };
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Bell className="h-5 w-5" />
           Performance Alerts
+          {currentMetrics && (
+            <Badge variant="outline" className="ml-2">
+              Live Data Connected
+            </Badge>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -93,30 +141,51 @@ export const AlertSystem = () => {
             <div
               key={alert.id}
               className={`p-4 border rounded-lg ${
+                alert.isTriggered ? 'bg-red-50 border-red-200' :
                 alert.isActive ? 'bg-white' : 'bg-gray-50'
               }`}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className={`p-1 rounded ${alert.isActive ? 'bg-orange-100' : 'bg-gray-100'}`}>
-                    <AlertTriangle className={`h-4 w-4 ${alert.isActive ? 'text-orange-600' : 'text-gray-400'}`} />
+                  <div className={`p-1 rounded ${
+                    alert.isTriggered ? 'bg-red-100' :
+                    alert.isActive ? 'bg-orange-100' : 'bg-gray-100'
+                  }`}>
+                    <AlertTriangle className={`h-4 w-4 ${
+                      alert.isTriggered ? 'text-red-600' :
+                      alert.isActive ? 'text-orange-600' : 'text-gray-400'
+                    }`} />
                   </div>
                   <div>
                     <p className="font-medium">
                       {getMetricLabel(alert.metric)} {alert.condition} {alert.threshold}
-                      {alert.metric.includes('rate') || alert.metric === 'roas' ? '' : 
-                       alert.metric.includes('cost') || alert.metric.includes('revenue') || alert.metric.includes('spend') ? '$' : ''}
+                      {alert.metric.includes('Rate') || alert.metric === 'ctr' ? '%' : 
+                       alert.metric === 'roas' ? '' :
+                       alert.metric.includes('cost') || alert.metric.includes('revenue') || alert.metric.includes('cpc') ? '$' : ''}
                     </p>
-                    {alert.lastTriggered && (
-                      <p className="text-sm text-red-600">
+                    {alert.currentValue !== undefined && (
+                      <p className="text-sm text-gray-600">
+                        Current: {formatMetricValue(alert.currentValue, alert.metric)}
+                      </p>
+                    )}
+                    {alert.isTriggered && (
+                      <p className="text-sm text-red-600 font-medium">
+                        ⚠️ Alert triggered now!
+                      </p>
+                    )}
+                    {alert.lastTriggered && !alert.isTriggered && (
+                      <p className="text-sm text-gray-500">
                         Last triggered: {alert.lastTriggered.toLocaleDateString()}
                       </p>
                     )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge variant={alert.isActive ? "default" : "secondary"}>
-                    {alert.isActive ? 'Active' : 'Inactive'}
+                  <Badge variant={
+                    alert.isTriggered ? "destructive" :
+                    alert.isActive ? "default" : "secondary"
+                  }>
+                    {alert.isTriggered ? 'Triggered' : alert.isActive ? 'Active' : 'Inactive'}
                   </Badge>
                   <Button
                     variant="ghost"
@@ -137,6 +206,31 @@ export const AlertSystem = () => {
             </div>
           ))}
         </div>
+
+        {/* Current Metrics Display */}
+        {currentMetrics && (
+          <div className="border-t pt-4">
+            <h4 className="font-medium mb-3">Current Metrics</h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+              <div className="p-2 bg-gray-50 rounded">
+                <div className="text-gray-600">Conversion Rate</div>
+                <div className="font-medium">{currentMetrics.conversionRate.toFixed(1)}%</div>
+              </div>
+              <div className="p-2 bg-gray-50 rounded">
+                <div className="text-gray-600">ROAS</div>
+                <div className="font-medium">{currentMetrics.roas.toFixed(2)}</div>
+              </div>
+              <div className="p-2 bg-gray-50 rounded">
+                <div className="text-gray-600">Revenue</div>
+                <div className="font-medium">${currentMetrics.revenue.toLocaleString()}</div>
+              </div>
+              <div className="p-2 bg-gray-50 rounded">
+                <div className="text-gray-600">Cost</div>
+                <div className="font-medium">${currentMetrics.cost.toLocaleString()}</div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Add New Alert */}
         <div className="border-t pt-4">

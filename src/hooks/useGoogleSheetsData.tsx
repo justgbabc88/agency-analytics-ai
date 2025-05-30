@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 
 interface GoogleSheetsRow {
@@ -74,6 +75,7 @@ export const useGoogleSheetsData = () => {
     if (!targetData || !targetData.data.length) return null;
 
     const data = targetData.data;
+    console.log('Calculating metrics from data:', data);
     
     // Calculate totals and averages
     const totals = {
@@ -81,7 +83,9 @@ export const useGoogleSheetsData = () => {
       clicks: 0,
       cost: 0,
       conversions: 0,
-      revenue: 0
+      revenue: 0,
+      pageViews: 0,
+      optins: 0
     };
 
     data.forEach(row => {
@@ -91,15 +95,36 @@ export const useGoogleSheetsData = () => {
       totals.cost += parseFloat(row.Cost?.replace(/[$,]/g, '') || '0') || 0;
       totals.conversions += parseInt(row.Conversions?.replace(/[^\d]/g, '') || '0') || 0;
       totals.revenue += parseFloat(row.Revenue?.replace(/[$,]/g, '') || '0') || 0;
+      
+      // Also try to get funnel data
+      totals.pageViews += parseInt(row['Page Views']?.replace(/[^\d]/g, '') || '0') || 0;
+      totals.optins += parseInt(row['Opt-Ins']?.replace(/[^\d]/g, '') || '0') || 0;
+      
+      // Try alternative column names for conversions and revenue
+      if (!totals.conversions) {
+        totals.conversions += parseInt(row['Main Offer']?.replace(/[^\d]/g, '') || '0') || 0;
+      }
+      
+      // If no direct revenue, try to calculate from ROAS
+      if (!totals.revenue && row['ROAS']) {
+        const roas = parseFloat(row['ROAS']?.replace(/[^\d.]/g, '') || '0') || 0;
+        const cost = parseFloat(row.Cost?.replace(/[$,]/g, '') || '0') || 0;
+        if (roas > 0 && cost > 0) {
+          totals.revenue += roas * cost;
+        }
+      }
     });
+
+    console.log('Calculated totals:', totals);
 
     // Calculate derived metrics
     const ctr = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
-    const conversionRate = totals.clicks > 0 ? (totals.conversions / totals.clicks) * 100 : 0;
+    const conversionRate = totals.clicks > 0 ? (totals.conversions / totals.clicks) * 100 : 
+                          totals.pageViews > 0 ? (totals.optins / totals.pageViews) * 100 : 0;
     const cpc = totals.clicks > 0 ? totals.cost / totals.clicks : 0;
     const roas = totals.cost > 0 ? totals.revenue / totals.cost : 0;
 
-    return {
+    const metrics = {
       ...totals,
       ctr,
       conversionRate,
@@ -107,6 +132,9 @@ export const useGoogleSheetsData = () => {
       roas,
       dataRows: data.length
     };
+
+    console.log('Final calculated metrics:', metrics);
+    return metrics;
   };
 
   // Load data and config from localStorage on mount

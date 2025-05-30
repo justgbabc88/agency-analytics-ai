@@ -20,36 +20,7 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
   // Calculate current metrics from synced data
   const currentMetrics = calculateMetricsFromSyncedData();
 
-  // Helper function to parse date more flexibly
-  const parseDate = (dateStr: string) => {
-    if (!dateStr) return null;
-    
-    try {
-      // Handle various date formats
-      const date = new Date(dateStr);
-      if (!isNaN(date.getTime())) {
-        return date;
-      }
-      
-      // Try parsing MM/DD/YYYY format specifically
-      const parts = dateStr.split('/');
-      if (parts.length === 3) {
-        const month = parseInt(parts[0]) - 1; // Month is 0-indexed
-        const day = parseInt(parts[1]);
-        const year = parseInt(parts[2]);
-        const parsedDate = new Date(year, month, day);
-        if (!isNaN(parsedDate.getTime())) {
-          return parsedDate;
-        }
-      }
-    } catch (error) {
-      console.log('Date parsing error:', error);
-    }
-    
-    return null;
-  };
-
-  // Generate forecast data based on actual data trends
+  // Generate forecast data based on actual data trends - showing all available data regardless of date
   const generateForecastData = () => {
     if (!syncedData || !currentMetrics) {
       return [
@@ -62,53 +33,57 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
     console.log('Generating forecast with synced data:', syncedData.data.length, 'rows');
     
     const data = syncedData.data;
-    const baseMetric = selectedMetric === 'revenue' ? currentMetrics.revenue : 
-                     selectedMetric === 'conversions' ? currentMetrics.conversions : 
-                     currentMetrics.impressions;
+    const baseMetric = selectedMetric === 'revenue' ? (currentMetrics.revenue || 1000) : 
+                     selectedMetric === 'conversions' ? (currentMetrics.conversions || 100) : 
+                     (currentMetrics.pageViews || currentMetrics.impressions || 1000);
 
-    // Use all available data, don't restrict by date
-    const forecastData = data.slice(0, 6).map((row, index) => {
+    // Use all available data without date restrictions to show yesterday/today data
+    const forecastData = data.map((row, index) => {
       const dateField = row['Date'] || row['date'] || `Day ${index + 1}`;
       
       // Calculate actual values from the data
       let actualValue = null;
-      if (index < 3) { // Show actual data for first 3 points
-        if (selectedMetric === 'revenue') {
-          // Look for revenue-related fields
-          const revenueFields = ['Revenue', 'revenue', 'ROAS', 'roas'];
-          for (const field of revenueFields) {
-            if (row[field]) {
-              const value = parseFloat(row[field].toString().replace(/[$,]/g, '') || '0');
-              if (value > 0) {
-                actualValue = selectedMetric === 'revenue' && field.toLowerCase().includes('roas') 
-                  ? value * 10000 // Convert ROAS to revenue estimate
-                  : value;
-                break;
-              }
+      if (selectedMetric === 'revenue') {
+        // Look for revenue-related fields
+        const revenueFields = ['Revenue', 'revenue'];
+        for (const field of revenueFields) {
+          if (row[field]) {
+            const value = parseFloat(row[field].toString().replace(/[$,]/g, '') || '0');
+            if (value > 0) {
+              actualValue = value;
+              break;
             }
           }
-        } else if (selectedMetric === 'conversions') {
-          // Look for conversion-related fields
-          const conversionFields = ['Main Offer', 'Conversions', 'conversions', 'Opt-Ins'];
-          for (const field of conversionFields) {
-            if (row[field]) {
-              const value = parseInt(row[field].toString().replace(/[^\d]/g, '') || '0');
-              if (value > 0) {
-                actualValue = value;
-                break;
-              }
+        }
+        // If no direct revenue, calculate from ROAS
+        if (!actualValue && row['ROAS'] && row['Cost']) {
+          const roas = parseFloat(row['ROAS'].toString().replace(/[^\d.]/g, '') || '0');
+          const cost = parseFloat(row['Cost'].toString().replace(/[$,]/g, '') || '0');
+          if (roas > 0 && cost > 0) {
+            actualValue = roas * cost;
+          }
+        }
+      } else if (selectedMetric === 'conversions') {
+        // Look for conversion-related fields
+        const conversionFields = ['Main Offer', 'Conversions', 'conversions', 'Opt-Ins'];
+        for (const field of conversionFields) {
+          if (row[field]) {
+            const value = parseInt(row[field].toString().replace(/[^\d]/g, '') || '0');
+            if (value > 0) {
+              actualValue = value;
+              break;
             }
           }
-        } else {
-          // Traffic/impressions
-          const trafficFields = ['Page Views', 'Impressions', 'impressions', 'traffic'];
-          for (const field of trafficFields) {
-            if (row[field]) {
-              const value = parseInt(row[field].toString().replace(/[^\d]/g, '') || '0');
-              if (value > 0) {
-                actualValue = value;
-                break;
-              }
+        }
+      } else {
+        // Traffic/impressions
+        const trafficFields = ['Page Views', 'Impressions', 'impressions', 'traffic'];
+        for (const field of trafficFields) {
+          if (row[field]) {
+            const value = parseInt(row[field].toString().replace(/[^\d]/g, '') || '0');
+            if (value > 0) {
+              actualValue = value;
+              break;
             }
           }
         }
@@ -117,7 +92,7 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
       // Generate predicted values based on base metric and trend
       const trendMultiplier = 1 + (Math.random() * 0.3 - 0.15); // ±15% variation
       const growthFactor = 1 + (index * 0.08); // 8% growth per period
-      const predictedValue = (baseMetric || 1000) * trendMultiplier * growthFactor;
+      const predictedValue = baseMetric * trendMultiplier * growthFactor;
       
       const confidence = Math.max(70, 95 - index * 4);
 
@@ -133,7 +108,7 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
     return forecastData;
   };
 
-  // Generate predictions based on actual data
+  // Generate predictions based on actual data including conversion rate
   const generatePredictions = () => {
     if (!currentMetrics) {
       return [
@@ -294,16 +269,16 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
                     <span className="text-gray-600">Current:</span>
                     <span className="font-medium">
                       {prediction.metric.includes('Rate') || prediction.metric === 'ROAS' 
-                        ? prediction.current.toFixed(1) 
-                        : prediction.current.toLocaleString()}
+                        ? `${prediction.current.toFixed(1)}${prediction.metric.includes('Rate') ? '%' : ''}` 
+                        : `$${prediction.current.toLocaleString()}`}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Predicted:</span>
                     <span className="font-medium">
                       {prediction.metric.includes('Rate') || prediction.metric === 'ROAS'
-                        ? prediction.predicted.toFixed(1)
-                        : prediction.predicted.toLocaleString()}
+                        ? `${prediction.predicted.toFixed(1)}${prediction.metric.includes('Rate') ? '%' : ''}`
+                        : `$${prediction.predicted.toLocaleString()}`}
                     </span>
                   </div>
                   <div className="flex justify-between text-xs">
@@ -327,8 +302,10 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
               <h4 className="font-medium text-purple-900 mb-1">AI Forecast Insights</h4>
               <p className="text-sm text-purple-800">
                 {currentMetrics ? (
-                  `Based on your current ROAS of ${currentMetrics.roas.toFixed(2)} and ${currentMetrics.dataRows} data points, 
-                  your metrics show strong performance. The predictive model suggests continued growth with ${predictions[0].change.toFixed(1)}% 
+                  `Based on your current data with ${currentMetrics.dataRows} data points, 
+                  ${currentMetrics.conversionRate > 0 ? `conversion rate of ${currentMetrics.conversionRate.toFixed(1)}%` : 'your campaign metrics'} 
+                  and ${currentMetrics.roas > 0 ? `ROAS of ${currentMetrics.roas.toFixed(2)}` : 'performance trends'}, 
+                  the predictive model suggests continued growth with ${predictions[0].change.toFixed(1)}% 
                   revenue increase expected. Focus on scaling successful campaigns while monitoring conversion quality.`
                 ) : (
                   "Connect your Google Sheets to see personalized AI insights based on your actual campaign data."
