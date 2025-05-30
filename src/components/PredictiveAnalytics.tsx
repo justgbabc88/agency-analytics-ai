@@ -17,10 +17,9 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
   const [forecastPeriod, setForecastPeriod] = useState('30days');
   const { syncedData, calculateMetricsFromSyncedData } = useGoogleSheetsData();
 
-  // Calculate current metrics from synced data
   const currentMetrics = calculateMetricsFromSyncedData();
 
-  // Generate forecast data based on actual data trends - showing all available data regardless of date
+  // Generate more realistic forecast data based on actual trends
   const generateForecastData = () => {
     if (!syncedData || !currentMetrics) {
       return [
@@ -30,21 +29,14 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
       ];
     }
 
-    console.log('Generating forecast with synced data:', syncedData.data.length, 'rows');
-    
     const data = syncedData.data;
-    const baseMetric = selectedMetric === 'revenue' ? (currentMetrics.revenue || 1000) : 
-                     selectedMetric === 'conversions' ? (currentMetrics.conversions || 100) : 
-                     (currentMetrics.pageViews || currentMetrics.impressions || 1000);
-
-    // Use all available data without date restrictions to show yesterday/today data
-    const forecastData = data.map((row, index) => {
+    
+    // Calculate actual values from historical data
+    const historicalData = data.map((row, index) => {
       const dateField = row['Date'] || row['date'] || `Day ${index + 1}`;
       
-      // Calculate actual values from the data
       let actualValue = null;
       if (selectedMetric === 'revenue') {
-        // Look for revenue-related fields
         const revenueFields = ['Revenue', 'revenue'];
         for (const field of revenueFields) {
           if (row[field]) {
@@ -55,7 +47,6 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
             }
           }
         }
-        // If no direct revenue, calculate from ROAS
         if (!actualValue && row['ROAS'] && row['Cost']) {
           const roas = parseFloat(row['ROAS'].toString().replace(/[^\d.]/g, '') || '0');
           const cost = parseFloat(row['Cost'].toString().replace(/[$,]/g, '') || '0');
@@ -64,7 +55,6 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
           }
         }
       } else if (selectedMetric === 'conversions') {
-        // Look for conversion-related fields
         const conversionFields = ['Main Offer', 'Conversions', 'conversions', 'Opt-Ins'];
         for (const field of conversionFields) {
           if (row[field]) {
@@ -76,7 +66,6 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
           }
         }
       } else {
-        // Traffic/impressions
         const trafficFields = ['Page Views', 'Impressions', 'impressions', 'traffic'];
         for (const field of trafficFields) {
           if (row[field]) {
@@ -89,26 +78,57 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
         }
       }
 
-      // Generate predicted values based on base metric and trend
-      const trendMultiplier = 1 + (Math.random() * 0.3 - 0.15); // ±15% variation
-      const growthFactor = 1 + (index * 0.08); // 8% growth per period
-      const predictedValue = baseMetric * trendMultiplier * growthFactor;
-      
-      const confidence = Math.max(70, 95 - index * 4);
-
       return {
         period: typeof dateField === 'string' ? dateField : `Period ${index + 1}`,
         actual: actualValue,
+        index
+      };
+    });
+
+    // Calculate trend from actual data
+    const actualValues = historicalData.filter(d => d.actual !== null).map(d => d.actual);
+    const avgValue = actualValues.length > 0 ? actualValues.reduce((a, b) => a + b, 0) / actualValues.length : 1000;
+    
+    // Calculate growth trend from recent data
+    let growthRate = 0.05; // Default 5% growth
+    if (actualValues.length >= 3) {
+      const recent = actualValues.slice(-3);
+      const older = actualValues.slice(-6, -3);
+      if (older.length > 0) {
+        const recentAvg = recent.reduce((a, b) => a + b, 0) / recent.length;
+        const olderAvg = older.reduce((a, b) => a + b, 0) / older.length;
+        growthRate = olderAvg > 0 ? (recentAvg - olderAvg) / olderAvg : 0.05;
+        growthRate = Math.max(-0.2, Math.min(0.3, growthRate)); // Cap between -20% and 30%
+      }
+    }
+
+    // Generate predictions based on trend
+    const forecastData = historicalData.map((item, index) => {
+      let predictedValue;
+      if (item.actual !== null) {
+        // For historical data, predict close to actual with some variance
+        predictedValue = item.actual * (0.95 + Math.random() * 0.1);
+      } else {
+        // For future data, use trend-based prediction
+        const daysFromLast = index - (actualValues.length - 1);
+        const trendMultiplier = 1 + (growthRate * daysFromLast * 0.1);
+        const variance = 0.9 + Math.random() * 0.2; // ±10% variance
+        predictedValue = avgValue * trendMultiplier * variance;
+      }
+      
+      const confidence = Math.max(60, 95 - index * 2);
+
+      return {
+        ...item,
         predicted: Math.round(predictedValue),
         confidence: Math.round(confidence)
       };
     });
 
-    console.log('Generated forecast data:', forecastData);
     return forecastData;
   };
 
-  // Generate predictions based on actual data including conversion rate
+  // Generate more realistic predictions based on trends
   const generatePredictions = () => {
     if (!currentMetrics) {
       return [
@@ -119,45 +139,43 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
       ];
     }
 
-    console.log('Generating predictions with metrics:', currentMetrics);
-
-    // Calculate revenue estimate from ROAS if no direct revenue
     const estimatedRevenue = currentMetrics.revenue || (currentMetrics.roas * currentMetrics.cost);
     
+    // Calculate more realistic predictions based on current performance
     const predictions = [
       {
         metric: 'Revenue',
         current: estimatedRevenue,
-        predicted: estimatedRevenue * 1.12,
-        change: 12.0,
-        confidence: 87,
+        predicted: estimatedRevenue * (currentMetrics.roas > 3 ? 1.15 : currentMetrics.roas > 2 ? 1.08 : 1.02),
+        change: currentMetrics.roas > 3 ? 15.0 : currentMetrics.roas > 2 ? 8.0 : 2.0,
+        confidence: currentMetrics.roas > 3 ? 88 : currentMetrics.roas > 2 ? 82 : 75,
         trend: 'up' as const,
         timeframe: 'Next 30 days'
       },
       {
         metric: 'Conversion Rate',
         current: currentMetrics.conversionRate,
-        predicted: currentMetrics.conversionRate * 1.08,
-        change: 8.0,
-        confidence: 82,
+        predicted: currentMetrics.conversionRate * (currentMetrics.conversionRate > 5 ? 1.05 : 1.12),
+        change: currentMetrics.conversionRate > 5 ? 5.0 : 12.0,
+        confidence: currentMetrics.conversionRate > 5 ? 85 : 78,
         trend: 'up' as const,
         timeframe: 'Next 30 days'
       },
       {
         metric: 'Ad Spend',
         current: currentMetrics.cost,
-        predicted: currentMetrics.cost * 1.06,
-        change: 6.0,
-        confidence: 91,
+        predicted: currentMetrics.cost * (currentMetrics.roas > 3 ? 1.20 : 1.05),
+        change: currentMetrics.roas > 3 ? 20.0 : 5.0,
+        confidence: 90,
         trend: 'up' as const,
         timeframe: 'Next 30 days'
       },
       {
         metric: 'ROAS',
         current: currentMetrics.roas,
-        predicted: currentMetrics.roas * 1.05,
-        change: 5.0,
-        confidence: 79,
+        predicted: currentMetrics.roas * (currentMetrics.roas < 2 ? 1.25 : currentMetrics.roas < 3 ? 1.15 : 1.08),
+        change: currentMetrics.roas < 2 ? 25.0 : currentMetrics.roas < 3 ? 15.0 : 8.0,
+        confidence: currentMetrics.roas < 2 ? 70 : currentMetrics.roas < 3 ? 80 : 85,
         trend: 'up' as const,
         timeframe: 'Next 30 days'
       },
@@ -302,11 +320,12 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
               <h4 className="font-medium text-purple-900 mb-1">AI Forecast Insights</h4>
               <p className="text-sm text-purple-800">
                 {currentMetrics ? (
-                  `Based on your current data with ${currentMetrics.dataRows} data points, 
-                  ${currentMetrics.conversionRate > 0 ? `conversion rate of ${currentMetrics.conversionRate.toFixed(1)}%` : 'your campaign metrics'} 
-                  and ${currentMetrics.roas > 0 ? `ROAS of ${currentMetrics.roas.toFixed(2)}` : 'performance trends'}, 
-                  the predictive model suggests continued growth with ${predictions[0].change.toFixed(1)}% 
-                  revenue increase expected. Focus on scaling successful campaigns while monitoring conversion quality.`
+                  `Based on your ${currentMetrics.dataRows} data points and current ROAS of ${currentMetrics.roas.toFixed(2)}, 
+                  ${currentMetrics.roas > 3 ? 'your campaigns are performing excellently. The model predicts continued strong growth.' :
+                    currentMetrics.roas > 2 ? 'your campaigns show good performance with room for optimization. Moderate growth expected.' :
+                    'your campaigns need optimization. Focus on improving targeting and creative to boost ROAS above 2.0.'} 
+                  Current conversion rate of ${currentMetrics.conversionRate.toFixed(1)}% 
+                  ${currentMetrics.conversionRate > 5 ? 'is strong.' : 'has potential for improvement through landing page optimization.'}`
                 ) : (
                   "Connect your Google Sheets to see personalized AI insights based on your actual campaign data."
                 )}

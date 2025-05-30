@@ -4,16 +4,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MessageSquare, Send, Bot, User, Lightbulb, TrendingUp } from "lucide-react";
+import { MessageSquare, Send, Bot, User, Lightbulb, TrendingUp, AlertTriangle, Brain } from "lucide-react";
 import { useState } from "react";
 import { useGoogleSheetsData } from "@/hooks/useGoogleSheetsData";
 
 interface Message {
   id: string;
-  type: 'user' | 'ai';
+  type: 'user' | 'ai' | 'insight';
   content: string;
   timestamp: Date;
   suggestions?: string[];
+  priority?: 'critical' | 'high' | 'medium' | 'low';
 }
 
 interface AIChatPanelProps {
@@ -33,19 +34,73 @@ export const AIChatPanel = ({ className }: AIChatPanelProps) => {
   const [isTyping, setIsTyping] = useState(false);
   const { syncedData, calculateMetricsFromSyncedData } = useGoogleSheetsData();
 
-  // Initialize with welcome message
+  // Generate AI insights based on current data
+  const generateDataInsights = () => {
+    const currentMetrics = calculateMetricsFromSyncedData();
+    if (!currentMetrics || !syncedData) return [];
+
+    const insights: Message[] = [];
+
+    // ROAS Analysis
+    if (currentMetrics.roas < 2) {
+      insights.push({
+        id: `insight-roas-${Date.now()}`,
+        type: 'insight',
+        content: `⚠️ Critical Alert: Your ROAS of ${currentMetrics.roas.toFixed(2)} is below the healthy threshold of 2.0. With $${currentMetrics.cost.toLocaleString()} in ad spend, you need immediate optimization to improve profitability.`,
+        timestamp: new Date(),
+        priority: 'critical'
+      });
+    } else if (currentMetrics.roas > 4) {
+      insights.push({
+        id: `insight-roas-${Date.now()}`,
+        type: 'insight',
+        content: `🎯 Excellent Performance: Your ROAS of ${currentMetrics.roas.toFixed(2)} is outstanding! Consider scaling your budget to maximize this strong performance.`,
+        timestamp: new Date(),
+        priority: 'high'
+      });
+    }
+
+    // Conversion Rate Analysis
+    if (currentMetrics.conversionRate < 2) {
+      insights.push({
+        id: `insight-conv-${Date.now()}`,
+        type: 'insight',
+        content: `📊 Optimization Opportunity: Your conversion rate of ${currentMetrics.conversionRate.toFixed(1)}% is below average. Focus on landing page optimization and audience targeting to improve results.`,
+        timestamp: new Date(),
+        priority: 'high'
+      });
+    }
+
+    // Data Quality Insight
+    if (currentMetrics.dataRows > 0) {
+      insights.push({
+        id: `insight-data-${Date.now()}`,
+        type: 'insight',
+        content: `📈 Data Analysis: Analyzing ${currentMetrics.dataRows} data points. Your current performance shows ${currentMetrics.conversions.toLocaleString()} conversions with a ${currentMetrics.conversionRate.toFixed(1)}% conversion rate. Total revenue: $${currentMetrics.revenue.toLocaleString()}.`,
+        timestamp: new Date(),
+        priority: 'medium'
+      });
+    }
+
+    return insights;
+  };
+
+  // Initialize with welcome message and insights
   useState(() => {
     const currentMetrics = calculateMetricsFromSyncedData();
+    const insights = generateDataInsights();
+    
     const welcomeMessage: Message = {
       id: '1',
       type: 'ai',
       content: currentMetrics ? 
-        `Hi! I'm your AI marketing assistant. I can see you have ${currentMetrics.dataRows} data points in your dashboard with a current ROAS of ${currentMetrics.roas.toFixed(2)}. What would you like to know about your campaigns?` :
-        "Hi! I'm your AI marketing assistant. Connect your Google Sheets to get personalized insights, or ask me general marketing questions!",
+        `Hi! I'm your AI Marketing Assistant. I've analyzed your campaign data and found some key insights. You have ${currentMetrics.dataRows} data points with a current ROAS of ${currentMetrics.roas.toFixed(2)} and conversion rate of ${currentMetrics.conversionRate.toFixed(1)}%. What would you like to optimize?` :
+        "Hi! I'm your AI Marketing Assistant. Connect your Google Sheets to get personalized insights and recommendations based on your campaign data!",
       timestamp: new Date(),
       suggestions: quickQuestions.slice(0, 2)
     };
-    setMessages([welcomeMessage]);
+    
+    setMessages([welcomeMessage, ...insights]);
   });
 
   const handleSendMessage = async (content: string) => {
@@ -85,30 +140,50 @@ export const AIChatPanel = ({ className }: AIChatPanelProps) => {
       return "I'd love to help you analyze your campaign data! Please connect your Google Sheets in the Integrations tab to get personalized insights based on your actual performance metrics.";
     }
 
+    // Enhanced responses based on actual data trends
     if (lowerQuestion.includes('roas') || lowerQuestion.includes('declining')) {
-      const roasStatus = currentMetrics.roas > 3 ? 'strong' : currentMetrics.roas > 2 ? 'moderate' : 'concerning';
-      return `Your current ROAS is ${currentMetrics.roas.toFixed(2)}, which is ${roasStatus}. With ${currentMetrics.cost.toLocaleString()} in ad spend generating ${currentMetrics.revenue.toLocaleString()} in revenue, I recommend: 1) Analyze your top-performing campaigns and scale them, 2) Pause campaigns with ROAS below 2.0, 3) Test new creative variations for underperforming ads.`;
+      const roasStatus = currentMetrics.roas > 4 ? 'excellent' : currentMetrics.roas > 3 ? 'strong' : currentMetrics.roas > 2 ? 'moderate' : 'concerning';
+      const recommendations = currentMetrics.roas < 2 ? 
+        'URGENT: 1) Pause campaigns with ROAS below 1.5, 2) Analyze your best-performing ads and scale them, 3) Review your targeting - you may be too broad' :
+        currentMetrics.roas < 3 ?
+        '1) Optimize your highest-traffic keywords, 2) Test new ad creatives, 3) Improve landing page conversion rates' :
+        '1) Scale your budget on top performers, 2) Test premium audiences, 3) Expand to similar products';
+      
+      return `Your current ROAS of ${currentMetrics.roas.toFixed(2)} is ${roasStatus}. With $${currentMetrics.cost.toLocaleString()} in spend generating $${currentMetrics.revenue.toLocaleString()} revenue from ${currentMetrics.dataRows} data points. ${recommendations}`;
     }
     
     if (lowerQuestion.includes('conversion') || lowerQuestion.includes('improve')) {
-      return `Your current conversion rate is ${currentMetrics.conversionRate.toFixed(1)}% with ${currentMetrics.conversions.toLocaleString()} conversions from ${currentMetrics.clicks.toLocaleString()} clicks. To improve: 1) A/B test your landing pages, 2) Optimize your checkout flow, 3) Add urgency and social proof elements, 4) Review your traffic quality and targeting.`;
+      const conversionAnalysis = currentMetrics.conversionRate > 5 ? 
+        'Your conversion rate is strong! Focus on scaling traffic while maintaining quality.' :
+        currentMetrics.conversionRate > 3 ?
+        'Your conversion rate is decent but has room for improvement.' :
+        'Your conversion rate needs immediate attention.';
+        
+      return `${conversionAnalysis} Current rate: ${currentMetrics.conversionRate.toFixed(1)}% (${currentMetrics.conversions.toLocaleString()} conversions from ${currentMetrics.clicks.toLocaleString()} clicks). Recommendations: 1) A/B test headlines and CTAs, 2) Reduce form fields, 3) Add social proof and urgency, 4) Optimize for mobile users.`;
     }
     
     if (lowerQuestion.includes('funnel') || lowerQuestion.includes('performing')) {
       const ctr = currentMetrics.clicks > 0 ? (currentMetrics.clicks / currentMetrics.impressions) * 100 : 0;
-      return `Based on your ${currentMetrics.dataRows} data points: Your CTR is ${ctr.toFixed(2)}%, conversion rate is ${currentMetrics.conversionRate.toFixed(1)}%, and ROAS is ${currentMetrics.roas.toFixed(2)}. Focus on scaling campaigns with ROAS above 3.0 and optimizing those below 2.0.`;
+      const performance = currentMetrics.roas > 3 && currentMetrics.conversionRate > 3 ? 'excellent' : 
+                         currentMetrics.roas > 2 && currentMetrics.conversionRate > 2 ? 'good' : 'needs improvement';
+      
+      return `Funnel Performance Analysis: ${performance}. CTR: ${ctr.toFixed(2)}%, Conversion Rate: ${currentMetrics.conversionRate.toFixed(1)}%, ROAS: ${currentMetrics.roas.toFixed(2)}. ${currentMetrics.roas > 3 ? 'Scale your top campaigns and test similar audiences.' : 'Focus on improving your weakest metrics first - start with the lowest ROAS campaigns.'}`;
     }
 
     if (lowerQuestion.includes('optimization') || lowerQuestion.includes('opportunities')) {
-      const suggestions = [];
-      if (currentMetrics.roas < 3) suggestions.push("Improve ROAS by optimizing targeting");
-      if (currentMetrics.conversionRate < 5) suggestions.push("Test landing page variations");
-      if (currentMetrics.ctr < 2) suggestions.push("Refresh ad creatives");
+      const opportunities = [];
+      if (currentMetrics.roas < 3) opportunities.push(`Improve ROAS (currently ${currentMetrics.roas.toFixed(2)})`);
+      if (currentMetrics.conversionRate < 5) opportunities.push(`Optimize conversion rate (currently ${currentMetrics.conversionRate.toFixed(1)}%)`);
+      if (currentMetrics.ctr < 2) opportunities.push('Improve ad creative performance');
       
-      return `Based on your current metrics, here are optimization opportunities: ${suggestions.join(', ')}. Your current performance: ROAS ${currentMetrics.roas.toFixed(2)}, Conversion Rate ${currentMetrics.conversionRate.toFixed(1)}%, ${currentMetrics.conversions} total conversions.`;
+      const priorityAction = currentMetrics.roas < 2 ? 'URGENT: Fix ROAS first' : 
+                            currentMetrics.conversionRate < 2 ? 'Focus on conversion optimization' :
+                            'Scale your best performers';
+      
+      return `Top optimization opportunities: ${opportunities.join(', ')}. Priority: ${priorityAction}. Your data shows ${currentMetrics.dataRows} touchpoints with $${currentMetrics.revenue.toLocaleString()} total revenue. Next steps: Focus on the metric that will have the biggest revenue impact.`;
     }
     
-    return `I can help you analyze your marketing data. Your current metrics show: ROAS of ${currentMetrics.roas.toFixed(2)}, ${currentMetrics.conversions.toLocaleString()} conversions, and ${currentMetrics.conversionRate.toFixed(1)}% conversion rate. Try asking about specific optimization strategies or performance comparisons.`;
+    return `Based on your ${currentMetrics.dataRows} data points: ROAS ${currentMetrics.roas.toFixed(2)}, ${currentMetrics.conversions.toLocaleString()} conversions at ${currentMetrics.conversionRate.toFixed(1)}% rate. ${currentMetrics.roas > 3 ? 'Strong performance - consider scaling!' : currentMetrics.roas > 2 ? 'Good foundation - optimize for growth.' : 'Needs improvement - focus on ROAS first.'} What specific area would you like to improve?`;
   };
 
   const generateSuggestions = (question: string): string[] => {
@@ -120,13 +195,31 @@ export const AIChatPanel = ({ className }: AIChatPanelProps) => {
     handleSendMessage(inputValue);
   };
 
+  const getInsightIcon = (type: string, priority?: string) => {
+    if (type === 'insight') {
+      return priority === 'critical' ? <AlertTriangle className="h-4 w-4 text-red-600" /> :
+             priority === 'high' ? <TrendingUp className="h-4 w-4 text-orange-600" /> :
+             <Brain className="h-4 w-4 text-blue-600" />;
+    }
+    return type === 'ai' ? <Bot className="h-4 w-4 text-blue-600" /> : <User className="h-4 w-4 text-gray-600" />;
+  };
+
+  const getInsightBgColor = (type: string, priority?: string) => {
+    if (type === 'insight') {
+      return priority === 'critical' ? 'bg-red-50 border-red-200' :
+             priority === 'high' ? 'bg-orange-50 border-orange-200' :
+             'bg-blue-50 border-blue-200';
+    }
+    return type === 'ai' ? 'bg-gray-50 border' : 'bg-blue-600 text-white';
+  };
+
   return (
     <Card className={className}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <MessageSquare className="h-5 w-5 text-blue-600" />
           AI Assistant
-          <Badge variant="secondary" className="ml-auto">Beta</Badge>
+          <Badge variant="secondary" className="ml-auto">Live Data</Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="h-96 flex flex-col">
@@ -135,20 +228,12 @@ export const AIChatPanel = ({ className }: AIChatPanelProps) => {
             {messages.map((message) => (
               <div key={message.id} className={`flex gap-3 ${message.type === 'user' ? 'flex-row-reverse' : ''}`}>
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                  message.type === 'ai' ? 'bg-blue-100' : 'bg-gray-100'
+                  message.type === 'ai' || message.type === 'insight' ? 'bg-blue-100' : 'bg-gray-100'
                 }`}>
-                  {message.type === 'ai' ? (
-                    <Bot className="h-4 w-4 text-blue-600" />
-                  ) : (
-                    <User className="h-4 w-4 text-gray-600" />
-                  )}
+                  {getInsightIcon(message.type, message.priority)}
                 </div>
                 <div className={`max-w-[80%] ${message.type === 'user' ? 'text-right' : ''}`}>
-                  <div className={`p-3 rounded-lg ${
-                    message.type === 'ai' 
-                      ? 'bg-gray-50 border' 
-                      : 'bg-blue-600 text-white'
-                  }`}>
+                  <div className={`p-3 rounded-lg ${getInsightBgColor(message.type, message.priority)}`}>
                     <p className="text-sm">{message.content}</p>
                   </div>
                   {message.suggestions && (

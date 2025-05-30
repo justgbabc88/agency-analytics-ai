@@ -7,7 +7,6 @@ import { LowTicketFunnel } from "@/components/LowTicketFunnel";
 import { WebinarFunnel } from "@/components/WebinarFunnel";
 import { BookCallFunnel } from "@/components/BookCallFunnel";
 import { IntegrationsPanel } from "@/components/IntegrationsPanel";
-import { AIInsightsPanel } from "@/components/AIInsightsPanel";
 import { MetricCustomizer } from "@/components/MetricCustomizer";
 import { AlertSystem } from "@/components/AlertSystem";
 import { ExportPanel } from "@/components/ExportPanel";
@@ -15,7 +14,7 @@ import { PredictiveAnalytics } from "@/components/PredictiveAnalytics";
 import { AIChatPanel } from "@/components/AIChatPanel";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, BarChart3, Settings, Brain, MessageSquare, Download, Target, TrendingUp } from "lucide-react";
+import { Plus, BarChart3, Settings, MessageSquare, Download, Target, TrendingUp } from "lucide-react";
 
 interface FunnelProductConfig {
   id: string;
@@ -92,22 +91,18 @@ const Index = () => {
 
       <div className="p-6">
         <Tabs defaultValue="dashboard" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
               Dashboard
-            </TabsTrigger>
-            <TabsTrigger value="insights" className="flex items-center gap-2">
-              <Brain className="h-4 w-4" />
-              AI Insights
             </TabsTrigger>
             <TabsTrigger value="predictions" className="flex items-center gap-2">
               <Target className="h-4 w-4" />
               Predictions
             </TabsTrigger>
-            <TabsTrigger value="chat" className="flex items-center gap-2">
+            <TabsTrigger value="assistant" className="flex items-center gap-2">
               <MessageSquare className="h-4 w-4" />
-              AI Chat
+              AI Assistant
             </TabsTrigger>
             <TabsTrigger value="alerts" className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
@@ -133,15 +128,11 @@ const Index = () => {
             {renderFunnelContent()}
           </TabsContent>
 
-          <TabsContent value="insights" className="space-y-6">
-            <AIInsightsPanel />
-          </TabsContent>
-
           <TabsContent value="predictions" className="space-y-6">
             <PredictiveAnalytics />
           </TabsContent>
 
-          <TabsContent value="chat" className="space-y-6">
+          <TabsContent value="assistant" className="space-y-6">
             <AIChatPanel />
           </TabsContent>
 
