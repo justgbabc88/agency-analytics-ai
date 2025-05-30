@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -136,8 +135,7 @@ const PrivacyPolicy = () => {
               </p>
               <div className="bg-gray-50 p-4 rounded-lg mt-2">
                 <p><strong>Quantum Sync LLC</strong></p>
-                <p>Email: privacy@quantumsync.com</p>
-                <p>Address: [Your Business Address]</p>
+                <p>Email: justin@automaticdesigns.co</p>
               </div>
             </section>
           </CardContent>

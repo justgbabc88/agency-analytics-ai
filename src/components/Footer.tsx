@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Mail, Phone, MapPin } from 'lucide-react';
+import { Mail, MapPin } from 'lucide-react';
 
 const Footer = () => {
   return (
@@ -18,11 +18,7 @@ const Footer = () => {
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-gray-300">
                 <Mail className="h-4 w-4" />
-                <span>support@quantumsync.com</span>
-              </div>
-              <div className="flex items-center gap-2 text-gray-300">
-                <Phone className="h-4 w-4" />
-                <span>1-800-QUANTUM</span>
+                <span>justin@automaticdesigns.co</span>
               </div>
               <div className="flex items-center gap-2 text-gray-300">
                 <MapPin className="h-4 w-4" />
