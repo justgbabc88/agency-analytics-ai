@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -31,6 +30,71 @@ export const useGoogleAuth = () => {
       setIsConnected(true);
     }
   }, []);
+
+  const refreshToken = async () => {
+    const refreshTokenValue = localStorage.getItem('google_refresh_token');
+    
+    if (!refreshTokenValue) {
+      console.log('No refresh token available, need to re-authenticate');
+      disconnect();
+      return null;
+    }
+
+    try {
+      console.log('Attempting to refresh access token...');
+      
+      const { data, error } = await supabase.functions.invoke('google-oauth', {
+        body: { 
+          action: 'refresh_token', 
+          refreshToken: refreshTokenValue 
+        }
+      });
+
+      if (error || !data || !data.accessToken) {
+        console.error('Token refresh failed:', error);
+        disconnect();
+        return null;
+      }
+
+      console.log('Token refreshed successfully');
+      setAccessToken(data.accessToken);
+      localStorage.setItem('google_access_token', data.accessToken);
+      
+      return data.accessToken;
+    } catch (error) {
+      console.error('Error refreshing token:', error);
+      disconnect();
+      return null;
+    }
+  };
+
+  const makeAuthenticatedRequest = async (requestFn: (token: string) => Promise<any>) => {
+    let token = accessToken;
+    
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+
+    try {
+      // Try with current token
+      return await requestFn(token);
+    } catch (error: any) {
+      // If we get a 401, try to refresh the token
+      if (error.message?.includes('401') || error.message?.includes('Invalid Credentials')) {
+        console.log('Access token expired, attempting refresh...');
+        
+        const newToken = await refreshToken();
+        if (!newToken) {
+          throw new Error('Authentication expired. Please reconnect your Google account.');
+        }
+        
+        // Retry with new token
+        return await requestFn(newToken);
+      }
+      
+      throw error;
+    }
+  };
 
   const initiateAuth = async () => {
     setLoading(true);
@@ -171,59 +235,59 @@ export const useGoogleAuth = () => {
   };
 
   const listSheets = async (): Promise<GoogleSheet[]> => {
-    if (!accessToken) throw new Error('Not authenticated');
+    return makeAuthenticatedRequest(async (token) => {
+      console.log('Fetching sheets list...');
 
-    console.log('Fetching sheets list...');
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const { data, error } = await supabase.functions.invoke('google-oauth', {
+        body: { 
+          action: 'list_sheets', 
+          accessToken: token 
+        },
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+      });
 
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    const { data, error } = await supabase.functions.invoke('google-oauth', {
-      body: { 
-        action: 'list_sheets', 
-        accessToken 
-      },
-      headers: {
-        'Authorization': `Bearer ${session?.access_token}`,
-      },
+      console.log('Sheets list response:', { data, error });
+
+      if (error) {
+        console.error('Error fetching sheets:', error);
+        throw new Error(`Failed to fetch sheets: ${error.message || JSON.stringify(error)}`);
+      }
+      
+      return data.sheets;
     });
-
-    console.log('Sheets list response:', { data, error });
-
-    if (error) {
-      console.error('Error fetching sheets:', error);
-      throw new Error(`Failed to fetch sheets: ${error.message || JSON.stringify(error)}`);
-    }
-    
-    return data.sheets;
   };
 
   const getSheetData = async (spreadsheetId: string, range?: string) => {
-    if (!accessToken) throw new Error('Not authenticated');
+    return makeAuthenticatedRequest(async (token) => {
+      console.log('Fetching sheet data for:', spreadsheetId, 'range:', range);
 
-    console.log('Fetching sheet data for:', spreadsheetId, 'range:', range);
+      const { data: { session } } = await supabase.auth.getSession();
 
-    const { data: { session } } = await supabase.auth.getSession();
+      const { data, error } = await supabase.functions.invoke('google-oauth', {
+        body: { 
+          action: 'get_sheet_data', 
+          accessToken: token, 
+          spreadsheetId, 
+          range 
+        },
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+      });
 
-    const { data, error } = await supabase.functions.invoke('google-oauth', {
-      body: { 
-        action: 'get_sheet_data', 
-        accessToken, 
-        spreadsheetId, 
-        range 
-      },
-      headers: {
-        'Authorization': `Bearer ${session?.access_token}`,
-      },
+      console.log('Sheet data response:', { data, error });
+
+      if (error) {
+        console.error('Error fetching sheet data:', error);
+        throw new Error(`Failed to fetch sheet data: ${error.message || JSON.stringify(error)}`);
+      }
+      
+      return data;
     });
-
-    console.log('Sheet data response:', { data, error });
-
-    if (error) {
-      console.error('Error fetching sheet data:', error);
-      throw new Error(`Failed to fetch sheet data: ${error.message || JSON.stringify(error)}`);
-    }
-    
-    return data;
   };
 
   return {

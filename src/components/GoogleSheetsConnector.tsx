@@ -80,13 +80,23 @@ export const GoogleSheetsConnector = () => {
     try {
       const googleSheets = await listSheets();
       setSheets(googleSheets);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to load sheets:', error);
-      toast({
-        title: "Error Loading Sheets",
-        description: "Failed to load your Google Sheets. Please try reconnecting.",
-        variant: "destructive",
-      });
+      
+      // Check if it's an authentication error
+      if (error.message?.includes('Authentication expired') || error.message?.includes('reconnect')) {
+        toast({
+          title: "Authentication Expired",
+          description: "Your Google account connection has expired. Please disconnect and reconnect.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error Loading Sheets",
+          description: "Failed to load your Google Sheets. Please try reconnecting.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setLoadingSheets(false);
     }
@@ -205,13 +215,23 @@ export const GoogleSheetsConnector = () => {
         title: "Sync Completed",
         description: `Successfully synced ${sheetData.data?.length - 1 || 0} rows from Google Sheets and updated dashboard metrics.`,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Sync failed:', error);
-      toast({
-        title: "Sync Failed",
-        description: "Failed to sync data from Google Sheets. Please try again.",
-        variant: "destructive",
-      });
+      
+      // Check if it's an authentication error
+      if (error.message?.includes('Authentication expired') || error.message?.includes('reconnect')) {
+        toast({
+          title: "Authentication Expired",
+          description: "Your Google account connection has expired. Please disconnect and reconnect.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Sync Failed",
+          description: "Failed to sync data from Google Sheets. Please try again.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setSyncing(false);
     }

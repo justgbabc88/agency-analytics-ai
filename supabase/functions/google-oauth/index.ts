@@ -7,8 +7,9 @@ const corsHeaders = {
 }
 
 interface OAuthRequest {
-  action: 'get_auth_url' | 'exchange_code' | 'list_sheets' | 'get_sheet_data'
+  action: 'get_auth_url' | 'exchange_code' | 'refresh_token' | 'list_sheets' | 'get_sheet_data'
   code?: string
+  refreshToken?: string
   accessToken?: string
   spreadsheetId?: string
   range?: string
@@ -36,7 +37,7 @@ serve(async (req) => {
       throw new Error('Only POST requests are supported')
     }
 
-    const { action, code, accessToken, spreadsheetId, range } = requestData
+    const { action, code, refreshToken, accessToken, spreadsheetId, range } = requestData
 
     if (!action) {
       console.error('No action provided in request')
@@ -164,6 +165,43 @@ serve(async (req) => {
           accessToken: tokens.access_token,
           refreshToken: tokens.refresh_token,
           userInfo 
+        }
+        break
+
+      case 'refresh_token':
+        if (!refreshToken) {
+          console.error('No refresh token provided')
+          throw new Error('Refresh token required')
+        }
+        
+        console.log('Refreshing access token...')
+        
+        const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            client_id: clientId,
+            client_secret: clientSecret,
+            refresh_token: refreshToken,
+            grant_type: 'refresh_token',
+          }),
+        })
+
+        console.log('Token refresh response status:', refreshResponse.status)
+
+        if (!refreshResponse.ok) {
+          const errorText = await refreshResponse.text()
+          console.error('Token refresh failed:', errorText)
+          throw new Error(`Failed to refresh token: ${errorText}`)
+        }
+
+        const refreshTokens = await refreshResponse.json()
+        console.log('Token refresh successful')
+        
+        result = { 
+          accessToken: refreshTokens.access_token,
+          // Google might return a new refresh token
+          refreshToken: refreshTokens.refresh_token || refreshToken
         }
         break
 
