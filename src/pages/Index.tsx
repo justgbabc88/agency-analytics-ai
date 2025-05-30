@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { MetricCard } from "@/components/MetricCard";
@@ -14,6 +15,7 @@ import { AlertSystem } from "@/components/AlertSystem";
 import { ExportPanel } from "@/components/ExportPanel";
 import { PredictiveAnalytics } from "@/components/PredictiveAnalytics";
 import { AIChatPanel } from "@/components/AIChatPanel";
+import { GoogleSheetsMetrics } from "@/components/GoogleSheetsMetrics";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -132,6 +134,9 @@ const Index = () => {
           <TabsContent value="dashboard" className="space-y-6">
             {/* Metric Customizer */}
             <MetricCustomizer onMetricsChange={handleMetricsChange} />
+
+            {/* Google Sheets Synced Data */}
+            <GoogleSheetsMetrics />
 
             {/* Key Metrics Overview */}
             <Card>

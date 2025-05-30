@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Trash2, Plus, FileSpreadsheet, MapPin, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useGoogleAuth } from "@/hooks/useGoogleAuth";
+import { useGoogleSheetsData } from "@/hooks/useGoogleSheetsData";
 
 interface GoogleSheet {
   id: string;
@@ -44,6 +44,8 @@ export const GoogleSheetsConnector = () => {
     listSheets, 
     getSheetData 
   } = useGoogleAuth();
+
+  const { storeSyncedData } = useGoogleSheetsData();
 
   useEffect(() => {
     if (isConnected) {
@@ -173,12 +175,15 @@ export const GoogleSheetsConnector = () => {
       
       const sheetData = await getSheetData(selectedSheet, range);
       
+      // Store the synced data using our hook
+      storeSyncedData(sheetData, fieldMappings);
+      
       // Process and sync the data based on field mappings
       console.log('Syncing data:', sheetData);
       
       toast({
         title: "Sync Completed",
-        description: `Successfully synced ${sheetData.data?.length || 0} rows from Google Sheets.`,
+        description: `Successfully synced ${sheetData.data?.length - 1 || 0} rows from Google Sheets and updated dashboard metrics.`,
       });
     } catch (error) {
       console.error('Sync failed:', error);
