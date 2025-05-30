@@ -4,12 +4,14 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useIntegrations } from "@/hooks/useIntegrations";
 import { useApiKeys } from "@/hooks/useApiKeys";
 import { ApiKeyManager } from "./ApiKeyManager";
 import { GoogleSheetsConnector } from "./GoogleSheetsConnector";
 import { SupermetricsConnector } from "./SupermetricsConnector";
-import { Settings, CheckCircle, XCircle, RefreshCw, Key, FileSpreadsheet, BarChart3 } from "lucide-react";
+import { Settings, CheckCircle, XCircle, RefreshCw, Key, FileSpreadsheet, BarChart3, ChevronDown, ChevronRight } from "lucide-react";
+import { useState } from "react";
 
 const integrationPlatforms = [
   { 
@@ -52,6 +54,7 @@ const integrationPlatforms = [
 export const IntegrationsPanel = () => {
   const { integrations, updateIntegration } = useIntegrations();
   const { saveApiKeys, getApiKeys, hasApiKeys } = useApiKeys();
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
 
   const getIntegrationStatus = (platformId: string) => {
     const integration = integrations?.find(i => i.platform === platformId);
@@ -66,9 +69,91 @@ export const IntegrationsPanel = () => {
     }
   };
 
+  const toggleSection = (sectionId: string) => {
+    setOpenSections(prev => ({
+      ...prev,
+      [sectionId]: !prev[sectionId]
+    }));
+  };
+
+  const renderIntegrationHeader = (platform: any) => {
+    const isConnected = getIntegrationStatus(platform.id);
+    const hasKeys = hasApiKeys(platform.id);
+    const integration = integrations?.find(i => i.platform === platform.id);
+    const IconComponent = platform.icon;
+    const isOpen = openSections[platform.id];
+    
+    return (
+      <CollapsibleTrigger asChild>
+        <div className="flex items-center justify-between p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              <IconComponent className="h-5 w-5 text-gray-500" />
+            </div>
+            {isConnected ? (
+              <CheckCircle className="h-5 w-5 text-green-600" />
+            ) : (
+              <XCircle className="h-5 w-5 text-gray-400" />
+            )}
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-medium">{platform.name}</h3>
+                <Badge className={platform.color} variant="secondary">
+                  {isConnected ? 'Connected' : 'Not Connected'}
+                </Badge>
+                {hasKeys && !['google_sheets', 'supermetrics'].includes(platform.id) && (
+                  <Badge variant="outline" className="text-xs">
+                    <Key className="h-3 w-3 mr-1" />
+                    API Keys Set
+                  </Badge>
+                )}
+              </div>
+              <p className="text-sm text-gray-600">{platform.description}</p>
+              {integration?.last_sync && (
+                <p className="text-xs text-gray-500">
+                  Last sync: {new Date(integration.last_sync).toLocaleString()}
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {isConnected && (
+              <Button variant="ghost" size="sm">
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+            )}
+            <Switch
+              checked={isConnected}
+              onCheckedChange={(checked) => handleToggleIntegration(platform.id, checked)}
+              disabled={!hasKeys && !['google_sheets', 'supermetrics'].includes(platform.id)}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
+      </CollapsibleTrigger>
+    );
+  };
+
+  const renderIntegrationContent = (platform: any) => {
+    switch (platform.id) {
+      case 'google_sheets':
+        return <GoogleSheetsConnector />;
+      case 'supermetrics':
+        return <SupermetricsConnector />;
+      default:
+        return (
+          <ApiKeyManager
+            platform={platform.id}
+            onSave={(keys) => saveApiKeys(platform.id, keys)}
+            savedKeys={getApiKeys(platform.id)}
+          />
+        );
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Platform Integrations Overview */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -77,103 +162,22 @@ export const IntegrationsPanel = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {integrationPlatforms.map((platform) => {
-            const isConnected = getIntegrationStatus(platform.id);
-            const hasKeys = hasApiKeys(platform.id);
-            const integration = integrations?.find(i => i.platform === platform.id);
-            const IconComponent = platform.icon;
-            
-            return (
-              <div key={platform.id} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex items-center gap-3">
-                  <IconComponent className="h-5 w-5 text-gray-500" />
-                  {isConnected ? (
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                  ) : (
-                    <XCircle className="h-5 w-5 text-gray-400" />
-                  )}
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-medium">{platform.name}</h3>
-                      <Badge className={platform.color} variant="secondary">
-                        {isConnected ? 'Connected' : 'Not Connected'}
-                      </Badge>
-                      {hasKeys && !['google_sheets', 'supermetrics'].includes(platform.id) && (
-                        <Badge variant="outline" className="text-xs">
-                          <Key className="h-3 w-3 mr-1" />
-                          API Keys Set
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-600">{platform.description}</p>
-                    {integration?.last_sync && (
-                      <p className="text-xs text-gray-500">
-                        Last sync: {new Date(integration.last_sync).toLocaleString()}
-                      </p>
-                    )}
-                  </div>
+          {integrationPlatforms.map((platform) => (
+            <Collapsible
+              key={platform.id}
+              open={openSections[platform.id]}
+              onOpenChange={() => toggleSection(platform.id)}
+            >
+              {renderIntegrationHeader(platform)}
+              <CollapsibleContent className="mt-4">
+                <div className="pl-6 border-l-2 border-gray-100">
+                  {renderIntegrationContent(platform)}
                 </div>
-                <div className="flex items-center gap-2">
-                  {isConnected && (
-                    <Button variant="ghost" size="sm">
-                      <RefreshCw className="h-4 w-4" />
-                    </Button>
-                  )}
-                  <Switch
-                    checked={isConnected}
-                    onCheckedChange={(checked) => handleToggleIntegration(platform.id, checked)}
-                    disabled={!hasKeys && !['google_sheets', 'supermetrics'].includes(platform.id)}
-                  />
-                </div>
-              </div>
-            );
-          })}
+              </CollapsibleContent>
+            </Collapsible>
+          ))}
         </CardContent>
       </Card>
-
-      <Separator />
-
-      {/* Google Sheets Configuration */}
-      <div>
-        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <FileSpreadsheet className="h-5 w-5" />
-          Google Sheets Setup
-        </h3>
-        <GoogleSheetsConnector />
-      </div>
-
-      <Separator />
-
-      {/* Supermetrics Configuration */}
-      <div>
-        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <BarChart3 className="h-5 w-5" />
-          Supermetrics Setup
-        </h3>
-        <SupermetricsConnector />
-      </div>
-
-      <Separator />
-
-      {/* API Keys Configuration for other platforms */}
-      <div>
-        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <Key className="h-5 w-5" />
-          API Configuration
-        </h3>
-        <div className="grid gap-4">
-          {integrationPlatforms
-            .filter(p => !['google_sheets', 'supermetrics'].includes(p.id))
-            .map((platform) => (
-              <ApiKeyManager
-                key={platform.id}
-                platform={platform.id}
-                onSave={(keys) => saveApiKeys(platform.id, keys)}
-                savedKeys={getApiKeys(platform.id)}
-              />
-            ))}
-        </div>
-      </div>
     </div>
   );
 };
