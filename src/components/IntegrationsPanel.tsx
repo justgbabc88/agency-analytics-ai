@@ -8,7 +8,8 @@ import { useIntegrations } from "@/hooks/useIntegrations";
 import { useApiKeys } from "@/hooks/useApiKeys";
 import { ApiKeyManager } from "./ApiKeyManager";
 import { GoogleSheetsConnector } from "./GoogleSheetsConnector";
-import { Settings, CheckCircle, XCircle, RefreshCw, Key, FileSpreadsheet } from "lucide-react";
+import { SupermetricsConnector } from "./SupermetricsConnector";
+import { Settings, CheckCircle, XCircle, RefreshCw, Key, FileSpreadsheet, BarChart3 } from "lucide-react";
 
 const integrationPlatforms = [
   { 
@@ -18,9 +19,9 @@ const integrationPlatforms = [
     color: 'bg-green-100 text-green-700'
   },
   { 
-    id: 'facebook_ads', 
-    name: 'Facebook Ads', 
-    description: 'Ad spend and performance metrics',
+    id: 'supermetrics', 
+    name: 'Supermetrics', 
+    description: 'Advanced marketing data analytics',
     color: 'bg-blue-100 text-blue-700'
   },
   { 
@@ -63,10 +64,11 @@ export const IntegrationsPanel = () => {
   return (
     <div className="space-y-6">
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="configure">Configure APIs</TabsTrigger>
           <TabsTrigger value="google-sheets">Google Sheets</TabsTrigger>
+          <TabsTrigger value="supermetrics">Supermetrics</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
@@ -121,7 +123,7 @@ export const IntegrationsPanel = () => {
                       <Switch
                         checked={isConnected}
                         onCheckedChange={(checked) => handleToggleIntegration(platform.id, checked)}
-                        disabled={!hasKeys && platform.id !== 'google_sheets'}
+                        disabled={!hasKeys && !['google_sheets', 'supermetrics'].includes(platform.id)}
                       />
                     </div>
                   </div>
@@ -133,7 +135,7 @@ export const IntegrationsPanel = () => {
 
         <TabsContent value="configure" className="space-y-4">
           <div className="grid gap-4">
-            {integrationPlatforms.filter(p => p.id !== 'google_sheets').map((platform) => (
+            {integrationPlatforms.filter(p => !['google_sheets', 'supermetrics'].includes(p.id)).map((platform) => (
               <ApiKeyManager
                 key={platform.id}
                 platform={platform.id}
@@ -146,6 +148,10 @@ export const IntegrationsPanel = () => {
 
         <TabsContent value="google-sheets" className="space-y-4">
           <GoogleSheetsConnector />
+        </TabsContent>
+
+        <TabsContent value="supermetrics" className="space-y-4">
+          <SupermetricsConnector />
         </TabsContent>
       </Tabs>
     </div>

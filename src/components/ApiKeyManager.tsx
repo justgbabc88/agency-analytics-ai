@@ -15,20 +15,6 @@ interface ApiKeyManagerProps {
 }
 
 const platformConfigs = {
-  google_sheets: {
-    name: "Google Sheets",
-    fields: [
-      { key: "client_id", label: "Google Client ID", type: "text" },
-      { key: "client_secret", label: "Google Client Secret", type: "password" },
-    ]
-  },
-  facebook_ads: {
-    name: "Facebook Ads",
-    fields: [
-      { key: "access_token", label: "Facebook Access Token", type: "password" },
-      { key: "app_id", label: "Facebook App ID", type: "text" },
-    ]
-  },
   clickfunnels: {
     name: "ClickFunnels",
     fields: [
