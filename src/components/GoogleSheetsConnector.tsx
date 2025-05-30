@@ -1,9 +1,10 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Plus, FileSpreadsheet, MapPin, User } from "lucide-react";
+import { Trash2, Plus, FileSpreadsheet, MapPin, User, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useGoogleAuth } from "@/hooks/useGoogleAuth";
 import { useGoogleSheetsData } from "@/hooks/useGoogleSheetsData";
@@ -33,6 +34,7 @@ export const GoogleSheetsConnector = () => {
   const [selectedSubSheet, setSelectedSubSheet] = useState<string>("");
   const [fieldMappings, setFieldMappings] = useState<FieldMapping[]>([]);
   const [loadingSheets, setLoadingSheets] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const { toast } = useToast();
 
   const { 
@@ -45,7 +47,7 @@ export const GoogleSheetsConnector = () => {
     getSheetData 
   } = useGoogleAuth();
 
-  const { storeSyncedData } = useGoogleSheetsData();
+  const { config, storeSyncedData, storeConfig, clearConfig } = useGoogleSheetsData();
 
   useEffect(() => {
     if (isConnected) {
@@ -53,9 +55,23 @@ export const GoogleSheetsConnector = () => {
     }
   }, [isConnected]);
 
+  // Load saved configuration when component mounts
   useEffect(() => {
-    if (selectedSheet) {
-      loadSheetColumns();
+    if (config && sheets.length > 0) {
+      setSelectedSheet(config.selectedSheet);
+      setSelectedSubSheet(config.selectedSubSheet);
+      setFieldMappings(config.fieldMappings);
+      
+      // Load sheet columns if we have a selected sheet
+      if (config.selectedSheet) {
+        loadSheetColumns(config.selectedSheet);
+      }
+    }
+  }, [config, sheets]);
+
+  useEffect(() => {
+    if (selectedSheet && !config) {
+      loadSheetColumns(selectedSheet);
     }
   }, [selectedSheet]);
 
@@ -76,16 +92,17 @@ export const GoogleSheetsConnector = () => {
     }
   };
 
-  const loadSheetColumns = async () => {
-    if (!selectedSheet) return;
+  const loadSheetColumns = async (sheetId?: string) => {
+    const targetSheet = sheetId || selectedSheet;
+    if (!targetSheet) return;
 
     try {
-      const sheetData = await getSheetData(selectedSheet);
+      const sheetData = await getSheetData(targetSheet);
       setSheetColumns(sheetData.columns || []);
       setAvailableSheets(sheetData.sheets || []);
       
-      // Auto-select the first sheet if available
-      if (sheetData.sheets && sheetData.sheets.length > 0) {
+      // Auto-select the first sheet if available and no config exists
+      if (sheetData.sheets && sheetData.sheets.length > 0 && !config) {
         setSelectedSubSheet(sheetData.sheets[0].title);
       }
     } catch (error) {
@@ -131,6 +148,7 @@ export const GoogleSheetsConnector = () => {
     setFieldMappings([]);
     setAvailableSheets([]);
     setSelectedSubSheet("");
+    clearConfig();
     toast({
       title: "Google Account Disconnected",
       description: "Your Google account has been disconnected.",
@@ -147,18 +165,17 @@ export const GoogleSheetsConnector = () => {
   };
 
   const updateFieldMapping = (id: string, field: keyof FieldMapping, value: string) => {
-    setFieldMappings(prev => 
-      prev.map(mapping => 
-        mapping.id === id ? { ...mapping, [field]: value } : mapping
-      )
+    const updatedMappings = fieldMappings.map(mapping => 
+      mapping.id === id ? { ...mapping, [field]: value } : mapping
     );
+    setFieldMappings(updatedMappings);
   };
 
   const removeFieldMapping = (id: string) => {
     setFieldMappings(prev => prev.filter(mapping => mapping.id !== id));
   };
 
-  const handleSyncData = async () => {
+  const performSync = async () => {
     if (!selectedSheet || !selectedSubSheet || fieldMappings.length === 0) {
       toast({
         title: "Configuration Required",
@@ -168,17 +185,20 @@ export const GoogleSheetsConnector = () => {
       return;
     }
 
+    setSyncing(true);
     try {
-      // Use the selected sub-sheet name with proper range
       const range = `${selectedSubSheet}!A:Z`;
       console.log('Syncing with range:', range);
       
       const sheetData = await getSheetData(selectedSheet, range);
       
-      // Store the synced data using our hook
+      // Store the synced data
       storeSyncedData(sheetData, fieldMappings);
       
-      // Process and sync the data based on field mappings
+      // Store the configuration for future use
+      const selectedSheetTitle = sheets.find(s => s.id === selectedSheet)?.name || '';
+      storeConfig(selectedSheet, selectedSubSheet, fieldMappings, selectedSheetTitle);
+      
       console.log('Syncing data:', sheetData);
       
       toast({
@@ -192,7 +212,28 @@ export const GoogleSheetsConnector = () => {
         description: "Failed to sync data from Google Sheets. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setSyncing(false);
     }
+  };
+
+  const handleRefreshData = async () => {
+    if (config) {
+      await performSync();
+    }
+  };
+
+  const clearConfiguration = () => {
+    setSelectedSheet("");
+    setSelectedSubSheet("");
+    setFieldMappings([]);
+    setSheetColumns([]);
+    setAvailableSheets([]);
+    clearConfig();
+    toast({
+      title: "Configuration Cleared",
+      description: "Google Sheets configuration has been reset.",
+    });
   };
 
   return (
@@ -232,12 +273,43 @@ export const GoogleSheetsConnector = () => {
                   Disconnect
                 </Button>
               </div>
+
+              {config && (
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-blue-900">Configuration Saved</p>
+                      <p className="text-xs text-blue-700">
+                        {config.sheetTitle} → {config.selectedSubSheet} ({config.fieldMappings.length} mappings)
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={handleRefreshData}
+                        disabled={syncing}
+                        size="sm"
+                        className="flex items-center gap-1"
+                      >
+                        <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+                        {syncing ? 'Syncing...' : 'Refresh Data'}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={clearConfiguration}
+                      >
+                        Reset
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
       </Card>
 
-      {isConnected && (
+      {isConnected && !config && (
         <>
           <Card>
             <CardHeader>
@@ -354,8 +426,8 @@ export const GoogleSheetsConnector = () => {
                     <Plus className="h-4 w-4 mr-2" />
                     Add Mapping
                   </Button>
-                  <Button onClick={handleSyncData} className="ml-auto">
-                    Sync Data
+                  <Button onClick={performSync} disabled={syncing} className="ml-auto">
+                    {syncing ? 'Syncing...' : 'Sync Data'}
                   </Button>
                 </div>
               </CardContent>

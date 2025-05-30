@@ -12,8 +12,22 @@ interface SyncedData {
   syncedAt: string;
 }
 
+interface FieldMapping {
+  id: string;
+  sheetColumn: string;
+  dashboardField: string;
+}
+
+interface GoogleSheetsConfig {
+  selectedSheet: string;
+  selectedSubSheet: string;
+  fieldMappings: FieldMapping[];
+  sheetTitle: string;
+}
+
 export const useGoogleSheetsData = () => {
   const [syncedData, setSyncedData] = useState<SyncedData | null>(null);
+  const [config, setConfig] = useState<GoogleSheetsConfig | null>(null);
 
   const storeSyncedData = (data: any, fieldMappings: any[]) => {
     if (!data.data || data.data.length <= 1) return;
@@ -42,6 +56,18 @@ export const useGoogleSheetsData = () => {
     
     // Store in localStorage for persistence
     localStorage.setItem('google_sheets_synced_data', JSON.stringify(syncedDataObject));
+  };
+
+  const storeConfig = (selectedSheet: string, selectedSubSheet: string, fieldMappings: FieldMapping[], sheetTitle: string) => {
+    const configObject: GoogleSheetsConfig = {
+      selectedSheet,
+      selectedSubSheet,
+      fieldMappings,
+      sheetTitle
+    };
+
+    setConfig(configObject);
+    localStorage.setItem('google_sheets_config', JSON.stringify(configObject));
   };
 
   const calculateMetricsFromSyncedData = () => {
@@ -83,25 +109,41 @@ export const useGoogleSheetsData = () => {
     };
   };
 
-  // Load data from localStorage on mount
+  // Load data and config from localStorage on mount
   useEffect(() => {
-    const stored = localStorage.getItem('google_sheets_synced_data');
-    if (stored) {
+    const storedData = localStorage.getItem('google_sheets_synced_data');
+    const storedConfig = localStorage.getItem('google_sheets_config');
+    
+    if (storedData) {
       try {
-        setSyncedData(JSON.parse(stored));
+        setSyncedData(JSON.parse(storedData));
       } catch (error) {
         console.error('Failed to parse stored Google Sheets data:', error);
+      }
+    }
+
+    if (storedConfig) {
+      try {
+        setConfig(JSON.parse(storedConfig));
+      } catch (error) {
+        console.error('Failed to parse stored Google Sheets config:', error);
       }
     }
   }, []);
 
   return {
     syncedData,
+    config,
     storeSyncedData,
+    storeConfig,
     calculateMetricsFromSyncedData,
     clearSyncedData: () => {
       setSyncedData(null);
       localStorage.removeItem('google_sheets_synced_data');
+    },
+    clearConfig: () => {
+      setConfig(null);
+      localStorage.removeItem('google_sheets_config');
     }
   };
 };
