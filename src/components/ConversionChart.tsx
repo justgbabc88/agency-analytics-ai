@@ -1,5 +1,5 @@
 
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 interface FunnelProductConfig {
   id: string;
@@ -122,6 +122,31 @@ export const ConversionChart = ({ data, title, metrics, productConfig }: Convers
     return nameMap[metric as keyof typeof nameMap] || metric.charAt(0).toUpperCase() + metric.slice(1).replace(/([A-Z])/g, ' $1');
   };
 
+  // Calculate trend line for primary metric (first metric)
+  const primaryMetric = metrics[0];
+  const calculateTrendLine = () => {
+    if (!primaryMetric || data.length < 2) return null;
+    
+    const validData = data.filter(d => d[primaryMetric] !== undefined && d[primaryMetric] !== null);
+    if (validData.length < 2) return null;
+
+    const xValues = validData.map((_, index) => index);
+    const yValues = validData.map(d => Number(d[primaryMetric]));
+    
+    const n = xValues.length;
+    const sumX = xValues.reduce((sum, x) => sum + x, 0);
+    const sumY = yValues.reduce((sum, y) => sum + y, 0);
+    const sumXY = xValues.reduce((sum, x, i) => sum + x * yValues[i], 0);
+    const sumXX = xValues.reduce((sum, x) => sum + x * x, 0);
+    
+    const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / n;
+    
+    return { slope, intercept };
+  };
+
+  const trendLine = calculateTrendLine();
+
   return (
     <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
       <h3 className="text-lg font-semibold text-gray-800 mb-4">{title}</h3>
@@ -143,6 +168,19 @@ export const ConversionChart = ({ data, title, metrics, productConfig }: Convers
             }}
             formatter={formatTooltipValue}
           />
+          {/* Trend line for primary metric */}
+          {trendLine && primaryMetric && (
+            <ReferenceLine 
+              segment={[
+                { x: data[0]?.date, y: trendLine.intercept },
+                { x: data[data.length - 1]?.date, y: trendLine.intercept + trendLine.slope * (data.length - 1) }
+              ]}
+              stroke={getMetricColor(primaryMetric)}
+              strokeDasharray="5 5"
+              strokeWidth={2}
+              opacity={0.7}
+            />
+          )}
           {metrics.map(metric => (
             data[0] && data[0][metric] !== undefined && (
               <Line 

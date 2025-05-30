@@ -35,6 +35,18 @@ export const MetricCard = ({
     }
   };
 
+  const getPercentageChange = () => {
+    if (!previousValue) return null;
+    
+    const current = typeof value === 'string' ? parseFloat(value) : value;
+    const previous = typeof previousValue === 'string' ? parseFloat(previousValue) : previousValue;
+    
+    if (previous === 0) return null;
+    
+    const percentChange = ((current - previous) / previous) * 100;
+    return percentChange;
+  };
+
   const getTrend = () => {
     if (!previousValue) return null;
     
@@ -60,6 +72,8 @@ export const MetricCard = ({
     return 'text-gray-400';
   };
 
+  const percentChange = getPercentageChange();
+
   return (
     <Card className={`transition-all duration-200 hover:shadow-md ${className}`}>
       <CardHeader className="pb-2">
@@ -73,6 +87,11 @@ export const MetricCard = ({
           {previousValue && (
             <div className={`flex items-center space-x-1 ${getTrendColor()}`}>
               {getTrendIcon()}
+              {percentChange !== null && (
+                <span className="text-sm font-medium">
+                  {percentChange > 0 ? '+' : ''}{percentChange.toFixed(1)}%
+                </span>
+              )}
             </div>
           )}
         </div>

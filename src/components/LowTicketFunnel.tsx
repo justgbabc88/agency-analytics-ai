@@ -1,9 +1,8 @@
-
 import { useState } from "react";
 import { MetricCard } from "./MetricCard";
 import { ConversionChart } from "./ConversionChart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronDown, ChevronUp, TrendingUp, MousePointer, Target } from "lucide-react";
+import { ChevronDown, ChevronUp, TrendingUp, MousePointer, Target, Percent } from "lucide-react";
 import { useGoogleSheetsData } from "@/hooks/useGoogleSheetsData";
 
 interface FunnelProductConfig {
@@ -447,8 +446,8 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
           >
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                <Target className="h-5 w-5" />
-                Conversion Statistics
+                <Percent className="h-5 w-5" />
+                Conversion Rates
               </CardTitle>
               {expandedSections.conversionStats ? 
                 <ChevronUp className="h-5 w-5" /> : 
@@ -458,65 +457,74 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
           </CardHeader>
           {expandedSections.conversionStats && (
             <CardContent className="space-y-6">
-              {/* Base Conversion Rates */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <MetricCard 
-                  title="Optin Rate" 
-                  value={conversions.optinRate} 
-                  format="percentage" 
-                  previousValue={previousConversions?.optinRate}
-                />
-                <MetricCard 
-                  title="Main Offer Conversion" 
-                  value={conversions.mainOfferRate} 
-                  format="percentage" 
-                  previousValue={previousConversions?.mainOfferRate}
-                />
+              {/* Primary Conversion Rates */}
+              <div>
+                <h4 className="text-md font-medium text-gray-700 mb-3 flex items-center gap-2">
+                  <Target className="h-4 w-4" />
+                  Primary Conversions
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <MetricCard 
+                    title="Optin Rate" 
+                    value={conversions.optinRate} 
+                    format="percentage" 
+                    previousValue={previousConversions?.optinRate}
+                  />
+                  <MetricCard 
+                    title="Main Offer Conversion" 
+                    value={conversions.mainOfferRate} 
+                    format="percentage" 
+                    previousValue={previousConversions?.mainOfferRate}
+                  />
+                </div>
               </div>
               
-              {/* Product Conversion Rates - Dynamic Grid */}
+              {/* Product Conversion Rates */}
               {visibleProductsCount > 0 && (
-                <div className={`grid grid-cols-1 ${visibleProductsCount >= 4 ? 'md:grid-cols-4' : visibleProductsCount === 3 ? 'md:grid-cols-3' : visibleProductsCount === 2 ? 'md:grid-cols-2' : 'md:grid-cols-1'} gap-4`}>
-                  {productConfig.bump?.visible && (
-                    <MetricCard 
-                      title="Bump Conversion" 
-                      value={conversions.bumpRate} 
-                      format="percentage" 
-                      previousValue={previousConversions?.bumpRate}
-                    />
-                  )}
-                  {productConfig.upsell1?.visible && (
-                    <MetricCard 
-                      title="Upsell 1 Conversion" 
-                      value={conversions.upsell1Rate} 
-                      format="percentage" 
-                      previousValue={previousConversions?.upsell1Rate}
-                    />
-                  )}
-                  {productConfig.downsell1?.visible && (
-                    <MetricCard 
-                      title="Downsell 1 Conversion" 
-                      value={conversions.downsell1Rate} 
-                      format="percentage" 
-                      previousValue={previousConversions?.downsell1Rate}
-                    />
-                  )}
-                  {productConfig.upsell2?.visible && (
-                    <MetricCard 
-                      title="Upsell 2 Conversion" 
-                      value={conversions.upsell2Rate} 
-                      format="percentage" 
-                      previousValue={previousConversions?.upsell2Rate}
-                    />
-                  )}
-                  {productConfig.downsell2?.visible && (
-                    <MetricCard 
-                      title="Downsell 2 Conversion" 
-                      value={conversions.downsell2Rate} 
-                      format="percentage" 
-                      previousValue={previousConversions?.downsell2Rate}
-                    />
-                  )}
+                <div>
+                  <h4 className="text-md font-medium text-gray-700 mb-3">Product Conversions</h4>
+                  <div className={`grid grid-cols-1 ${visibleProductsCount >= 3 ? 'md:grid-cols-3' : visibleProductsCount === 2 ? 'md:grid-cols-2' : 'md:grid-cols-1'} gap-4`}>
+                    {productConfig.bump?.visible && (
+                      <MetricCard 
+                        title="Bump Conversion" 
+                        value={conversions.bumpRate} 
+                        format="percentage" 
+                        previousValue={previousConversions?.bumpRate}
+                      />
+                    )}
+                    {productConfig.upsell1?.visible && (
+                      <MetricCard 
+                        title="Upsell 1 Conversion" 
+                        value={conversions.upsell1Rate} 
+                        format="percentage" 
+                        previousValue={previousConversions?.upsell1Rate}
+                      />
+                    )}
+                    {productConfig.downsell1?.visible && (
+                      <MetricCard 
+                        title="Downsell 1 Conversion" 
+                        value={conversions.downsell1Rate} 
+                        format="percentage" 
+                        previousValue={previousConversions?.downsell1Rate}
+                      />
+                    )}
+                    {productConfig.upsell2?.visible && (
+                      <MetricCard 
+                        title="Upsell 2 Conversion" 
+                        value={conversions.upsell2Rate} 
+                        format="percentage" 
+                        previousValue={previousConversions?.upsell2Rate}
+                      />
+                    )}
+                    {productConfig.downsell2?.visible && (
+                      <MetricCard 
+                        title="Downsell 2 Conversion" 
+                        value={conversions.downsell2Rate} 
+                        format="percentage" 
+                        previousValue={previousConversions?.downsell2Rate}
+                      />
+                    )}
+                  </div>
                 </div>
               )}
 
