@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConversionChart } from "./ConversionChart";
 import { FacebookMetrics } from "./FacebookMetrics";
@@ -46,7 +47,7 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
         date: row.Date || `Day ${index + 1}`,
         pageViews: parseInt(row['Page Views']?.replace(/[^\d]/g, '') || '0') || 0,
         optins: parseInt(row['Opt-Ins']?.replace(/[^\d]/g, '') || '0') || 0,
-        mainOffer: parseInt(row['Main Offer']?.replace(/[^\d]/g, '') || '0') || 0,
+        mainProduct: parseInt(row['Main Offer']?.replace(/[^\d]/g, '') || '0') || 0,
         bump: parseInt(row['Bump']?.replace(/[^\d]/g, '') || '0') || 0,
         upsell1: parseInt(row['Upsell 1']?.replace(/[^\d]/g, '') || '0') || 0,
         downsell1: parseInt(row['Downsell 1']?.replace(/[^\d]/g, '') || '0') || 0,
@@ -55,51 +56,61 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
         roas: parseFloat(row['ROAS']?.replace(/[^\d.]/g, '') || '0') || 0,
         optinRate: row['Page Views'] && row['Opt-Ins'] ? 
           (parseInt(row['Opt-Ins']?.replace(/[^\d]/g, '') || '0') / parseInt(row['Page Views']?.replace(/[^\d]/g, '') || '1')) * 100 : 0,
-        mainOfferRate: row['Page Views'] && row['Main Offer'] ? 
+        mainProduct: row['Page Views'] && row['Main Offer'] ? 
           (parseInt(row['Main Offer']?.replace(/[^\d]/g, '') || '0') / parseInt(row['Page Views']?.replace(/[^\d]/g, '') || '1')) * 100 : 0,
-        bumpRate: row['Main Offer'] && row['Bump'] ? 
+        bump: row['Main Offer'] && row['Bump'] ? 
           (parseInt(row['Bump']?.replace(/[^\d]/g, '') || '0') / parseInt(row['Main Offer']?.replace(/[^\d]/g, '') || '1')) * 100 : 0,
-        upsell1Rate: row['Main Offer'] && row['Upsell 1'] ? 
+        upsell1: row['Main Offer'] && row['Upsell 1'] ? 
           (parseInt(row['Upsell 1']?.replace(/[^\d]/g, '') || '0') / parseInt(row['Main Offer']?.replace(/[^\d]/g, '') || '1')) * 100 : 0,
-        downsell1Rate: row['Main Offer'] && row['Downsell 1'] ? 
+        downsell1: row['Main Offer'] && row['Downsell 1'] ? 
           (parseInt(row['Downsell 1']?.replace(/[^\d]/g, '') || '0') / parseInt(row['Main Offer']?.replace(/[^\d]/g, '') || '1')) * 100 : 0,
-        upsell2Rate: row['Upsell 1'] && row['Upsell 2'] ? 
+        upsell2: row['Upsell 1'] && row['Upsell 2'] ? 
           (parseInt(row['Upsell 2']?.replace(/[^\d]/g, '') || '0') / parseInt(row['Upsell 1']?.replace(/[^\d]/g, '') || '1')) * 100 : 0,
-        downsell2Rate: row['Upsell 1'] && row['Downsell 2'] ? 
+        downsell2: row['Upsell 1'] && row['Downsell 2'] ? 
           (parseInt(row['Downsell 2']?.replace(/[^\d]/g, '') || '0') / parseInt(row['Upsell 1']?.replace(/[^\d]/g, '') || '1')) * 100 : 0
       }));
     }
     
     // Fallback mock data
     return [
-      { date: "Nov 1", pageViews: 10000, optins: 2500, mainOffer: 625, bump: 187, upsell1: 125, downsell1: 150, upsell2: 75, downsell2: 50, roas: 3.2, optinRate: 25, mainOfferRate: 6.25, bumpRate: 30, upsell1Rate: 20, downsell1Rate: 24, upsell2Rate: 60, downsell2Rate: 40 },
-      { date: "Nov 2", pageViews: 2500, optins: 625, mainOffer: 156, bump: 47, upsell1: 31, downsell1: 38, upsell2: 19, downsell2: 13, roas: 3.5, optinRate: 25, mainOfferRate: 6.24, bumpRate: 30, upsell1Rate: 20, downsell1Rate: 24, upsell2Rate: 61, downsell2Rate: 42 },
-      { date: "Nov 3", pageViews: 625, optins: 187, mainOffer: 56, bump: 17, upsell1: 11, downsell1: 14, upsell2: 7, downsell2: 5, roas: 3.8, optinRate: 30, mainOfferRate: 8.96, bumpRate: 30, upsell1Rate: 20, downsell1Rate: 25, upsell2Rate: 64, downsell2Rate: 45 },
-      { date: "Nov 4", pageViews: 625, optins: 125, mainOffer: 25, bump: 8, upsell1: 5, downsell1: 6, upsell2: 3, downsell2: 2, roas: 2.9, optinRate: 20, mainOfferRate: 4.0, bumpRate: 32, upsell1Rate: 20, downsell1Rate: 24, upsell2Rate: 60, downsell2Rate: 40 },
-      { date: "Nov 5", pageViews: 500, optins: 150, mainOffer: 45, bump: 14, upsell1: 9, downsell1: 11, upsell2: 5, downsell2: 4, roas: 3.1, optinRate: 30, mainOfferRate: 9.0, bumpRate: 31, upsell1Rate: 20, downsell1Rate: 24, upsell2Rate: 56, downsell2Rate: 44 },
+      { date: "Nov 1", pageViews: 10000, optins: 2500, mainProduct: 6.25, bump: 30, upsell1: 20, downsell1: 24, upsell2: 60, downsell2: 40, roas: 3.2 },
+      { date: "Nov 2", pageViews: 2500, optins: 625, mainProduct: 6.24, bump: 30, upsell1: 20, downsell1: 24, upsell2: 61, downsell2: 42, roas: 3.5 },
+      { date: "Nov 3", pageViews: 625, optins: 187, mainProduct: 8.96, bump: 30, upsell1: 20, downsell1: 25, upsell2: 64, downsell2: 45, roas: 3.8 },
+      { date: "Nov 4", pageViews: 625, optins: 125, mainProduct: 4.0, bump: 32, upsell1: 20, downsell1: 24, upsell2: 60, downsell2: 40, roas: 2.9 },
+      { date: "Nov 5", pageViews: 500, optins: 150, mainProduct: 9.0, bump: 31, upsell1: 20, downsell1: 24, upsell2: 56, downsell2: 44, roas: 3.1 },
     ];
   };
 
   const funnelData = generateFunnelData();
 
-  // Calculate funnel conversion percentages
+  // Get latest metrics for each product
   const latestData = funnelData[funnelData.length - 1];
-  const mainOfferPercent = latestData.pageViews > 0 ? (latestData.mainOffer / latestData.pageViews) * 100 : 0;
-  const bumpPercent = latestData.mainOffer > 0 ? (latestData.bump / latestData.mainOffer) * 100 : 0;
-  const upsell1Percent = latestData.mainOffer > 0 ? (latestData.upsell1 / latestData.mainOffer) * 100 : 0;
-  const downsell1Percent = latestData.mainOffer > 0 ? (latestData.downsell1 / latestData.mainOffer) * 100 : 0;
-  const upsell2Percent = latestData.upsell1 > 0 ? (latestData.upsell2 / latestData.upsell1) * 100 : 0;
-  const downsell2Percent = latestData.upsell1 > 0 ? (latestData.downsell2 / latestData.upsell1) * 100 : 0;
 
-  // Mock previous period data for comparison
-  const previousPeriodData = {
-    mainOffer: mainOfferPercent * (0.85 + Math.random() * 0.3),
-    bump: bumpPercent * (0.85 + Math.random() * 0.3),
-    upsell1: upsell1Percent * (0.85 + Math.random() * 0.3),
-    downsell1: downsell1Percent * (0.85 + Math.random() * 0.3),
-    upsell2: upsell2Percent * (0.85 + Math.random() * 0.3),
-    downsell2: downsell2Percent * (0.85 + Math.random() * 0.3)
+  // Create a mapping from product IDs to their current values and calculate changes
+  const getProductMetrics = () => {
+    const currentMetrics: Record<string, number> = {
+      mainProduct: latestData.mainProduct || 0,
+      bump: latestData.bump || 0,
+      upsell1: latestData.upsell1 || 0,
+      downsell1: latestData.downsell1 || 0,
+      upsell2: latestData.upsell2 || 0,
+      downsell2: latestData.downsell2 || 0
+    };
+
+    // Mock previous period data for comparison
+    const previousMetrics: Record<string, number> = {
+      mainProduct: currentMetrics.mainProduct * (0.85 + Math.random() * 0.3),
+      bump: currentMetrics.bump * (0.85 + Math.random() * 0.3),
+      upsell1: currentMetrics.upsell1 * (0.85 + Math.random() * 0.3),
+      downsell1: currentMetrics.downsell1 * (0.85 + Math.random() * 0.3),
+      upsell2: currentMetrics.upsell2 * (0.85 + Math.random() * 0.3),
+      downsell2: currentMetrics.downsell2 * (0.85 + Math.random() * 0.3)
+    };
+
+    return { currentMetrics, previousMetrics };
   };
+
+  const { currentMetrics, previousMetrics } = getProductMetrics();
 
   const calculatePercentageChange = (current: number, previous: number) => {
     if (previous === 0) return 0;
@@ -118,12 +129,22 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
     return "text-gray-500";
   };
 
-  const mainOfferChange = calculatePercentageChange(mainOfferPercent, previousPeriodData.mainOffer);
-  const bumpChange = calculatePercentageChange(bumpPercent, previousPeriodData.bump);
-  const upsell1Change = calculatePercentageChange(upsell1Percent, previousPeriodData.upsell1);
-  const downsell1Change = calculatePercentageChange(downsell1Percent, previousPeriodData.downsell1);
-  const upsell2Change = calculatePercentageChange(upsell2Percent, previousPeriodData.upsell2);
-  const downsell2Change = calculatePercentageChange(downsell2Percent, previousPeriodData.downsell2);
+  // Get icon for each product type
+  const getProductIcon = (productId: string) => {
+    switch (productId) {
+      case 'mainProduct': return <Target className="h-3 w-3" />;
+      case 'bump': return <ShoppingCart className="h-3 w-3" />;
+      case 'upsell1': return <TrendingUp className="h-3 w-3" />;
+      case 'downsell1': return <Users className="h-3 w-3" />;
+      case 'upsell2': return <DollarSign className="h-3 w-3" />;
+      case 'downsell2': return <Target className="h-3 w-3" />;
+      default: return <Target className="h-3 w-3" />;
+    }
+  };
+
+  // Filter visible products and create chart metrics array
+  const visibleProducts = selectedProducts.filter(product => product.visible);
+  const chartMetrics = visibleProducts.map(product => product.id);
 
   return (
     <div className="space-y-6">
@@ -158,151 +179,95 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
             >
               <h3 className="text-lg font-semibold text-amber-700 flex items-center gap-2">
                 <TrendingUp className="h-5 w-5 text-amber-600" />
-                Funnel Analysis
+                Funnel Analysis ({visibleProducts.length} products selected)
               </h3>
               {isFunnelOpen ? <ChevronUp className="h-4 w-4 text-amber-600" /> : <ChevronDown className="h-4 w-4 text-amber-600" />}
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-4 mt-4">
-            {/* Funnel Conversion Percentages */}
+            {/* Funnel Conversion Percentages - Only show selected products */}
             <Card className="border-amber-200">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <BarChart3 className="h-5 w-5 text-amber-600" />
-                    Funnel Conversion Rates
+                    Selected Funnel Products ({visibleProducts.length})
                   </CardTitle>
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                  {/* Main Offer Metric */}
-                  <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-lg p-3 border border-gray-100">
-                    <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
-                      <Target className="h-3 w-3" />
-                      Main Offer
-                    </div>
-                    <div className="text-lg font-bold text-gray-800">
-                      {mainOfferPercent.toFixed(1)}%
-                    </div>
-                    <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(mainOfferChange)}`}>
-                      {getChangeIcon(mainOfferChange)}
-                      <span>{mainOfferChange > 0 ? '+' : ''}{mainOfferChange.toFixed(1)}%</span>
-                    </div>
-                  </div>
-
-                  {/* Bump Metric */}
-                  <div className="bg-gradient-to-br from-slate-50 to-slate-100/50 rounded-lg p-3 border border-slate-100">
-                    <div className="flex items-center gap-2 text-xs text-slate-600 mb-1">
-                      <ShoppingCart className="h-3 w-3" />
-                      Bump
-                    </div>
-                    <div className="text-lg font-bold text-slate-800">
-                      {bumpPercent.toFixed(1)}%
-                    </div>
-                    <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(bumpChange)}`}>
-                      {getChangeIcon(bumpChange)}
-                      <span>{bumpChange > 0 ? '+' : ''}{bumpChange.toFixed(1)}%</span>
-                    </div>
-                  </div>
-
-                  {/* Upsell 1 Metric */}
-                  <div className="bg-gradient-to-br from-zinc-50 to-zinc-100/50 rounded-lg p-3 border border-zinc-100">
-                    <div className="flex items-center gap-2 text-xs text-zinc-600 mb-1">
-                      <TrendingUp className="h-3 w-3" />
-                      Upsell 1
-                    </div>
-                    <div className="text-lg font-bold text-zinc-800">
-                      {upsell1Percent.toFixed(1)}%
-                    </div>
-                    <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(upsell1Change)}`}>
-                      {getChangeIcon(upsell1Change)}
-                      <span>{upsell1Change > 0 ? '+' : ''}{upsell1Change.toFixed(1)}%</span>
-                    </div>
-                  </div>
-
-                  {/* Downsell 1 Metric */}
-                  <div className="bg-gradient-to-br from-stone-50 to-stone-100/50 rounded-lg p-3 border border-stone-100">
-                    <div className="flex items-center gap-2 text-xs text-stone-600 mb-1">
-                      <Users className="h-3 w-3" />
-                      Downsell 1
-                    </div>
-                    <div className="text-lg font-bold text-stone-800">
-                      {downsell1Percent.toFixed(1)}%
-                    </div>
-                    <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(downsell1Change)}`}>
-                      {getChangeIcon(downsell1Change)}
-                      <span>{downsell1Change > 0 ? '+' : ''}{downsell1Change.toFixed(1)}%</span>
-                    </div>
-                  </div>
-
-                  {/* Upsell 2 Metric */}
-                  <div className="bg-gradient-to-br from-neutral-50 to-neutral-100/50 rounded-lg p-3 border border-neutral-100">
-                    <div className="flex items-center gap-2 text-xs text-neutral-600 mb-1">
-                      <DollarSign className="h-3 w-3" />
-                      Upsell 2
-                    </div>
-                    <div className="text-lg font-bold text-neutral-800">
-                      {upsell2Percent.toFixed(1)}%
-                    </div>
-                    <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(upsell2Change)}`}>
-                      {getChangeIcon(upsell2Change)}
-                      <span>{upsell2Change > 0 ? '+' : ''}{upsell2Change.toFixed(1)}%</span>
-                    </div>
-                  </div>
-
-                  {/* Downsell 2 Metric */}
-                  <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-lg p-3 border border-gray-100">
-                    <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
-                      <Target className="h-3 w-3" />
-                      Downsell 2
-                    </div>
-                    <div className="text-lg font-bold text-gray-800">
-                      {downsell2Percent.toFixed(1)}%
-                    </div>
-                    <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(downsell2Change)}`}>
-                      {getChangeIcon(downsell2Change)}
-                      <span>{downsell2Change > 0 ? '+' : ''}{downsell2Change.toFixed(1)}%</span>
-                    </div>
-                  </div>
+                  {visibleProducts.map(product => {
+                    const currentValue = currentMetrics[product.id] || 0;
+                    const previousValue = previousMetrics[product.id] || 0;
+                    const change = calculatePercentageChange(currentValue, previousValue);
+                    
+                    return (
+                      <div 
+                        key={product.id}
+                        className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-lg p-3 border"
+                        style={{ borderColor: `${product.color}40` }}
+                      >
+                        <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
+                          {getProductIcon(product.id)}
+                          <span style={{ color: product.color }}>{product.label}</span>
+                        </div>
+                        <div className="text-lg font-bold text-gray-800">
+                          {currentValue.toFixed(1)}%
+                        </div>
+                        <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(change)}`}>
+                          {getChangeIcon(change)}
+                          <span>{change > 0 ? '+' : ''}{change.toFixed(1)}%</span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
+                
+                {visibleProducts.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    <p>No products selected. Use the Funnel Products customizer above to select products to display.</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
-            {/* Funnel Conversion Charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <Card className="border-amber-200">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4" />
-                    Funnel Volume
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ConversionChart 
-                    data={funnelData}
-                    title=""
-                    metrics={['pageViews', 'optins', 'mainOffer']}
-                  />
-                </CardContent>
-              </Card>
+            {/* Funnel Conversion Charts - Only show if products are selected */}
+            {visibleProducts.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <Card className="border-amber-200">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <BarChart3 className="h-4 w-4" />
+                      Funnel Volume
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ConversionChart 
+                      data={funnelData}
+                      title=""
+                      metrics={['pageViews', 'optins', 'mainProduct']}
+                    />
+                  </CardContent>
+                </Card>
 
-              <Card className="border-amber-200">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4" />
-                    All Conversion Rates
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ConversionChart 
-                    data={funnelData}
-                    title=""
-                    metrics={['optinRate', 'mainOfferRate', 'bumpRate', 'upsell1Rate', 'downsell1Rate', 'upsell2Rate', 'downsell2Rate']}
-                  />
-                </CardContent>
-              </Card>
-            </div>
+                <Card className="border-amber-200">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4" />
+                      Selected Product Conversion Rates
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ConversionChart 
+                      data={funnelData}
+                      title=""
+                      metrics={chartMetrics}
+                    />
+                  </CardContent>
+                </Card>
+              </div>
+            )}
           </CollapsibleContent>
         </Collapsible>
       </div>

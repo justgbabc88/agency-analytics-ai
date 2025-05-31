@@ -1,8 +1,9 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Settings, Eye, EyeOff, ChevronDown, ChevronUp } from "lucide-react";
+import { Settings, Eye, EyeOff, ChevronDown, ChevronUp, BarChart3 } from "lucide-react";
 import { useState } from "react";
 
 interface FunnelProductConfig {
@@ -12,15 +13,6 @@ interface FunnelProductConfig {
   color: string;
 }
 
-const defaultFunnelProducts: FunnelProductConfig[] = [
-  { id: 'mainProduct', label: 'Main Product', visible: true, color: '#10B981' },
-  { id: 'bump', label: 'Bump Product', visible: true, color: '#3B82F6' },
-  { id: 'upsell1', label: 'Upsell 1', visible: true, color: '#F59E0B' },
-  { id: 'downsell1', label: 'Downsell 1', visible: false, color: '#8B5CF6' },
-  { id: 'upsell2', label: 'Upsell 2', visible: false, color: '#EF4444' },
-  { id: 'downsell2', label: 'Downsell 2', visible: false, color: '#06B6D4' },
-];
-
 interface MetricCustomizerProps {
   onProductsChange: (products: FunnelProductConfig[]) => void;
   className?: string;
@@ -28,7 +20,7 @@ interface MetricCustomizerProps {
 
 export const MetricCustomizer = ({ onProductsChange, className }: MetricCustomizerProps) => {
   const [funnelProducts, setFunnelProducts] = useState<FunnelProductConfig[]>([
-    { id: 'mainProduct', label: 'Main Offer Rate', visible: true, color: '#10B981' },
+    { id: 'mainProduct', label: 'Main Product Rate', visible: true, color: '#10B981' },
     { id: 'bump', label: 'Bump Rate', visible: true, color: '#3B82F6' },
     { id: 'upsell1', label: 'Upsell 1 Rate', visible: true, color: '#F59E0B' },
     { id: 'downsell1', label: 'Downsell 1 Rate', visible: false, color: '#8B5CF6' },
@@ -53,9 +45,9 @@ export const MetricCustomizer = ({ onProductsChange, className }: MetricCustomiz
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Settings className="h-4 w-4 text-blue-600" />
+            <BarChart3 className="h-4 w-4 text-blue-600" />
             <CardTitle className="text-sm font-medium text-blue-900">
-              Funnel Products ({visibleProducts.length} selected)
+              Funnel Products Display ({visibleProducts.length} selected)
             </CardTitle>
           </div>
           <Button 
@@ -67,6 +59,9 @@ export const MetricCustomizer = ({ onProductsChange, className }: MetricCustomiz
             {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </Button>
         </div>
+        <p className="text-xs text-blue-700/80">
+          Select which products to show in the funnel analysis below
+        </p>
       </CardHeader>
       
       {isExpanded && (
@@ -91,6 +86,8 @@ export const MetricCustomizer = ({ onProductsChange, className }: MetricCustomiz
                   >
                     {product.label}
                   </label>
+                  {product.visible && <Eye className="h-3 w-3 text-green-600" />}
+                  {!product.visible && <EyeOff className="h-3 w-3 text-gray-400" />}
                 </div>
               </div>
             ))}
