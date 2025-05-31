@@ -55,8 +55,8 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
         roas: parseFloat(row['ROAS']?.replace(/[^\d.]/g, '') || '0') || 0,
         optinRate: row['Page Views'] && row['Opt-Ins'] ? 
           (parseInt(row['Opt-Ins']?.replace(/[^\d]/g, '') || '0') / parseInt(row['Page Views']?.replace(/[^\d]/g, '') || '1')) * 100 : 0,
-        mainOfferRate: row['Opt-Ins'] && row['Main Offer'] ? 
-          (parseInt(row['Main Offer']?.replace(/[^\d]/g, '') || '0') / parseInt(row['Opt-Ins']?.replace(/[^\d]/g, '') || '1')) * 100 : 0,
+        mainOfferRate: row['Page Views'] && row['Main Offer'] ? 
+          (parseInt(row['Main Offer']?.replace(/[^\d]/g, '') || '0') / parseInt(row['Page Views']?.replace(/[^\d]/g, '') || '1')) * 100 : 0,
         bumpRate: row['Main Offer'] && row['Bump'] ? 
           (parseInt(row['Bump']?.replace(/[^\d]/g, '') || '0') / parseInt(row['Main Offer']?.replace(/[^\d]/g, '') || '1')) * 100 : 0,
         upsell1Rate: row['Main Offer'] && row['Upsell 1'] ? 
@@ -72,11 +72,11 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
     
     // Fallback mock data
     return [
-      { date: "Nov 1", pageViews: 10000, optins: 2500, mainOffer: 625, bump: 187, upsell1: 125, downsell1: 150, upsell2: 75, downsell2: 50, roas: 3.2, optinRate: 25, mainOfferRate: 25, bumpRate: 30, upsell1Rate: 20, downsell1Rate: 24, upsell2Rate: 60, downsell2Rate: 40 },
-      { date: "Nov 2", pageViews: 2500, optins: 625, mainOffer: 156, bump: 47, upsell1: 31, downsell1: 38, upsell2: 19, downsell2: 13, roas: 3.5, optinRate: 25, mainOfferRate: 25, bumpRate: 30, upsell1Rate: 20, downsell1Rate: 24, upsell2Rate: 61, downsell2Rate: 42 },
-      { date: "Nov 3", pageViews: 625, optins: 187, mainOffer: 56, bump: 17, upsell1: 11, downsell1: 14, upsell2: 7, downsell2: 5, roas: 3.8, optinRate: 30, mainOfferRate: 30, bumpRate: 30, upsell1Rate: 20, downsell1Rate: 25, upsell2Rate: 64, downsell2Rate: 45 },
-      { date: "Nov 4", pageViews: 625, optins: 125, mainOffer: 25, bump: 8, upsell1: 5, downsell1: 6, upsell2: 3, downsell2: 2, roas: 2.9, optinRate: 20, mainOfferRate: 20, bumpRate: 32, upsell1Rate: 20, downsell1Rate: 24, upsell2Rate: 60, downsell2Rate: 40 },
-      { date: "Nov 5", pageViews: 500, optins: 150, mainOffer: 45, bump: 14, upsell1: 9, downsell1: 11, upsell2: 5, downsell2: 4, roas: 3.1, optinRate: 30, mainOfferRate: 30, bumpRate: 31, upsell1Rate: 20, downsell1Rate: 24, upsell2Rate: 56, downsell2Rate: 44 },
+      { date: "Nov 1", pageViews: 10000, optins: 2500, mainOffer: 625, bump: 187, upsell1: 125, downsell1: 150, upsell2: 75, downsell2: 50, roas: 3.2, optinRate: 25, mainOfferRate: 6.25, bumpRate: 30, upsell1Rate: 20, downsell1Rate: 24, upsell2Rate: 60, downsell2Rate: 40 },
+      { date: "Nov 2", pageViews: 2500, optins: 625, mainOffer: 156, bump: 47, upsell1: 31, downsell1: 38, upsell2: 19, downsell2: 13, roas: 3.5, optinRate: 25, mainOfferRate: 6.24, bumpRate: 30, upsell1Rate: 20, downsell1Rate: 24, upsell2Rate: 61, downsell2Rate: 42 },
+      { date: "Nov 3", pageViews: 625, optins: 187, mainOffer: 56, bump: 17, upsell1: 11, downsell1: 14, upsell2: 7, downsell2: 5, roas: 3.8, optinRate: 30, mainOfferRate: 8.96, bumpRate: 30, upsell1Rate: 20, downsell1Rate: 25, upsell2Rate: 64, downsell2Rate: 45 },
+      { date: "Nov 4", pageViews: 625, optins: 125, mainOffer: 25, bump: 8, upsell1: 5, downsell1: 6, upsell2: 3, downsell2: 2, roas: 2.9, optinRate: 20, mainOfferRate: 4.0, bumpRate: 32, upsell1Rate: 20, downsell1Rate: 24, upsell2Rate: 60, downsell2Rate: 40 },
+      { date: "Nov 5", pageViews: 500, optins: 150, mainOffer: 45, bump: 14, upsell1: 9, downsell1: 11, upsell2: 5, downsell2: 4, roas: 3.1, optinRate: 30, mainOfferRate: 9.0, bumpRate: 31, upsell1Rate: 20, downsell1Rate: 24, upsell2Rate: 56, downsell2Rate: 44 },
     ];
   };
 
@@ -84,7 +84,7 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
 
   // Calculate funnel conversion percentages
   const latestData = funnelData[funnelData.length - 1];
-  const mainOfferPercent = latestData.optins > 0 ? (latestData.mainOffer / latestData.optins) * 100 : 0;
+  const mainOfferPercent = latestData.pageViews > 0 ? (latestData.mainOffer / latestData.pageViews) * 100 : 0;
   const bumpPercent = latestData.mainOffer > 0 ? (latestData.bump / latestData.mainOffer) * 100 : 0;
   const upsell1Percent = latestData.mainOffer > 0 ? (latestData.upsell1 / latestData.mainOffer) * 100 : 0;
   const downsell1Percent = latestData.mainOffer > 0 ? (latestData.downsell1 / latestData.mainOffer) * 100 : 0;
