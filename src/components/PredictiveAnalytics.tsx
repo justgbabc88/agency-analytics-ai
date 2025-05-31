@@ -350,8 +350,8 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
     return acc;
   }, {} as Record<string, FunnelProductConfig>);
 
-  // Get current metrics for scenario analysis
-  const getBaseMetricForScenarios = () => {
+  // Get current metrics for prediction analysis
+  const getBaseMetricForPredictions = () => {
     if (!currentMetrics) return 100000; // Default value
     
     if (selectedMetric === 'revenue') {
@@ -433,7 +433,7 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
 
         {showPredictions && selectedMetric !== 'funnelProducts' && (
           <ScenarioForecast
-            baseMetric={getBaseMetricForScenarios()}
+            baseMetric={getBaseMetricForPredictions()}
             metricName={selectedMetric === 'revenue' ? 'Revenue' : selectedMetric === 'conversions' ? 'Conversions' : 'Traffic'}
             forecastDays={forecastDays}
             currentTrend={forecastResult.trend}
