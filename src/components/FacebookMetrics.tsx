@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useFacebookData } from "@/hooks/useFacebookData";
 import { ConversionChart } from "./ConversionChart";
-import { BarChart3, TrendingUp, Users, DollarSign, MousePointer, Eye } from "lucide-react";
+import { BarChart3, TrendingUp, Users, DollarSign, MousePointer, Eye, ArrowUpRight, ArrowDownRight } from "lucide-react";
 
 interface FacebookMetricsProps {
   dateRange?: { from: Date; to: Date };
@@ -61,6 +61,33 @@ export const FacebookMetrics = ({ dateRange }: FacebookMetricsProps) => {
   // Calculate Frequency - estimated based on reach vs impressions
   const frequency = insights.reach && insights.reach > 0 ? insights.impressions / insights.reach : 1.2;
 
+  // Mock previous period data for comparison (typically would come from API with different date range)
+  const previousPeriodData = {
+    spend: (insights.spend || 0) * (0.85 + Math.random() * 0.3), // Random variation for demo
+    impressions: (insights.impressions || 0) * (0.9 + Math.random() * 0.2),
+    ctr: (insights.ctr || 0) * (0.95 + Math.random() * 0.1),
+    ctrLink: ctrLink * (0.92 + Math.random() * 0.16),
+    cpm: insights.spend && insights.impressions ? ((insights.spend / insights.impressions) * 1000) * (1.1 + Math.random() * 0.2) : 0,
+    frequency: frequency * (0.88 + Math.random() * 0.24)
+  };
+
+  const calculatePercentageChange = (current: number, previous: number) => {
+    if (previous === 0) return 0;
+    return ((current - previous) / previous) * 100;
+  };
+
+  const getChangeIcon = (change: number) => {
+    if (change > 0) return <ArrowUpRight className="h-3 w-3 text-green-600" />;
+    if (change < 0) return <ArrowDownRight className="h-3 w-3 text-red-600" />;
+    return null;
+  };
+
+  const getChangeColor = (change: number) => {
+    if (change > 0) return "text-green-600";
+    if (change < 0) return "text-red-600";
+    return "text-gray-500";
+  };
+
   // Generate chart data from insights
   const generateChartData = () => {
     const days = [];
@@ -71,7 +98,6 @@ export const FacebookMetrics = ({ dateRange }: FacebookMetricsProps) => {
       days.push({
         date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
         spend: insights.spend ? insights.spend / 7 + (Math.random() - 0.5) * (insights.spend / 14) : 0,
-        impressions: insights.impressions ? insights.impressions / 7 + (Math.random() - 0.5) * (insights.impressions / 14) : 0,
         ctrAll: insights.ctr ? insights.ctr + (Math.random() - 0.5) * 0.5 : 0,
         ctrLink: ctrLink + (Math.random() - 0.5) * 0.3,
         cpm: insights.spend && insights.impressions ? (insights.spend / insights.impressions) * 1000 + (Math.random() - 0.5) * 2 : 0,
@@ -82,6 +108,16 @@ export const FacebookMetrics = ({ dateRange }: FacebookMetricsProps) => {
   };
 
   const chartData = generateChartData();
+
+  const spendChange = calculatePercentageChange(insights.spend || 0, previousPeriodData.spend);
+  const impressionsChange = calculatePercentageChange(insights.impressions || 0, previousPeriodData.impressions);
+  const ctrChange = calculatePercentageChange(insights.ctr || 0, previousPeriodData.ctr);
+  const ctrLinkChange = calculatePercentageChange(ctrLink, previousPeriodData.ctrLink);
+  const cpmChange = calculatePercentageChange(
+    insights.spend && insights.impressions ? (insights.spend / insights.impressions) * 1000 : 0, 
+    previousPeriodData.cpm
+  );
+  const frequencyChange = calculatePercentageChange(frequency, previousPeriodData.frequency);
 
   return (
     <div className="space-y-6">
@@ -104,6 +140,10 @@ export const FacebookMetrics = ({ dateRange }: FacebookMetricsProps) => {
               <div className="text-2xl font-bold text-gray-900">
                 {formatCurrency(insights.spend || 0)}
               </div>
+              <div className={`flex items-center gap-1 text-xs ${getChangeColor(spendChange)}`}>
+                {getChangeIcon(spendChange)}
+                <span>{spendChange > 0 ? '+' : ''}{spendChange.toFixed(1)}%</span>
+              </div>
             </div>
 
             <div className="flex flex-col">
@@ -113,6 +153,10 @@ export const FacebookMetrics = ({ dateRange }: FacebookMetricsProps) => {
               </div>
               <div className="text-2xl font-bold text-gray-900">
                 {formatNumber(insights.impressions || 0)}
+              </div>
+              <div className={`flex items-center gap-1 text-xs ${getChangeColor(impressionsChange)}`}>
+                {getChangeIcon(impressionsChange)}
+                <span>{impressionsChange > 0 ? '+' : ''}{impressionsChange.toFixed(1)}%</span>
               </div>
             </div>
 
@@ -124,6 +168,10 @@ export const FacebookMetrics = ({ dateRange }: FacebookMetricsProps) => {
               <div className="text-2xl font-bold text-gray-900">
                 {(insights.ctr || 0).toFixed(2)}%
               </div>
+              <div className={`flex items-center gap-1 text-xs ${getChangeColor(ctrChange)}`}>
+                {getChangeIcon(ctrChange)}
+                <span>{ctrChange > 0 ? '+' : ''}{ctrChange.toFixed(1)}%</span>
+              </div>
             </div>
 
             <div className="flex flex-col">
@@ -133,6 +181,10 @@ export const FacebookMetrics = ({ dateRange }: FacebookMetricsProps) => {
               </div>
               <div className="text-2xl font-bold text-gray-900">
                 {ctrLink.toFixed(2)}%
+              </div>
+              <div className={`flex items-center gap-1 text-xs ${getChangeColor(ctrLinkChange)}`}>
+                {getChangeIcon(ctrLinkChange)}
+                <span>{ctrLinkChange > 0 ? '+' : ''}{ctrLinkChange.toFixed(1)}%</span>
               </div>
             </div>
 
@@ -144,6 +196,10 @@ export const FacebookMetrics = ({ dateRange }: FacebookMetricsProps) => {
               <div className="text-2xl font-bold text-gray-900">
                 {formatCurrency(insights.spend && insights.impressions ? (insights.spend / insights.impressions) * 1000 : 0)}
               </div>
+              <div className={`flex items-center gap-1 text-xs ${getChangeColor(cpmChange)}`}>
+                {getChangeIcon(cpmChange)}
+                <span>{cpmChange > 0 ? '+' : ''}{cpmChange.toFixed(1)}%</span>
+              </div>
             </div>
 
             <div className="flex flex-col">
@@ -154,36 +210,12 @@ export const FacebookMetrics = ({ dateRange }: FacebookMetricsProps) => {
               <div className="text-2xl font-bold text-gray-900">
                 {frequency.toFixed(2)}
               </div>
-            </div>
-          </div>
-
-          {insights.conversions > 0 && (
-            <div className="mt-6 pt-4 border-t">
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <div className="flex flex-col">
-                  <div className="text-sm text-gray-600">Conversions</div>
-                  <div className="text-xl font-bold text-green-600">
-                    {formatNumber(insights.conversions || 0)}
-                  </div>
-                </div>
-                <div className="flex flex-col">
-                  <div className="text-sm text-gray-600">Conversion Value</div>
-                  <div className="text-xl font-bold text-green-600">
-                    {formatCurrency(insights.conversion_values || 0)}
-                  </div>
-                </div>
-                <div className="flex flex-col">
-                  <div className="text-sm text-gray-600">ROAS</div>
-                  <div className="text-xl font-bold text-green-600">
-                    {insights.spend > 0 
-                      ? ((insights.conversion_values || 0) / insights.spend).toFixed(2) + 'x'
-                      : '0x'
-                    }
-                  </div>
-                </div>
+              <div className={`flex items-center gap-1 text-xs ${getChangeColor(frequencyChange)}`}>
+                {getChangeIcon(frequencyChange)}
+                <span>{frequencyChange > 0 ? '+' : ''}{frequencyChange.toFixed(1)}%</span>
               </div>
             </div>
-          )}
+          </div>
 
           {facebookData.last_updated && (
             <div className="mt-4 pt-4 border-t">
@@ -199,43 +231,58 @@ export const FacebookMetrics = ({ dateRange }: FacebookMetricsProps) => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Spend & Impressions Trends</CardTitle>
+            <CardTitle>Spend Trends</CardTitle>
           </CardHeader>
           <CardContent>
             <ConversionChart 
               data={chartData}
-              title="Spend & Impressions Over Time"
-              metrics={['spend', 'impressions']}
+              title="Spend Over Time"
+              metrics={['spend']}
             />
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>CTR & Frequency Analysis</CardTitle>
+            <CardTitle>CTR Analysis</CardTitle>
           </CardHeader>
           <CardContent>
             <ConversionChart 
               data={chartData}
-              title="CTR and Frequency Metrics"
-              metrics={['ctrAll', 'ctrLink', 'frequency']}
+              title="CTR Metrics"
+              metrics={['ctrAll', 'ctrLink']}
             />
           </CardContent>
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Cost Efficiency Metrics</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ConversionChart 
-            data={chartData}
-            title="CPM Trends"
-            metrics={['cpm']}
-          />
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Cost Efficiency</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ConversionChart 
+              data={chartData}
+              title="CPM Trends"
+              metrics={['cpm']}
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Frequency Analysis</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ConversionChart 
+              data={chartData}
+              title="Frequency Metrics"
+              metrics={['frequency']}
+            />
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
