@@ -7,7 +7,7 @@ import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import Index from "./pages/Index";
 import AuthPage from "./pages/auth";
 import NotFound from "./pages/NotFound";
-import ProtectedRoute from "./components/ProtectedRoute";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 import "./App.css";
 
 const queryClient = new QueryClient({
