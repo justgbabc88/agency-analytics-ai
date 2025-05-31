@@ -85,13 +85,22 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
     returnOnAdSpend: 3.83
   };
 
+  // Calculate funnel conversion percentages
+  const latestData = funnelData[funnelData.length - 1];
+  const mainOfferPercent = latestData.optins > 0 ? (latestData.mainOffer / latestData.optins) * 100 : 0;
+  const bumpPercent = latestData.mainOffer > 0 ? (latestData.bump / latestData.mainOffer) * 100 : 0;
+  const upsell1Percent = latestData.mainOffer > 0 ? (latestData.upsell1 / latestData.mainOffer) * 100 : 0;
+  const downsell1Percent = latestData.mainOffer > 0 ? (latestData.downsell1 / latestData.mainOffer) * 100 : 0;
+  const upsell2Percent = latestData.upsell1 > 0 ? (latestData.upsell2 / latestData.upsell1) * 100 : 0;
+  const downsell2Percent = latestData.upsell1 > 0 ? (latestData.downsell2 / latestData.upsell1) * 100 : 0;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Facebook Ads Integration */}
       <FacebookMetrics dateRange={dateRange} />
       
       {/* Key Metrics Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
         <MetricCard
           title="Total Revenue"
           value={metrics.totalRevenue}
@@ -134,35 +143,70 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
         />
       </div>
 
-      {/* Funnel Conversion Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Funnel Conversion Percentages */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg">Funnel Conversion Rates</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100">
+              <div className="text-xs text-green-600 mb-1">Main Offer %</div>
+              <div className="text-lg font-bold text-green-800">{mainOfferPercent.toFixed(1)}%</div>
+            </div>
+            <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-100">
+              <div className="text-xs text-blue-600 mb-1">Bump %</div>
+              <div className="text-lg font-bold text-blue-800">{bumpPercent.toFixed(1)}%</div>
+            </div>
+            <div className="text-center p-3 bg-amber-50 rounded-lg border border-amber-100">
+              <div className="text-xs text-amber-600 mb-1">Upsell 1 %</div>
+              <div className="text-lg font-bold text-amber-800">{upsell1Percent.toFixed(1)}%</div>
+            </div>
+            <div className="text-center p-3 bg-purple-50 rounded-lg border border-purple-100">
+              <div className="text-xs text-purple-600 mb-1">Downsell 1 %</div>
+              <div className="text-lg font-bold text-purple-800">{downsell1Percent.toFixed(1)}%</div>
+            </div>
+            <div className="text-center p-3 bg-red-50 rounded-lg border border-red-100">
+              <div className="text-xs text-red-600 mb-1">Upsell 2 %</div>
+              <div className="text-lg font-bold text-red-800">{upsell2Percent.toFixed(1)}%</div>
+            </div>
+            <div className="text-center p-3 bg-cyan-50 rounded-lg border border-cyan-100">
+              <div className="text-xs text-cyan-600 mb-1">Downsell 2 %</div>
+              <div className="text-lg font-bold text-cyan-800">{downsell2Percent.toFixed(1)}%</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Funnel Conversion Charts - More Condensed */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
               Funnel Volume
             </CardTitle>
           </CardHeader>
           <CardContent>
             <ConversionChart 
               data={funnelData}
-              title="Funnel Volume Metrics"
+              title=""
               metrics={['pageViews', 'optins', 'mainOffer']}
             />
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
               Conversion Rates
             </CardTitle>
           </CardHeader>
           <CardContent>
             <ConversionChart 
               data={funnelData}
-              title="Conversion Rate Trends"
+              title=""
               metrics={['optinRate', 'mainOfferRate']}
             />
           </CardContent>
@@ -170,13 +214,13 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
       </div>
 
       {/* Product Performance Breakdown */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
-          <CardHeader>
-            <CardTitle>Product Performance</CardTitle>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Product Performance</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="space-y-3">
               {selectedProducts.filter(p => p.visible).map((product) => {
                 // Use actual data if available
                 const getProductSales = (productId: string) => {
@@ -214,24 +258,24 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
                 }[product.id] || 0;
 
                 return (
-                  <div key={product.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div key={product.id} className="flex items-center justify-between p-3 border rounded-lg">
                     <div className="flex items-center gap-3">
                       <div 
                         className="w-3 h-3 rounded-full" 
                         style={{ backgroundColor: product.color }}
                       />
                       <div>
-                        <div className="font-medium">{product.label}</div>
-                        <div className="text-sm text-gray-600">
+                        <div className="font-medium text-sm">{product.label}</div>
+                        <div className="text-xs text-gray-600">
                           {sales} sales
                         </div>
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="font-semibold">
+                      <div className="font-semibold text-sm">
                         ${revenue.toLocaleString()}
                       </div>
-                      <div className="text-sm text-gray-600 flex items-center gap-1">
+                      <div className="text-xs text-gray-600 flex items-center gap-1">
                         {Math.random() > 0.5 ? (
                           <>
                             <ArrowUpRight className="h-3 w-3 text-green-600" />
@@ -253,39 +297,39 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Traffic Sources</CardTitle>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Traffic Sources</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div className="flex items-center justify-between p-3 border rounded-lg">
                 <div>
-                  <div className="font-medium">Facebook Ads</div>
-                  <div className="text-sm text-gray-600">Social Media</div>
+                  <div className="font-medium text-sm">Facebook Ads</div>
+                  <div className="text-xs text-gray-600">Social Media</div>
                 </div>
                 <div className="text-right">
-                  <div className="font-semibold">{(calculatedMetrics?.pageViews * 0.675) || 6750} visitors</div>
-                  <div className="text-sm text-green-600">67.5%</div>
+                  <div className="font-semibold text-sm">{(calculatedMetrics?.pageViews * 0.675) || 6750} visitors</div>
+                  <div className="text-xs text-green-600">67.5%</div>
                 </div>
               </div>
               <div className="flex items-center justify-between p-3 border rounded-lg">
                 <div>
-                  <div className="font-medium">Google Ads</div>
-                  <div className="text-sm text-gray-600">Search Engine</div>
+                  <div className="font-medium text-sm">Google Ads</div>
+                  <div className="text-xs text-gray-600">Search Engine</div>
                 </div>
                 <div className="text-right">
-                  <div className="font-semibold">{(calculatedMetrics?.pageViews * 0.225) || 2250} visitors</div>
-                  <div className="text-sm text-green-600">22.5%</div>
+                  <div className="font-semibold text-sm">{(calculatedMetrics?.pageViews * 0.225) || 2250} visitors</div>
+                  <div className="text-xs text-green-600">22.5%</div>
                 </div>
               </div>
               <div className="flex items-center justify-between p-3 border rounded-lg">
                 <div>
-                  <div className="font-medium">Organic</div>
-                  <div className="text-sm text-gray-600">Direct & Referral</div>
+                  <div className="font-medium text-sm">Organic</div>
+                  <div className="text-xs text-gray-600">Direct & Referral</div>
                 </div>
                 <div className="text-right">
-                  <div className="font-semibold">{(calculatedMetrics?.pageViews * 0.10) || 1000} visitors</div>
-                  <div className="text-sm text-green-600">10%</div>
+                  <div className="font-semibold text-sm">{(calculatedMetrics?.pageViews * 0.10) || 1000} visitors</div>
+                  <div className="text-xs text-green-600">10%</div>
                 </div>
               </div>
             </div>

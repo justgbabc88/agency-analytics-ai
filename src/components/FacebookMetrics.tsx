@@ -120,25 +120,25 @@ export const FacebookMetrics = ({ dateRange }: FacebookMetricsProps) => {
   const frequencyChange = calculatePercentageChange(frequency, previousPeriodData.frequency);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
               <BarChart3 className="h-5 w-5 text-blue-600" />
               Facebook Ads Performance
             </CardTitle>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             {/* Spend Metric */}
-            <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-lg p-4 border border-slate-200">
-              <div className="flex items-center gap-2 text-sm text-slate-600 mb-2">
-                <DollarSign className="h-4 w-4" />
+            <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-lg p-3 border border-gray-100">
+              <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
+                <DollarSign className="h-3 w-3" />
                 Spend
               </div>
-              <div className="text-2xl font-bold text-slate-800">
+              <div className="text-lg font-bold text-gray-800">
                 {formatCurrency(insights.spend || 0)}
               </div>
               <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(spendChange)}`}>
@@ -148,12 +148,12 @@ export const FacebookMetrics = ({ dateRange }: FacebookMetricsProps) => {
             </div>
 
             {/* Impressions Metric */}
-            <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-4 border border-gray-200">
-              <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
-                <Eye className="h-4 w-4" />
+            <div className="bg-gradient-to-br from-slate-50 to-slate-100/50 rounded-lg p-3 border border-slate-100">
+              <div className="flex items-center gap-2 text-xs text-slate-600 mb-1">
+                <Eye className="h-3 w-3" />
                 Impressions
               </div>
-              <div className="text-2xl font-bold text-gray-800">
+              <div className="text-lg font-bold text-slate-800">
                 {formatNumber(insights.impressions || 0)}
               </div>
               <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(impressionsChange)}`}>
@@ -163,12 +163,12 @@ export const FacebookMetrics = ({ dateRange }: FacebookMetricsProps) => {
             </div>
 
             {/* CTR (All) Metric */}
-            <div className="bg-gradient-to-br from-zinc-50 to-zinc-100 rounded-lg p-4 border border-zinc-200">
-              <div className="flex items-center gap-2 text-sm text-zinc-600 mb-2">
-                <TrendingUp className="h-4 w-4" />
+            <div className="bg-gradient-to-br from-zinc-50 to-zinc-100/50 rounded-lg p-3 border border-zinc-100">
+              <div className="flex items-center gap-2 text-xs text-zinc-600 mb-1">
+                <TrendingUp className="h-3 w-3" />
                 CTR (All)
               </div>
-              <div className="text-2xl font-bold text-zinc-800">
+              <div className="text-lg font-bold text-zinc-800">
                 {(insights.ctr || 0).toFixed(2)}%
               </div>
               <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(ctrChange)}`}>
@@ -178,12 +178,12 @@ export const FacebookMetrics = ({ dateRange }: FacebookMetricsProps) => {
             </div>
 
             {/* CTR (Link) Metric */}
-            <div className="bg-gradient-to-br from-stone-50 to-stone-100 rounded-lg p-4 border border-stone-200">
-              <div className="flex items-center gap-2 text-sm text-stone-600 mb-2">
-                <MousePointer className="h-4 w-4" />
+            <div className="bg-gradient-to-br from-stone-50 to-stone-100/50 rounded-lg p-3 border border-stone-100">
+              <div className="flex items-center gap-2 text-xs text-stone-600 mb-1">
+                <MousePointer className="h-3 w-3" />
                 CTR (Link)
               </div>
-              <div className="text-2xl font-bold text-stone-800">
+              <div className="text-lg font-bold text-stone-800">
                 {ctrLink.toFixed(2)}%
               </div>
               <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(ctrLinkChange)}`}>
@@ -193,12 +193,12 @@ export const FacebookMetrics = ({ dateRange }: FacebookMetricsProps) => {
             </div>
 
             {/* CPM Metric */}
-            <div className="bg-gradient-to-br from-neutral-50 to-neutral-100 rounded-lg p-4 border border-neutral-200">
-              <div className="flex items-center gap-2 text-sm text-neutral-600 mb-2">
-                <DollarSign className="h-4 w-4" />
+            <div className="bg-gradient-to-br from-neutral-50 to-neutral-100/50 rounded-lg p-3 border border-neutral-100">
+              <div className="flex items-center gap-2 text-xs text-neutral-600 mb-1">
+                <DollarSign className="h-3 w-3" />
                 CPM
               </div>
-              <div className="text-2xl font-bold text-neutral-800">
+              <div className="text-lg font-bold text-neutral-800">
                 {formatCurrency(insights.spend && insights.impressions ? (insights.spend / insights.impressions) * 1000 : 0)}
               </div>
               <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(cpmChange)}`}>
@@ -208,12 +208,12 @@ export const FacebookMetrics = ({ dateRange }: FacebookMetricsProps) => {
             </div>
 
             {/* Frequency Metric */}
-            <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-lg p-4 border border-slate-200 shadow-sm">
-              <div className="flex items-center gap-2 text-sm text-slate-600 mb-2">
-                <Users className="h-4 w-4" />
+            <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-lg p-3 border border-gray-100">
+              <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
+                <Users className="h-3 w-3" />
                 Frequency
               </div>
-              <div className="text-2xl font-bold text-slate-800">
+              <div className="text-lg font-bold text-gray-800">
                 {frequency.toFixed(2)}
               </div>
               <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(frequencyChange)}`}>
@@ -224,7 +224,7 @@ export const FacebookMetrics = ({ dateRange }: FacebookMetricsProps) => {
           </div>
 
           {facebookData.last_updated && (
-            <div className="mt-4 pt-4 border-t">
+            <div className="mt-3 pt-3 border-t">
               <p className="text-xs text-gray-500">
                 Last updated: {new Date(facebookData.last_updated).toLocaleString()}
               </p>
@@ -233,58 +233,30 @@ export const FacebookMetrics = ({ dateRange }: FacebookMetricsProps) => {
         </CardContent>
       </Card>
 
-      {/* Facebook Performance Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Facebook Performance Charts - More Condensed */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
-          <CardHeader>
-            <CardTitle>Spend Trends</CardTitle>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Spend & CTR Trends</CardTitle>
           </CardHeader>
           <CardContent>
             <ConversionChart 
               data={chartData}
-              title="Spend Over Time"
-              metrics={['spend']}
+              title=""
+              metrics={['spend', 'ctrAll', 'ctrLink']}
             />
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>CTR Analysis</CardTitle>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Cost & Frequency Analysis</CardTitle>
           </CardHeader>
           <CardContent>
             <ConversionChart 
               data={chartData}
-              title="CTR Metrics"
-              metrics={['ctrAll', 'ctrLink']}
-            />
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Cost Efficiency</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ConversionChart 
-              data={chartData}
-              title="CPM Trends"
-              metrics={['cpm']}
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Frequency Analysis</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ConversionChart 
-              data={chartData}
-              title="Frequency Metrics"
-              metrics={['frequency']}
+              title=""
+              metrics={['cpm', 'frequency']}
             />
           </CardContent>
         </Card>

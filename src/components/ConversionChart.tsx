@@ -1,3 +1,4 @@
+
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 interface FunnelProductConfig {
@@ -147,9 +148,9 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
   // Ensure data and metrics are arrays before filtering
   if (!Array.isArray(data) || !Array.isArray(metrics)) {
     return (
-      <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">{title}</h3>
-        <div className="flex items-center justify-center h-64 text-gray-500">
+      <div className="bg-white p-4 rounded-lg border border-gray-200">
+        <h3 className="text-base font-semibold text-gray-800 mb-3">{title}</h3>
+        <div className="flex items-center justify-center h-48 text-gray-500">
           <div className="text-center">
             <p>Invalid data format</p>
             <p className="text-sm mt-1">Please check your data structure</p>
@@ -170,9 +171,9 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
 
   if (filteredData.length === 0) {
     return (
-      <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">{title}</h3>
-        <div className="flex items-center justify-center h-64 text-gray-500">
+      <div className="bg-white p-4 rounded-lg border border-gray-200">
+        <h3 className="text-base font-semibold text-gray-800 mb-3">{title}</h3>
+        <div className="flex items-center justify-center h-48 text-gray-500">
           <div className="text-center">
             <p>No data available for the selected metrics</p>
             <p className="text-sm mt-1">Try adjusting your date range or field mappings</p>
@@ -182,16 +183,13 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     );
   }
 
-  // Calculate trend line for primary metric (first metric)
-  const primaryMetric = metrics[0];
-  const calculateTrendLine = () => {
-    if (!primaryMetric || filteredData.length < 2) return null;
-    
-    const validData = filteredData.filter(d => d[primaryMetric] !== undefined && d[primaryMetric] !== null && d[primaryMetric] !== 0);
+  // Calculate trend line for each metric
+  const calculateTrendLine = (metric: string) => {
+    const validData = filteredData.filter(d => d[metric] !== undefined && d[metric] !== null && d[metric] !== 0);
     if (validData.length < 2) return null;
 
     const xValues = validData.map((_, index) => index);
-    const yValues = validData.map(d => Number(d[primaryMetric]));
+    const yValues = validData.map(d => Number(d[metric]));
     
     const n = xValues.length;
     const sumX = xValues.reduce((sum, x) => sum + x, 0);
@@ -205,50 +203,55 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     return { slope, intercept };
   };
 
-  const trendLine = calculateTrendLine();
-
   return (
-    <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
-        <div className="text-sm text-gray-500">
-          {filteredData.length} data point{filteredData.length !== 1 ? 's' : ''}
+    <div className="bg-white">
+      {title && (
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-base font-semibold text-gray-800">{title}</h3>
+          <div className="text-xs text-gray-500">
+            {filteredData.length} data point{filteredData.length !== 1 ? 's' : ''}
+          </div>
         </div>
-      </div>
-      <ResponsiveContainer width="100%" height={300}>
+      )}
+      <ResponsiveContainer width="100%" height={200}>
         <LineChart data={filteredData}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
           <XAxis 
             dataKey="date" 
             stroke="#6b7280"
-            fontSize={12}
+            fontSize={10}
             angle={-45}
             textAnchor="end"
-            height={80}
+            height={50}
           />
-          <YAxis stroke="#6b7280" fontSize={12} />
+          <YAxis stroke="#6b7280" fontSize={10} />
           <Tooltip 
             contentStyle={{
               backgroundColor: 'white',
               border: '1px solid #e5e7eb',
-              borderRadius: '8px',
-              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+              borderRadius: '6px',
+              boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.1)',
+              fontSize: '12px'
             }}
             formatter={formatTooltipValue}
           />
-          {/* Trend line for primary metric */}
-          {trendLine && primaryMetric && filteredData.length > 1 && (
-            <ReferenceLine 
-              segment={[
-                { x: filteredData[0]?.date, y: trendLine.intercept },
-                { x: filteredData[filteredData.length - 1]?.date, y: trendLine.intercept + trendLine.slope * (filteredData.length - 1) }
-              ]}
-              stroke={getMetricColor(primaryMetric)}
-              strokeDasharray="5 5"
-              strokeWidth={2}
-              opacity={0.7}
-            />
-          )}
+          {/* Trend lines for each metric */}
+          {metrics.map(metric => {
+            const trendLine = calculateTrendLine(metric);
+            return trendLine && filteredData.length > 1 ? (
+              <ReferenceLine 
+                key={`trend-${metric}`}
+                segment={[
+                  { x: filteredData[0]?.date, y: trendLine.intercept },
+                  { x: filteredData[filteredData.length - 1]?.date, y: trendLine.intercept + trendLine.slope * (filteredData.length - 1) }
+                ]}
+                stroke={getMetricColor(metric)}
+                strokeDasharray="3 3"
+                strokeWidth={1}
+                opacity={0.6}
+              />
+            ) : null;
+          })}
           {metrics.map(metric => {
             const hasData = filteredData.some(d => d[metric] !== undefined && d[metric] !== null && d[metric] !== 0);
             return hasData ? (
@@ -258,7 +261,7 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
                 dataKey={metric} 
                 stroke={getMetricColor(metric)}
                 strokeWidth={2}
-                dot={{ fill: getMetricColor(metric), strokeWidth: 2, r: 4 }}
+                dot={{ fill: getMetricColor(metric), strokeWidth: 1, r: 3 }}
                 connectNulls={false}
                 name={formatMetricName(metric)}
               />
