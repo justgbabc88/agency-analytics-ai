@@ -21,7 +21,7 @@ import {
   Facebook,
   Eye,
   EyeOff,
-  Settings
+  Settings2
 } from "lucide-react";
 import { useState } from "react";
 
@@ -183,7 +183,7 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts, onProductsChange 
         </Collapsible>
       </div>
 
-      {/* Funnel Analysis Section with Integrated Product Customizer */}
+      {/* Funnel Analysis Section */}
       <div className="bg-amber-50/30 rounded-lg border border-amber-100/80 p-4 shadow-sm">
         <Collapsible open={isFunnelOpen} onOpenChange={setIsFunnelOpen}>
           <CollapsibleTrigger asChild>
@@ -199,35 +199,43 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts, onProductsChange 
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-4 mt-4">
-            {/* Integrated Funnel Products Customizer */}
-            <Card className="border-2 border-dashed border-amber-300 bg-amber-50/70">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Settings className="h-4 w-4 text-amber-600" />
-                    <CardTitle className="text-sm font-medium text-amber-900">
-                      Product Display Settings ({visibleProducts.length} selected)
-                    </CardTitle>
+            {/* Subtle Product Display Settings */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Settings2 className="h-4 w-4 text-amber-600" />
+                  <span className="text-sm font-medium text-amber-900">
+                    Product Display ({visibleProducts.length} selected)
+                  </span>
+                  <div className="flex flex-wrap gap-1">
+                    {visibleProducts.slice(0, 3).map(product => (
+                      <div 
+                        key={product.id}
+                        className="w-2 h-2 rounded-full" 
+                        style={{ backgroundColor: product.color }}
+                      />
+                    ))}
+                    {visibleProducts.length > 3 && (
+                      <span className="text-xs text-amber-700">+{visibleProducts.length - 3}</span>
+                    )}
                   </div>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => setIsCustomizerExpanded(!isCustomizerExpanded)}
-                    className="h-6 w-6 p-0 text-amber-600 hover:bg-amber-100"
-                  >
-                    {isCustomizerExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                  </Button>
                 </div>
-                <p className="text-xs text-amber-700/80">
-                  Select which funnel products to analyze and display in the charts below
-                </p>
-              </CardHeader>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setIsCustomizerExpanded(!isCustomizerExpanded)}
+                  className="h-6 px-2 text-xs text-amber-600 hover:bg-amber-100/50"
+                >
+                  {isCustomizerExpanded ? 'Hide' : 'Edit'}
+                  {isCustomizerExpanded ? <ChevronUp className="h-3 w-3 ml-1" /> : <ChevronDown className="h-3 w-3 ml-1" />}
+                </Button>
+              </div>
               
               {isCustomizerExpanded && (
-                <CardContent className="pt-0 space-y-3">
-                  <div className="grid grid-cols-2 gap-2">
+                <div className="bg-white/50 rounded-md border border-amber-200/50 p-3 space-y-3">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                     {selectedProducts.map(product => (
-                      <div key={product.id} className="flex items-center space-x-2 p-2 rounded-md hover:bg-white/60 transition-colors">
+                      <div key={product.id} className="flex items-center space-x-2 p-2 rounded-md hover:bg-white/80 transition-colors">
                         <Checkbox
                           id={product.id}
                           checked={product.visible}
@@ -236,7 +244,7 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts, onProductsChange 
                         />
                         <div className="flex items-center gap-2 flex-1">
                           <div 
-                            className="w-2.5 h-2.5 rounded-full flex-shrink-0" 
+                            className="w-2 h-2 rounded-full flex-shrink-0" 
                             style={{ backgroundColor: product.color }}
                           />
                           <label
@@ -245,27 +253,14 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts, onProductsChange 
                           >
                             {product.label}
                           </label>
-                          {product.visible && <Eye className="h-3 w-3 text-green-600" />}
-                          {!product.visible && <EyeOff className="h-3 w-3 text-gray-400" />}
+                          {product.visible ? <Eye className="h-3 w-3 text-green-600" /> : <EyeOff className="h-3 w-3 text-gray-400" />}
                         </div>
                       </div>
                     ))}
                   </div>
-                  
-                  <div className="flex flex-wrap gap-1 mt-3 pt-2 border-t border-amber-300">
-                    {visibleProducts.map(product => (
-                      <Badge key={product.id} variant="secondary" className="text-xs h-5 px-2">
-                        <div 
-                          className="w-1.5 h-1.5 rounded-full mr-1" 
-                          style={{ backgroundColor: product.color }}
-                        />
-                        {product.label}
-                      </Badge>
-                    ))}
-                  </div>
-                </CardContent>
+                </div>
               )}
-            </Card>
+            </div>
 
             {/* Funnel Conversion Percentages - Only show selected products */}
             <Card className="border-amber-200">
@@ -308,7 +303,7 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts, onProductsChange 
                 
                 {visibleProducts.length === 0 && (
                   <div className="text-center py-8 text-gray-500">
-                    <p>No products selected. Use the Product Display Settings above to select products to display.</p>
+                    <p>No products selected. Use the Product Display settings above to select products to display.</p>
                   </div>
                 )}
               </CardContent>
