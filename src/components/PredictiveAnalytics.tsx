@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,14 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { useGoogleSheetsData } from "@/hooks/useGoogleSheetsData";
 import { generateForecast, generateScenarioForecasts, parseDateFromSheetData, ForecastResult, calculateLinearTrend } from "@/utils/timeSeriesUtils";
 import { format, addDays } from "date-fns";
+import { MetricCustomizer } from "./MetricCustomizer";
+
+interface FunnelProductConfig {
+  id: string;
+  label: string;
+  visible: boolean;
+  color: string;
+}
 
 interface PredictiveAnalyticsProps {
   className?: string;
@@ -17,6 +26,7 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
   const [selectedMetric, setSelectedMetric] = useState('revenue');
   const [forecastPeriod, setForecastPeriod] = useState('30days');
   const [showScenarios, setShowScenarios] = useState(false);
+  const [selectedProducts, setSelectedProducts] = useState<FunnelProductConfig[]>([]);
   const { syncedData, calculateMetricsFromSyncedData } = useGoogleSheetsData();
 
   const currentMetrics = calculateMetricsFromSyncedData();
@@ -42,6 +52,10 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
         } else if (selectedMetric === 'conversions') {
           value = isActual ? 180 + (i * 5) + (Math.random() * 15) : 
                             220 + (i * 4) + (Math.random() * 10);
+        } else if (selectedMetric.includes('Rate')) {
+          // Funnel conversion rates
+          value = isActual ? 15 + (i * 0.5) + (Math.random() * 3) : 
+                            18 + (i * 0.3) + (Math.random() * 2);
         } else {
           value = isActual ? 8500 + (i * 200) + (Math.random() * 500) : 
                             9500 + (i * 150) + (Math.random() * 300);
@@ -49,7 +63,7 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
         
         return {
           date,
-          value: Math.round(value),
+          value: Math.round(value * 100) / 100,
           isActual,
           confidence: isActual ? 100 : Math.max(60, 90 - (i - 9) * 3),
         };
@@ -111,6 +125,30 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
             value = parseInt(row[field].toString().replace(/[^\d]/g, '') || '0');
             if (value > 0) break;
           }
+        }
+      } else if (selectedMetric === 'mainOfferRate') {
+        const pageViews = parseInt(row['Page Views']?.toString().replace(/[^\d]/g, '') || '0');
+        const mainOffer = parseInt(row['Main Offer']?.toString().replace(/[^\d]/g, '') || '0');
+        if (pageViews > 0) {
+          value = (mainOffer / pageViews) * 100;
+        }
+      } else if (selectedMetric === 'bumpRate') {
+        const mainOffer = parseInt(row['Main Offer']?.toString().replace(/[^\d]/g, '') || '0');
+        const bump = parseInt(row['Bump']?.toString().replace(/[^\d]/g, '') || '0');
+        if (mainOffer > 0) {
+          value = (bump / mainOffer) * 100;
+        }
+      } else if (selectedMetric === 'upsell1Rate') {
+        const mainOffer = parseInt(row['Main Offer']?.toString().replace(/[^\d]/g, '') || '0');
+        const upsell1 = parseInt(row['Upsell 1']?.toString().replace(/[^\d]/g, '') || '0');
+        if (mainOffer > 0) {
+          value = (upsell1 / mainOffer) * 100;
+        }
+      } else if (selectedMetric === 'upsell2Rate') {
+        const upsell1 = parseInt(row['Upsell 1']?.toString().replace(/[^\d]/g, '') || '0');
+        const upsell2 = parseInt(row['Upsell 2']?.toString().replace(/[^\d]/g, '') || '0');
+        if (upsell1 > 0) {
+          value = (upsell2 / upsell1) * 100;
         }
       } else { // traffic
         const trafficFields = ['Page Views', 'Impressions', 'impressions', 'pageViews'];
@@ -256,11 +294,13 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
     
     if (nameStr.includes('confidence')) return `${value}%`;
     if (selectedMetric === 'revenue') return `$${value.toLocaleString()}`;
+    if (selectedMetric.includes('Rate')) return `${value.toFixed(2)}%`;
     return value.toLocaleString();
   };
 
   const formatYAxisValue = (value: number) => {
     if (selectedMetric === 'revenue') return `$${(value / 1000).toFixed(0)}k`;
+    if (selectedMetric.includes('Rate')) return `${value.toFixed(1)}%`;
     return value.toString();
   };
 
@@ -290,7 +330,7 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Forecast Controls */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-wrap">
           <Select value={selectedMetric} onValueChange={setSelectedMetric}>
             <SelectTrigger className="w-48">
               <SelectValue />
@@ -299,6 +339,10 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
               <SelectItem value="revenue">Revenue Forecast</SelectItem>
               <SelectItem value="conversions">Conversion Forecast</SelectItem>
               <SelectItem value="traffic">Traffic Forecast</SelectItem>
+              <SelectItem value="mainOfferRate">Main Offer Rate</SelectItem>
+              <SelectItem value="bumpRate">Bump Rate</SelectItem>
+              <SelectItem value="upsell1Rate">Upsell 1 Rate</SelectItem>
+              <SelectItem value="upsell2Rate">Upsell 2 Rate</SelectItem>
             </SelectContent>
           </Select>
           <Select value={forecastPeriod} onValueChange={setForecastPeriod}>
@@ -322,6 +366,14 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
             {forecastResult.trend.charAt(0).toUpperCase() + forecastResult.trend.slice(1)} Trend
           </Badge>
         </div>
+
+        {/* Funnel Product Selector */}
+        {selectedMetric.includes('Rate') && (
+          <MetricCustomizer 
+            onProductsChange={setSelectedProducts}
+            className="border border-purple-200 bg-purple-50/30"
+          />
+        )}
 
         {/* Enhanced Forecast Chart with Trend Lines */}
         <div className="h-80">
