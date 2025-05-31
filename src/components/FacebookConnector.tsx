@@ -41,7 +41,10 @@ export const FacebookConnector = () => {
   }, [isConnected, savedKeys.access_token, hasAdsPermissions]);
 
   const handleFacebookAuth = async (permissionLevel: 'basic' | 'ads' = 'basic') => {
-    setIsConnecting(true);
+    const isUpgradeFlow = permissionLevel === 'ads';
+    setIsConnecting(!isUpgradeFlow);
+    setIsUpgrading(isUpgradeFlow);
+    
     console.log(`Starting Facebook OAuth process with ${permissionLevel} permissions...`);
     
     try {
@@ -51,7 +54,11 @@ export const FacebookConnector = () => {
 
       if (error) {
         console.error('Failed to initiate Facebook OAuth:', error);
-        throw error;
+        throw new Error('Failed to initiate OAuth process');
+      }
+
+      if (!data?.authUrl) {
+        throw new Error('No authorization URL received');
       }
 
       console.log('Opening Facebook OAuth popup with URL:', data.authUrl);
@@ -92,7 +99,11 @@ export const FacebookConnector = () => {
 
             if (tokenError) {
               console.error('Token exchange failed:', tokenError);
-              throw tokenError;
+              throw new Error('Failed to exchange authorization code');
+            }
+
+            if (!tokenData?.access_token) {
+              throw new Error('No access token received');
             }
 
             console.log('Successfully received access token, saving keys...');
@@ -102,7 +113,7 @@ export const FacebookConnector = () => {
               user_id: tokenData.user_id,
               user_name: tokenData.user_name,
               user_email: tokenData.user_email,
-              permissions: tokenData.permissions
+              permissions: tokenData.permissions || []
             });
 
             console.log('Updating integration status...');
@@ -114,7 +125,7 @@ export const FacebookConnector = () => {
             if (permissionLevel === 'basic') {
               toast({
                 title: "Connected Successfully",
-                description: "Basic Facebook connection established. You can now upgrade to get ads permissions.",
+                description: "Basic Facebook connection established. You can now test the connection to enable ads permission requests.",
               });
             } else {
               toast({
@@ -129,7 +140,7 @@ export const FacebookConnector = () => {
             console.error('Error during token exchange or saving:', error);
             toast({
               title: "Connection Failed",
-              description: "Failed to complete Facebook connection. Please try again.",
+              description: error instanceof Error ? error.message : "Failed to complete Facebook connection. Please try again.",
               variant: "destructive"
             });
           }
@@ -138,7 +149,7 @@ export const FacebookConnector = () => {
           messageListenerActive = false;
           popup?.close();
           window.removeEventListener('message', messageListener);
-          throw new Error(event.data.error);
+          throw new Error(event.data.error || 'OAuth authorization failed');
         }
       };
 
@@ -151,7 +162,6 @@ export const FacebookConnector = () => {
           if (messageListenerActive) {
             messageListenerActive = false;
             window.removeEventListener('message', messageListener);
-            setIsConnecting(false);
             toast({
               title: "Connection Cancelled",
               description: "Facebook connection was cancelled.",
@@ -175,6 +185,15 @@ export const FacebookConnector = () => {
   };
 
   const handleTestApiCall = async () => {
+    if (!savedKeys.access_token) {
+      toast({
+        title: "No Access Token",
+        description: "Please connect to Facebook first.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsTesting(true);
     try {
       const { data, error } = await supabase.functions.invoke('facebook-oauth', {
@@ -185,17 +204,18 @@ export const FacebookConnector = () => {
       });
 
       if (error) {
-        throw error;
+        throw new Error(error.message || 'Test API call failed');
       }
 
       toast({
         title: "Test Successful",
-        description: "Facebook API test call completed successfully. You can now request ads permissions.",
+        description: "Facebook API test call completed successfully. You can now request ads permissions (may take up to 24 hours to become available).",
       });
     } catch (error) {
+      console.error('Test API call failed:', error);
       toast({
         title: "Test Failed",
-        description: "Facebook API test call failed. Please try reconnecting.",
+        description: error instanceof Error ? error.message : "Facebook API test call failed. Please try reconnecting.",
         variant: "destructive"
       });
     } finally {
@@ -400,7 +420,7 @@ export const FacebookConnector = () => {
                         {isTesting ? "Testing..." : "Test Connection"}
                       </Button>
                       <Button
-                        onClick={handleUpgradePermissions}
+                        onClick={() => handleFacebookAuth('ads')}
                         disabled={isUpgrading}
                         size="sm"
                       >
