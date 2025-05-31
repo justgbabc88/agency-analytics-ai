@@ -1,8 +1,9 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConversionChart } from "./ConversionChart";
 import { FacebookMetrics } from "./FacebookMetrics";
 import { useGoogleSheetsData } from "@/hooks/useGoogleSheetsData";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Button } from "@/components/ui/button";
 import { 
   TrendingUp, 
   BarChart3,
@@ -11,8 +12,11 @@ import {
   Users,
   DollarSign,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
+import { useState } from "react";
 
 interface FunnelProductConfig {
   id: string;
@@ -28,6 +32,8 @@ interface LowTicketFunnelProps {
 
 export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnelProps) => {
   const { syncedData, calculateMetricsFromSyncedData } = useGoogleSheetsData();
+  const [isAdsOpen, setIsAdsOpen] = useState(true);
+  const [isFunnelOpen, setIsFunnelOpen] = useState(true);
   
   // Calculate metrics from Google Sheets data
   const calculatedMetrics = calculateMetricsFromSyncedData();
@@ -119,148 +125,185 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
   const downsell2Change = calculatePercentageChange(downsell2Percent, previousPeriodData.downsell2);
 
   return (
-    <div className="space-y-4">
-      {/* Facebook Ads Integration */}
-      <FacebookMetrics dateRange={dateRange} />
-      
-      {/* Funnel Conversion Percentages */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <BarChart3 className="h-5 w-5 text-blue-600" />
-              Funnel Conversion Rates
-            </CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            {/* Main Offer Metric */}
-            <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-lg p-3 border border-gray-100">
-              <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
-                <Target className="h-3 w-3" />
-                Main Offer
-              </div>
-              <div className="text-lg font-bold text-gray-800">
-                {mainOfferPercent.toFixed(1)}%
-              </div>
-              <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(mainOfferChange)}`}>
-                {getChangeIcon(mainOfferChange)}
-                <span>{mainOfferChange > 0 ? '+' : ''}{mainOfferChange.toFixed(1)}%</span>
-              </div>
+    <div className="space-y-6">
+      {/* Facebook Ads Section */}
+      <div className="bg-slate-50/50 rounded-lg border border-slate-200/60 p-4">
+        <Collapsible open={isAdsOpen} onOpenChange={setIsAdsOpen}>
+          <CollapsibleTrigger asChild>
+            <Button 
+              variant="ghost" 
+              className="w-full justify-between p-0 h-auto hover:bg-transparent"
+            >
+              <h3 className="text-lg font-semibold text-slate-700 flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-slate-600" />
+                Facebook Ads Performance
+              </h3>
+              {isAdsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-4">
+            <FacebookMetrics dateRange={dateRange} />
+          </CollapsibleContent>
+        </Collapsible>
+      </div>
+
+      {/* Funnel Section */}
+      <div className="bg-zinc-50/50 rounded-lg border border-zinc-200/60 p-4">
+        <Collapsible open={isFunnelOpen} onOpenChange={setIsFunnelOpen}>
+          <CollapsibleTrigger asChild>
+            <Button 
+              variant="ghost" 
+              className="w-full justify-between p-0 h-auto hover:bg-transparent"
+            >
+              <h3 className="text-lg font-semibold text-zinc-700 flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-zinc-600" />
+                Funnel Performance
+              </h3>
+              {isFunnelOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-4 mt-4">
+            {/* Funnel Conversion Percentages */}
+            <Card className="border-zinc-200">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <BarChart3 className="h-5 w-5 text-zinc-600" />
+                    Funnel Conversion Rates
+                  </CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                  {/* Main Offer Metric */}
+                  <div className="bg-white rounded-lg p-3 border border-zinc-100">
+                    <div className="flex items-center gap-2 text-xs text-zinc-600 mb-1">
+                      <Target className="h-3 w-3" />
+                      Main Offer
+                    </div>
+                    <div className="text-lg font-bold text-zinc-800">
+                      {mainOfferPercent.toFixed(1)}%
+                    </div>
+                    <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(mainOfferChange)}`}>
+                      {getChangeIcon(mainOfferChange)}
+                      <span>{mainOfferChange > 0 ? '+' : ''}{mainOfferChange.toFixed(1)}%</span>
+                    </div>
+                  </div>
+
+                  {/* Bump Metric */}
+                  <div className="bg-white rounded-lg p-3 border border-zinc-100">
+                    <div className="flex items-center gap-2 text-xs text-zinc-600 mb-1">
+                      <ShoppingCart className="h-3 w-3" />
+                      Bump
+                    </div>
+                    <div className="text-lg font-bold text-zinc-800">
+                      {bumpPercent.toFixed(1)}%
+                    </div>
+                    <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(bumpChange)}`}>
+                      {getChangeIcon(bumpChange)}
+                      <span>{bumpChange > 0 ? '+' : ''}{bumpChange.toFixed(1)}%</span>
+                    </div>
+                  </div>
+
+                  {/* Upsell 1 Metric */}
+                  <div className="bg-white rounded-lg p-3 border border-zinc-100">
+                    <div className="flex items-center gap-2 text-xs text-zinc-600 mb-1">
+                      <TrendingUp className="h-3 w-3" />
+                      Upsell 1
+                    </div>
+                    <div className="text-lg font-bold text-zinc-800">
+                      {upsell1Percent.toFixed(1)}%
+                    </div>
+                    <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(upsell1Change)}`}>
+                      {getChangeIcon(upsell1Change)}
+                      <span>{upsell1Change > 0 ? '+' : ''}{upsell1Change.toFixed(1)}%</span>
+                    </div>
+                  </div>
+
+                  {/* Downsell 1 Metric */}
+                  <div className="bg-white rounded-lg p-3 border border-zinc-100">
+                    <div className="flex items-center gap-2 text-xs text-zinc-600 mb-1">
+                      <Users className="h-3 w-3" />
+                      Downsell 1
+                    </div>
+                    <div className="text-lg font-bold text-zinc-800">
+                      {downsell1Percent.toFixed(1)}%
+                    </div>
+                    <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(downsell1Change)}`}>
+                      {getChangeIcon(downsell1Change)}
+                      <span>{downsell1Change > 0 ? '+' : ''}{downsell1Change.toFixed(1)}%</span>
+                    </div>
+                  </div>
+
+                  {/* Upsell 2 Metric */}
+                  <div className="bg-white rounded-lg p-3 border border-zinc-100">
+                    <div className="flex items-center gap-2 text-xs text-zinc-600 mb-1">
+                      <DollarSign className="h-3 w-3" />
+                      Upsell 2
+                    </div>
+                    <div className="text-lg font-bold text-zinc-800">
+                      {upsell2Percent.toFixed(1)}%
+                    </div>
+                    <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(upsell2Change)}`}>
+                      {getChangeIcon(upsell2Change)}
+                      <span>{upsell2Change > 0 ? '+' : ''}{upsell2Change.toFixed(1)}%</span>
+                    </div>
+                  </div>
+
+                  {/* Downsell 2 Metric */}
+                  <div className="bg-white rounded-lg p-3 border border-zinc-100">
+                    <div className="flex items-center gap-2 text-xs text-zinc-600 mb-1">
+                      <Target className="h-3 w-3" />
+                      Downsell 2
+                    </div>
+                    <div className="text-lg font-bold text-zinc-800">
+                      {downsell2Percent.toFixed(1)}%
+                    </div>
+                    <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(downsell2Change)}`}>
+                      {getChangeIcon(downsell2Change)}
+                      <span>{downsell2Change > 0 ? '+' : ''}{downsell2Change.toFixed(1)}%</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Funnel Conversion Charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <Card className="border-zinc-200">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4" />
+                    Funnel Volume
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ConversionChart 
+                    data={funnelData}
+                    title=""
+                    metrics={['pageViews', 'optins', 'mainOffer']}
+                  />
+                </CardContent>
+              </Card>
+
+              <Card className="border-zinc-200">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4" />
+                    All Conversion Rates
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ConversionChart 
+                    data={funnelData}
+                    title=""
+                    metrics={['optinRate', 'mainOfferRate', 'bumpRate', 'upsell1Rate', 'downsell1Rate', 'upsell2Rate', 'downsell2Rate']}
+                  />
+                </CardContent>
+              </Card>
             </div>
-
-            {/* Bump Metric */}
-            <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-lg p-3 border border-gray-100">
-              <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
-                <ShoppingCart className="h-3 w-3" />
-                Bump
-              </div>
-              <div className="text-lg font-bold text-gray-800">
-                {bumpPercent.toFixed(1)}%
-              </div>
-              <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(bumpChange)}`}>
-                {getChangeIcon(bumpChange)}
-                <span>{bumpChange > 0 ? '+' : ''}{bumpChange.toFixed(1)}%</span>
-              </div>
-            </div>
-
-            {/* Upsell 1 Metric */}
-            <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-lg p-3 border border-gray-100">
-              <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
-                <TrendingUp className="h-3 w-3" />
-                Upsell 1
-              </div>
-              <div className="text-lg font-bold text-gray-800">
-                {upsell1Percent.toFixed(1)}%
-              </div>
-              <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(upsell1Change)}`}>
-                {getChangeIcon(upsell1Change)}
-                <span>{upsell1Change > 0 ? '+' : ''}{upsell1Change.toFixed(1)}%</span>
-              </div>
-            </div>
-
-            {/* Downsell 1 Metric */}
-            <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-lg p-3 border border-gray-100">
-              <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
-                <Users className="h-3 w-3" />
-                Downsell 1
-              </div>
-              <div className="text-lg font-bold text-gray-800">
-                {downsell1Percent.toFixed(1)}%
-              </div>
-              <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(downsell1Change)}`}>
-                {getChangeIcon(downsell1Change)}
-                <span>{downsell1Change > 0 ? '+' : ''}{downsell1Change.toFixed(1)}%</span>
-              </div>
-            </div>
-
-            {/* Upsell 2 Metric */}
-            <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-lg p-3 border border-gray-100">
-              <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
-                <DollarSign className="h-3 w-3" />
-                Upsell 2
-              </div>
-              <div className="text-lg font-bold text-gray-800">
-                {upsell2Percent.toFixed(1)}%
-              </div>
-              <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(upsell2Change)}`}>
-                {getChangeIcon(upsell2Change)}
-                <span>{upsell2Change > 0 ? '+' : ''}{upsell2Change.toFixed(1)}%</span>
-              </div>
-            </div>
-
-            {/* Downsell 2 Metric */}
-            <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-lg p-3 border border-gray-100">
-              <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
-                <Target className="h-3 w-3" />
-                Downsell 2
-              </div>
-              <div className="text-lg font-bold text-gray-800">
-                {downsell2Percent.toFixed(1)}%
-              </div>
-              <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(downsell2Change)}`}>
-                {getChangeIcon(downsell2Change)}
-                <span>{downsell2Change > 0 ? '+' : ''}{downsell2Change.toFixed(1)}%</span>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Funnel Conversion Charts - More Condensed */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Funnel Volume
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ConversionChart 
-              data={funnelData}
-              title=""
-              metrics={['pageViews', 'optins', 'mainOffer']}
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              All Conversion Rates
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ConversionChart 
-              data={funnelData}
-              title=""
-              metrics={['optinRate', 'mainOfferRate', 'bumpRate', 'upsell1Rate', 'downsell1Rate', 'upsell2Rate', 'downsell2Rate']}
-            />
-          </CardContent>
-        </Card>
+          </CollapsibleContent>
+        </Collapsible>
       </div>
     </div>
   );
