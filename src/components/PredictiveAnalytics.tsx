@@ -180,14 +180,25 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
       return [];
     }
 
-    return Array.from({ length: 15 }, (_, i) => {
-      const date = format(addDays(new Date(), i - 10), 'M/d/yyyy');
-      const isActual = i < 10;
+    // Use the same forecast period as other metrics
+    const totalDays = forecastDays + 10; // 10 historical days + forecast period
+    const historicalDays = 10;
+
+    return Array.from({ length: totalDays }, (_, i) => {
+      const date = format(addDays(new Date(), i - historicalDays), 'M/d/yyyy');
+      const isActual = i < historicalDays;
       
       const dataPoint: any = { date, isActual };
       
       selectedProducts.forEach(product => {
         let baseValue;
+        let trendMultiplier = 1;
+        
+        // Add slight upward trend for forecasted data
+        if (!isActual) {
+          trendMultiplier = 1 + ((i - historicalDays) * 0.002); // Small positive trend
+        }
+        
         switch (product.id) {
           case 'mainProduct':
             baseValue = isActual ? 25 + (i * 0.3) : 28 + (i * 0.2);
@@ -211,7 +222,8 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
             baseValue = 10;
         }
         
-        dataPoint[product.id] = Math.round((baseValue + (Math.random() * 2 - 1)) * 100) / 100;
+        const finalValue = baseValue * trendMultiplier;
+        dataPoint[product.id] = Math.round((finalValue + (Math.random() * 2 - 1)) * 100) / 100;
       });
       
       return dataPoint;
