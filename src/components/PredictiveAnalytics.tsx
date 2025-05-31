@@ -11,7 +11,9 @@ import { ForecastControls } from "./ForecastControls";
 import { ForecastChart } from "./ForecastChart";
 import { ChartLegend } from "./ChartLegend";
 import { PredictionsGrid } from "./PredictionsGrid";
-import { AIInsights } from "./AIInsights";
+import { ScenarioForecast } from "./ScenarioForecast";
+import { AccuracyIndicator } from "./AccuracyIndicator";
+import { EnhancedAIInsights } from "./EnhancedAIInsights";
 
 interface FunnelProductConfig {
   id: string;
@@ -247,7 +249,7 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
         
         // Use calculated funnel rates from actual dashboard data
         switch (product.id) {
-          case 'mainProduct':
+          case 'mainOffer':
             baseValue = isActual ? 
               funnelRates.mainOfferRate + (i * 0.1) + (Math.random() * 0.5 - 0.25) : 
               funnelRates.mainOfferRate * 1.1 + (i * 0.05) + (Math.random() * 0.3 - 0.15);
@@ -412,6 +414,9 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
     return acc;
   }, {} as Record<string, FunnelProductConfig>);
 
+  // Get primary prediction for scenario analysis
+  const primaryPrediction = predictions.find(p => p.metric === 'Revenue') || predictions[0];
+
   return (
     <Card className={className}>
       <CardHeader>
@@ -428,7 +433,7 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" onClick={() => setShowScenarios(!showScenarios)}>
               <BarChart className="h-4 w-4" />
-              Scenarios
+              {showScenarios ? 'Hide' : 'Show'} Scenarios
             </Button>
             <Button variant="ghost" size="sm">
               <RefreshCw className="h-4 w-4" />
@@ -452,19 +457,40 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
           />
         )}
 
-        <ForecastChart
-          data={forecastResult.data}
-          funnelData={funnelData}
-          selectedMetric={selectedMetric}
-          selectedProducts={selectedProducts}
-          trendLineData={trendLineData}
-          productConfigMap={productConfigMap}
-        />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <ForecastChart
+              data={forecastResult.data}
+              funnelData={funnelData}
+              selectedMetric={selectedMetric}
+              selectedProducts={selectedProducts}
+              trendLineData={trendLineData}
+              productConfigMap={productConfigMap}
+            />
+          </div>
+          <div>
+            <AccuracyIndicator
+              accuracy={forecastResult.accuracy}
+              dataPoints={forecastResult.data.filter(d => d.isActual).length}
+              forecastDays={forecastDays}
+              trend={forecastResult.trend}
+            />
+          </div>
+        </div>
 
         <ChartLegend 
           selectedMetric={selectedMetric}
           selectedProducts={selectedProducts}
         />
+
+        {showScenarios && selectedMetric !== 'funnelProducts' && (
+          <ScenarioForecast
+            baseMetric={primaryPrediction.current}
+            metricName={primaryPrediction.metric}
+            forecastDays={forecastDays}
+            currentTrend={forecastResult.trend}
+          />
+        )}
 
         {selectedMetric !== 'funnelProducts' && (
           <PredictionsGrid 
@@ -473,8 +499,13 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
           />
         )}
 
-        <AIInsights 
+        <EnhancedAIInsights 
           insights={generateAIInsights()}
+          accuracy={forecastResult.accuracy}
+          trend={forecastResult.trend}
+          dataPoints={forecastResult.data.filter(d => d.isActual).length}
+          forecastDays={forecastDays}
+          currentMetrics={currentMetrics}
           seasonality={forecastResult.seasonality}
         />
       </CardContent>
