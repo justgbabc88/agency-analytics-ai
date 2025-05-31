@@ -32,7 +32,7 @@ interface ConversionChartProps {
   productConfig?: Record<string, FunnelProductConfig>;
 }
 
-export const ConversionChart = ({ data, title, metrics, productConfig }: ConversionChartProps) => {
+export const ConversionChart = ({ data, title, metrics = [], productConfig }: ConversionChartProps) => {
   // ... keep existing code (defaultColors object)
   const defaultColors = {
     pageViews: '#6B7280',
@@ -144,9 +144,24 @@ export const ConversionChart = ({ data, title, metrics, productConfig }: Convers
     return nameMap[metric as keyof typeof nameMap] || metric.charAt(0).toUpperCase() + metric.slice(1).replace(/([A-Z])/g, ' $1');
   };
 
+  // Ensure data and metrics are arrays before filtering
+  if (!Array.isArray(data) || !Array.isArray(metrics)) {
+    return (
+      <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+        <h3 className="text-lg font-semibold text-gray-800 mb-4">{title}</h3>
+        <div className="flex items-center justify-center h-64 text-gray-500">
+          <div className="text-center">
+            <p>Invalid data format</p>
+            <p className="text-sm mt-1">Please check your data structure</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Filter data to only include rows where at least one metric has a value
   const filteredData = data.filter(row => 
-    metrics.some(metric => 
+    metrics.length > 0 && metrics.some(metric => 
       row[metric] !== undefined && 
       row[metric] !== null && 
       row[metric] !== 0

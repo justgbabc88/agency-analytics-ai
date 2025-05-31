@@ -29,11 +29,11 @@ interface LowTicketFunnelProps {
 export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnelProps) => {
   // Mock data for demonstration
   const funnelData = [
-    { stage: "Landing Page Views", visitors: 10000, conversions: 2500, rate: 25 },
-    { stage: "Main Product", visitors: 2500, conversions: 625, rate: 25 },
-    { stage: "Bump Offer", visitors: 625, conversions: 187, rate: 30 },
-    { stage: "Upsell 1", visitors: 625, conversions: 125, rate: 20 },
-    { stage: "Downsell 1", visitors: 500, conversions: 150, rate: 30 },
+    { date: "Nov 1", visitors: 10000, conversions: 2500, conversionRate: 25 },
+    { date: "Nov 2", visitors: 2500, conversions: 625, conversionRate: 25 },
+    { date: "Nov 3", visitors: 625, conversions: 187, conversionRate: 30 },
+    { date: "Nov 4", visitors: 625, conversions: 125, conversionRate: 20 },
+    { date: "Nov 5", visitors: 500, conversions: 150, conversionRate: 30 },
   ];
 
   const metrics = {
@@ -55,42 +55,36 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
         <MetricCard
           title="Total Revenue"
           value={`$${metrics.totalRevenue.toLocaleString()}`}
-          icon={DollarSign}
           trend={{ value: 12.5, isPositive: true }}
           className="col-span-1"
         />
         <MetricCard
           title="Total Customers"
           value={metrics.totalCustomers.toLocaleString()}
-          icon={Users}
           trend={{ value: 8.3, isPositive: true }}
           className="col-span-1"
         />
         <MetricCard
           title="Average Order Value"
           value={`$${metrics.averageOrderValue.toFixed(2)}`}
-          icon={ShoppingCart}
           trend={{ value: 5.2, isPositive: true }}
           className="col-span-1"
         />
         <MetricCard
           title="Conversion Rate"
           value={`${metrics.conversionRate}%`}
-          icon={Target}
           trend={{ value: 2.1, isPositive: false }}
           className="col-span-1"
         />
         <MetricCard
           title="Cost Per Acquisition"
           value={`$${metrics.costPerAcquisition.toFixed(2)}`}
-          icon={TrendingUp}
           trend={{ value: 15.7, isPositive: false }}
           className="col-span-1"
         />
         <MetricCard
           title="ROAS"
           value={`${metrics.returnOnAdSpend.toFixed(2)}x`}
-          icon={BarChart3}
           trend={{ value: 18.9, isPositive: true }}
           className="col-span-1"
         />
@@ -105,7 +99,11 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <ConversionChart data={funnelData} />
+          <ConversionChart 
+            data={funnelData}
+            title="Funnel Conversion Rate"
+            metrics={['conversionRate']}
+          />
         </CardContent>
       </Card>
 
