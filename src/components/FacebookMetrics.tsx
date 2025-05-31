@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useFacebookData } from "@/hooks/useFacebookData";
@@ -132,85 +131,91 @@ export const FacebookMetrics = ({ dateRange }: FacebookMetricsProps) => {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            <div className="flex flex-col">
-              <div className="flex items-center gap-2 text-sm text-gray-600">
+            {/* Spend Metric */}
+            <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-lg p-4 border border-red-200">
+              <div className="flex items-center gap-2 text-sm text-red-700 mb-2">
                 <DollarSign className="h-4 w-4" />
                 Spend
               </div>
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-2xl font-bold text-red-900">
                 {formatCurrency(insights.spend || 0)}
               </div>
-              <div className={`flex items-center gap-1 text-xs ${getChangeColor(spendChange)}`}>
+              <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(spendChange)}`}>
                 {getChangeIcon(spendChange)}
                 <span>{spendChange > 0 ? '+' : ''}{spendChange.toFixed(1)}%</span>
               </div>
             </div>
 
-            <div className="flex flex-col">
-              <div className="flex items-center gap-2 text-sm text-gray-600">
+            {/* Impressions Metric */}
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
+              <div className="flex items-center gap-2 text-sm text-blue-700 mb-2">
                 <Eye className="h-4 w-4" />
                 Impressions
               </div>
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-2xl font-bold text-blue-900">
                 {formatNumber(insights.impressions || 0)}
               </div>
-              <div className={`flex items-center gap-1 text-xs ${getChangeColor(impressionsChange)}`}>
+              <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(impressionsChange)}`}>
                 {getChangeIcon(impressionsChange)}
                 <span>{impressionsChange > 0 ? '+' : ''}{impressionsChange.toFixed(1)}%</span>
               </div>
             </div>
 
-            <div className="flex flex-col">
-              <div className="flex items-center gap-2 text-sm text-gray-600">
+            {/* CTR (All) Metric */}
+            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 border border-purple-200">
+              <div className="flex items-center gap-2 text-sm text-purple-700 mb-2">
                 <TrendingUp className="h-4 w-4" />
                 CTR (All)
               </div>
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-2xl font-bold text-purple-900">
                 {(insights.ctr || 0).toFixed(2)}%
               </div>
-              <div className={`flex items-center gap-1 text-xs ${getChangeColor(ctrChange)}`}>
+              <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(ctrChange)}`}>
                 {getChangeIcon(ctrChange)}
                 <span>{ctrChange > 0 ? '+' : ''}{ctrChange.toFixed(1)}%</span>
               </div>
             </div>
 
-            <div className="flex flex-col">
-              <div className="flex items-center gap-2 text-sm text-gray-600">
+            {/* CTR (Link) Metric */}
+            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 border border-green-200">
+              <div className="flex items-center gap-2 text-sm text-green-700 mb-2">
                 <MousePointer className="h-4 w-4" />
                 CTR (Link)
               </div>
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-2xl font-bold text-green-900">
                 {ctrLink.toFixed(2)}%
               </div>
-              <div className={`flex items-center gap-1 text-xs ${getChangeColor(ctrLinkChange)}`}>
+              <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(ctrLinkChange)}`}>
                 {getChangeIcon(ctrLinkChange)}
                 <span>{ctrLinkChange > 0 ? '+' : ''}{ctrLinkChange.toFixed(1)}%</span>
               </div>
             </div>
 
-            <div className="flex flex-col">
-              <div className="flex items-center gap-2 text-sm text-gray-600">
+            {/* CPM Metric */}
+            <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-4 border border-orange-200">
+              <div className="flex items-center gap-2 text-sm text-orange-700 mb-2">
                 <DollarSign className="h-4 w-4" />
                 CPM
               </div>
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-2xl font-bold text-orange-900">
                 {formatCurrency(insights.spend && insights.impressions ? (insights.spend / insights.impressions) * 1000 : 0)}
               </div>
-              <div className={`flex items-center gap-1 text-xs ${getChangeColor(cpmChange)}`}>
+              <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(cpmChange)}`}>
                 {getChangeIcon(cpmChange)}
                 <span>{cpmChange > 0 ? '+' : ''}{cpmChange.toFixed(1)}%</span>
               </div>
             </div>
 
-            <div className="flex flex-col">
-              <div className="flex items-center gap-2 text-sm text-gray-600">
+            {/* Frequency Metric */}
+            <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-lg p-4 border border-indigo-200">
+              <div className="flex items-center gap-2 text-sm text-indigo-700 mb-2">
                 <Users className="h-4 w-4" />
                 Frequency
               </div>
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-2xl font-bold text-indigo-900">
                 {frequency.toFixed(2)}
               </div>
-              <div className={`flex items-center gap-1 text-xs ${getChangeColor(frequencyChange)}`}>
+              <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(frequencyChange)}`}>
                 {getChangeIcon(frequencyChange)}
                 <span>{frequencyChange > 0 ? '+' : ''}{frequencyChange.toFixed(1)}%</span>
               </div>
