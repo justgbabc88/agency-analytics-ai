@@ -1,16 +1,15 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConversionChart } from "./ConversionChart";
-import { MetricCard } from "./MetricCard";
 import { FacebookMetrics } from "./FacebookMetrics";
 import { useGoogleSheetsData } from "@/hooks/useGoogleSheetsData";
 import { 
   TrendingUp, 
-  Users, 
-  DollarSign, 
-  ShoppingCart,
   BarChart3,
   Target,
+  ShoppingCart,
+  Users,
+  DollarSign,
   ArrowUpRight,
   ArrowDownRight
 } from "lucide-react";
@@ -76,25 +75,6 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
 
   const funnelData = generateFunnelData();
 
-  // Use calculated metrics if available, otherwise fallback to mock data
-  const metrics = calculatedMetrics ? {
-    totalRevenue: calculatedMetrics.revenue || 47850,
-    totalCustomers: calculatedMetrics.conversions || 625,
-    averageOrderValue: calculatedMetrics.revenue && calculatedMetrics.conversions ? 
-      calculatedMetrics.revenue / calculatedMetrics.conversions : 76.56,
-    conversionRate: calculatedMetrics.conversionRate || 6.25,
-    costPerAcquisition: calculatedMetrics.cost && calculatedMetrics.conversions ? 
-      calculatedMetrics.cost / calculatedMetrics.conversions : 12.50,
-    returnOnAdSpend: calculatedMetrics.roas || 3.83
-  } : {
-    totalRevenue: 47850,
-    totalCustomers: 625,
-    averageOrderValue: 76.56,
-    conversionRate: 6.25,
-    costPerAcquisition: 12.50,
-    returnOnAdSpend: 3.83
-  };
-
   // Calculate funnel conversion percentages
   const latestData = funnelData[funnelData.length - 1];
   const mainOfferPercent = latestData.optins > 0 ? (latestData.mainOffer / latestData.optins) * 100 : 0;
@@ -104,85 +84,145 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
   const upsell2Percent = latestData.upsell1 > 0 ? (latestData.upsell2 / latestData.upsell1) * 100 : 0;
   const downsell2Percent = latestData.upsell1 > 0 ? (latestData.downsell2 / latestData.upsell1) * 100 : 0;
 
+  // Mock previous period data for comparison
+  const previousPeriodData = {
+    mainOffer: mainOfferPercent * (0.85 + Math.random() * 0.3),
+    bump: bumpPercent * (0.85 + Math.random() * 0.3),
+    upsell1: upsell1Percent * (0.85 + Math.random() * 0.3),
+    downsell1: downsell1Percent * (0.85 + Math.random() * 0.3),
+    upsell2: upsell2Percent * (0.85 + Math.random() * 0.3),
+    downsell2: downsell2Percent * (0.85 + Math.random() * 0.3)
+  };
+
+  const calculatePercentageChange = (current: number, previous: number) => {
+    if (previous === 0) return 0;
+    return ((current - previous) / previous) * 100;
+  };
+
+  const getChangeIcon = (change: number) => {
+    if (change > 0) return <ArrowUpRight className="h-3 w-3 text-green-600" />;
+    if (change < 0) return <ArrowDownRight className="h-3 w-3 text-red-600" />;
+    return null;
+  };
+
+  const getChangeColor = (change: number) => {
+    if (change > 0) return "text-green-600";
+    if (change < 0) return "text-red-600";
+    return "text-gray-500";
+  };
+
+  const mainOfferChange = calculatePercentageChange(mainOfferPercent, previousPeriodData.mainOffer);
+  const bumpChange = calculatePercentageChange(bumpPercent, previousPeriodData.bump);
+  const upsell1Change = calculatePercentageChange(upsell1Percent, previousPeriodData.upsell1);
+  const downsell1Change = calculatePercentageChange(downsell1Percent, previousPeriodData.downsell1);
+  const upsell2Change = calculatePercentageChange(upsell2Percent, previousPeriodData.upsell2);
+  const downsell2Change = calculatePercentageChange(downsell2Percent, previousPeriodData.downsell2);
+
   return (
     <div className="space-y-4">
       {/* Facebook Ads Integration */}
       <FacebookMetrics dateRange={dateRange} />
       
-      {/* Key Metrics Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-        <MetricCard
-          title="Total Revenue"
-          value={metrics.totalRevenue}
-          previousValue={42150}
-          format="currency"
-          className="col-span-1"
-        />
-        <MetricCard
-          title="Total Customers"
-          value={metrics.totalCustomers}
-          previousValue={577}
-          className="col-span-1"
-        />
-        <MetricCard
-          title="Average Order Value"
-          value={metrics.averageOrderValue}
-          previousValue={72.80}
-          format="currency"
-          className="col-span-1"
-        />
-        <MetricCard
-          title="Conversion Rate"
-          value={metrics.conversionRate}
-          previousValue={6.4}
-          format="percentage"
-          className="col-span-1"
-        />
-        <MetricCard
-          title="Cost Per Acquisition"
-          value={metrics.costPerAcquisition}
-          previousValue={14.85}
-          format="currency"
-          className="col-span-1"
-        />
-        <MetricCard
-          title="ROAS"
-          value={metrics.returnOnAdSpend}
-          previousValue={3.22}
-          className="col-span-1"
-        />
-      </div>
-
       {/* Funnel Conversion Percentages */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Funnel Conversion Rates</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <BarChart3 className="h-5 w-5 text-blue-600" />
+              Funnel Conversion Rates
+            </CardTitle>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            <div className="text-center p-3 bg-gray-50 rounded-lg border border-gray-200">
-              <div className="text-xs text-gray-600 mb-1">Main Offer %</div>
-              <div className="text-lg font-bold text-gray-800">{mainOfferPercent.toFixed(1)}%</div>
+            {/* Main Offer Metric */}
+            <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-lg p-3 border border-gray-100">
+              <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
+                <Target className="h-3 w-3" />
+                Main Offer
+              </div>
+              <div className="text-lg font-bold text-gray-800">
+                {mainOfferPercent.toFixed(1)}%
+              </div>
+              <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(mainOfferChange)}`}>
+                {getChangeIcon(mainOfferChange)}
+                <span>{mainOfferChange > 0 ? '+' : ''}{mainOfferChange.toFixed(1)}%</span>
+              </div>
             </div>
-            <div className="text-center p-3 bg-slate-50 rounded-lg border border-slate-200">
-              <div className="text-xs text-slate-600 mb-1">Bump %</div>
-              <div className="text-lg font-bold text-slate-800">{bumpPercent.toFixed(1)}%</div>
+
+            {/* Bump Metric */}
+            <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-lg p-3 border border-gray-100">
+              <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
+                <ShoppingCart className="h-3 w-3" />
+                Bump
+              </div>
+              <div className="text-lg font-bold text-gray-800">
+                {bumpPercent.toFixed(1)}%
+              </div>
+              <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(bumpChange)}`}>
+                {getChangeIcon(bumpChange)}
+                <span>{bumpChange > 0 ? '+' : ''}{bumpChange.toFixed(1)}%</span>
+              </div>
             </div>
-            <div className="text-center p-3 bg-zinc-50 rounded-lg border border-zinc-200">
-              <div className="text-xs text-zinc-600 mb-1">Upsell 1 %</div>
-              <div className="text-lg font-bold text-zinc-800">{upsell1Percent.toFixed(1)}%</div>
+
+            {/* Upsell 1 Metric */}
+            <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-lg p-3 border border-gray-100">
+              <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
+                <TrendingUp className="h-3 w-3" />
+                Upsell 1
+              </div>
+              <div className="text-lg font-bold text-gray-800">
+                {upsell1Percent.toFixed(1)}%
+              </div>
+              <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(upsell1Change)}`}>
+                {getChangeIcon(upsell1Change)}
+                <span>{upsell1Change > 0 ? '+' : ''}{upsell1Change.toFixed(1)}%</span>
+              </div>
             </div>
-            <div className="text-center p-3 bg-stone-50 rounded-lg border border-stone-200">
-              <div className="text-xs text-stone-600 mb-1">Downsell 1 %</div>
-              <div className="text-lg font-bold text-stone-800">{downsell1Percent.toFixed(1)}%</div>
+
+            {/* Downsell 1 Metric */}
+            <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-lg p-3 border border-gray-100">
+              <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
+                <Users className="h-3 w-3" />
+                Downsell 1
+              </div>
+              <div className="text-lg font-bold text-gray-800">
+                {downsell1Percent.toFixed(1)}%
+              </div>
+              <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(downsell1Change)}`}>
+                {getChangeIcon(downsell1Change)}
+                <span>{downsell1Change > 0 ? '+' : ''}{downsell1Change.toFixed(1)}%</span>
+              </div>
             </div>
-            <div className="text-center p-3 bg-neutral-50 rounded-lg border border-neutral-200">
-              <div className="text-xs text-neutral-600 mb-1">Upsell 2 %</div>
-              <div className="text-lg font-bold text-neutral-800">{upsell2Percent.toFixed(1)}%</div>
+
+            {/* Upsell 2 Metric */}
+            <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-lg p-3 border border-gray-100">
+              <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
+                <DollarSign className="h-3 w-3" />
+                Upsell 2
+              </div>
+              <div className="text-lg font-bold text-gray-800">
+                {upsell2Percent.toFixed(1)}%
+              </div>
+              <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(upsell2Change)}`}>
+                {getChangeIcon(upsell2Change)}
+                <span>{upsell2Change > 0 ? '+' : ''}{upsell2Change.toFixed(1)}%</span>
+              </div>
             </div>
-            <div className="text-center p-3 bg-gray-100 rounded-lg border border-gray-300">
-              <div className="text-xs text-gray-600 mb-1">Downsell 2 %</div>
-              <div className="text-lg font-bold text-gray-800">{downsell2Percent.toFixed(1)}%</div>
+
+            {/* Downsell 2 Metric */}
+            <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-lg p-3 border border-gray-100">
+              <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
+                <Target className="h-3 w-3" />
+                Downsell 2
+              </div>
+              <div className="text-lg font-bold text-gray-800">
+                {downsell2Percent.toFixed(1)}%
+              </div>
+              <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(downsell2Change)}`}>
+                {getChangeIcon(downsell2Change)}
+                <span>{downsell2Change > 0 ? '+' : ''}{downsell2Change.toFixed(1)}%</span>
+              </div>
             </div>
           </div>
         </CardContent>
@@ -219,130 +259,6 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
               title=""
               metrics={['optinRate', 'mainOfferRate', 'bumpRate', 'upsell1Rate', 'downsell1Rate', 'upsell2Rate', 'downsell2Rate']}
             />
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Product Performance Breakdown */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Product Performance</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {selectedProducts.filter(p => p.visible).map((product) => {
-                // Use actual data if available
-                const getProductSales = (productId: string) => {
-                  if (calculatedMetrics && funnelData.length > 0) {
-                    const latestData = funnelData[funnelData.length - 1];
-                    switch(productId) {
-                      case 'mainProduct': return latestData.mainOffer || 0;
-                      case 'bump': return latestData.bump || 0;
-                      case 'upsell1': return latestData.upsell1 || 0;
-                      case 'downsell1': return latestData.downsell1 || 0;
-                      case 'upsell2': return latestData.upsell2 || 0;
-                      case 'downsell2': return latestData.downsell2 || 0;
-                      default: return 0;
-                    }
-                  }
-                  // Fallback data
-                  return {
-                    'mainProduct': 625,
-                    'bump': 187,
-                    'upsell1': 125,
-                    'downsell1': 150,
-                    'upsell2': 75,
-                    'downsell2': 50
-                  }[productId] || 0;
-                };
-
-                const sales = getProductSales(product.id);
-                const revenue = {
-                  'mainProduct': sales * 50,
-                  'bump': sales * 50,
-                  'upsell1': sales * 50,
-                  'downsell1': sales * 30,
-                  'upsell2': sales * 30,
-                  'downsell2': sales * 30
-                }[product.id] || 0;
-
-                return (
-                  <div key={product.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <div 
-                        className="w-3 h-3 rounded-full" 
-                        style={{ backgroundColor: product.color }}
-                      />
-                      <div>
-                        <div className="font-medium text-sm">{product.label}</div>
-                        <div className="text-xs text-gray-600">
-                          {sales} sales
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-semibold text-sm">
-                        ${revenue.toLocaleString()}
-                      </div>
-                      <div className="text-xs text-gray-600 flex items-center gap-1">
-                        {Math.random() > 0.5 ? (
-                          <>
-                            <ArrowUpRight className="h-3 w-3 text-green-600" />
-                            <span className="text-green-600">+{(Math.random() * 20).toFixed(1)}%</span>
-                          </>
-                        ) : (
-                          <>
-                            <ArrowDownRight className="h-3 w-3 text-red-600" />
-                            <span className="text-red-600">-{(Math.random() * 10).toFixed(1)}%</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Traffic Sources</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 border rounded-lg">
-                <div>
-                  <div className="font-medium text-sm">Facebook Ads</div>
-                  <div className="text-xs text-gray-600">Social Media</div>
-                </div>
-                <div className="text-right">
-                  <div className="font-semibold text-sm">{(calculatedMetrics?.pageViews * 0.675) || 6750} visitors</div>
-                  <div className="text-xs text-green-600">67.5%</div>
-                </div>
-              </div>
-              <div className="flex items-center justify-between p-3 border rounded-lg">
-                <div>
-                  <div className="font-medium text-sm">Google Ads</div>
-                  <div className="text-xs text-gray-600">Search Engine</div>
-                </div>
-                <div className="text-right">
-                  <div className="font-semibold text-sm">{(calculatedMetrics?.pageViews * 0.225) || 2250} visitors</div>
-                  <div className="text-xs text-green-600">22.5%</div>
-                </div>
-              </div>
-              <div className="flex items-center justify-between p-3 border rounded-lg">
-                <div>
-                  <div className="font-medium text-sm">Organic</div>
-                  <div className="text-xs text-gray-600">Direct & Referral</div>
-                </div>
-                <div className="text-right">
-                  <div className="font-semibold text-sm">{(calculatedMetrics?.pageViews * 0.10) || 1000} visitors</div>
-                  <div className="text-xs text-green-600">10%</div>
-                </div>
-              </div>
-            </div>
           </CardContent>
         </Card>
       </div>
