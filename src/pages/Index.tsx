@@ -108,13 +108,13 @@ const Index = () => {
               <TrendingUp className="h-4 w-4" />
               Alerts
             </TabsTrigger>
-            <TabsTrigger value="export" className="flex items-center gap-2">
-              <Download className="h-4 w-4" />
-              Export
-            </TabsTrigger>
             <TabsTrigger value="settings" className="flex items-center gap-2">
               <Settings className="h-4 w-4" />
               Integrations
+            </TabsTrigger>
+            <TabsTrigger value="export" className="flex items-center gap-2">
+              <Download className="h-4 w-4" />
+              Export
             </TabsTrigger>
           </TabsList>
 
@@ -140,12 +140,12 @@ const Index = () => {
             <AlertSystem />
           </TabsContent>
 
-          <TabsContent value="export" className="space-y-6">
-            <ExportPanel />
-          </TabsContent>
-
           <TabsContent value="settings" className="space-y-6">
             <IntegrationsPanel />
+          </TabsContent>
+
+          <TabsContent value="export" className="space-y-6">
+            <ExportPanel />
           </TabsContent>
         </Tabs>
       </div>
