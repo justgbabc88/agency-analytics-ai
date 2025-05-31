@@ -5,6 +5,8 @@ import { FacebookMetrics } from "./FacebookMetrics";
 import { useGoogleSheetsData } from "@/hooks/useGoogleSheetsData";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { 
   TrendingUp, 
   BarChart3,
@@ -16,7 +18,10 @@ import {
   ArrowDownRight,
   ChevronDown,
   ChevronUp,
-  Facebook
+  Facebook,
+  Eye,
+  EyeOff,
+  Settings
 } from "lucide-react";
 import { useState } from "react";
 
@@ -30,12 +35,14 @@ interface FunnelProductConfig {
 interface LowTicketFunnelProps {
   dateRange: { from: Date; to: Date };
   selectedProducts: FunnelProductConfig[];
+  onProductsChange: (products: FunnelProductConfig[]) => void;
 }
 
-export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnelProps) => {
+export const LowTicketFunnel = ({ dateRange, selectedProducts, onProductsChange }: LowTicketFunnelProps) => {
   const { syncedData, calculateMetricsFromSyncedData } = useGoogleSheetsData();
   const [isAdsOpen, setIsAdsOpen] = useState(true);
   const [isFunnelOpen, setIsFunnelOpen] = useState(true);
+  const [isCustomizerExpanded, setIsCustomizerExpanded] = useState(false);
   
   // Calculate metrics from Google Sheets data
   const calculatedMetrics = calculateMetricsFromSyncedData();
@@ -142,6 +149,13 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
     }
   };
 
+  const toggleProduct = (productId: string) => {
+    const updatedProducts = selectedProducts.map(product => 
+      product.id === productId ? { ...product, visible: !product.visible } : product
+    );
+    onProductsChange(updatedProducts);
+  };
+
   // Filter visible products and create chart metrics array
   const visibleProducts = selectedProducts.filter(product => product.visible);
   const chartMetrics = visibleProducts.map(product => product.id);
@@ -169,7 +183,7 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
         </Collapsible>
       </div>
 
-      {/* Funnel Analysis Section */}
+      {/* Funnel Analysis Section with Integrated Product Customizer */}
       <div className="bg-amber-50/30 rounded-lg border border-amber-100/80 p-4 shadow-sm">
         <Collapsible open={isFunnelOpen} onOpenChange={setIsFunnelOpen}>
           <CollapsibleTrigger asChild>
@@ -185,6 +199,74 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-4 mt-4">
+            {/* Integrated Funnel Products Customizer */}
+            <Card className="border-2 border-dashed border-amber-300 bg-amber-50/70">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Settings className="h-4 w-4 text-amber-600" />
+                    <CardTitle className="text-sm font-medium text-amber-900">
+                      Product Display Settings ({visibleProducts.length} selected)
+                    </CardTitle>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => setIsCustomizerExpanded(!isCustomizerExpanded)}
+                    className="h-6 w-6 p-0 text-amber-600 hover:bg-amber-100"
+                  >
+                    {isCustomizerExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </Button>
+                </div>
+                <p className="text-xs text-amber-700/80">
+                  Select which funnel products to analyze and display in the charts below
+                </p>
+              </CardHeader>
+              
+              {isCustomizerExpanded && (
+                <CardContent className="pt-0 space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    {selectedProducts.map(product => (
+                      <div key={product.id} className="flex items-center space-x-2 p-2 rounded-md hover:bg-white/60 transition-colors">
+                        <Checkbox
+                          id={product.id}
+                          checked={product.visible}
+                          onCheckedChange={() => toggleProduct(product.id)}
+                          className="data-[state=checked]:bg-amber-600 data-[state=checked]:border-amber-600"
+                        />
+                        <div className="flex items-center gap-2 flex-1">
+                          <div 
+                            className="w-2.5 h-2.5 rounded-full flex-shrink-0" 
+                            style={{ backgroundColor: product.color }}
+                          />
+                          <label
+                            htmlFor={product.id}
+                            className="text-xs font-medium text-gray-700 cursor-pointer flex-1"
+                          >
+                            {product.label}
+                          </label>
+                          {product.visible && <Eye className="h-3 w-3 text-green-600" />}
+                          {!product.visible && <EyeOff className="h-3 w-3 text-gray-400" />}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-1 mt-3 pt-2 border-t border-amber-300">
+                    {visibleProducts.map(product => (
+                      <Badge key={product.id} variant="secondary" className="text-xs h-5 px-2">
+                        <div 
+                          className="w-1.5 h-1.5 rounded-full mr-1" 
+                          style={{ backgroundColor: product.color }}
+                        />
+                        {product.label}
+                      </Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              )}
+            </Card>
+
             {/* Funnel Conversion Percentages - Only show selected products */}
             <Card className="border-amber-200">
               <CardHeader className="pb-3">
@@ -226,7 +308,7 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
                 
                 {visibleProducts.length === 0 && (
                   <div className="text-center py-8 text-gray-500">
-                    <p>No products selected. Use the Funnel Products customizer above to select products to display.</p>
+                    <p>No products selected. Use the Product Display Settings above to select products to display.</p>
                   </div>
                 )}
               </CardContent>

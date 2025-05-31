@@ -7,7 +7,6 @@ import { LowTicketFunnel } from "@/components/LowTicketFunnel";
 import { WebinarFunnel } from "@/components/WebinarFunnel";
 import { BookCallFunnel } from "@/components/BookCallFunnel";
 import { IntegrationsPanel } from "@/components/IntegrationsPanel";
-import { MetricCustomizer } from "@/components/MetricCustomizer";
 import { AlertSystem } from "@/components/AlertSystem";
 import { PredictiveAnalytics } from "@/components/PredictiveAnalytics";
 import { AIChatPanel } from "@/components/AIChatPanel";
@@ -26,12 +25,12 @@ const Index = () => {
   const [selectedFunnel, setSelectedFunnel] = useState("low-ticket");
   const [dateRange, setDateRange] = useState({ from: new Date(), to: new Date() });
   const [selectedProducts, setSelectedProducts] = useState<FunnelProductConfig[]>([
-    { id: 'mainProduct', label: 'Main Product', visible: true, color: '#10B981' },
-    { id: 'bump', label: 'Bump Product', visible: true, color: '#3B82F6' },
-    { id: 'upsell1', label: 'Upsell 1', visible: true, color: '#F59E0B' },
-    { id: 'downsell1', label: 'Downsell 1', visible: true, color: '#8B5CF6' },
-    { id: 'upsell2', label: 'Upsell 2', visible: false, color: '#EF4444' },
-    { id: 'downsell2', label: 'Downsell 2', visible: false, color: '#06B6D4' },
+    { id: 'mainProduct', label: 'Main Product Rate', visible: true, color: '#10B981' },
+    { id: 'bump', label: 'Bump Rate', visible: true, color: '#3B82F6' },
+    { id: 'upsell1', label: 'Upsell 1 Rate', visible: true, color: '#F59E0B' },
+    { id: 'downsell1', label: 'Downsell 1 Rate', visible: false, color: '#8B5CF6' },
+    { id: 'upsell2', label: 'Upsell 2 Rate', visible: false, color: '#EF4444' },
+    { id: 'downsell2', label: 'Downsell 2 Rate', visible: false, color: '#06B6D4' },
   ]);
 
   const handleDateChange = (from: Date, to: Date) => {
@@ -56,7 +55,13 @@ const Index = () => {
       case "book-call":
         return <BookCallFunnel />;
       default:
-        return <LowTicketFunnel dateRange={dateRange} selectedProducts={selectedProducts} />;
+        return (
+          <LowTicketFunnel 
+            dateRange={dateRange} 
+            selectedProducts={selectedProducts}
+            onProductsChange={handleProductsChange}
+          />
+        );
     }
   };
 
@@ -114,11 +119,6 @@ const Index = () => {
           </TabsList>
 
           <TabsContent value="dashboard" className="space-y-6">
-            {/* Funnel Products Customizer - only show for low ticket funnel */}
-            {selectedFunnel === "low-ticket" && (
-              <MetricCustomizer onProductsChange={handleProductsChange} />
-            )}
-
             {/* Funnel-Specific Content */}
             {renderFunnelContent()}
           </TabsContent>
