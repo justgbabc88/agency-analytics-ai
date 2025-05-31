@@ -48,6 +48,12 @@ export const ForecastChart = ({
     return value.toString();
   };
 
+  // Filter to only show visible products
+  const visibleProducts = selectedProducts.filter(product => product.visible);
+
+  // Find the reference line position for funnel data
+  const funnelReferenceDate = funnelData.length > 0 ? funnelData.find(d => d.isActual && funnelData[funnelData.indexOf(d) + 1]?.isActual === false)?.date : null;
+
   return (
     <div className="h-80">
       <ResponsiveContainer width="100%" height="100%">
@@ -81,36 +87,59 @@ export const ForecastChart = ({
               labelFormatter={(label) => `Date: ${label}`}
             />
             
-            <ReferenceLine 
-              x={funnelData[10]?.date}
-              stroke="#e5e7eb"
-              strokeDasharray="2 2"
-              strokeWidth={1}
-              label={{ 
-                value: "Forecast", 
-                position: "top",
-                style: { fontSize: '11px', fill: '#6b7280' }
-              }}
-            />
+            {/* Reference line to separate actual from predicted data */}
+            {funnelReferenceDate && (
+              <ReferenceLine 
+                x={funnelReferenceDate}
+                stroke="#e5e7eb"
+                strokeDasharray="2 2"
+                strokeWidth={1}
+                label={{ 
+                  value: "Forecast", 
+                  position: "top",
+                  style: { fontSize: '11px', fill: '#6b7280' }
+                }}
+              />
+            )}
             
-            {selectedProducts.map(product => (
+            {/* Only render lines for visible/selected products */}
+            {visibleProducts.map(product => (
               <Line 
                 key={product.id}
                 type="monotone" 
-                dataKey={product.id}
+                dataKey={(entry) => entry.isActual ? entry[product.id] : null}
                 stroke={product.color}
-                strokeWidth={2.5}
+                strokeWidth={3}
                 strokeDasharray="0"
                 dot={(props) => {
                   const { payload } = props;
                   return payload?.isActual ? (
                     <circle {...props} fill={product.color} strokeWidth={2} r={4} />
-                  ) : (
-                    <circle {...props} fill={product.color} stroke={product.color} strokeWidth={1} r={2} fillOpacity={0.7} />
-                  );
+                  ) : null;
                 }}
                 connectNulls={false}
-                name={product.id}
+                name={`${product.id}_actual`}
+              />
+            ))}
+            
+            {/* Predicted lines for visible products */}
+            {visibleProducts.map(product => (
+              <Line 
+                key={`${product.id}_predicted`}
+                type="monotone" 
+                dataKey={(entry) => !entry.isActual ? entry[product.id] : null}
+                stroke={product.color}
+                strokeWidth={2}
+                strokeDasharray="6 6"
+                strokeOpacity={0.7}
+                dot={(props) => {
+                  const { payload } = props;
+                  return !payload?.isActual ? (
+                    <circle {...props} fill={product.color} stroke={product.color} strokeWidth={1} r={2} fillOpacity={0.7} />
+                  ) : null;
+                }}
+                connectNulls={false}
+                name={`${product.id}_predicted`}
               />
             ))}
           </LineChart>
