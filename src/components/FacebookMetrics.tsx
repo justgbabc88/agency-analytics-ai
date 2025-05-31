@@ -233,30 +233,56 @@ export const FacebookMetrics = ({ dateRange }: FacebookMetricsProps) => {
         </CardContent>
       </Card>
 
-      {/* Facebook Performance Charts - More Condensed */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Facebook Performance Charts - All in One Row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Spend & CTR Trends</CardTitle>
+            <CardTitle className="text-sm">Spend</CardTitle>
           </CardHeader>
           <CardContent>
             <ConversionChart 
               data={chartData}
               title=""
-              metrics={['spend', 'ctrAll', 'ctrLink']}
+              metrics={['spend']}
             />
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Cost & Frequency Analysis</CardTitle>
+            <CardTitle className="text-sm">CTR Metrics</CardTitle>
           </CardHeader>
           <CardContent>
             <ConversionChart 
               data={chartData}
               title=""
-              metrics={['cpm', 'frequency']}
+              metrics={['ctrAll', 'ctrLink']}
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">CPM</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ConversionChart 
+              data={chartData}
+              title=""
+              metrics={['cpm']}
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Frequency</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ConversionChart 
+              data={chartData}
+              title=""
+              metrics={['frequency']}
             />
           </CardContent>
         </Card>
