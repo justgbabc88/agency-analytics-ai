@@ -36,52 +36,63 @@ export const useFacebookData = () => {
     queryFn: async () => {
       if (!agency) return null;
       
-      const { data, error } = await supabase
+      // First check if Facebook integration is connected
+      const { data: integration, error: integrationError } = await supabase
         .from('integrations')
         .select('*')
         .eq('agency_id', agency.id)
         .eq('platform', 'facebook')
         .eq('is_connected', true)
-        .order('last_sync', { ascending: false })
+        .maybeSingle();
+
+      if (integrationError) {
+        console.error('Error fetching Facebook integration:', integrationError);
+        throw integrationError;
+      }
+
+      if (!integration) {
+        console.log('No Facebook integration found or not connected');
+        return null;
+      }
+
+      // Then fetch the actual synced data
+      const { data: syncedData, error: syncError } = await supabase
+        .from('integration_data')
+        .select('*')
+        .eq('agency_id', agency.id)
+        .eq('platform', 'facebook')
+        .order('synced_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      if (error) {
-        console.error('Error fetching Facebook integration:', error);
-        throw error;
+      if (syncError) {
+        console.error('Error fetching Facebook data:', syncError);
+        throw syncError;
       }
 
-      // For now, return mock data structure since we don't have the actual data schema
-      if (data) {
+      if (syncedData && syncedData.data) {
+        const fbData = syncedData.data as any;
+        
         return {
           insights: {
-            impressions: 125000,
-            clicks: 3200,
-            spend: 850,
-            reach: 95000,
-            ctr: 2.56,
-            cpc: 0.27,
-            conversions: 75,
-            conversion_values: 3200,
+            impressions: fbData.insights?.impressions || fbData.aggregated_metrics?.total_impressions || 0,
+            clicks: fbData.insights?.clicks || fbData.aggregated_metrics?.total_clicks || 0,
+            spend: fbData.insights?.spend || fbData.aggregated_metrics?.total_spend || 0,
+            reach: fbData.insights?.reach || 0,
+            ctr: fbData.insights?.ctr || fbData.aggregated_metrics?.overall_ctr || 0,
+            cpc: fbData.insights?.cpc || fbData.aggregated_metrics?.overall_cpc || 0,
+            conversions: fbData.insights?.conversions || fbData.aggregated_metrics?.total_conversions || 0,
+            conversion_values: fbData.insights?.conversion_values || fbData.aggregated_metrics?.total_revenue || 0,
           },
-          campaigns: [
-            {
-              id: '1',
-              name: 'Holiday Sale Campaign',
-              status: 'ACTIVE',
-              objective: 'CONVERSIONS',
-              created_time: new Date().toISOString(),
-            },
-            {
-              id: '2',
-              name: 'Brand Awareness Campaign',
-              status: 'ACTIVE',
-              objective: 'REACH',
-              created_time: new Date().toISOString(),
-            }
-          ],
-          last_updated: data.last_sync || new Date().toISOString(),
+          campaigns: fbData.campaigns || [],
+          last_updated: syncedData.synced_at,
         } as FacebookData;
+      }
+
+      // If no synced data but integration exists, show connection message
+      if (integration) {
+        console.log('Facebook integration connected but no synced data found');
+        return null;
       }
 
       return null;

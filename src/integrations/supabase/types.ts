@@ -209,6 +209,36 @@ export type Database = {
           },
         ]
       }
+      integration_data: {
+        Row: {
+          agency_id: string
+          created_at: string
+          data: Json
+          id: string
+          platform: string
+          synced_at: string
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          created_at?: string
+          data: Json
+          id?: string
+          platform: string
+          synced_at?: string
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          created_at?: string
+          data?: Json
+          id?: string
+          platform?: string
+          synced_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       integrations: {
         Row: {
           agency_id: string
