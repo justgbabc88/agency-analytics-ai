@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Brain, RefreshCw, BarChart } from "lucide-react";
+import { Brain, RefreshCw, BarChart, Target } from "lucide-react";
 import { useState } from "react";
 import { useGoogleSheetsData } from "@/hooks/useGoogleSheetsData";
 import { generateForecast, generateScenarioForecasts, parseDateFromSheetData, ForecastResult, calculateLinearTrend } from "@/utils/timeSeriesUtils";
@@ -29,7 +29,8 @@ interface PredictiveAnalyticsProps {
 export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => {
   const [selectedMetric, setSelectedMetric] = useState('revenue');
   const [forecastPeriod, setForecastPeriod] = useState('30days');
-  const [showScenarios, setShowScenarios] = useState(false);
+  const [showScenarios, setShowScenarios] = useState(true);
+  const [showPredictions, setShowPredictions] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<FunnelProductConfig[]>([]);
   const { syncedData, calculateMetricsFromSyncedData } = useGoogleSheetsData();
 
@@ -435,6 +436,10 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
               <BarChart className="h-4 w-4" />
               {showScenarios ? 'Hide' : 'Show'} Scenarios
             </Button>
+            <Button variant="ghost" size="sm" onClick={() => setShowPredictions(!showPredictions)}>
+              <Target className="h-4 w-4" />
+              {showPredictions ? 'Hide' : 'Show'} Predictions
+            </Button>
             <Button variant="ghost" size="sm">
               <RefreshCw className="h-4 w-4" />
             </Button>
@@ -492,7 +497,7 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
           />
         )}
 
-        {selectedMetric !== 'funnelProducts' && (
+        {showPredictions && selectedMetric !== 'funnelProducts' && (
           <PredictionsGrid 
             predictions={predictions}
             forecastDays={forecastDays}
