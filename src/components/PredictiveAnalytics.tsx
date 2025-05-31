@@ -43,6 +43,51 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
     setSelectedProducts(products);
   };
 
+  // Helper function to calculate funnel rates from raw data
+  const calculateFunnelRates = () => {
+    if (!syncedData || !syncedData.data.length) {
+      return {
+        mainOfferRate: 2.5,
+        bumpRate: 45,
+        upsell1Rate: 35,
+        downsell1Rate: 25,
+        upsell2Rate: 20,
+        downsell2Rate: 15,
+      };
+    }
+
+    const data = syncedData.data;
+    let totalPageViews = 0;
+    let totalMainOffer = 0;
+    let totalBump = 0;
+    let totalUpsell1 = 0;
+    let totalUpsell2 = 0;
+
+    // Calculate totals from the data
+    data.forEach(row => {
+      const pageViews = parseInt(row['Page Views']?.toString().replace(/[^\d]/g, '') || '0');
+      const mainOffer = parseInt(row['Main Offer']?.toString().replace(/[^\d]/g, '') || '0');
+      const bump = parseInt(row['Bump']?.toString().replace(/[^\d]/g, '') || '0');
+      const upsell1 = parseInt(row['Upsell 1']?.toString().replace(/[^\d]/g, '') || '0');
+      const upsell2 = parseInt(row['Upsell 2']?.toString().replace(/[^\d]/g, '') || '0');
+
+      totalPageViews += pageViews;
+      totalMainOffer += mainOffer;
+      totalBump += bump;
+      totalUpsell1 += upsell1;
+      totalUpsell2 += upsell2;
+    });
+
+    return {
+      mainOfferRate: totalPageViews > 0 ? (totalMainOffer / totalPageViews) * 100 : 2.5,
+      bumpRate: totalMainOffer > 0 ? (totalBump / totalMainOffer) * 100 : 45,
+      upsell1Rate: totalMainOffer > 0 ? (totalUpsell1 / totalMainOffer) * 100 : 35,
+      downsell1Rate: totalMainOffer > 0 ? ((totalMainOffer - totalUpsell1) * 0.25 / totalMainOffer) * 100 : 25,
+      upsell2Rate: totalUpsell1 > 0 ? (totalUpsell2 / totalUpsell1) * 100 : 20,
+      downsell2Rate: totalUpsell1 > 0 ? ((totalUpsell1 - totalUpsell2) * 0.15 / totalUpsell1) * 100 : 15,
+    };
+  };
+
   // Generate forecast data based on actual historical data
   const generateEnhancedForecastData = (): ForecastResult => {
     if (!syncedData || !syncedData.data.length) {
@@ -182,8 +227,8 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
     const totalDays = forecastDays + 10; // 10 historical days + forecast period
     const historicalDays = 10;
 
-    // Get current metrics to base historical data on
-    const metrics = calculateMetricsFromSyncedData();
+    // Get calculated funnel rates from actual data
+    const funnelRates = calculateFunnelRates();
     
     return Array.from({ length: totalDays }, (_, i) => {
       const date = format(addDays(new Date(), i - historicalDays), 'M/d/yyyy');
@@ -200,49 +245,37 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
           trendMultiplier = 1 + ((i - historicalDays) * 0.002); // Small positive trend
         }
         
-        // Use actual dashboard metrics as baseline for realistic data
+        // Use calculated funnel rates from actual dashboard data
         switch (product.id) {
           case 'mainProduct':
-            // Use actual main offer rate from dashboard
-            const baseMainRate = metrics?.mainOfferRate || 2.5;
             baseValue = isActual ? 
-              baseMainRate + (i * 0.1) + (Math.random() * 0.5 - 0.25) : 
-              baseMainRate * 1.1 + (i * 0.05) + (Math.random() * 0.3 - 0.15);
+              funnelRates.mainOfferRate + (i * 0.1) + (Math.random() * 0.5 - 0.25) : 
+              funnelRates.mainOfferRate * 1.1 + (i * 0.05) + (Math.random() * 0.3 - 0.15);
             break;
           case 'bump':
-            // Use actual bump rate from dashboard
-            const baseBumpRate = metrics?.bumpRate || 45;
             baseValue = isActual ? 
-              baseBumpRate + (i * 0.5) + (Math.random() * 2 - 1) : 
-              baseBumpRate * 1.05 + (i * 0.3) + (Math.random() * 1.5 - 0.75);
+              funnelRates.bumpRate + (i * 0.5) + (Math.random() * 2 - 1) : 
+              funnelRates.bumpRate * 1.05 + (i * 0.3) + (Math.random() * 1.5 - 0.75);
             break;
           case 'upsell1':
-            // Use actual upsell 1 rate from dashboard
-            const baseUpsell1Rate = metrics?.upsell1Rate || 35;
             baseValue = isActual ? 
-              baseUpsell1Rate + (i * 0.4) + (Math.random() * 1.5 - 0.75) : 
-              baseUpsell1Rate * 1.08 + (i * 0.25) + (Math.random() * 1 - 0.5);
+              funnelRates.upsell1Rate + (i * 0.4) + (Math.random() * 1.5 - 0.75) : 
+              funnelRates.upsell1Rate * 1.08 + (i * 0.25) + (Math.random() * 1 - 0.5);
             break;
           case 'downsell1':
-            // Use actual downsell 1 rate from dashboard (derived from upsell1 failures)
-            const baseDownsell1Rate = metrics?.downsell1Rate || 25;
             baseValue = isActual ? 
-              baseDownsell1Rate + (i * 0.3) + (Math.random() * 1 - 0.5) : 
-              baseDownsell1Rate * 1.06 + (i * 0.2) + (Math.random() * 0.8 - 0.4);
+              funnelRates.downsell1Rate + (i * 0.3) + (Math.random() * 1 - 0.5) : 
+              funnelRates.downsell1Rate * 1.06 + (i * 0.2) + (Math.random() * 0.8 - 0.4);
             break;
           case 'upsell2':
-            // Use actual upsell 2 rate from dashboard
-            const baseUpsell2Rate = metrics?.upsell2Rate || 20;
             baseValue = isActual ? 
-              baseUpsell2Rate + (i * 0.2) + (Math.random() * 0.8 - 0.4) : 
-              baseUpsell2Rate * 1.07 + (i * 0.15) + (Math.random() * 0.6 - 0.3);
+              funnelRates.upsell2Rate + (i * 0.2) + (Math.random() * 0.8 - 0.4) : 
+              funnelRates.upsell2Rate * 1.07 + (i * 0.15) + (Math.random() * 0.6 - 0.3);
             break;
           case 'downsell2':
-            // Use actual downsell 2 rate from dashboard (derived from upsell2 failures)
-            const baseDownsell2Rate = metrics?.downsell2Rate || 15;
             baseValue = isActual ? 
-              baseDownsell2Rate + (i * 0.15) + (Math.random() * 0.6 - 0.3) : 
-              baseDownsell2Rate * 1.05 + (i * 0.1) + (Math.random() * 0.4 - 0.2);
+              funnelRates.downsell2Rate + (i * 0.15) + (Math.random() * 0.6 - 0.3) : 
+              funnelRates.downsell2Rate * 1.05 + (i * 0.1) + (Math.random() * 0.4 - 0.2);
             break;
           default:
             baseValue = 10;
