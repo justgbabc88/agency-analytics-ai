@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 
 export const useAgency = () => {
-  const { user } = useAuth();
+  const { user, ensureAgency } = useAuth();
   const queryClient = useQueryClient();
 
   const { data: agency, isLoading } = useQuery({
@@ -12,16 +12,28 @@ export const useAgency = () => {
     queryFn: async () => {
       if (!user) return null;
       
+      // First try to get existing agency
       const { data, error } = await supabase
         .from('agencies')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching agency:', error);
+        throw error;
+      }
+
+      // If no agency exists, create one
+      if (!data) {
+        console.log('No agency found, creating one...');
+        return await ensureAgency();
+      }
+
       return data;
     },
     enabled: !!user,
+    retry: 1,
   });
 
   const updateAgency = useMutation({

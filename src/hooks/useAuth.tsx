@@ -60,6 +60,38 @@ export const useAuth = () => {
     return await supabase.auth.signOut();
   };
 
+  const ensureAgency = async (agencyName: string = 'My Agency') => {
+    if (!user) return null;
+
+    // Check if agency already exists
+    const { data: existingAgency } = await supabase
+      .from('agencies')
+      .select('*')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (existingAgency) {
+      return existingAgency;
+    }
+
+    // Create agency if it doesn't exist
+    const { data: newAgency, error } = await supabase
+      .from('agencies')
+      .insert([{
+        user_id: user.id,
+        name: agencyName,
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating agency:', error);
+      throw error;
+    }
+
+    return newAgency;
+  };
+
   return {
     user,
     session,
@@ -67,5 +99,6 @@ export const useAuth = () => {
     signUp,
     signIn,
     signOut,
+    ensureAgency,
   };
 };

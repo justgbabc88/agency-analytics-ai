@@ -54,11 +54,11 @@ export const FacebookConnector = () => {
 
       if (error) {
         console.error('Failed to initiate Facebook OAuth:', error);
-        throw new Error('Failed to initiate OAuth process');
+        throw new Error(`Failed to initiate OAuth process: ${error.message || 'Unknown error'}`);
       }
 
       if (!data?.authUrl) {
-        throw new Error('No authorization URL received');
+        throw new Error('No authorization URL received from Facebook');
       }
 
       console.log('Opening Facebook OAuth popup with URL:', data.authUrl);
@@ -99,11 +99,11 @@ export const FacebookConnector = () => {
 
             if (tokenError) {
               console.error('Token exchange failed:', tokenError);
-              throw new Error('Failed to exchange authorization code');
+              throw new Error(`Failed to exchange authorization code: ${tokenError.message || 'Unknown error'}`);
             }
 
             if (!tokenData?.access_token) {
-              throw new Error('No access token received');
+              throw new Error('No access token received from Facebook');
             }
 
             console.log('Successfully received access token, saving keys...');
@@ -117,24 +117,33 @@ export const FacebookConnector = () => {
             });
 
             console.log('Updating integration status...');
-            await updateIntegration.mutateAsync({ 
-              platform: 'facebook', 
-              isConnected: true 
-            });
-
-            if (permissionLevel === 'basic') {
-              toast({
-                title: "Connected Successfully",
-                description: "Basic Facebook connection established. You can now test the connection to enable ads permission requests.",
+            try {
+              await updateIntegration.mutateAsync({ 
+                platform: 'facebook', 
+                isConnected: true 
               });
-            } else {
+
+              if (permissionLevel === 'basic') {
+                toast({
+                  title: "Connected Successfully",
+                  description: "Basic Facebook connection established. You can now test the connection to enable ads permission requests.",
+                });
+              } else {
+                toast({
+                  title: "Permissions Upgraded",
+                  description: "Facebook ads permissions have been granted. Loading ad accounts...",
+                });
+              }
+
+              console.log('Facebook connection completed successfully');
+            } catch (integrationError) {
+              console.error('Failed to update integration:', integrationError);
               toast({
-                title: "Permissions Upgraded",
-                description: "Facebook ads permissions have been granted. Loading ad accounts...",
+                title: "Partial Success",
+                description: "Facebook connected but failed to update settings. You may need to refresh the page.",
+                variant: "destructive"
               });
             }
-
-            console.log('Facebook connection completed successfully');
 
           } catch (error) {
             console.error('Error during token exchange or saving:', error);
