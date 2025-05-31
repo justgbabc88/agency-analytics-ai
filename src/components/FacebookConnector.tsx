@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,12 +38,19 @@ export const FacebookConnector = () => {
 
   const handleFacebookAuth = async () => {
     setIsConnecting(true);
+    console.log('Starting Facebook OAuth process...');
+    
     try {
       const { data, error } = await supabase.functions.invoke('facebook-oauth', {
         body: { action: 'initiate' }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Failed to initiate Facebook OAuth:', error);
+        throw error;
+      }
+
+      console.log('Opening Facebook OAuth popup with URL:', data.authUrl);
 
       // Open Facebook OAuth in a popup
       const popup = window.open(
@@ -53,43 +59,81 @@ export const FacebookConnector = () => {
         'width=600,height=700,scrollbars=yes,resizable=yes'
       );
 
+      if (!popup) {
+        throw new Error('Failed to open popup window. Please allow popups for this site.');
+      }
+
+      let messageListenerActive = true;
+
       // Listen for the OAuth callback
       const messageListener = async (event: MessageEvent) => {
-        if (event.origin !== window.location.origin) return;
+        console.log('Received message from popup:', event.data);
+        
+        if (event.origin !== window.location.origin) {
+          console.log('Ignoring message from different origin:', event.origin);
+          return;
+        }
+
+        if (!messageListenerActive) {
+          console.log('Message listener no longer active, ignoring message');
+          return;
+        }
 
         if (event.data.type === 'FACEBOOK_OAUTH_SUCCESS') {
+          console.log('Facebook OAuth success, processing...');
+          messageListenerActive = false;
           popup?.close();
           window.removeEventListener('message', messageListener);
 
-          // Exchange code for access token
-          const { data: tokenData, error: tokenError } = await supabase.functions.invoke('facebook-oauth', {
-            body: { 
-              action: 'exchange', 
-              code: event.data.code 
+          try {
+            // Exchange code for access token
+            console.log('Exchanging authorization code for access token...');
+            const { data: tokenData, error: tokenError } = await supabase.functions.invoke('facebook-oauth', {
+              body: { 
+                action: 'exchange', 
+                code: event.data.code 
+              }
+            });
+
+            if (tokenError) {
+              console.error('Token exchange failed:', tokenError);
+              throw tokenError;
             }
-          });
 
-          if (tokenError) throw tokenError;
+            console.log('Successfully received access token, saving keys...');
 
-          // Save access token
-          saveApiKeys('facebook', {
-            access_token: tokenData.access_token,
-            user_id: tokenData.user_id
-          });
+            // Save access token
+            saveApiKeys('facebook', {
+              access_token: tokenData.access_token,
+              user_id: tokenData.user_id,
+              user_name: tokenData.user_name,
+              user_email: tokenData.user_email
+            });
 
-          await updateIntegration.mutateAsync({ 
-            platform: 'facebook', 
-            isConnected: true 
-          });
+            console.log('Updating integration status...');
+            await updateIntegration.mutateAsync({ 
+              platform: 'facebook', 
+              isConnected: true 
+            });
 
-          toast({
-            title: "Connected Successfully",
-            description: "Your Facebook account has been connected. Loading ad accounts...",
-          });
+            toast({
+              title: "Connected Successfully",
+              description: "Your Facebook account has been connected. Loading ad accounts...",
+            });
 
-          // Load ad accounts after successful connection
-          await loadAdAccounts();
+            console.log('Facebook connection completed successfully');
+
+          } catch (error) {
+            console.error('Error during token exchange or saving:', error);
+            toast({
+              title: "Connection Failed",
+              description: "Failed to complete Facebook connection. Please try again.",
+              variant: "destructive"
+            });
+          }
         } else if (event.data.type === 'FACEBOOK_OAUTH_ERROR') {
+          console.error('Facebook OAuth error:', event.data.error);
+          messageListenerActive = false;
           popup?.close();
           window.removeEventListener('message', messageListener);
           throw new Error(event.data.error);
@@ -101,9 +145,18 @@ export const FacebookConnector = () => {
       // Check if popup was closed without completing auth
       const checkClosed = setInterval(() => {
         if (popup?.closed) {
+          console.log('Popup was closed by user');
           clearInterval(checkClosed);
-          window.removeEventListener('message', messageListener);
-          setIsConnecting(false);
+          if (messageListenerActive) {
+            messageListenerActive = false;
+            window.removeEventListener('message', messageListener);
+            setIsConnecting(false);
+            toast({
+              title: "Connection Cancelled",
+              description: "Facebook connection was cancelled.",
+              variant: "destructive"
+            });
+          }
         }
       }, 1000);
 
@@ -111,7 +164,7 @@ export const FacebookConnector = () => {
       console.error('Facebook auth error:', error);
       toast({
         title: "Connection Failed",
-        description: "Failed to connect to Facebook. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to connect to Facebook. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -121,6 +174,8 @@ export const FacebookConnector = () => {
 
   const loadAdAccounts = async () => {
     setIsLoadingAccounts(true);
+    console.log('Loading Facebook ad accounts...');
+    
     try {
       const { data, error } = await supabase.functions.invoke('facebook-oauth', {
         body: { 
@@ -129,8 +184,12 @@ export const FacebookConnector = () => {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Failed to load ad accounts:', error);
+        throw error;
+      }
 
+      console.log('Successfully loaded ad accounts:', data.adAccounts?.length || 0);
       setAdAccounts(data.adAccounts || []);
       
       // Auto-select first account if none selected
@@ -268,6 +327,9 @@ export const FacebookConnector = () => {
                 <div className="flex items-center gap-2 text-green-600">
                   <CheckCircle className="h-4 w-4" />
                   <span className="text-sm font-medium">Connected to Facebook</span>
+                  {savedKeys.user_name && (
+                    <span className="text-xs text-gray-500">({savedKeys.user_name})</span>
+                  )}
                 </div>
                 
                 {integration?.last_sync && (
