@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,6 +35,11 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
     '60days': 60,
     '90days': 90,
   }[forecastPeriod] || 30;
+
+  // Handle product selection changes
+  const handleProductsChange = (products: FunnelProductConfig[]) => {
+    setSelectedProducts(products);
+  };
 
   // Generate forecast data based on actual historical data
   const generateEnhancedForecastData = (): ForecastResult => {
@@ -171,6 +175,51 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
 
   const forecastResult = generateEnhancedForecastData();
 
+  // Generate multi-product forecast data for funnel products
+  const generateFunnelForecastData = () => {
+    if (selectedMetric !== 'funnelProducts' || selectedProducts.length === 0) {
+      return [];
+    }
+
+    // Generate sample data for each selected product
+    return Array.from({ length: 15 }, (_, i) => {
+      const date = format(addDays(new Date(), i - 10), 'M/d/yyyy');
+      const isActual = i < 10;
+      
+      const dataPoint: any = { date, isActual };
+      
+      selectedProducts.forEach(product => {
+        let baseValue;
+        switch (product.id) {
+          case 'mainProduct':
+            baseValue = isActual ? 25 + (i * 0.3) : 28 + (i * 0.2);
+            break;
+          case 'bump':
+            baseValue = isActual ? 15 + (i * 0.2) : 17 + (i * 0.15);
+            break;
+          case 'upsell1':
+            baseValue = isActual ? 10 + (i * 0.15) : 12 + (i * 0.1);
+            break;
+          case 'downsell1':
+            baseValue = isActual ? 8 + (i * 0.1) : 9 + (i * 0.08);
+            break;
+          case 'upsell2':
+            baseValue = isActual ? 5 + (i * 0.08) : 6 + (i * 0.06);
+            break;
+          case 'downsell2':
+            baseValue = isActual ? 4 + (i * 0.05) : 5 + (i * 0.04);
+            break;
+          default:
+            baseValue = 10;
+        }
+        
+        dataPoint[product.id] = Math.round((baseValue + (Math.random() * 2 - 1)) * 100) / 100;
+      });
+      
+      return dataPoint;
+    });
+  };
+
   // Calculate trend line data for visualization
   const generateTrendLineData = () => {
     const actualData = forecastResult.data.filter(d => d.isActual);
@@ -186,6 +235,7 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
   };
 
   const trendLineData = generateTrendLineData();
+  const funnelData = generateFunnelForecastData();
 
   // Generate enhanced predictions with scenarios
   const generateEnhancedPredictions = () => {
@@ -294,15 +344,21 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
     
     if (nameStr.includes('confidence')) return `${value}%`;
     if (selectedMetric === 'revenue') return `$${value.toLocaleString()}`;
-    if (selectedMetric.includes('Rate')) return `${value.toFixed(2)}%`;
+    if (selectedMetric.includes('Rate') || selectedMetric === 'funnelProducts') return `${value.toFixed(2)}%`;
     return value.toLocaleString();
   };
 
   const formatYAxisValue = (value: number) => {
     if (selectedMetric === 'revenue') return `$${(value / 1000).toFixed(0)}k`;
-    if (selectedMetric.includes('Rate')) return `${value.toFixed(1)}%`;
+    if (selectedMetric.includes('Rate') || selectedMetric === 'funnelProducts') return `${value.toFixed(1)}%`;
     return value.toString();
   };
+
+  // Create product configuration mapping for colors
+  const productConfigMap = selectedProducts.reduce((acc, product) => {
+    acc[product.id] = product;
+    return acc;
+  }, {} as Record<string, FunnelProductConfig>);
 
   return (
     <Card className={className}>
@@ -339,10 +395,7 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
               <SelectItem value="revenue">Revenue Forecast</SelectItem>
               <SelectItem value="conversions">Conversion Forecast</SelectItem>
               <SelectItem value="traffic">Traffic Forecast</SelectItem>
-              <SelectItem value="mainOfferRate">Main Offer Rate</SelectItem>
-              <SelectItem value="bumpRate">Bump Rate</SelectItem>
-              <SelectItem value="upsell1Rate">Upsell 1 Rate</SelectItem>
-              <SelectItem value="upsell2Rate">Upsell 2 Rate</SelectItem>
+              <SelectItem value="funnelProducts">Funnel Products</SelectItem>
             </SelectContent>
           </Select>
           <Select value={forecastPeriod} onValueChange={setForecastPeriod}>
@@ -367,108 +420,50 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
           </Badge>
         </div>
 
-        {/* Funnel Product Selector */}
-        {selectedMetric.includes('Rate') && (
+        {/* Funnel Product Selector - Only show when Funnel Products is selected */}
+        {selectedMetric === 'funnelProducts' && (
           <MetricCustomizer 
-            onProductsChange={setSelectedProducts}
+            onProductsChange={handleProductsChange}
             className="border border-purple-200 bg-purple-50/30"
           />
         )}
 
-        {/* Enhanced Forecast Chart with Trend Lines */}
+        {/* Enhanced Forecast Chart */}
         <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={trendLineData || forecastResult.data}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis 
-                dataKey="date" 
-                stroke="#6b7280"
-                fontSize={12}
-                angle={-45}
-                textAnchor="end"
-                height={80}
-              />
-              <YAxis 
-                stroke="#6b7280" 
-                fontSize={12}
-                tickFormatter={formatYAxisValue}
-              />
-              <Tooltip 
-                contentStyle={{
-                  backgroundColor: 'white',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                }}
-                formatter={(value: number, name: string | number | any) => [
-                  formatTooltipValue(value, name),
-                  String(name) === 'value' ? (selectedMetric.charAt(0).toUpperCase() + selectedMetric.slice(1)) : 
-                  String(name) === 'trendValue' ? 'Trend Line' : String(name)
-                ]}
-                labelFormatter={(label) => `Date: ${label}`}
-              />
-              
-              {/* Subtle confidence band for predictions only */}
-              <Area
-                dataKey={(entry) => entry.isActual ? null : entry.confidence}
-                stroke="none"
-                fill="rgba(147, 51, 234, 0.08)"
-                fillOpacity={0.5}
-                stackId="confidence"
-              />
-              
-              {/* Trend line - subtle and continuous */}
-              {trendLineData && (
-                <Line 
-                  type="monotone" 
-                  dataKey="trendValue"
-                  stroke="#94a3b8" 
-                  strokeWidth={1.5}
-                  strokeDasharray="4 4"
-                  dot={false}
-                  connectNulls={true}
-                  name="Trend"
+            {selectedMetric === 'funnelProducts' && funnelData.length > 0 ? (
+              <LineChart data={funnelData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis 
+                  dataKey="date" 
+                  stroke="#6b7280"
+                  fontSize={12}
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
                 />
-              )}
-              
-              {/* Historical data line - bold and solid */}
-              <Line 
-                type="monotone" 
-                dataKey={(entry) => entry.isActual ? entry.value : null}
-                stroke="#1f2937" 
-                strokeWidth={3}
-                dot={(props) => {
-                  const { payload } = props;
-                  return payload?.isActual ? (
-                    <circle {...props} fill="#1f2937" strokeWidth={2} r={4} />
-                  ) : null;
-                }}
-                connectNulls={false}
-                name="Historical Data"
-              />
-              
-              {/* Predicted data line - lighter and dashed */}
-              <Line 
-                type="monotone" 
-                dataKey={(entry) => !entry.isActual ? entry.value : null}
-                stroke="#a855f7" 
-                strokeWidth={2}
-                strokeDasharray="6 6"
-                strokeOpacity={0.7}
-                dot={(props) => {
-                  const { payload } = props;
-                  return !payload?.isActual ? (
-                    <circle {...props} fill="#a855f7" stroke="#a855f7" strokeWidth={1} r={2} fillOpacity={0.7} />
-                  ) : null;
-                }}
-                connectNulls={false}
-                name="Prediction"
-              />
-              
-              {/* Vertical line separating actual vs predicted */}
-              {forecastResult.data.some(d => d.isActual) && forecastResult.data.some(d => !d.isActual) && (
+                <YAxis 
+                  stroke="#6b7280" 
+                  fontSize={12}
+                  tickFormatter={formatYAxisValue}
+                />
+                <Tooltip 
+                  contentStyle={{
+                    backgroundColor: 'white',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                  }}
+                  formatter={(value: number, name: string) => [
+                    `${Number(value).toFixed(2)}%`,
+                    productConfigMap[name]?.label || name
+                  ]}
+                  labelFormatter={(label) => `Date: ${label}`}
+                />
+                
+                {/* Vertical line separating actual vs predicted */}
                 <ReferenceLine 
-                  x={forecastResult.data.find(d => d.isActual && forecastResult.data[forecastResult.data.indexOf(d) + 1]?.isActual === false)?.date}
+                  x={funnelData[10]?.date}
                   stroke="#e5e7eb"
                   strokeDasharray="2 2"
                   strokeWidth={1}
@@ -478,79 +473,225 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
                     style: { fontSize: '11px', fill: '#6b7280' }
                   }}
                 />
-              )}
-            </ComposedChart>
+                
+                {/* Lines for each selected product */}
+                {selectedProducts.map(product => (
+                  <Line 
+                    key={product.id}
+                    type="monotone" 
+                    dataKey={product.id}
+                    stroke={product.color}
+                    strokeWidth={2.5}
+                    dot={(props) => {
+                      const { payload } = props;
+                      return payload?.isActual ? (
+                        <circle {...props} fill={product.color} strokeWidth={2} r={4} />
+                      ) : (
+                        <circle {...props} fill={product.color} stroke={product.color} strokeWidth={1} r={2} fillOpacity={0.7} />
+                      );
+                    }}
+                    strokeDasharray={(props: any) => {
+                      const { payload } = props;
+                      return payload?.isActual ? "0" : "6 6";
+                    }}
+                    connectNulls={false}
+                    name={product.id}
+                  />
+                ))}
+              </LineChart>
+            ) : (
+              <ComposedChart data={trendLineData || forecastResult.data}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis 
+                  dataKey="date" 
+                  stroke="#6b7280"
+                  fontSize={12}
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
+                />
+                <YAxis 
+                  stroke="#6b7280" 
+                  fontSize={12}
+                  tickFormatter={formatYAxisValue}
+                />
+                <Tooltip 
+                  contentStyle={{
+                    backgroundColor: 'white',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                  }}
+                  formatter={(value: number, name: string | number | any) => [
+                    formatTooltipValue(value, name),
+                    String(name) === 'value' ? (selectedMetric.charAt(0).toUpperCase() + selectedMetric.slice(1)) : 
+                    String(name) === 'trendValue' ? 'Trend Line' : String(name)
+                  ]}
+                  labelFormatter={(label) => `Date: ${label}`}
+                />
+                
+                {/* Subtle confidence band for predictions only */}
+                <Area
+                  dataKey={(entry) => entry.isActual ? null : entry.confidence}
+                  stroke="none"
+                  fill="rgba(147, 51, 234, 0.08)"
+                  fillOpacity={0.5}
+                  stackId="confidence"
+                />
+                
+                {/* Trend line - subtle and continuous */}
+                {trendLineData && (
+                  <Line 
+                    type="monotone" 
+                    dataKey="trendValue"
+                    stroke="#94a3b8" 
+                    strokeWidth={1.5}
+                    strokeDasharray="4 4"
+                    dot={false}
+                    connectNulls={true}
+                    name="Trend"
+                  />
+                )}
+                
+                {/* Historical data line - bold and solid */}
+                <Line 
+                  type="monotone" 
+                  dataKey={(entry) => entry.isActual ? entry.value : null}
+                  stroke="#1f2937" 
+                  strokeWidth={3}
+                  dot={(props) => {
+                    const { payload } = props;
+                    return payload?.isActual ? (
+                      <circle {...props} fill="#1f2937" strokeWidth={2} r={4} />
+                    ) : null;
+                  }}
+                  connectNulls={false}
+                  name="Historical Data"
+                />
+                
+                {/* Predicted data line - lighter and dashed */}
+                <Line 
+                  type="monotone" 
+                  dataKey={(entry) => !entry.isActual ? entry.value : null}
+                  stroke="#a855f7" 
+                  strokeWidth={2}
+                  strokeDasharray="6 6"
+                  strokeOpacity={0.7}
+                  dot={(props) => {
+                    const { payload } = props;
+                    return !payload?.isActual ? (
+                      <circle {...props} fill="#a855f7" stroke="#a855f7" strokeWidth={1} r={2} fillOpacity={0.7} />
+                    ) : null;
+                  }}
+                  connectNulls={false}
+                  name="Prediction"
+                />
+                
+                {/* Vertical line separating actual vs predicted */}
+                {forecastResult.data.some(d => d.isActual) && forecastResult.data.some(d => !d.isActual) && (
+                  <ReferenceLine 
+                    x={forecastResult.data.find(d => d.isActual && forecastResult.data[forecastResult.data.indexOf(d) + 1]?.isActual === false)?.date}
+                    stroke="#e5e7eb"
+                    strokeDasharray="2 2"
+                    strokeWidth={1}
+                    label={{ 
+                      value: "Forecast", 
+                      position: "top",
+                      style: { fontSize: '11px', fill: '#6b7280' }
+                    }}
+                  />
+                )}
+              </ComposedChart>
+            )}
           </ResponsiveContainer>
         </div>
 
         {/* Legend for chart clarity */}
         <div className="flex items-center justify-center gap-6 text-xs text-gray-600">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-0.5 bg-gray-800"></div>
-            <span>Historical Data</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-0.5 bg-purple-500 opacity-70" style={{ borderTop: '2px dashed' }}></div>
-            <span>Prediction</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-0.5 bg-slate-400" style={{ borderTop: '1px dashed' }}></div>
-            <span>Trend Line</span>
-          </div>
+          {selectedMetric === 'funnelProducts' ? (
+            <div className="flex items-center gap-4">
+              {selectedProducts.map(product => (
+                <div key={product.id} className="flex items-center gap-2">
+                  <div 
+                    className="w-4 h-0.5" 
+                    style={{ backgroundColor: product.color }}
+                  ></div>
+                  <span>{product.label}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-0.5 bg-gray-800"></div>
+                <span>Historical Data</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-0.5 bg-purple-500 opacity-70" style={{ borderTop: '2px dashed' }}></div>
+                <span>Prediction</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-0.5 bg-slate-400" style={{ borderTop: '1px dashed' }}></div>
+                <span>Trend Line</span>
+              </div>
+            </>
+          )}
         </div>
 
-        {/* Enhanced Predictions Grid */}
-        <div>
-          <h4 className="font-medium mb-3 flex items-center gap-2">
-            <Target className="h-4 w-4" />
-            {forecastDays}-Day Predictions
-          </h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {predictions.map((prediction) => (
-              <div key={prediction.metric} className="p-4 border rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <h5 className="font-medium">{prediction.metric}</h5>
-                  <Badge 
-                    variant={prediction.trend === 'up' ? 'default' : 'destructive'}
-                    className="text-xs"
-                  >
-                    {prediction.trend === 'up' ? (
-                      <TrendingUp className="h-3 w-3 mr-1" />
-                    ) : (
-                      <TrendingDown className="h-3 w-3 mr-1" />
-                    )}
-                    {prediction.change > 0 ? '+' : ''}{prediction.change.toFixed(1)}%
-                  </Badge>
+        {/* Enhanced Predictions Grid - Only show for non-funnel metrics */}
+        {selectedMetric !== 'funnelProducts' && (
+          <div>
+            <h4 className="font-medium mb-3 flex items-center gap-2">
+              <Target className="h-4 w-4" />
+              {forecastDays}-Day Predictions
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {predictions.map((prediction) => (
+                <div key={prediction.metric} className="p-4 border rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <h5 className="font-medium">{prediction.metric}</h5>
+                    <Badge 
+                      variant={prediction.trend === 'up' ? 'default' : 'destructive'}
+                      className="text-xs"
+                    >
+                      {prediction.trend === 'up' ? (
+                        <TrendingUp className="h-3 w-3 mr-1" />
+                      ) : (
+                        <TrendingDown className="h-3 w-3 mr-1" />
+                      )}
+                      {prediction.change > 0 ? '+' : ''}{prediction.change.toFixed(1)}%
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Current:</span>
+                      <span className="font-medium">
+                        {prediction.metric.includes('Rate') || prediction.metric === 'ROAS' 
+                          ? `${prediction.current.toFixed(1)}${prediction.metric.includes('Rate') ? '%' : ''}` 
+                          : `$${prediction.current.toLocaleString()}`}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Predicted:</span>
+                      <span className="font-medium">
+                        {prediction.metric.includes('Rate') || prediction.metric === 'ROAS'
+                          ? `${prediction.predicted.toFixed(1)}${prediction.metric.includes('Rate') ? '%' : ''}`
+                          : `$${prediction.predicted.toLocaleString()}`}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-500">Confidence:</span>
+                      <span className={`${prediction.confidence > 85 ? 'text-green-600' : prediction.confidence > 75 ? 'text-yellow-600' : 'text-red-600'}`}>
+                        {prediction.confidence}%
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">{prediction.timeframe}</p>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Current:</span>
-                    <span className="font-medium">
-                      {prediction.metric.includes('Rate') || prediction.metric === 'ROAS' 
-                        ? `${prediction.current.toFixed(1)}${prediction.metric.includes('Rate') ? '%' : ''}` 
-                        : `$${prediction.current.toLocaleString()}`}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Predicted:</span>
-                    <span className="font-medium">
-                      {prediction.metric.includes('Rate') || prediction.metric === 'ROAS'
-                        ? `${prediction.predicted.toFixed(1)}${prediction.metric.includes('Rate') ? '%' : ''}`
-                        : `$${prediction.predicted.toLocaleString()}`}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-500">Confidence:</span>
-                    <span className={`${prediction.confidence > 85 ? 'text-green-600' : prediction.confidence > 75 ? 'text-yellow-600' : 'text-red-600'}`}>
-                      {prediction.confidence}%
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">{prediction.timeframe}</p>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Enhanced AI Insights */}
         <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
