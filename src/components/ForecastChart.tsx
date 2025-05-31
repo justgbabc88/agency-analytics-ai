@@ -102,10 +102,10 @@ export const ForecastChart = ({
               />
             )}
             
-            {/* Only render lines for visible/selected products */}
+            {/* Historical (actual) lines for visible products - solid lines */}
             {visibleProducts.map(product => (
               <Line 
-                key={product.id}
+                key={`${product.id}_actual`}
                 type="monotone" 
                 dataKey={(entry) => entry.isActual ? entry[product.id] : null}
                 stroke={product.color}
@@ -122,7 +122,7 @@ export const ForecastChart = ({
               />
             ))}
             
-            {/* Predicted lines for visible products */}
+            {/* Predicted lines for visible products - dashed lines like conversion forecast */}
             {visibleProducts.map(product => (
               <Line 
                 key={`${product.id}_predicted`}

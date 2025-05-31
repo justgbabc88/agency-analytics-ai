@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -174,16 +173,18 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
 
   const forecastResult = generateEnhancedForecastData();
 
-  // Generate multi-product forecast data for funnel products
+  // Generate multi-product forecast data for funnel products using real dashboard data
   const generateFunnelForecastData = () => {
     if (selectedMetric !== 'funnelProducts' || selectedProducts.length === 0) {
       return [];
     }
 
-    // Use the same forecast period as other metrics
     const totalDays = forecastDays + 10; // 10 historical days + forecast period
     const historicalDays = 10;
 
+    // Get current metrics to base historical data on
+    const metrics = calculateMetricsFromSyncedData();
+    
     return Array.from({ length: totalDays }, (_, i) => {
       const date = format(addDays(new Date(), i - historicalDays), 'M/d/yyyy');
       const isActual = i < historicalDays;
@@ -199,31 +200,56 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
           trendMultiplier = 1 + ((i - historicalDays) * 0.002); // Small positive trend
         }
         
+        // Use actual dashboard metrics as baseline for realistic data
         switch (product.id) {
           case 'mainProduct':
-            baseValue = isActual ? 25 + (i * 0.3) : 28 + (i * 0.2);
+            // Use actual main offer rate from dashboard
+            const baseMainRate = metrics?.mainOfferRate || 2.5;
+            baseValue = isActual ? 
+              baseMainRate + (i * 0.1) + (Math.random() * 0.5 - 0.25) : 
+              baseMainRate * 1.1 + (i * 0.05) + (Math.random() * 0.3 - 0.15);
             break;
           case 'bump':
-            baseValue = isActual ? 15 + (i * 0.2) : 17 + (i * 0.15);
+            // Use actual bump rate from dashboard
+            const baseBumpRate = metrics?.bumpRate || 45;
+            baseValue = isActual ? 
+              baseBumpRate + (i * 0.5) + (Math.random() * 2 - 1) : 
+              baseBumpRate * 1.05 + (i * 0.3) + (Math.random() * 1.5 - 0.75);
             break;
           case 'upsell1':
-            baseValue = isActual ? 10 + (i * 0.15) : 12 + (i * 0.1);
+            // Use actual upsell 1 rate from dashboard
+            const baseUpsell1Rate = metrics?.upsell1Rate || 35;
+            baseValue = isActual ? 
+              baseUpsell1Rate + (i * 0.4) + (Math.random() * 1.5 - 0.75) : 
+              baseUpsell1Rate * 1.08 + (i * 0.25) + (Math.random() * 1 - 0.5);
             break;
           case 'downsell1':
-            baseValue = isActual ? 8 + (i * 0.1) : 9 + (i * 0.08);
+            // Use actual downsell 1 rate from dashboard (derived from upsell1 failures)
+            const baseDownsell1Rate = metrics?.downsell1Rate || 25;
+            baseValue = isActual ? 
+              baseDownsell1Rate + (i * 0.3) + (Math.random() * 1 - 0.5) : 
+              baseDownsell1Rate * 1.06 + (i * 0.2) + (Math.random() * 0.8 - 0.4);
             break;
           case 'upsell2':
-            baseValue = isActual ? 5 + (i * 0.08) : 6 + (i * 0.06);
+            // Use actual upsell 2 rate from dashboard
+            const baseUpsell2Rate = metrics?.upsell2Rate || 20;
+            baseValue = isActual ? 
+              baseUpsell2Rate + (i * 0.2) + (Math.random() * 0.8 - 0.4) : 
+              baseUpsell2Rate * 1.07 + (i * 0.15) + (Math.random() * 0.6 - 0.3);
             break;
           case 'downsell2':
-            baseValue = isActual ? 4 + (i * 0.05) : 5 + (i * 0.04);
+            // Use actual downsell 2 rate from dashboard (derived from upsell2 failures)
+            const baseDownsell2Rate = metrics?.downsell2Rate || 15;
+            baseValue = isActual ? 
+              baseDownsell2Rate + (i * 0.15) + (Math.random() * 0.6 - 0.3) : 
+              baseDownsell2Rate * 1.05 + (i * 0.1) + (Math.random() * 0.4 - 0.2);
             break;
           default:
             baseValue = 10;
         }
         
-        const finalValue = baseValue * trendMultiplier;
-        dataPoint[product.id] = Math.round((finalValue + (Math.random() * 2 - 1)) * 100) / 100;
+        const finalValue = Math.max(0, baseValue * trendMultiplier);
+        dataPoint[product.id] = Math.round(finalValue * 100) / 100;
       });
       
       return dataPoint;

@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -28,18 +27,26 @@ interface MetricCustomizerProps {
 }
 
 export const MetricCustomizer = ({ onProductsChange, className }: MetricCustomizerProps) => {
-  const [products, setProducts] = useState<FunnelProductConfig[]>(defaultFunnelProducts);
+  const [funnelProducts, setFunnelProducts] = useState<FunnelProductConfig[]>([
+    { id: 'mainProduct', label: 'Main Offer Rate', visible: true, color: '#10B981' },
+    { id: 'bump', label: 'Bump Rate', visible: true, color: '#3B82F6' },
+    { id: 'upsell1', label: 'Upsell 1 Rate', visible: true, color: '#F59E0B' },
+    { id: 'downsell1', label: 'Downsell 1 Rate', visible: false, color: '#8B5CF6' },
+    { id: 'upsell2', label: 'Upsell 2 Rate', visible: false, color: '#EF4444' },
+    { id: 'downsell2', label: 'Downsell 2 Rate', visible: false, color: '#06B6D4' },
+  ]);
+
   const [isExpanded, setIsExpanded] = useState(false);
 
   const toggleProduct = (productId: string) => {
-    const updatedProducts = products.map(product => 
+    const updatedProducts = funnelProducts.map(product => 
       product.id === productId ? { ...product, visible: !product.visible } : product
     );
-    setProducts(updatedProducts);
+    setFunnelProducts(updatedProducts);
     onProductsChange(updatedProducts);
   };
 
-  const visibleProducts = products.filter(p => p.visible);
+  const visibleProducts = funnelProducts.filter(p => p.visible);
 
   return (
     <Card className={`${className} border-2 border-dashed border-blue-200 bg-blue-50/50`}>
@@ -65,7 +72,7 @@ export const MetricCustomizer = ({ onProductsChange, className }: MetricCustomiz
       {isExpanded && (
         <CardContent className="pt-0 space-y-3">
           <div className="grid grid-cols-2 gap-2">
-            {products.map(product => (
+            {funnelProducts.map(product => (
               <div key={product.id} className="flex items-center space-x-2 p-2 rounded-md hover:bg-white/60 transition-colors">
                 <Checkbox
                   id={product.id}
