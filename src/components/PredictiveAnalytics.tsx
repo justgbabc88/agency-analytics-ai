@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -239,10 +238,10 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
   const generateEnhancedPredictions = () => {
     if (!currentMetrics) {
       return [
-        { metric: 'Revenue', current: 0, predicted: 0, change: 0, confidence: 75, trend: 'up', timeframe: `Next ${forecastDays} days` },
-        { metric: 'Conversion Rate', current: 0, predicted: 0, change: 0, confidence: 75, trend: 'up', timeframe: `Next ${forecastDays} days` },
-        { metric: 'Ad Spend', current: 0, predicted: 0, change: 0, confidence: 75, trend: 'up', timeframe: `Next ${forecastDays} days` },
-        { metric: 'ROAS', current: 0, predicted: 0, change: 0, confidence: 75, trend: 'up', timeframe: `Next ${forecastDays} days` },
+        { metric: 'Revenue', current: 0, predicted: 0, change: 0, confidence: 75, trend: 'up' as const, timeframe: `Next ${forecastDays} days` },
+        { metric: 'Conversion Rate', current: 0, predicted: 0, change: 0, confidence: 75, trend: 'up' as const, timeframe: `Next ${forecastDays} days` },
+        { metric: 'Ad Spend', current: 0, predicted: 0, change: 0, confidence: 75, trend: 'up' as const, timeframe: `Next ${forecastDays} days` },
+        { metric: 'ROAS', current: 0, predicted: 0, change: 0, confidence: 75, trend: 'up' as const, timeframe: `Next ${forecastDays} days` },
       ];
     }
 
@@ -256,7 +255,7 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
         predicted: estimatedRevenue * (forecastResult.trend === 'increasing' ? 1.12 : forecastResult.trend === 'decreasing' ? 0.95 : 1.03),
         change: forecastResult.trend === 'increasing' ? 12.0 : forecastResult.trend === 'decreasing' ? -5.0 : 3.0,
         confidence: Math.round(baseConfidence),
-        trend: forecastResult.trend === 'decreasing' ? 'down' as const : 'up' as const,
+        trend: (forecastResult.trend === 'decreasing' ? 'down' : 'up') as const,
         timeframe: `Next ${forecastDays} days`
       },
       {
@@ -265,7 +264,7 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
         predicted: currentMetrics.conversionRate * (forecastResult.trend === 'increasing' ? 1.08 : 0.98),
         change: forecastResult.trend === 'increasing' ? 8.0 : -2.0,
         confidence: Math.round(baseConfidence * 0.9),
-        trend: forecastResult.trend === 'decreasing' ? 'down' as const : 'up' as const,
+        trend: (forecastResult.trend === 'decreasing' ? 'down' : 'up') as const,
         timeframe: `Next ${forecastDays} days`
       },
       {
@@ -283,7 +282,7 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
         predicted: currentMetrics.roas * (forecastResult.trend === 'increasing' ? 1.05 : 0.97),
         change: forecastResult.trend === 'increasing' ? 5.0 : -3.0,
         confidence: Math.round(baseConfidence * 0.85),
-        trend: forecastResult.trend === 'decreasing' ? 'down' as const : 'up' as const,
+        trend: (forecastResult.trend === 'decreasing' ? 'down' : 'up') as const,
         timeframe: `Next ${forecastDays} days`
       },
     ];
