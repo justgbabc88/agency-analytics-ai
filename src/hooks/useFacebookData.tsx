@@ -3,6 +3,31 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAgency } from './useAgency';
 
+interface FacebookInsights {
+  impressions: number;
+  clicks: number;
+  spend: number;
+  reach: number;
+  ctr: number;
+  cpc: number;
+  conversions: number;
+  conversion_values: number;
+}
+
+interface FacebookCampaign {
+  id: string;
+  name: string;
+  status: string;
+  objective: string;
+  created_time: string;
+}
+
+interface FacebookData {
+  insights: FacebookInsights;
+  campaigns: FacebookCampaign[];
+  last_updated: string;
+}
+
 export const useFacebookData = () => {
   const { agency } = useAgency();
 
@@ -56,7 +81,7 @@ export const useFacebookData = () => {
             }
           ],
           last_updated: data.last_sync || new Date().toISOString(),
-        };
+        } as FacebookData;
       }
 
       return null;
@@ -64,11 +89,23 @@ export const useFacebookData = () => {
     enabled: !!agency,
   });
 
+  // Default insights with proper typing
+  const defaultInsights: FacebookInsights = {
+    impressions: 0,
+    clicks: 0,
+    spend: 0,
+    reach: 0,
+    ctr: 0,
+    cpc: 0,
+    conversions: 0,
+    conversion_values: 0,
+  };
+
   return {
     facebookData,
     isLoading,
-    insights: facebookData?.insights || {},
+    insights: facebookData?.insights || defaultInsights,
     campaigns: facebookData?.campaigns || [],
-    metrics: facebookData?.insights || {},
+    metrics: facebookData?.insights || defaultInsights,
   };
 };

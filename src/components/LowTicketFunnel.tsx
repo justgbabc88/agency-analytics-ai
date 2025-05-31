@@ -54,38 +54,42 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <MetricCard
           title="Total Revenue"
-          value={`$${metrics.totalRevenue.toLocaleString()}`}
-          trend={{ value: 12.5, isPositive: true }}
+          value={metrics.totalRevenue}
+          previousValue={42150}
+          format="currency"
           className="col-span-1"
         />
         <MetricCard
           title="Total Customers"
-          value={metrics.totalCustomers.toLocaleString()}
-          trend={{ value: 8.3, isPositive: true }}
+          value={metrics.totalCustomers}
+          previousValue={577}
           className="col-span-1"
         />
         <MetricCard
           title="Average Order Value"
-          value={`$${metrics.averageOrderValue.toFixed(2)}`}
-          trend={{ value: 5.2, isPositive: true }}
+          value={metrics.averageOrderValue}
+          previousValue={72.80}
+          format="currency"
           className="col-span-1"
         />
         <MetricCard
           title="Conversion Rate"
-          value={`${metrics.conversionRate}%`}
-          trend={{ value: 2.1, isPositive: false }}
+          value={metrics.conversionRate}
+          previousValue={6.4}
+          format="percentage"
           className="col-span-1"
         />
         <MetricCard
           title="Cost Per Acquisition"
-          value={`$${metrics.costPerAcquisition.toFixed(2)}`}
-          trend={{ value: 15.7, isPositive: false }}
+          value={metrics.costPerAcquisition}
+          previousValue={14.85}
+          format="currency"
           className="col-span-1"
         />
         <MetricCard
           title="ROAS"
-          value={`${metrics.returnOnAdSpend.toFixed(2)}x`}
-          trend={{ value: 18.9, isPositive: true }}
+          value={metrics.returnOnAdSpend}
+          previousValue={3.22}
           className="col-span-1"
         />
       </div>
