@@ -8,9 +8,10 @@ const corsHeaders = {
 }
 
 interface FacebookOAuthRequest {
-  action: 'initiate' | 'exchange' | 'get_ad_accounts'
+  action: 'initiate' | 'exchange' | 'get_ad_accounts' | 'upgrade_permissions' | 'test_api'
   code?: string
   access_token?: string
+  permission_level?: 'basic' | 'ads'
 }
 
 serve(async (req) => {
@@ -24,15 +25,19 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { action, code, access_token }: FacebookOAuthRequest = await req.json()
+    const { action, code, access_token, permission_level }: FacebookOAuthRequest = await req.json()
 
     console.log(`Facebook OAuth action: ${action}`)
 
     switch (action) {
       case 'initiate':
-        return handleInitiateAuth()
+        return handleInitiateAuth(permission_level || 'basic')
       case 'exchange':
         return await handleExchangeCode(code!)
+      case 'test_api':
+        return await handleTestApiCall(access_token!)
+      case 'upgrade_permissions':
+        return handleInitiateAuth('ads')
       case 'get_ad_accounts':
         return await handleGetAdAccounts(access_token!)
       default:
@@ -51,7 +56,7 @@ serve(async (req) => {
   }
 })
 
-function handleInitiateAuth() {
+function handleInitiateAuth(permissionLevel: 'basic' | 'ads' = 'basic') {
   const clientId = Deno.env.get('FACEBOOK_APP_ID')
   const redirectUri = Deno.env.get('FACEBOOK_REDIRECT_URI')
   
@@ -59,19 +64,24 @@ function handleInitiateAuth() {
     throw new Error('Facebook app credentials not configured')
   }
 
-  const scopes = ['ads_read', 'ads_management', 'business_management'].join(',')
+  // Start with basic permissions that don't require approval
+  const basicScopes = ['email', 'public_profile']
+  // Advanced ads permissions - only request these after basic connection works
+  const adsScopes = ['ads_read', 'ads_management', 'business_management']
+  
+  const scopes = permissionLevel === 'basic' ? basicScopes : [...basicScopes, ...adsScopes]
   
   const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?` +
     `client_id=${clientId}&` +
     `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-    `scope=${encodeURIComponent(scopes)}&` +
+    `scope=${encodeURIComponent(scopes.join(','))}&` +
     `response_type=code&` +
     `state=${crypto.randomUUID()}`
 
-  console.log('Generated Facebook auth URL')
+  console.log(`Generated Facebook auth URL for ${permissionLevel} permissions`)
 
   return new Response(
-    JSON.stringify({ authUrl }),
+    JSON.stringify({ authUrl, permissionLevel }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   )
 }
@@ -105,14 +115,22 @@ async function handleExchangeCode(code: string) {
 
   const tokenData = await response.json()
   
-  // Get user info
+  // Get user info with basic permissions
   const userResponse = await fetch(
     `https://graph.facebook.com/v18.0/me?access_token=${tokenData.access_token}&fields=id,name,email`
   )
   
   const userData = await userResponse.json()
 
-  console.log('Successfully exchanged code for access token')
+  // Check what permissions we actually have
+  const permissionsResponse = await fetch(
+    `https://graph.facebook.com/v18.0/me/permissions?access_token=${tokenData.access_token}`
+  )
+  
+  const permissionsData = await permissionsResponse.json()
+  const grantedPermissions = permissionsData.data?.filter((p: any) => p.status === 'granted').map((p: any) => p.permission) || []
+
+  console.log('Successfully exchanged code for access token with permissions:', grantedPermissions)
 
   return new Response(
     JSON.stringify({
@@ -120,10 +138,41 @@ async function handleExchangeCode(code: string) {
       token_type: tokenData.token_type,
       user_id: userData.id,
       user_name: userData.name,
-      user_email: userData.email
+      user_email: userData.email,
+      permissions: grantedPermissions
     }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   )
+}
+
+async function handleTestApiCall(accessToken: string) {
+  console.log('Making test API call to Facebook')
+
+  try {
+    // Make a simple test call to verify the token works
+    const response = await fetch(
+      `https://graph.facebook.com/v18.0/me?access_token=${accessToken}&fields=id,name`
+    )
+
+    if (!response.ok) {
+      throw new Error('Test API call failed')
+    }
+
+    const data = await response.json()
+    console.log('Test API call successful')
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: 'Test API call successful',
+        data
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+  } catch (error) {
+    console.error('Test API call failed:', error)
+    throw new Error('Test API call failed')
+  }
 }
 
 async function handleGetAdAccounts(accessToken: string) {

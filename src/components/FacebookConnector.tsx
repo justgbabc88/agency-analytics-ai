@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,7 @@ import { useIntegrations } from "@/hooks/useIntegrations";
 import { useApiKeys } from "@/hooks/useApiKeys";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { BarChart3, ExternalLink, CheckCircle, AlertCircle, Link, Users, RefreshCw } from "lucide-react";
+import { BarChart3, ExternalLink, CheckCircle, AlertCircle, Link, Users, RefreshCw, ArrowUp, TestTube } from "lucide-react";
 
 interface AdAccount {
   id: string;
@@ -24,25 +25,28 @@ export const FacebookConnector = () => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(false);
+  const [isUpgrading, setIsUpgrading] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
   const [adAccounts, setAdAccounts] = useState<AdAccount[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<string>('');
 
   const isConnected = integrations?.find(i => i.platform === 'facebook')?.is_connected || false;
   const savedKeys = getApiKeys('facebook');
+  const hasAdsPermissions = savedKeys.permissions?.includes('ads_read') || false;
 
   useEffect(() => {
-    if (isConnected && savedKeys.access_token) {
+    if (isConnected && savedKeys.access_token && hasAdsPermissions) {
       loadAdAccounts();
     }
-  }, [isConnected, savedKeys.access_token]);
+  }, [isConnected, savedKeys.access_token, hasAdsPermissions]);
 
-  const handleFacebookAuth = async () => {
+  const handleFacebookAuth = async (permissionLevel: 'basic' | 'ads' = 'basic') => {
     setIsConnecting(true);
-    console.log('Starting Facebook OAuth process...');
+    console.log(`Starting Facebook OAuth process with ${permissionLevel} permissions...`);
     
     try {
       const { data, error } = await supabase.functions.invoke('facebook-oauth', {
-        body: { action: 'initiate' }
+        body: { action: 'initiate', permission_level: permissionLevel }
       });
 
       if (error) {
@@ -52,7 +56,6 @@ export const FacebookConnector = () => {
 
       console.log('Opening Facebook OAuth popup with URL:', data.authUrl);
 
-      // Open Facebook OAuth in a popup
       const popup = window.open(
         data.authUrl,
         'facebook-oauth',
@@ -65,17 +68,10 @@ export const FacebookConnector = () => {
 
       let messageListenerActive = true;
 
-      // Listen for the OAuth callback
       const messageListener = async (event: MessageEvent) => {
         console.log('Received message from popup:', event.data);
         
-        if (event.origin !== window.location.origin) {
-          console.log('Ignoring message from different origin:', event.origin);
-          return;
-        }
-
-        if (!messageListenerActive) {
-          console.log('Message listener no longer active, ignoring message');
+        if (event.origin !== window.location.origin || !messageListenerActive) {
           return;
         }
 
@@ -86,7 +82,6 @@ export const FacebookConnector = () => {
           window.removeEventListener('message', messageListener);
 
           try {
-            // Exchange code for access token
             console.log('Exchanging authorization code for access token...');
             const { data: tokenData, error: tokenError } = await supabase.functions.invoke('facebook-oauth', {
               body: { 
@@ -102,12 +97,12 @@ export const FacebookConnector = () => {
 
             console.log('Successfully received access token, saving keys...');
 
-            // Save access token
             saveApiKeys('facebook', {
               access_token: tokenData.access_token,
               user_id: tokenData.user_id,
               user_name: tokenData.user_name,
-              user_email: tokenData.user_email
+              user_email: tokenData.user_email,
+              permissions: tokenData.permissions
             });
 
             console.log('Updating integration status...');
@@ -116,10 +111,17 @@ export const FacebookConnector = () => {
               isConnected: true 
             });
 
-            toast({
-              title: "Connected Successfully",
-              description: "Your Facebook account has been connected. Loading ad accounts...",
-            });
+            if (permissionLevel === 'basic') {
+              toast({
+                title: "Connected Successfully",
+                description: "Basic Facebook connection established. You can now upgrade to get ads permissions.",
+              });
+            } else {
+              toast({
+                title: "Permissions Upgraded",
+                description: "Facebook ads permissions have been granted. Loading ad accounts...",
+              });
+            }
 
             console.log('Facebook connection completed successfully');
 
@@ -142,7 +144,6 @@ export const FacebookConnector = () => {
 
       window.addEventListener('message', messageListener);
 
-      // Check if popup was closed without completing auth
       const checkClosed = setInterval(() => {
         if (popup?.closed) {
           console.log('Popup was closed by user');
@@ -169,7 +170,42 @@ export const FacebookConnector = () => {
       });
     } finally {
       setIsConnecting(false);
+      setIsUpgrading(false);
     }
+  };
+
+  const handleTestApiCall = async () => {
+    setIsTesting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('facebook-oauth', {
+        body: { 
+          action: 'test_api',
+          access_token: savedKeys.access_token
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Test Successful",
+        description: "Facebook API test call completed successfully. You can now request ads permissions.",
+      });
+    } catch (error) {
+      toast({
+        title: "Test Failed",
+        description: "Facebook API test call failed. Please try reconnecting.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  const handleUpgradePermissions = async () => {
+    setIsUpgrading(true);
+    await handleFacebookAuth('ads');
   };
 
   const loadAdAccounts = async () => {
@@ -192,7 +228,6 @@ export const FacebookConnector = () => {
       console.log('Successfully loaded ad accounts:', data.adAccounts?.length || 0);
       setAdAccounts(data.adAccounts || []);
       
-      // Auto-select first account if none selected
       if (data.adAccounts?.length > 0 && !selectedAccount) {
         setSelectedAccount(data.adAccounts[0].id);
       }
@@ -201,7 +236,7 @@ export const FacebookConnector = () => {
       console.error('Failed to load ad accounts:', error);
       toast({
         title: "Failed to Load Ad Accounts",
-        description: "Could not load your Facebook ad accounts. Please try reconnecting.",
+        description: "Could not load your Facebook ad accounts. You may need ads permissions.",
         variant: "destructive"
       });
     } finally {
@@ -216,7 +251,6 @@ export const FacebookConnector = () => {
         isConnected: false 
       });
 
-      // Clear saved tokens
       saveApiKeys('facebook', {});
       setAdAccounts([]);
       setSelectedAccount('');
@@ -287,9 +321,16 @@ export const FacebookConnector = () => {
               <BarChart3 className="h-5 w-5 text-blue-600" />
               Facebook Ads Integration
             </CardTitle>
-            <Badge variant={isConnected ? "default" : "secondary"}>
-              {isConnected ? "Connected" : "Not Connected"}
-            </Badge>
+            <div className="flex gap-2">
+              <Badge variant={isConnected ? "default" : "secondary"}>
+                {isConnected ? "Connected" : "Not Connected"}
+              </Badge>
+              {isConnected && (
+                <Badge variant={hasAdsPermissions ? "default" : "outline"}>
+                  {hasAdsPermissions ? "Ads Access" : "Basic Access"}
+                </Badge>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -315,7 +356,7 @@ export const FacebookConnector = () => {
           <div className="space-y-4">
             {!isConnected ? (
               <Button 
-                onClick={handleFacebookAuth}
+                onClick={() => handleFacebookAuth('basic')}
                 disabled={isConnecting}
                 className="w-full"
               >
@@ -338,73 +379,109 @@ export const FacebookConnector = () => {
                   </p>
                 )}
 
-                {/* Ad Account Selection */}
-                <div className="space-y-3 p-4 border rounded-lg bg-gray-50">
-                  <div className="flex items-center justify-between">
+                {/* Permission Upgrade Flow */}
+                {!hasAdsPermissions && (
+                  <div className="space-y-3 p-4 border rounded-lg bg-yellow-50">
                     <div className="flex items-center gap-2">
-                      <Users className="h-4 w-4" />
-                      <h3 className="font-medium">Select Ad Account</h3>
+                      <ArrowUp className="h-4 w-4 text-yellow-600" />
+                      <h3 className="font-medium text-yellow-800">Upgrade to Access Ads Data</h3>
                     </div>
-                    <Button
-                      onClick={loadAdAccounts}
-                      disabled={isLoadingAccounts}
-                      variant="ghost"
-                      size="sm"
-                    >
-                      <RefreshCw className={`h-4 w-4 ${isLoadingAccounts ? 'animate-spin' : ''}`} />
-                    </Button>
+                    <p className="text-sm text-yellow-700">
+                      You're connected with basic permissions. To access ads data, you need to upgrade your permissions.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={handleTestApiCall}
+                        disabled={isTesting}
+                        variant="outline"
+                        size="sm"
+                      >
+                        <TestTube className="h-4 w-4 mr-2" />
+                        {isTesting ? "Testing..." : "Test Connection"}
+                      </Button>
+                      <Button
+                        onClick={handleUpgradePermissions}
+                        disabled={isUpgrading}
+                        size="sm"
+                      >
+                        <ArrowUp className="h-4 w-4 mr-2" />
+                        {isUpgrading ? "Upgrading..." : "Upgrade Permissions"}
+                      </Button>
+                    </div>
                   </div>
-                  
-                  {adAccounts.length > 0 ? (
-                    <div className="space-y-3">
-                      <div className="space-y-2">
-                        <Label htmlFor="adAccount">Choose an ad account to sync data from:</Label>
-                        <Select value={selectedAccount} onValueChange={setSelectedAccount}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select an ad account" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {adAccounts.map((account) => (
-                              <SelectItem key={account.id} value={account.id}>
-                                <div className="flex flex-col">
-                                  <span>{account.name}</span>
-                                  <span className="text-xs text-gray-500">
-                                    ID: {account.id} • Currency: {account.currency}
-                                  </span>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                )}
+
+                {/* Ad Account Selection - only show if has ads permissions */}
+                {hasAdsPermissions && (
+                  <div className="space-y-3 p-4 border rounded-lg bg-gray-50">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        <h3 className="font-medium">Select Ad Account</h3>
                       </div>
-                      
-                      {selectedAccount && (
-                        <Button onClick={saveAdAccountSelection} variant="outline" className="w-full">
-                          Save Ad Account Selection
-                        </Button>
-                      )}
+                      <Button
+                        onClick={loadAdAccounts}
+                        disabled={isLoadingAccounts}
+                        variant="ghost"
+                        size="sm"
+                      >
+                        <RefreshCw className={`h-4 w-4 ${isLoadingAccounts ? 'animate-spin' : ''}`} />
+                      </Button>
                     </div>
-                  ) : (
-                    <div className="text-center py-4">
-                      {isLoadingAccounts ? (
-                        <p className="text-sm text-gray-600">Loading ad accounts...</p>
-                      ) : (
-                        <p className="text-sm text-gray-600">No ad accounts found</p>
-                      )}
-                    </div>
-                  )}
-                </div>
+                    
+                    {adAccounts.length > 0 ? (
+                      <div className="space-y-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="adAccount">Choose an ad account to sync data from:</Label>
+                          <Select value={selectedAccount} onValueChange={setSelectedAccount}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select an ad account" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {adAccounts.map((account) => (
+                                <SelectItem key={account.id} value={account.id}>
+                                  <div className="flex flex-col">
+                                    <span>{account.name}</span>
+                                    <span className="text-xs text-gray-500">
+                                      ID: {account.id} • Currency: {account.currency}
+                                    </span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        {selectedAccount && (
+                          <Button onClick={saveAdAccountSelection} variant="outline" className="w-full">
+                            Save Ad Account Selection
+                          </Button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4">
+                        {isLoadingAccounts ? (
+                          <p className="text-sm text-gray-600">Loading ad accounts...</p>
+                        ) : (
+                          <p className="text-sm text-gray-600">No ad accounts found</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Sync Actions */}
                 <div className="flex gap-2">
-                  <Button 
-                    onClick={handleSync}
-                    disabled={isSyncing || !selectedAccount}
-                    variant="outline"
-                    className="flex-1"
-                  >
-                    {isSyncing ? "Syncing..." : "Sync Data"}
-                  </Button>
+                  {hasAdsPermissions && (
+                    <Button 
+                      onClick={handleSync}
+                      disabled={isSyncing || !selectedAccount}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      {isSyncing ? "Syncing..." : "Sync Data"}
+                    </Button>
+                  )}
                   
                   <Button 
                     onClick={handleDisconnect}
@@ -425,10 +502,11 @@ export const FacebookConnector = () => {
               <div className="text-sm">
                 <p className="font-medium text-blue-900">How it works:</p>
                 <ul className="mt-1 text-blue-800 space-y-1">
-                  <li>• Click "Connect to Facebook" to authenticate via OAuth</li>
+                  <li>• Connect with basic permissions first (no approval needed)</li>
+                  <li>• Test the connection to enable ads permission requests</li>
+                  <li>• Upgrade to ads permissions when available (may take up to 24 hours)</li>
                   <li>• Select which ad account you want to sync data from</li>
                   <li>• Your advertising data will be automatically imported</li>
-                  <li>• Data appears in Dashboard, Predictions, Alerts, and AI Assistant</li>
                 </ul>
               </div>
             </div>
