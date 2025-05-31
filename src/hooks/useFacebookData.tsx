@@ -2,6 +2,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAgency } from './useAgency';
+import { format } from 'date-fns';
 
 interface FacebookInsights {
   impressions: number;
@@ -28,11 +29,15 @@ interface FacebookData {
   last_updated: string;
 }
 
-export const useFacebookData = () => {
+interface UseFacebookDataProps {
+  dateRange?: { from: Date; to: Date };
+}
+
+export const useFacebookData = ({ dateRange }: UseFacebookDataProps = {}) => {
   const { agency } = useAgency();
 
   const { data: facebookData, isLoading } = useQuery({
-    queryKey: ['facebook-integrations', agency?.id],
+    queryKey: ['facebook-integrations', agency?.id, dateRange?.from, dateRange?.to],
     queryFn: async () => {
       if (!agency) return null;
       
@@ -53,6 +58,35 @@ export const useFacebookData = () => {
       if (!integration) {
         console.log('No Facebook integration found or not connected');
         return null;
+      }
+
+      // If date range is provided, trigger a new sync with the date range
+      if (dateRange) {
+        try {
+          const dateRangeFormatted = {
+            since: format(dateRange.from, 'yyyy-MM-dd'),
+            until: format(dateRange.to, 'yyyy-MM-dd')
+          };
+
+          // Call sync function with date range
+          const syncResponse = await supabase.functions.invoke('sync-integrations', {
+            body: {
+              platform: 'facebook',
+              apiKeys: {
+                access_token: integration.api_key || 'demo_token',
+                selected_ad_account_id: integration.config?.selected_ad_account_id || 'act_123456789',
+                date_range: dateRangeFormatted
+              },
+              agencyId: agency.id
+            }
+          });
+
+          if (syncResponse.error) {
+            console.error('Sync error:', syncResponse.error);
+          }
+        } catch (error) {
+          console.error('Error triggering sync:', error);
+        }
       }
 
       // Then fetch the actual synced data
@@ -87,12 +121,6 @@ export const useFacebookData = () => {
           campaigns: fbData.campaigns || [],
           last_updated: syncedData.synced_at,
         } as FacebookData;
-      }
-
-      // If no synced data but integration exists, show connection message
-      if (integration) {
-        console.log('Facebook integration connected but no synced data found');
-        return null;
       }
 
       return null;

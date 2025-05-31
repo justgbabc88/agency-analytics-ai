@@ -4,8 +4,12 @@ import { Badge } from "@/components/ui/badge";
 import { useFacebookData } from "@/hooks/useFacebookData";
 import { BarChart3, TrendingUp, Users, DollarSign, MousePointer, Eye } from "lucide-react";
 
-export const FacebookMetrics = () => {
-  const { facebookData, isLoading, insights, campaigns, metrics } = useFacebookData();
+interface FacebookMetricsProps {
+  dateRange?: { from: Date; to: Date };
+}
+
+export const FacebookMetrics = ({ dateRange }: FacebookMetricsProps) => {
+  const { facebookData, isLoading, insights, campaigns, metrics } = useFacebookData({ dateRange });
 
   if (isLoading) {
     return (

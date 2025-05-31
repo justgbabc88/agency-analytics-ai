@@ -103,7 +103,7 @@ serve(async (req) => {
 })
 
 async function syncFacebook(apiKeys: Record<string, string>) {
-  const { access_token, selected_ad_account_id } = apiKeys
+  const { access_token, selected_ad_account_id, date_range } = apiKeys
   
   if (!access_token) {
     throw new Error('Facebook access token is required')
@@ -112,6 +112,19 @@ async function syncFacebook(apiKeys: Record<string, string>) {
   console.log('Facebook sync initiated - fetching ad data')
 
   const adAccountId = selected_ad_account_id || 'act_123456789' // fallback for demo
+
+  // Determine date range - use custom range if provided, otherwise default to last 30 days
+  let datePreset = 'last_30d'
+  let sinceParam = ''
+  let untilParam = ''
+  
+  if (date_range?.since && date_range?.until) {
+    sinceParam = `&time_range[since]=${date_range.since}`
+    untilParam = `&time_range[until]=${date_range.until}`
+    datePreset = '' // Don't use preset when custom range is provided
+  } else {
+    datePreset = '&date_preset=last_30d'
+  }
 
   try {
     // Fetch campaigns
@@ -125,10 +138,12 @@ async function syncFacebook(apiKeys: Record<string, string>) {
     
     const campaignsData = await campaignsResponse.json()
 
-    // Fetch ad insights
-    const insightsResponse = await fetch(
-      `https://graph.facebook.com/v18.0/${adAccountId}/insights?access_token=${access_token}&fields=impressions,clicks,spend,reach,frequency,ctr,cpm,cpp,cpc,conversions,conversion_values&date_preset=last_30d&level=account`
-    )
+    // Fetch ad insights with date range
+    const insightsUrl = date_range?.since && date_range?.until 
+      ? `https://graph.facebook.com/v18.0/${adAccountId}/insights?access_token=${access_token}&fields=impressions,clicks,spend,reach,frequency,ctr,cpm,cpp,cpc,conversions,conversion_values${sinceParam}${untilParam}&level=account`
+      : `https://graph.facebook.com/v18.0/${adAccountId}/insights?access_token=${access_token}&fields=impressions,clicks,spend,reach,frequency,ctr,cpm,cpp,cpc,conversions,conversion_values${datePreset}&level=account`
+    
+    const insightsResponse = await fetch(insightsUrl)
     
     if (!insightsResponse.ok) {
       throw new Error('Failed to fetch insights from Facebook')
@@ -138,7 +153,7 @@ async function syncFacebook(apiKeys: Record<string, string>) {
 
     const insights = insightsData.data?.[0] || {}
 
-    console.log(`Facebook sync successful - ${campaignsData.data?.length || 0} campaigns, insights fetched`)
+    console.log(`Facebook sync successful - ${campaignsData.data?.length || 0} campaigns, insights fetched for date range: ${date_range?.since || 'last 30 days'} to ${date_range?.until || 'today'}`)
 
     return {
       campaigns: campaignsData.data || [],
@@ -166,6 +181,7 @@ async function syncFacebook(apiKeys: Record<string, string>) {
         overall_cpc: parseFloat(insights.cpc || '0')
       },
       account_id: adAccountId,
+      date_range: date_range || { since: 'last_30d', until: 'today' },
       last_updated: new Date().toISOString(),
       synced_at: new Date().toISOString()
     }
@@ -199,6 +215,7 @@ async function syncFacebook(apiKeys: Record<string, string>) {
         overall_cpc: 0.77
       },
       account_id: adAccountId,
+      date_range: date_range || { since: 'last_30d', until: 'today' },
       last_updated: new Date().toISOString(),
       synced_at: new Date().toISOString(),
       note: 'Demo data - API call failed'

@@ -48,7 +48,7 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
   return (
     <div className="space-y-6">
       {/* Facebook Ads Integration */}
-      <FacebookMetrics />
+      <FacebookMetrics dateRange={dateRange} />
       
       {/* Key Metrics Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
