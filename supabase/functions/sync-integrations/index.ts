@@ -49,7 +49,7 @@ serve(async (req) => {
         throw new Error(`Unsupported platform: ${platform}`)
     }
 
-    // Store the synced data in the database
+    // Store the synced data in the database using upsert
     const { error: insertError } = await supabase
       .from('integration_data')
       .upsert({
@@ -57,11 +57,16 @@ serve(async (req) => {
         platform,
         data: syncResult,
         synced_at: new Date().toISOString()
+      }, {
+        onConflict: 'agency_id,platform'
       })
 
-    if (insertError) throw insertError
+    if (insertError) {
+      console.error('Database insert error:', insertError)
+      throw insertError
+    }
 
-    // Update the integration status
+    // Update the integration status using upsert
     const { error: updateError } = await supabase
       .from('integrations')
       .upsert({
@@ -69,9 +74,16 @@ serve(async (req) => {
         platform,
         is_connected: true,
         last_sync: new Date().toISOString()
+      }, {
+        onConflict: 'agency_id,platform'
       })
 
-    if (updateError) throw updateError
+    if (updateError) {
+      console.error('Integration update error:', updateError)
+      throw updateError
+    }
+
+    console.log(`Successfully synced ${platform} data for agency ${agencyId}`)
 
     return new Response(
       JSON.stringify({ success: true, data: syncResult }),
