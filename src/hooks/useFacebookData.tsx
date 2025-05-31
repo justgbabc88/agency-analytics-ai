@@ -2,6 +2,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAgency } from './useAgency';
+import { useApiKeys } from './useApiKeys';
 import { format } from 'date-fns';
 
 interface FacebookInsights {
@@ -35,6 +36,7 @@ interface UseFacebookDataProps {
 
 export const useFacebookData = ({ dateRange }: UseFacebookDataProps = {}) => {
   const { agency } = useAgency();
+  const { getApiKeys } = useApiKeys();
 
   const { data: facebookData, isLoading } = useQuery({
     queryKey: ['facebook-integrations', agency?.id, dateRange?.from, dateRange?.to],
@@ -68,13 +70,16 @@ export const useFacebookData = ({ dateRange }: UseFacebookDataProps = {}) => {
             until: format(dateRange.to, 'yyyy-MM-dd')
           };
 
+          // Get API keys from the useApiKeys hook
+          const apiKeys = getApiKeys('facebook');
+
           // Call sync function with date range
           const syncResponse = await supabase.functions.invoke('sync-integrations', {
             body: {
               platform: 'facebook',
               apiKeys: {
-                access_token: integration.api_key || 'demo_token',
-                selected_ad_account_id: integration.config?.selected_ad_account_id || 'act_123456789',
+                access_token: apiKeys.access_token || 'demo_token',
+                selected_ad_account_id: apiKeys.selected_ad_account_id || 'act_123456789',
                 date_range: dateRangeFormatted
               },
               agencyId: agency.id
