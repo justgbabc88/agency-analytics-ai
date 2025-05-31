@@ -14,7 +14,8 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Facebook
 } from "lucide-react";
 import { useState } from "react";
 
@@ -126,19 +127,19 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
 
   return (
     <div className="space-y-6">
-      {/* Facebook Ads Section */}
-      <div className="bg-slate-50/50 rounded-lg border border-slate-200/60 p-4">
+      {/* Facebook Analysis Section */}
+      <div className="bg-blue-50/30 rounded-lg border border-blue-100/80 p-4 shadow-sm">
         <Collapsible open={isAdsOpen} onOpenChange={setIsAdsOpen}>
           <CollapsibleTrigger asChild>
             <Button 
               variant="ghost" 
               className="w-full justify-between p-0 h-auto hover:bg-transparent"
             >
-              <h3 className="text-lg font-semibold text-slate-700 flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-slate-600" />
-                Facebook Ads Performance
+              <h3 className="text-lg font-semibold text-blue-700 flex items-center gap-2">
+                <Facebook className="h-5 w-5 text-blue-600" />
+                Facebook Analysis
               </h3>
-              {isAdsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              {isAdsOpen ? <ChevronUp className="h-4 w-4 text-blue-600" /> : <ChevronDown className="h-4 w-4 text-blue-600" />}
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-4">
@@ -147,28 +148,28 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
         </Collapsible>
       </div>
 
-      {/* Funnel Section */}
-      <div className="bg-zinc-50/50 rounded-lg border border-zinc-200/60 p-4">
+      {/* Funnel Analysis Section */}
+      <div className="bg-amber-50/30 rounded-lg border border-amber-100/80 p-4 shadow-sm">
         <Collapsible open={isFunnelOpen} onOpenChange={setIsFunnelOpen}>
           <CollapsibleTrigger asChild>
             <Button 
               variant="ghost" 
               className="w-full justify-between p-0 h-auto hover:bg-transparent"
             >
-              <h3 className="text-lg font-semibold text-zinc-700 flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-zinc-600" />
-                Funnel Performance
+              <h3 className="text-lg font-semibold text-amber-700 flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-amber-600" />
+                Funnel Analysis
               </h3>
-              {isFunnelOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              {isFunnelOpen ? <ChevronUp className="h-4 w-4 text-amber-600" /> : <ChevronDown className="h-4 w-4 text-amber-600" />}
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-4 mt-4">
             {/* Funnel Conversion Percentages */}
-            <Card className="border-zinc-200">
+            <Card className="border-amber-200">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2 text-lg">
-                    <BarChart3 className="h-5 w-5 text-zinc-600" />
+                    <BarChart3 className="h-5 w-5 text-amber-600" />
                     Funnel Conversion Rates
                   </CardTitle>
                 </div>
@@ -176,12 +177,12 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                   {/* Main Offer Metric */}
-                  <div className="bg-white rounded-lg p-3 border border-zinc-100">
-                    <div className="flex items-center gap-2 text-xs text-zinc-600 mb-1">
+                  <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-lg p-3 border border-gray-100">
+                    <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
                       <Target className="h-3 w-3" />
                       Main Offer
                     </div>
-                    <div className="text-lg font-bold text-zinc-800">
+                    <div className="text-lg font-bold text-gray-800">
                       {mainOfferPercent.toFixed(1)}%
                     </div>
                     <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(mainOfferChange)}`}>
@@ -191,12 +192,12 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
                   </div>
 
                   {/* Bump Metric */}
-                  <div className="bg-white rounded-lg p-3 border border-zinc-100">
-                    <div className="flex items-center gap-2 text-xs text-zinc-600 mb-1">
+                  <div className="bg-gradient-to-br from-slate-50 to-slate-100/50 rounded-lg p-3 border border-slate-100">
+                    <div className="flex items-center gap-2 text-xs text-slate-600 mb-1">
                       <ShoppingCart className="h-3 w-3" />
                       Bump
                     </div>
-                    <div className="text-lg font-bold text-zinc-800">
+                    <div className="text-lg font-bold text-slate-800">
                       {bumpPercent.toFixed(1)}%
                     </div>
                     <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(bumpChange)}`}>
@@ -206,7 +207,7 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
                   </div>
 
                   {/* Upsell 1 Metric */}
-                  <div className="bg-white rounded-lg p-3 border border-zinc-100">
+                  <div className="bg-gradient-to-br from-zinc-50 to-zinc-100/50 rounded-lg p-3 border border-zinc-100">
                     <div className="flex items-center gap-2 text-xs text-zinc-600 mb-1">
                       <TrendingUp className="h-3 w-3" />
                       Upsell 1
@@ -221,12 +222,12 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
                   </div>
 
                   {/* Downsell 1 Metric */}
-                  <div className="bg-white rounded-lg p-3 border border-zinc-100">
-                    <div className="flex items-center gap-2 text-xs text-zinc-600 mb-1">
+                  <div className="bg-gradient-to-br from-stone-50 to-stone-100/50 rounded-lg p-3 border border-stone-100">
+                    <div className="flex items-center gap-2 text-xs text-stone-600 mb-1">
                       <Users className="h-3 w-3" />
                       Downsell 1
                     </div>
-                    <div className="text-lg font-bold text-zinc-800">
+                    <div className="text-lg font-bold text-stone-800">
                       {downsell1Percent.toFixed(1)}%
                     </div>
                     <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(downsell1Change)}`}>
@@ -236,12 +237,12 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
                   </div>
 
                   {/* Upsell 2 Metric */}
-                  <div className="bg-white rounded-lg p-3 border border-zinc-100">
-                    <div className="flex items-center gap-2 text-xs text-zinc-600 mb-1">
+                  <div className="bg-gradient-to-br from-neutral-50 to-neutral-100/50 rounded-lg p-3 border border-neutral-100">
+                    <div className="flex items-center gap-2 text-xs text-neutral-600 mb-1">
                       <DollarSign className="h-3 w-3" />
                       Upsell 2
                     </div>
-                    <div className="text-lg font-bold text-zinc-800">
+                    <div className="text-lg font-bold text-neutral-800">
                       {upsell2Percent.toFixed(1)}%
                     </div>
                     <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(upsell2Change)}`}>
@@ -251,12 +252,12 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
                   </div>
 
                   {/* Downsell 2 Metric */}
-                  <div className="bg-white rounded-lg p-3 border border-zinc-100">
-                    <div className="flex items-center gap-2 text-xs text-zinc-600 mb-1">
+                  <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-lg p-3 border border-gray-100">
+                    <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
                       <Target className="h-3 w-3" />
                       Downsell 2
                     </div>
-                    <div className="text-lg font-bold text-zinc-800">
+                    <div className="text-lg font-bold text-gray-800">
                       {downsell2Percent.toFixed(1)}%
                     </div>
                     <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(downsell2Change)}`}>
@@ -270,7 +271,7 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
 
             {/* Funnel Conversion Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <Card className="border-zinc-200">
+              <Card className="border-amber-200">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base flex items-center gap-2">
                     <BarChart3 className="h-4 w-4" />
@@ -286,7 +287,7 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts }: LowTicketFunnel
                 </CardContent>
               </Card>
 
-              <Card className="border-zinc-200">
+              <Card className="border-amber-200">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base flex items-center gap-2">
                     <TrendingUp className="h-4 w-4" />
