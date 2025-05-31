@@ -9,12 +9,11 @@ import { BookCallFunnel } from "@/components/BookCallFunnel";
 import { IntegrationsPanel } from "@/components/IntegrationsPanel";
 import { MetricCustomizer } from "@/components/MetricCustomizer";
 import { AlertSystem } from "@/components/AlertSystem";
-import { ExportPanel } from "@/components/ExportPanel";
 import { PredictiveAnalytics } from "@/components/PredictiveAnalytics";
 import { AIChatPanel } from "@/components/AIChatPanel";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, BarChart3, Settings, MessageSquare, Download, Target, TrendingUp } from "lucide-react";
+import { Plus, BarChart3, Settings, MessageSquare, Target, TrendingUp } from "lucide-react";
 
 interface FunnelProductConfig {
   id: string;
@@ -91,7 +90,7 @@ const Index = () => {
 
       <div className="p-6">
         <Tabs defaultValue="dashboard" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
               Dashboard
@@ -111,10 +110,6 @@ const Index = () => {
             <TabsTrigger value="settings" className="flex items-center gap-2">
               <Settings className="h-4 w-4" />
               Integrations
-            </TabsTrigger>
-            <TabsTrigger value="export" className="flex items-center gap-2">
-              <Download className="h-4 w-4" />
-              Export
             </TabsTrigger>
           </TabsList>
 
@@ -142,10 +137,6 @@ const Index = () => {
 
           <TabsContent value="settings" className="space-y-6">
             <IntegrationsPanel />
-          </TabsContent>
-
-          <TabsContent value="export" className="space-y-6">
-            <ExportPanel />
           </TabsContent>
         </Tabs>
       </div>
