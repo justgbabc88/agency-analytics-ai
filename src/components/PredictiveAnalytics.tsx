@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Brain, RefreshCw, BarChart, Target } from "lucide-react";
+import { Brain, RefreshCw, Target } from "lucide-react";
 import { useState } from "react";
 import { useGoogleSheetsData } from "@/hooks/useGoogleSheetsData";
 import { generateForecast, generateScenarioForecasts, parseDateFromSheetData, ForecastResult, calculateLinearTrend } from "@/utils/timeSeriesUtils";
@@ -10,7 +10,6 @@ import { MetricCustomizer } from "./MetricCustomizer";
 import { ForecastControls } from "./ForecastControls";
 import { ForecastChart } from "./ForecastChart";
 import { ChartLegend } from "./ChartLegend";
-import { PredictionsGrid } from "./PredictionsGrid";
 import { ScenarioForecast } from "./ScenarioForecast";
 import { AccuracyIndicator } from "./AccuracyIndicator";
 import { EnhancedAIInsights } from "./EnhancedAIInsights";
@@ -29,8 +28,7 @@ interface PredictiveAnalyticsProps {
 export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => {
   const [selectedMetric, setSelectedMetric] = useState('revenue');
   const [forecastPeriod, setForecastPeriod] = useState('30days');
-  const [showScenarios, setShowScenarios] = useState(true);
-  const [showPredictions, setShowPredictions] = useState(false);
+  const [showPredictions, setShowPredictions] = useState(true);
   const [selectedProducts, setSelectedProducts] = useState<FunnelProductConfig[]>([]);
   const { syncedData, calculateMetricsFromSyncedData } = useGoogleSheetsData();
 
@@ -309,69 +307,6 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
   const trendLineData = generateTrendLineData();
   const funnelData = generateFunnelForecastData();
 
-  // Generate enhanced predictions with scenarios
-  const generateEnhancedPredictions = () => {
-    if (!currentMetrics) {
-      return [
-        { metric: 'Revenue', current: 0, predicted: 0, change: 0, confidence: 75, trend: 'up' as const, timeframe: `Next ${forecastDays} days` },
-        { metric: 'Conversion Rate', current: 0, predicted: 0, change: 0, confidence: 75, trend: 'up' as const, timeframe: `Next ${forecastDays} days` },
-        { metric: 'Ad Spend', current: 0, predicted: 0, change: 0, confidence: 75, trend: 'up' as const, timeframe: `Next ${forecastDays} days` },
-        { metric: 'ROAS', current: 0, predicted: 0, change: 0, confidence: 75, trend: 'up' as const, timeframe: `Next ${forecastDays} days` },
-      ];
-    }
-
-    const estimatedRevenue = currentMetrics.revenue || (currentMetrics.roas * currentMetrics.cost);
-    const baseConfidence = Math.max(60, forecastResult.accuracy);
-    
-    // Compute trend values separately to avoid const assertion issues
-    const revenueTrend: 'up' | 'down' = forecastResult.trend === 'decreasing' ? 'down' : 'up';
-    const conversionTrend: 'up' | 'down' = forecastResult.trend === 'decreasing' ? 'down' : 'up';
-    const roasTrend: 'up' | 'down' = forecastResult.trend === 'decreasing' ? 'down' : 'up';
-    
-    const predictions = [
-      {
-        metric: 'Revenue',
-        current: estimatedRevenue,
-        predicted: estimatedRevenue * (forecastResult.trend === 'increasing' ? 1.12 : forecastResult.trend === 'decreasing' ? 0.95 : 1.03),
-        change: forecastResult.trend === 'increasing' ? 12.0 : forecastResult.trend === 'decreasing' ? -5.0 : 3.0,
-        confidence: Math.round(baseConfidence),
-        trend: revenueTrend,
-        timeframe: `Next ${forecastDays} days`
-      },
-      {
-        metric: 'Conversion Rate',
-        current: currentMetrics.conversionRate,
-        predicted: currentMetrics.conversionRate * (forecastResult.trend === 'increasing' ? 1.08 : 0.98),
-        change: forecastResult.trend === 'increasing' ? 8.0 : -2.0,
-        confidence: Math.round(baseConfidence * 0.9),
-        trend: conversionTrend,
-        timeframe: `Next ${forecastDays} days`
-      },
-      {
-        metric: 'Ad Spend',
-        current: currentMetrics.cost,
-        predicted: currentMetrics.cost * (forecastResult.trend === 'increasing' ? 1.15 : 1.02),
-        change: forecastResult.trend === 'increasing' ? 15.0 : 2.0,
-        confidence: Math.round(baseConfidence * 0.95),
-        trend: 'up' as const,
-        timeframe: `Next ${forecastDays} days`
-      },
-      {
-        metric: 'ROAS',
-        current: currentMetrics.roas,
-        predicted: currentMetrics.roas * (forecastResult.trend === 'increasing' ? 1.05 : 0.97),
-        change: forecastResult.trend === 'increasing' ? 5.0 : -3.0,
-        confidence: Math.round(baseConfidence * 0.85),
-        trend: roasTrend,
-        timeframe: `Next ${forecastDays} days`
-      },
-    ];
-
-    return predictions;
-  };
-
-  const predictions = generateEnhancedPredictions();
-
   // Generate AI insights based on forecast results
   const generateAIInsights = () => {
     const accuracy = forecastResult.accuracy;
@@ -415,8 +350,20 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
     return acc;
   }, {} as Record<string, FunnelProductConfig>);
 
-  // Get primary prediction for scenario analysis
-  const primaryPrediction = predictions.find(p => p.metric === 'Revenue') || predictions[0];
+  // Get current metrics for scenario analysis
+  const getBaseMetricForScenarios = () => {
+    if (!currentMetrics) return 100000; // Default value
+    
+    if (selectedMetric === 'revenue') {
+      return currentMetrics.revenue || (currentMetrics.roas * currentMetrics.cost);
+    } else if (selectedMetric === 'conversions') {
+      return currentMetrics.conversions;
+    } else if (selectedMetric === 'traffic') {
+      return currentMetrics.pageViews || currentMetrics.impressions;
+    }
+    
+    return currentMetrics.revenue || (currentMetrics.roas * currentMetrics.cost);
+  };
 
   return (
     <Card className={className}>
@@ -432,10 +379,6 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
             )}
           </CardTitle>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setShowScenarios(!showScenarios)}>
-              <BarChart className="h-4 w-4" />
-              {showScenarios ? 'Hide' : 'Show'} Scenarios
-            </Button>
             <Button variant="ghost" size="sm" onClick={() => setShowPredictions(!showPredictions)}>
               <Target className="h-4 w-4" />
               {showPredictions ? 'Hide' : 'Show'} Predictions
@@ -488,19 +431,12 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
           selectedProducts={selectedProducts}
         />
 
-        {showScenarios && selectedMetric !== 'funnelProducts' && (
+        {showPredictions && selectedMetric !== 'funnelProducts' && (
           <ScenarioForecast
-            baseMetric={primaryPrediction.current}
-            metricName={primaryPrediction.metric}
+            baseMetric={getBaseMetricForScenarios()}
+            metricName={selectedMetric === 'revenue' ? 'Revenue' : selectedMetric === 'conversions' ? 'Conversions' : 'Traffic'}
             forecastDays={forecastDays}
             currentTrend={forecastResult.trend}
-          />
-        )}
-
-        {showPredictions && selectedMetric !== 'funnelProducts' && (
-          <PredictionsGrid 
-            predictions={predictions}
-            forecastDays={forecastDays}
           />
         )}
 
