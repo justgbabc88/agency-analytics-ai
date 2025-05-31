@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Settings, Eye, EyeOff } from "lucide-react";
+import { Settings, Eye, EyeOff, ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
 
 interface FunnelProductConfig {
@@ -17,7 +17,7 @@ const defaultFunnelProducts: FunnelProductConfig[] = [
   { id: 'mainProduct', label: 'Main Product', visible: true, color: '#10B981' },
   { id: 'bump', label: 'Bump Product', visible: true, color: '#3B82F6' },
   { id: 'upsell1', label: 'Upsell 1', visible: true, color: '#F59E0B' },
-  { id: 'downsell1', label: 'Downsell 1', visible: true, color: '#8B5CF6' },
+  { id: 'downsell1', label: 'Downsell 1', visible: false, color: '#8B5CF6' },
   { id: 'upsell2', label: 'Upsell 2', visible: false, color: '#EF4444' },
   { id: 'downsell2', label: 'Downsell 2', visible: false, color: '#06B6D4' },
 ];
@@ -41,68 +41,67 @@ export const MetricCustomizer = ({ onProductsChange, className }: MetricCustomiz
 
   const visibleProducts = products.filter(p => p.visible);
 
-  if (!isExpanded) {
-    return (
-      <div className={className}>
-        <Button 
-          variant="outline" 
-          onClick={() => setIsExpanded(true)}
-          className="flex items-center gap-2"
-        >
-          <Settings className="h-4 w-4" />
-          Configure Funnel Products ({visibleProducts.length})
-        </Button>
-      </div>
-    );
-  }
-
   return (
-    <Card className={className}>
-      <CardHeader>
+    <Card className={`${className} border-2 border-dashed border-blue-200 bg-blue-50/50`}>
+      <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="h-5 w-5" />
-            Funnel Products Configuration
-          </CardTitle>
-          <Button variant="ghost" size="sm" onClick={() => setIsExpanded(false)}>
-            <EyeOff className="h-4 w-4" />
+          <div className="flex items-center gap-2">
+            <Settings className="h-4 w-4 text-blue-600" />
+            <CardTitle className="text-sm font-medium text-blue-900">
+              Funnel Products ({visibleProducts.length} selected)
+            </CardTitle>
+          </div>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="h-6 w-6 p-0 text-blue-600 hover:bg-blue-100"
+          >
+            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </Button>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-center gap-2 mb-4">
-          <span className="text-sm text-gray-600">Visible products:</span>
-          {visibleProducts.map(product => (
-            <Badge key={product.id} variant="secondary" className="text-xs">
-              {product.label}
-            </Badge>
-          ))}
-        </div>
-
-        <div className="space-y-3">
-          {products.map(product => (
-            <div key={product.id} className="flex items-center space-x-2">
-              <Checkbox
-                id={product.id}
-                checked={product.visible}
-                onCheckedChange={() => toggleProduct(product.id)}
-              />
-              <div className="flex items-center gap-2">
+      
+      {isExpanded && (
+        <CardContent className="pt-0 space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            {products.map(product => (
+              <div key={product.id} className="flex items-center space-x-2 p-2 rounded-md hover:bg-white/60 transition-colors">
+                <Checkbox
+                  id={product.id}
+                  checked={product.visible}
+                  onCheckedChange={() => toggleProduct(product.id)}
+                  className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                />
+                <div className="flex items-center gap-2 flex-1">
+                  <div 
+                    className="w-2.5 h-2.5 rounded-full flex-shrink-0" 
+                    style={{ backgroundColor: product.color }}
+                  />
+                  <label
+                    htmlFor={product.id}
+                    className="text-xs font-medium text-gray-700 cursor-pointer flex-1"
+                  >
+                    {product.label}
+                  </label>
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          <div className="flex flex-wrap gap-1 mt-3 pt-2 border-t border-blue-200">
+            {visibleProducts.map(product => (
+              <Badge key={product.id} variant="secondary" className="text-xs h-5 px-2">
                 <div 
-                  className="w-3 h-3 rounded-full" 
+                  className="w-1.5 h-1.5 rounded-full mr-1" 
                   style={{ backgroundColor: product.color }}
                 />
-                <label
-                  htmlFor={product.id}
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                >
-                  {product.label}
-                </label>
-              </div>
-            </div>
-          ))}
-        </div>
-      </CardContent>
+                {product.label}
+              </Badge>
+            ))}
+          </div>
+        </CardContent>
+      )}
     </Card>
   );
 };

@@ -1,4 +1,3 @@
-
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 interface FunnelProductConfig {
@@ -96,6 +95,49 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     return defaultColors[metric as keyof typeof defaultColors] || '#6B7280';
   };
 
+  // Enhanced Y-axis domain calculation for better proportionality
+  const calculateYAxisDomain = () => {
+    if (!Array.isArray(data) || !Array.isArray(metrics) || data.length === 0) {
+      return undefined;
+    }
+
+    const allValues: number[] = [];
+    
+    data.forEach(row => {
+      metrics.forEach(metric => {
+        const value = row[metric];
+        if (value !== undefined && value !== null && !isNaN(Number(value))) {
+          allValues.push(Number(value));
+        }
+      });
+    });
+
+    if (allValues.length === 0) return undefined;
+
+    const min = Math.min(...allValues);
+    const max = Math.max(...allValues);
+    const range = max - min;
+    
+    // For conversion rates (percentages), use tighter bounds
+    const isPercentageMetric = metrics.some(m => m.includes('Rate') || m.includes('CTR'));
+    
+    if (isPercentageMetric && range < 10) {
+      // For small percentage ranges, add minimal padding
+      const padding = Math.max(0.5, range * 0.1);
+      return [Math.max(0, min - padding), max + padding];
+    }
+    
+    if (range > 0) {
+      // Add 10% padding for better visualization
+      const padding = range * 0.1;
+      const domainMin = Math.max(0, min - padding);
+      const domainMax = max + padding;
+      return [domainMin, domainMax];
+    }
+    
+    return undefined;
+  };
+
   // ... keep existing code (formatTooltipValue function)
   const formatTooltipValue = (value: number, name: string) => {
     if (name.includes('Rate') || name.includes('CTR')) {
@@ -108,6 +150,23 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
       return value.toFixed(2);
     }
     return value.toLocaleString();
+  };
+
+  // Enhanced Y-axis tick formatting
+  const formatYAxisTick = (value: number) => {
+    const isPercentageMetric = metrics.some(m => m.includes('Rate') || m.includes('CTR'));
+    
+    if (isPercentageMetric) {
+      return `${value.toFixed(1)}%`;
+    }
+    if (metrics.some(m => m.includes('Revenue') || m.includes('Cost') || m.includes('Spend'))) {
+      if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+      if (value >= 1000) return `$${(value / 1000).toFixed(0)}k`;
+      return `$${value.toFixed(0)}`;
+    }
+    if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+    if (value >= 1000) return `${(value / 1000).toFixed(0)}k`;
+    return value.toFixed(0);
   };
 
   // ... keep existing code (formatMetricName function)
@@ -203,6 +262,8 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     return { slope, intercept };
   };
 
+  const yAxisDomain = calculateYAxisDomain();
+
   return (
     <div className="bg-white">
       {title && (
@@ -213,7 +274,7 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
           </div>
         </div>
       )}
-      <ResponsiveContainer width="100%" height={200}>
+      <ResponsiveContainer width="100%" height={220}>
         <LineChart data={filteredData}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
           <XAxis 
@@ -222,20 +283,28 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
             fontSize={10}
             angle={-45}
             textAnchor="end"
-            height={50}
+            height={60}
+            interval="preserveStartEnd"
           />
-          <YAxis stroke="#6b7280" fontSize={10} />
+          <YAxis 
+            stroke="#6b7280" 
+            fontSize={10} 
+            domain={yAxisDomain}
+            tickFormatter={formatYAxisTick}
+            width={60}
+          />
           <Tooltip 
             contentStyle={{
               backgroundColor: 'white',
               border: '1px solid #e5e7eb',
-              borderRadius: '6px',
-              boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.1)',
+              borderRadius: '8px',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
               fontSize: '12px'
             }}
             formatter={formatTooltipValue}
+            labelStyle={{ color: '#374151', fontWeight: '500' }}
           />
-          {/* Trend lines for each metric */}
+          {/* Enhanced trend lines with better visibility */}
           {metrics.map(metric => {
             const trendLine = calculateTrendLine(metric);
             return trendLine && filteredData.length > 1 ? (
@@ -246,9 +315,9 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
                   { x: filteredData[filteredData.length - 1]?.date, y: trendLine.intercept + trendLine.slope * (filteredData.length - 1) }
                 ]}
                 stroke={getMetricColor(metric)}
-                strokeDasharray="3 3"
-                strokeWidth={1}
-                opacity={0.6}
+                strokeDasharray="4 4"
+                strokeWidth={1.5}
+                opacity={0.7}
               />
             ) : null;
           })}
@@ -260,8 +329,9 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
                 type="monotone" 
                 dataKey={metric} 
                 stroke={getMetricColor(metric)}
-                strokeWidth={2}
-                dot={{ fill: getMetricColor(metric), strokeWidth: 1, r: 3 }}
+                strokeWidth={2.5}
+                dot={{ fill: getMetricColor(metric), strokeWidth: 2, r: 4 }}
+                activeDot={{ r: 6, strokeWidth: 2 }}
                 connectNulls={false}
                 name={formatMetricName(metric)}
               />
