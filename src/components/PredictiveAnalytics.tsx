@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -482,6 +483,7 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
                     dataKey={product.id}
                     stroke={product.color}
                     strokeWidth={2.5}
+                    strokeDasharray="0"
                     dot={(props) => {
                       const { payload } = props;
                       return payload?.isActual ? (
@@ -489,10 +491,6 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
                       ) : (
                         <circle {...props} fill={product.color} stroke={product.color} strokeWidth={1} r={2} fillOpacity={0.7} />
                       );
-                    }}
-                    strokeDasharray={(props: any) => {
-                      const { payload } = props;
-                      return payload?.isActual ? "0" : "6 6";
                     }}
                     connectNulls={false}
                     name={product.id}
