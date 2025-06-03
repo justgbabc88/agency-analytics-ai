@@ -1,3 +1,4 @@
+
 import { MetricCard } from "./MetricCard";
 import { ConversionChart } from "./ConversionChart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -55,11 +56,7 @@ interface BookCallFunnelProps {
 }
 
 export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
-  console.log('BookCallFunnel rendering with projectId:', projectId);
-  
   const { calendlyEvents, getRecentBookings, getMonthlyComparison } = useCalendlyData(projectId);
-  
-  console.log('Calendly events loaded:', calendlyEvents.length, calendlyEvents);
   
   // Calculate chart data based on real Calendly events
   const chartData = generateCallDataFromEvents(calendlyEvents);
