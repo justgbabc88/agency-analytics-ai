@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,7 +7,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ExternalLink, RefreshCw, Calendar, CheckCircle, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { CalendlyHistoricalSync } from "./CalendlyHistoricalSync";
 
 interface CalendlyConnectorProps {
   projectId?: string;
@@ -37,6 +37,7 @@ export const CalendlyConnector = ({
   const [eventMappings, setEventMappings] = useState<EventMapping[]>([]);
   const [loading, setLoading] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const { toast } = useToast();
 
   const handleConnect = async () => {
@@ -226,6 +227,53 @@ export const CalendlyConnector = ({
     }
   };
 
+  const autoSyncHistoricalEvents = async () => {
+    if (!projectId) return;
+
+    setSyncing(true);
+    
+    try {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const today = new Date();
+
+      console.log('Auto-syncing last 30 days of historical events...');
+      
+      const { data, error } = await supabase.functions.invoke('calendly-oauth', {
+        body: { 
+          action: 'sync_historical_events', 
+          projectId,
+          dateRange: {
+            startDate: thirtyDaysAgo.toISOString(),
+            endDate: today.toISOString()
+          }
+        }
+      });
+
+      if (error) {
+        console.error('Auto sync error:', error);
+        throw new Error(error.message || 'Failed to sync historical events');
+      }
+
+      console.log('Auto sync result:', data);
+
+      if (data.synced_events > 0) {
+        toast({
+          title: "Historical Events Synced",
+          description: `Automatically synced ${data.synced_events} events from the last 30 days`,
+        });
+      }
+
+    } catch (error) {
+      console.error('Auto historical sync error:', error);
+      // Don't show error toast for auto sync - it's less intrusive
+      console.log('Auto sync failed silently:', error.message);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const toggleEventMapping = async (eventType: EventType, isActive: boolean) => {
     if (!projectId) return;
 
@@ -242,6 +290,12 @@ export const CalendlyConnector = ({
           });
 
         if (error) throw error;
+        
+        // Auto-sync historical events when first event type is added
+        const currentMappings = eventMappings.filter(m => m.is_active);
+        if (currentMappings.length === 0) {
+          setTimeout(() => autoSyncHistoricalEvents(), 1000);
+        }
       } else {
         // Remove mapping
         const { error } = await supabase
@@ -293,122 +347,124 @@ export const CalendlyConnector = ({
   }
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            Calendly Integration
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {!isConnected ? (
-            <div className="text-center space-y-4">
-              <p className="text-gray-600">
-                Connect your Calendly account to automatically track scheduled calls and sync them with your Book Call funnel.
-              </p>
-              
-              {connecting && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <div className="flex items-center justify-center gap-2 text-blue-700">
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                    <span>Connecting to Calendly...</span>
-                  </div>
-                  <p className="text-sm text-blue-600 mt-2">
-                    Please complete the authorization in the popup window.
-                  </p>
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Calendar className="h-5 w-5" />
+          Calendly Integration
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {!isConnected ? (
+          <div className="text-center space-y-4">
+            <p className="text-gray-600">
+              Connect your Calendly account to automatically track scheduled calls and sync them with your Book Call funnel.
+            </p>
+            
+            {connecting && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center justify-center gap-2 text-blue-700">
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  <span>Connecting to Calendly...</span>
                 </div>
-              )}
-              
-              <Button 
-                onClick={handleConnect} 
-                disabled={connecting || loading}
-                className="w-full"
-              >
-                <ExternalLink className="h-4 w-4 mr-2" />
-                {connecting ? "Connecting..." : "Connect Calendly"}
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-green-600 border-green-600">
-                    <CheckCircle className="h-3 w-3 mr-1" />
-                    Connected
-                  </Badge>
-                  <Button variant="ghost" size="sm" onClick={checkConnectionStatus} disabled={loading}>
-                    <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                  </Button>
-                </div>
-                <Button variant="outline" size="sm" onClick={handleDisconnect}>
-                  Disconnect
+                <p className="text-sm text-blue-600 mt-2">
+                  Please complete the authorization in the popup window.
+                </p>
+              </div>
+            )}
+            
+            <Button 
+              onClick={handleConnect} 
+              disabled={connecting || loading}
+              className="w-full"
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              {connecting ? "Connecting..." : "Connect Calendly"}
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-green-600 border-green-600">
+                  <CheckCircle className="h-3 w-3 mr-1" />
+                  Connected
+                </Badge>
+                <Button variant="ghost" size="sm" onClick={checkConnectionStatus} disabled={loading}>
+                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                 </Button>
               </div>
-
-              {eventTypes.length > 0 && (
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="text-sm font-medium mb-3">
-                      Select Event Types to Track as "Booked Calls"
-                    </h4>
-                    <div className="space-y-3">
-                      {eventTypes.map((eventType) => (
-                        <div key={eventType.uri} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div className="flex items-center space-x-3">
-                            <Checkbox
-                              checked={isEventMapped(eventType.uri)}
-                              onCheckedChange={(checked) => 
-                                toggleEventMapping(eventType, checked as boolean)
-                              }
-                            />
-                            <div>
-                              <p className="font-medium">{eventType.name}</p>
-                              <p className="text-sm text-gray-500">
-                                {eventType.duration} minutes • {eventType.kind}
-                              </p>
-                            </div>
-                          </div>
-                          {isEventMapped(eventType.uri) && (
-                            <CheckCircle className="h-5 w-5 text-green-600" />
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {eventMappings.filter(m => m.is_active).length > 0 && (
-                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                      <p className="text-sm text-green-800">
-                        <CheckCircle className="h-4 w-4 inline mr-2" />
-                        {eventMappings.filter(m => m.is_active).length} event type(s) are being tracked
-                      </p>
-                      <p className="text-xs text-green-600 mt-1">
-                        New bookings for these events will automatically appear in your Book Call funnel dashboard
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              {eventTypes.length === 0 && !loading && (
-                <div className="text-center py-4">
-                  <p className="text-gray-500">No event types found in your Calendly account.</p>
-                  <Button variant="outline" onClick={checkConnectionStatus} className="mt-2">
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Refresh
-                  </Button>
-                </div>
-              )}
+              <Button variant="outline" size="sm" onClick={handleDisconnect}>
+                Disconnect
+              </Button>
             </div>
-          )}
-        </CardContent>
-      </Card>
 
-      {/* Historical Sync Section - Only show when connected and has mapped events */}
-      {isConnected && eventMappings.filter(m => m.is_active).length > 0 && (
-        <CalendlyHistoricalSync projectId={projectId} />
-      )}
-    </div>
+            {syncing && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div className="flex items-center gap-2 text-blue-700">
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  <span className="text-sm">Syncing historical events...</span>
+                </div>
+              </div>
+            )}
+
+            {eventTypes.length > 0 && (
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-sm font-medium mb-3">
+                    Select Event Types to Track as "Booked Calls"
+                  </h4>
+                  <div className="space-y-3">
+                    {eventTypes.map((eventType) => (
+                      <div key={eventType.uri} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <Checkbox
+                            checked={isEventMapped(eventType.uri)}
+                            onCheckedChange={(checked) => 
+                              toggleEventMapping(eventType, checked as boolean)
+                            }
+                          />
+                          <div>
+                            <p className="font-medium">{eventType.name}</p>
+                            <p className="text-sm text-gray-500">
+                              {eventType.duration} minutes • {eventType.kind}
+                            </p>
+                          </div>
+                        </div>
+                        {isEventMapped(eventType.uri) && (
+                          <CheckCircle className="h-5 w-5 text-green-600" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {eventMappings.filter(m => m.is_active).length > 0 && (
+                  <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <p className="text-sm text-green-800">
+                      <CheckCircle className="h-4 w-4 inline mr-2" />
+                      {eventMappings.filter(m => m.is_active).length} event type(s) are being tracked
+                    </p>
+                    <p className="text-xs text-green-600 mt-1">
+                      New bookings and historical events (last 30 days) will automatically appear in your Book Call funnel dashboard
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {eventTypes.length === 0 && !loading && (
+              <div className="text-center py-4">
+                <p className="text-gray-500">No event types found in your Calendly account.</p>
+                <Button variant="outline" onClick={checkConnectionStatus} className="mt-2">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refresh
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 };
