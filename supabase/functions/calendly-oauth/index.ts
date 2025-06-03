@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -34,7 +35,14 @@ serve(async (req) => {
     }
 
     // Handle JSON requests
-    const { action, projectId, eventTypeId } = await req.json()
+    const requestBody = await req.text()
+    console.log('Request body:', requestBody)
+    
+    if (!requestBody) {
+      throw new Error('No request body provided')
+    }
+
+    const { action, projectId, eventTypeId } = JSON.parse(requestBody)
 
     switch (action) {
       case 'get_auth_url':
@@ -117,102 +125,133 @@ async function handleCallback(code: string, projectId: string, supabaseClient: a
   const clientSecret = Deno.env.get('CALENDLY_CLIENT_SECRET')
   const redirectUri = `${Deno.env.get('SUPABASE_URL')}/functions/v1/calendly-oauth`
 
-  // Exchange code for access token
-  const tokenResponse = await fetch('https://auth.calendly.com/oauth/token', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({
-      grant_type: 'authorization_code',
-      client_id: clientId!,
-      client_secret: clientSecret!,
-      redirect_uri: redirectUri,
-      code: code,
-    }),
-  })
-
-  const tokenData = await tokenResponse.json()
-  console.log('Token response status:', tokenResponse.ok, tokenData)
-
-  if (!tokenResponse.ok) {
-    throw new Error(tokenData.error_description || 'Failed to get access token')
-  }
-
-  // Store the access token in the project_integrations table
-  const { error: updateError } = await supabaseClient
-    .from('project_integrations')
-    .upsert({
-      project_id: projectId,
-      platform: 'calendly',
-      is_connected: true,
-      last_sync: new Date().toISOString(),
-    })
-
-  if (updateError) {
-    console.error('Error updating project_integrations:', updateError)
-    throw updateError
-  }
-
-  // Store the access token securely in a separate table for API calls
-  const { error: tokenError } = await supabaseClient
-    .from('project_integration_data')
-    .upsert({
-      project_id: projectId,
-      platform: 'calendly',
-      data: { 
-        access_token: tokenData.access_token,
-        refresh_token: tokenData.refresh_token,
-        token_type: tokenData.token_type,
-        expires_at: tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString() : null
+  try {
+    // Exchange code for access token
+    console.log('Exchanging code for access token...')
+    const tokenResponse = await fetch('https://auth.calendly.com/oauth/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
-      synced_at: new Date().toISOString(),
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: clientId!,
+        client_secret: clientSecret!,
+        redirect_uri: redirectUri,
+        code: code,
+      }),
     })
 
-  if (tokenError) {
-    console.error('Error storing token data:', tokenError)
-    throw tokenError
+    const tokenData = await tokenResponse.json()
+    console.log('Token response status:', tokenResponse.ok)
+    console.log('Token data received:', { 
+      hasAccessToken: !!tokenData.access_token,
+      hasRefreshToken: !!tokenData.refresh_token,
+      tokenType: tokenData.token_type,
+      expiresIn: tokenData.expires_in
+    })
+
+    if (!tokenResponse.ok) {
+      console.error('Token exchange failed:', tokenData)
+      throw new Error(tokenData.error_description || 'Failed to get access token')
+    }
+
+    if (!tokenData.access_token) {
+      console.error('No access token in response:', tokenData)
+      throw new Error('No access token received from Calendly')
+    }
+
+    // First, update or create the project integration record
+    console.log('Updating project_integrations table...')
+    const { error: integrationError } = await supabaseClient
+      .from('project_integrations')
+      .upsert({
+        project_id: projectId,
+        platform: 'calendly',
+        is_connected: true,
+        last_sync: new Date().toISOString(),
+      }, {
+        onConflict: 'project_id,platform'
+      })
+
+    if (integrationError) {
+      console.error('Error updating project_integrations:', integrationError)
+      throw integrationError
+    }
+
+    // Then, store the access token securely in project_integration_data
+    console.log('Storing token data...')
+    const { error: tokenError } = await supabaseClient
+      .from('project_integration_data')
+      .upsert({
+        project_id: projectId,
+        platform: 'calendly',
+        data: { 
+          access_token: tokenData.access_token,
+          refresh_token: tokenData.refresh_token,
+          token_type: tokenData.token_type,
+          expires_at: tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString() : null,
+          scope: 'default'
+        },
+        synced_at: new Date().toISOString(),
+      }, {
+        onConflict: 'project_id,platform'
+      })
+
+    if (tokenError) {
+      console.error('Error storing token data:', tokenError)
+      throw tokenError
+    }
+
+    console.log('Successfully stored tokens for project:', projectId)
+
+    // Verify the token works by getting user info
+    console.log('Testing access token...')
+    const userResponse = await fetch('https://api.calendly.com/users/me', {
+      headers: {
+        'Authorization': `Bearer ${tokenData.access_token}`,
+      },
+    })
+
+    if (userResponse.ok) {
+      const userData = await userResponse.json()
+      console.log('Token verification successful, user:', userData.resource?.name || 'Unknown')
+    } else {
+      console.log('Token verification failed:', userResponse.status, await userResponse.text())
+    }
+
+    // Return success page that closes the popup
+    const successHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Calendly Connected</title>
+        <style>
+          body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+          .success { color: #22c55e; font-size: 24px; margin-bottom: 20px; }
+        </style>
+      </head>
+      <body>
+        <div class="success">✓ Calendly Connected Successfully!</div>
+        <p>You can now close this window.</p>
+        <script>
+          // Auto-close after 2 seconds
+          setTimeout(() => {
+            window.close();
+          }, 2000);
+        </script>
+      </body>
+      </html>
+    `
+
+    return new Response(successHtml, {
+      headers: { ...corsHeaders, 'Content-Type': 'text/html' }
+    })
+
+  } catch (error) {
+    console.error('Callback handling error:', error)
+    throw error
   }
-
-  console.log('Successfully stored tokens for project:', projectId)
-
-  // Get user's event types
-  const eventTypesResponse = await fetch('https://api.calendly.com/event_types', {
-    headers: {
-      'Authorization': `Bearer ${tokenData.access_token}`,
-    },
-  })
-
-  const eventTypesData = await eventTypesResponse.json()
-  console.log('Event types fetched:', eventTypesData.collection?.length || 0)
-
-  // Return success page that closes the popup
-  const successHtml = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Calendly Connected</title>
-      <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-        .success { color: #22c55e; font-size: 24px; margin-bottom: 20px; }
-      </style>
-    </head>
-    <body>
-      <div class="success">✓ Calendly Connected Successfully!</div>
-      <p>You can now close this window.</p>
-      <script>
-        // Auto-close after 2 seconds
-        setTimeout(() => {
-          window.close();
-        }, 2000);
-      </script>
-    </body>
-    </html>
-  `
-
-  return new Response(successHtml, {
-    headers: { ...corsHeaders, 'Content-Type': 'text/html' }
-  })
 }
 
 async function getEventTypes(projectId: string, supabaseClient: any) {
@@ -224,28 +263,38 @@ async function getEventTypes(projectId: string, supabaseClient: any) {
     .select('data')
     .eq('project_id', projectId)
     .eq('platform', 'calendly')
-    .single()
+    .maybeSingle()
 
-  console.log('Token data query result:', { tokenData, tokenError })
+  console.log('Token data query result:', { 
+    hasData: !!tokenData, 
+    error: tokenError,
+    dataKeys: tokenData?.data ? Object.keys(tokenData.data) : []
+  })
 
-  if (tokenError || !tokenData) {
-    console.error('No token data found:', tokenError)
-    throw new Error('No Calendly integration found for this project')
+  if (tokenError) {
+    console.error('Database error retrieving token:', tokenError)
+    throw new Error('Database error retrieving Calendly integration data')
+  }
+
+  if (!tokenData || !tokenData.data) {
+    console.error('No token data found for project:', projectId)
+    throw new Error('No Calendly integration found for this project. Please reconnect your Calendly account.')
   }
 
   const accessToken = tokenData.data.access_token
 
   if (!accessToken) {
-    console.error('No access token in data:', tokenData.data)
-    throw new Error('No access token found for Calendly integration')
+    console.error('No access token in stored data:', tokenData.data)
+    throw new Error('Invalid Calendly integration data. Please reconnect your Calendly account.')
   }
 
-  console.log('Making API call to Calendly with token')
+  console.log('Making API call to Calendly with stored token...')
 
   // Make actual API call to Calendly
   const eventTypesResponse = await fetch('https://api.calendly.com/event_types', {
     headers: {
       'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
     },
   })
 
@@ -253,7 +302,12 @@ async function getEventTypes(projectId: string, supabaseClient: any) {
 
   if (!eventTypesResponse.ok) {
     const errorText = await eventTypesResponse.text()
-    console.error('Calendly API error:', errorText)
+    console.error('Calendly API error:', eventTypesResponse.status, errorText)
+    
+    if (eventTypesResponse.status === 401) {
+      throw new Error('Calendly authorization expired. Please reconnect your Calendly account.')
+    }
+    
     throw new Error(`Failed to fetch event types: ${eventTypesResponse.statusText}`)
   }
 
