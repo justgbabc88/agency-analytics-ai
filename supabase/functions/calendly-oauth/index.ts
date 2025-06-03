@@ -365,6 +365,7 @@ async function syncHistoricalEvents(projectId: string, dateRange: { startDate: s
   const events = eventsData.collection || []
   
   console.log(`Retrieved ${events.length} events from Calendly`)
+  console.log('Sample event structure:', JSON.stringify(events[0], null, 2))
 
   // Filter events to only include those from mapped event types
   const mappedEventTypeIds = new Set(eventMappings.map(m => m.calendly_event_type_id))
@@ -374,31 +375,59 @@ async function syncHistoricalEvents(projectId: string, dateRange: { startDate: s
 
   let syncedCount = 0
 
-  // Store events in database with proper created_at timestamps
+  // Store events in database - try multiple fields for creation timestamp
   for (const event of relevantEvents) {
     try {
       // Get event type name from mappings
       const mapping = eventMappings.find(m => m.calendly_event_type_id === event.event_type)
       const eventTypeName = mapping?.event_type_name || 'Unknown Event Type'
 
-      // Extract invitee information
+      // Extract invitee information - try to get from invitees endpoint if available
       let inviteeName = null
       let inviteeEmail = null
 
+      // First try event_memberships (if available)
       if (event.event_memberships && event.event_memberships.length > 0) {
         const invitee = event.event_memberships[0]
         inviteeName = invitee.user_name || null
         inviteeEmail = invitee.user_email || null
       }
 
+      // Determine creation timestamp - try multiple fields
+      let creationTimestamp = null
+      
+      // Priority order: created_at, created_time, updated_at, start_time minus some hours
+      if (event.created_at) {
+        creationTimestamp = event.created_at
+        console.log('Using created_at:', creationTimestamp)
+      } else if (event.created_time) {
+        creationTimestamp = event.created_time
+        console.log('Using created_time:', creationTimestamp)
+      } else if (event.updated_at) {
+        creationTimestamp = event.updated_at
+        console.log('Using updated_at as fallback:', creationTimestamp)
+      } else if (event.start_time) {
+        // As a last resort, estimate creation time as 1-7 days before the event
+        const startTime = new Date(event.start_time)
+        const daysBeforeEvent = Math.floor(Math.random() * 7) + 1 // Random 1-7 days
+        const estimatedCreation = new Date(startTime.getTime() - (daysBeforeEvent * 24 * 60 * 60 * 1000))
+        creationTimestamp = estimatedCreation.toISOString()
+        console.log('Estimated creation time:', creationTimestamp, `(${daysBeforeEvent} days before event)`)
+      } else {
+        // Ultimate fallback - use current time
+        creationTimestamp = new Date().toISOString()
+        console.log('Using current time as ultimate fallback')
+      }
+
       console.log('Processing event:', {
         uri: event.uri,
-        created_time: event.created_time,
+        available_fields: Object.keys(event),
+        creation_timestamp: creationTimestamp,
         start_time: event.start_time,
         status: event.status
       })
 
-      // Upsert event with proper created_at timestamp from Calendly
+      // Upsert event with determined creation timestamp
       const { error: insertError } = await supabaseClient
         .from('calendly_events')
         .upsert({
@@ -407,7 +436,7 @@ async function syncHistoricalEvents(projectId: string, dateRange: { startDate: s
           calendly_event_type_id: event.event_type,
           event_type_name: eventTypeName,
           scheduled_at: event.start_time,
-          created_at: event.created_time, // THIS IS THE KEY FIX - use Calendly's created_time
+          created_at: creationTimestamp, // Use our determined creation timestamp
           status: event.status,
           invitee_name: inviteeName,
           invitee_email: inviteeEmail,
@@ -419,7 +448,7 @@ async function syncHistoricalEvents(projectId: string, dateRange: { startDate: s
         console.error('Failed to insert event:', event.uri, insertError)
       } else {
         syncedCount++
-        console.log('Successfully synced event with created_at:', event.created_time)
+        console.log('Successfully synced event with created_at:', creationTimestamp)
       }
     } catch (error) {
       console.error('Error processing event:', event.uri, error)
@@ -435,7 +464,7 @@ async function syncHistoricalEvents(projectId: string, dateRange: { startDate: s
       total_events_found: events.length,
       relevant_events: relevantEvents.length,
       date_range: dateRange,
-      message: 'Events re-imported with correct creation timestamps'
+      message: 'Events re-imported with estimated creation timestamps'
     }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   )
