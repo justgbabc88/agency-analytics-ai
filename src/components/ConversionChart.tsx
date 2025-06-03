@@ -1,4 +1,3 @@
-
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface FunnelProductConfig {
@@ -152,8 +151,8 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     );
   }
 
-  // Calculate proper Y-axis domain
-  const calculateYAxisDomain = () => {
+  // Calculate proper Y-axis domain and ticks
+  const calculateYAxisConfig = () => {
     const allValues: number[] = [];
     
     validData.forEach(row => {
@@ -165,16 +164,18 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
       });
     });
 
-    if (allValues.length === 0) return [0, 100];
+    if (allValues.length === 0) return { domain: [0, 10], ticks: [0, 2, 4, 6, 8, 10] };
 
     const min = Math.min(...allValues);
     const max = Math.max(...allValues);
     
     // If all values are the same
     if (min === max) {
-      if (min === 0) return [0, 10];
+      if (min === 0) return { domain: [0, 10], ticks: [0, 2, 4, 6, 8, 10] };
       const padding = Math.abs(min) * 0.2;
-      return [Math.max(0, min - padding), max + padding];
+      const domainMin = Math.max(0, min - padding);
+      const domainMax = max + padding;
+      return { domain: [domainMin, domainMax], ticks: undefined };
     }
     
     // For percentage metrics (0-100)
@@ -183,12 +184,40 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     );
     
     if (isPercentage && max <= 100) {
-      return [0, Math.min(100, max * 1.1)];
+      const maxValue = Math.ceil(max / 10) * 10;
+      const tickCount = Math.min(6, Math.max(3, Math.floor(maxValue / 10)));
+      const tickInterval = maxValue / tickCount;
+      const ticks = Array.from({ length: tickCount + 1 }, (_, i) => i * tickInterval);
+      return { domain: [0, maxValue], ticks };
     }
     
-    // For other metrics, add 10% padding
-    const padding = (max - min) * 0.1;
-    return [Math.max(0, min - padding), max + padding];
+    // For other metrics, calculate nice ticks
+    const range = max - min;
+    const padding = range * 0.1;
+    const domainMin = Math.max(0, min - padding);
+    const domainMax = max + padding;
+    
+    // Calculate nice tick intervals
+    const tickCount = 5;
+    const roughInterval = (domainMax - domainMin) / tickCount;
+    const magnitude = Math.pow(10, Math.floor(Math.log10(roughInterval)));
+    const normalizedInterval = roughInterval / magnitude;
+    
+    let niceInterval;
+    if (normalizedInterval <= 1) niceInterval = magnitude;
+    else if (normalizedInterval <= 2) niceInterval = 2 * magnitude;
+    else if (normalizedInterval <= 5) niceInterval = 5 * magnitude;
+    else niceInterval = 10 * magnitude;
+    
+    const niceMin = Math.floor(domainMin / niceInterval) * niceInterval;
+    const niceMax = Math.ceil(domainMax / niceInterval) * niceInterval;
+    
+    const ticks = [];
+    for (let tick = niceMin; tick <= niceMax; tick += niceInterval) {
+      ticks.push(Math.round(tick * 100) / 100); // Round to avoid floating point issues
+    }
+    
+    return { domain: [niceMin, niceMax], ticks };
   };
 
   const formatTooltipValue = (value: number, name: string) => {
@@ -210,12 +239,12 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     );
     
     if (isPercentage) {
-      return `${value.toFixed(0)}%`;
+      return `${Math.round(value)}%`;
     }
     if (metrics.some(m => m.includes('Revenue') || m.includes('Cost') || m.includes('Spend'))) {
       if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
       if (value >= 1000) return `$${(value / 1000).toFixed(0)}k`;
-      return `$${value.toFixed(0)}`;
+      return `$${Math.round(value)}`;
     }
     if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
     if (value >= 1000) return `${(value / 1000).toFixed(0)}k`;
@@ -261,7 +290,7 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     return nameMap[metric as keyof typeof nameMap] || metric.charAt(0).toUpperCase() + metric.slice(1).replace(/([A-Z])/g, ' $1');
   };
 
-  const yAxisDomain = calculateYAxisDomain();
+  const yAxisConfig = calculateYAxisConfig();
 
   return (
     <div className="bg-white">
@@ -292,7 +321,8 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
           <YAxis 
             stroke="#6b7280" 
             fontSize={12} 
-            domain={yAxisDomain}
+            domain={yAxisConfig.domain}
+            ticks={yAxisConfig.ticks}
             tickFormatter={formatYAxisTick}
             width={80}
             tick={{ fontSize: 12 }}
