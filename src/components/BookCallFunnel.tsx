@@ -2,8 +2,6 @@
 import { MetricCard } from "./MetricCard";
 import { ConversionChart } from "./ConversionChart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { useCalendlyData } from "@/hooks/useCalendlyData";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 
@@ -23,17 +21,25 @@ const generateCallDataFromEvents = (calendlyEvents: any[]) => {
       return eventDate >= dayStart && eventDate <= dayEnd;
     });
     
-    // Calculate metrics based on real data
+    // Calculate daily stats
     const totalBookings = dayEvents.length;
-    const showUpRate = totalBookings > 0 ? Math.random() * 30 + 60 : 0; // Mock show up rate for now
-    const conversionRate = totalBookings > 0 ? (totalBookings / Math.max(totalBookings * 8, 100)) * 100 : 0; // Estimate based on bookings
+    const cancelled = dayEvents.filter(event => 
+      event.status === 'canceled' || event.status === 'cancelled'
+    ).length;
+    const noShows = dayEvents.filter(event => event.status === 'no_show').length;
+    const scheduled = dayEvents.filter(event => 
+      event.status === 'active' || event.status === 'scheduled'
+    ).length;
+    const callsTaken = scheduled - noShows;
+    const showUpRate = scheduled > 0 ? ((callsTaken / scheduled) * 100) : 0;
     
     dates.push({
       date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      conversionRate: Math.max(conversionRate, Math.random() * 8 + 3),
-      roas: Math.random() * 6 + 3,
-      pageViews: Math.floor(Math.random() * 300) + 150,
-      bookings: totalBookings
+      totalBookings,
+      callsTaken,
+      cancelled,
+      showUpRate: Math.max(showUpRate, 0),
+      pageViews: Math.floor(Math.random() * 300) + 150 // Mock page views
     });
   }
   return dates;
@@ -126,26 +132,6 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   const costPerBooking = callStats.totalBookings > 0 ? (1500 / callStats.totalBookings) : 0; // Mock cost calculation
   const previousCostPerBooking = previous30Days.length > 0 ? costPerBooking * 1.15 : 0;
 
-  // Get recent events for the table
-  const recentEvents = calendlyEvents
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    .slice(0, 10);
-
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status) {
-      case 'active':
-      case 'scheduled':
-        return 'default';
-      case 'canceled':
-      case 'cancelled':
-        return 'destructive';
-      case 'no_show':
-        return 'secondary';
-      default:
-        return 'outline';
-    }
-  };
-
   // Show a message if no project is selected
   if (!projectId) {
     return (
@@ -194,18 +180,12 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
           <CardTitle className="text-lg font-semibold">Call Stats</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <MetricCard 
               title="Total Bookings" 
               value={callStats.totalBookings} 
               previousValue={previousStats.totalBookings}
               description="All Calendly bookings"
-            />
-            <MetricCard 
-              title="Calls Scheduled" 
-              value={callStats.scheduled} 
-              previousValue={previousStats.scheduled}
-              description="Active bookings"
             />
             <MetricCard 
               title="Calls Taken" 
@@ -229,62 +209,11 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
           </div>
           <ConversionChart 
             data={chartData}
-            title="Call Booking Trends (Last 30 Days)"
-            metrics={['conversionRate', 'bookings']}
+            title="Call Performance Trends (Last 30 Days)"
+            metrics={['totalBookings', 'callsTaken', 'cancelled', 'showUpRate']}
           />
         </CardContent>
       </Card>
-
-      {/* Recent Calendly Events */}
-      {calendlyEvents.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold">Recent Calendly Events</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Event Type</TableHead>
-                  <TableHead>Invitee</TableHead>
-                  <TableHead>Scheduled For</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {recentEvents.map((event) => (
-                  <TableRow key={event.id}>
-                    <TableCell className="font-medium">{event.event_type_name}</TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{event.invitee_name || 'N/A'}</div>
-                        <div className="text-sm text-gray-500">{event.invitee_email || 'N/A'}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {format(new Date(event.scheduled_at), 'MMM dd, yyyy HH:mm')}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={getStatusBadgeVariant(event.status)}>
-                        {event.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {format(new Date(event.created_at), 'MMM dd, yyyy')}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            {recentEvents.length === 0 && (
-              <div className="text-center py-8 text-gray-500">
-                No events found. Events will appear here once synced from Calendly.
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       {/* Sales Conversion */}
       <Card>
@@ -301,7 +230,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
           <ConversionChart 
             data={chartData}
             title="Sales Performance"
-            metrics={['conversionRate', 'roas']}
+            metrics={['showUpRate']}
           />
         </CardContent>
       </Card>
