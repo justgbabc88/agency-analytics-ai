@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -248,6 +247,177 @@ async function getEventTypes(projectId: string, supabaseClient: any) {
   )
 }
 
+async function syncHistoricalEvents(projectId: string, dateRange: { startDate: string, endDate: string }, supabaseClient: any) {
+  console.log('=== SYNC HISTORICAL EVENTS ===')
+  console.log('Project ID:', projectId)
+  console.log('Date Range:', dateRange)
+  
+  if (!projectId) {
+    throw new Error('Project ID is required')
+  }
+  
+  // Check integration exists and is connected
+  const { data: integration, error: integrationError } = await supabaseClient
+    .from('project_integrations')
+    .select('*')
+    .eq('project_id', projectId)
+    .eq('platform', 'calendly')
+    .eq('is_connected', true)
+    .maybeSingle()
+
+  if (integrationError) {
+    console.error('Integration query error:', integrationError)
+    throw new Error(`Database error: ${integrationError.message}`)
+  }
+
+  if (!integration) {
+    console.error('No connected integration found')
+    throw new Error('No Calendly integration found for this project. Please connect your Calendly account first.')
+  }
+
+  // Get token data
+  const { data: tokenData, error: tokenError } = await supabaseClient
+    .from('project_integration_data')
+    .select('data')
+    .eq('project_id', projectId)
+    .eq('platform', 'calendly')
+    .maybeSingle()
+
+  if (tokenError || !tokenData?.data?.access_token) {
+    console.error('Token error:', tokenError)
+    throw new Error('Invalid token data. Please reconnect your Calendly account.')
+  }
+
+  const accessToken = tokenData.data.access_token
+  const userInfo = tokenData.data.user_info
+
+  if (!userInfo?.uri) {
+    console.error('No user URI found in stored data')
+    throw new Error('User information incomplete. Please reconnect your Calendly account.')
+  }
+
+  // Get active event mappings to know which event types to sync
+  const { data: eventMappings, error: mappingsError } = await supabaseClient
+    .from('calendly_event_mappings')
+    .select('calendly_event_type_id, event_type_name')
+    .eq('project_id', projectId)
+    .eq('is_active', true)
+
+  if (mappingsError) {
+    console.error('Event mappings error:', mappingsError)
+    throw new Error('Failed to fetch event mappings')
+  }
+
+  if (!eventMappings || eventMappings.length === 0) {
+    console.log('No active event mappings found')
+    return {
+      synced_events: 0,
+      message: 'No event types are currently being tracked. Please select event types to track first.'
+    }
+  }
+
+  console.log(`Found ${eventMappings.length} active event type mappings`)
+
+  // Fetch scheduled events from Calendly
+  const eventsUrl = `https://api.calendly.com/scheduled_events?user=${encodeURIComponent(userInfo.uri)}&min_start_time=${dateRange.startDate}&max_start_time=${dateRange.endDate}&count=100&sort=start_time:desc`
+  console.log('Fetching events from:', eventsUrl)
+  
+  const eventsResponse = await fetch(eventsUrl, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  })
+
+  if (!eventsResponse.ok) {
+    console.error('Events API error:', eventsResponse.status)
+    const errorText = await eventsResponse.text()
+    console.error('Error response:', errorText)
+    
+    if (eventsResponse.status === 401) {
+      // Mark as disconnected
+      await supabaseClient
+        .from('project_integrations')
+        .update({ is_connected: false })
+        .eq('project_id', projectId)
+        .eq('platform', 'calendly')
+      
+      throw new Error('Calendly authorization expired. Please reconnect your Calendly account.')
+    }
+    
+    throw new Error(`Failed to fetch events: ${eventsResponse.status} - ${errorText}`)
+  }
+
+  const eventsData = await eventsResponse.json()
+  const events = eventsData.collection || []
+  
+  console.log(`Retrieved ${events.length} events from Calendly`)
+
+  // Filter events to only include those from mapped event types
+  const mappedEventTypeIds = new Set(eventMappings.map(m => m.calendly_event_type_id))
+  const relevantEvents = events.filter(event => mappedEventTypeIds.has(event.event_type))
+
+  console.log(`${relevantEvents.length} events match tracked event types`)
+
+  let syncedCount = 0
+
+  // Store events in database
+  for (const event of relevantEvents) {
+    try {
+      // Get event type name from mappings
+      const mapping = eventMappings.find(m => m.calendly_event_type_id === event.event_type)
+      const eventTypeName = mapping?.event_type_name || 'Unknown Event Type'
+
+      // Extract invitee information
+      let inviteeName = null
+      let inviteeEmail = null
+
+      if (event.event_memberships && event.event_memberships.length > 0) {
+        const invitee = event.event_memberships[0]
+        inviteeName = invitee.user_name || null
+        inviteeEmail = invitee.user_email || null
+      }
+
+      // Upsert event to avoid duplicates
+      const { error: insertError } = await supabaseClient
+        .from('calendly_events')
+        .upsert({
+          project_id: projectId,
+          calendly_event_id: event.uri,
+          calendly_event_type_id: event.event_type,
+          event_type_name: eventTypeName,
+          scheduled_at: event.start_time,
+          status: event.status,
+          invitee_name: inviteeName,
+          invitee_email: inviteeEmail,
+        }, {
+          onConflict: 'project_id,calendly_event_id'
+        })
+
+      if (insertError) {
+        console.error('Failed to insert event:', event.uri, insertError)
+      } else {
+        syncedCount++
+      }
+    } catch (error) {
+      console.error('Error processing event:', event.uri, error)
+    }
+  }
+
+  console.log(`Successfully synced ${syncedCount} events`)
+
+  return new Response(
+    JSON.stringify({ 
+      success: true, 
+      synced_events: syncedCount,
+      total_events_found: events.length,
+      relevant_events: relevantEvents.length,
+      date_range: dateRange
+    }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  )
+}
+
 async function disconnectCalendly(projectId: string, supabaseClient: any) {
   console.log('=== DISCONNECT CALENDLY ===')
   
@@ -303,7 +473,7 @@ serve(async (req) => {
       throw new Error('No request body provided')
     }
 
-    const { action, projectId, code } = JSON.parse(requestBody)
+    const { action, projectId, code, dateRange } = JSON.parse(requestBody)
     console.log('Action:', action, 'ProjectId:', projectId)
 
     switch (action) {
@@ -315,6 +485,9 @@ serve(async (req) => {
       
       case 'get_event_types':
         return await getEventTypes(projectId, supabaseClient)
+      
+      case 'sync_historical_events':
+        return await syncHistoricalEvents(projectId, dateRange, supabaseClient)
       
       case 'disconnect':
         return await disconnectCalendly(projectId, supabaseClient)

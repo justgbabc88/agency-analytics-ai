@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 export const useCalendlyData = (projectId?: string) => {
-  const { data: calendlyEvents, isLoading } = useQuery({
+  const { data: calendlyEvents, isLoading, refetch } = useQuery({
     queryKey: ['calendly-events', projectId],
     queryFn: async () => {
       if (!projectId) return [];
@@ -70,11 +70,46 @@ export const useCalendlyData = (projectId?: string) => {
     return { current: currentMonth, previous: previousMonth };
   };
 
+  // Get events by creation date (for events created on specific days)
+  const getEventsByCreationDate = (targetDate: Date) => {
+    if (!calendlyEvents) return [];
+    
+    const startOfDay = new Date(targetDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(targetDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    return calendlyEvents.filter(event => {
+      const createdAt = new Date(event.created_at);
+      return createdAt >= startOfDay && createdAt <= endOfDay;
+    });
+  };
+
+  // Get events by scheduled date
+  const getEventsByScheduledDate = (targetDate: Date) => {
+    if (!calendlyEvents) return [];
+    
+    const startOfDay = new Date(targetDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(targetDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    return calendlyEvents.filter(event => {
+      const scheduledAt = new Date(event.scheduled_at);
+      return scheduledAt >= startOfDay && scheduledAt <= endOfDay;
+    });
+  };
+
   return {
     calendlyEvents: calendlyEvents || [],
     eventMappings: eventMappings || [],
     isLoading,
+    refetch,
     getRecentBookings,
     getMonthlyComparison,
+    getEventsByCreationDate,
+    getEventsByScheduledDate,
   };
 };
