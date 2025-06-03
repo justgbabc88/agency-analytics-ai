@@ -1,9 +1,8 @@
-
 import { MetricCard } from "./MetricCard";
 import { ConversionChart } from "./ConversionChart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCalendlyData } from "@/hooks/useCalendlyData";
-import { format, subDays, startOfDay, endOfDay, isWithinInterval, parseISO, isValid } from "date-fns";
+import { format, subDays, startOfDay, endOfDay, isWithinInterval, parseISO, isValid, isSameDay } from "date-fns";
 import { AdvancedDateRangePicker } from "./AdvancedDateRangePicker";
 import { useState } from "react";
 
@@ -20,61 +19,49 @@ const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Da
   console.log('Total days in range:', daysDiff);
   console.log('Total Calendly events available:', calendlyEvents.length);
   
-  // Debug: Log all event created dates to understand the data
-  console.log('All event created dates in dataset:');
-  calendlyEvents.forEach((event, index) => {
-    if (index < 10) { // Log first 10 events
-      console.log(`Event ${index + 1}:`, {
-        id: event.id,
-        created_at: event.created_at,
-        scheduled_at: event.scheduled_at,
-        parsed_created: event.created_at ? parseISO(event.created_at) : null,
-        status: event.status
-      });
-    }
+  // Debug: Log first few events with their actual created dates
+  console.log('Sample events with created_at dates:');
+  calendlyEvents.slice(0, 5).forEach((event, index) => {
+    console.log(`Event ${index + 1}:`, {
+      id: event.id,
+      created_at: event.created_at,
+      parsed_created: event.created_at ? parseISO(event.created_at) : null,
+      formatted_created: event.created_at ? format(parseISO(event.created_at), 'yyyy-MM-dd HH:mm:ss') : null,
+      status: event.status
+    });
   });
   
   for (let i = 0; i <= daysDiff; i++) {
-    const date = new Date(startDate);
-    date.setDate(date.getDate() + i);
+    const currentDate = new Date(startDate);
+    currentDate.setDate(currentDate.getDate() + i);
     
-    // Use local date boundaries to avoid timezone issues
-    const dayStart = startOfDay(date);
-    const dayEnd = endOfDay(date);
+    console.log(`\n--- Processing ${format(currentDate, 'yyyy-MM-dd')} ---`);
     
-    console.log(`\n--- Processing ${format(date, 'yyyy-MM-dd')} ---`);
-    console.log('Day boundaries:', {
-      start: format(dayStart, 'yyyy-MM-dd HH:mm:ss'),
-      end: format(dayEnd, 'yyyy-MM-dd HH:mm:ss')
-    });
-    
-    // Filter events CREATED on this day (not scheduled)
+    // Filter events CREATED on this specific day using isSameDay for accuracy
     const eventsCreatedThisDay = calendlyEvents.filter(event => {
       if (!event.created_at) {
-        console.warn('Event missing created_at:', event.id);
         return false;
       }
       
       try {
         const createdDate = parseISO(event.created_at);
         if (!isValid(createdDate)) {
-          console.warn('Invalid created date:', event.created_at);
           return false;
         }
         
-        const isInDay = createdDate >= dayStart && createdDate <= dayEnd;
+        // Use isSameDay to avoid timezone boundary issues
+        const isOnThisDay = isSameDay(createdDate, currentDate);
         
-        if (isInDay) {
+        if (isOnThisDay) {
           console.log('✓ Event created on this day:', {
             id: event.id,
-            created_at: event.created_at,
-            parsed_date: format(createdDate, 'yyyy-MM-dd HH:mm:ss'),
-            scheduled_at: event.scheduled_at,
+            created_at: format(createdDate, 'yyyy-MM-dd HH:mm:ss'),
+            target_date: format(currentDate, 'yyyy-MM-dd'),
             status: event.status
           });
         }
         
-        return isInDay;
+        return isOnThisDay;
       } catch (error) {
         console.warn('Error parsing created date:', event.created_at, error);
         return false;
@@ -99,7 +86,7 @@ const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Da
     const pageViews = Math.floor(Math.random() * 300) + 150;
     
     dates.push({
-      date: format(date, 'MMM d'),
+      date: format(currentDate, 'MMM d'),
       totalBookings: callsBooked,
       callsBooked,
       callsTaken,
