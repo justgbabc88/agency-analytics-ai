@@ -1,4 +1,4 @@
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 interface FunnelProductConfig {
   id: string;
@@ -29,7 +29,6 @@ interface ConversionChartProps {
     callsTaken?: number;
     callsBooked?: number;
     cancelled?: number;
-    showUpRate?: number;
     [key: string]: any;
   }>;
   title: string;
@@ -74,12 +73,11 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     downsell2Rate: '#06B6D4',
     totalBookings: '#10B981',
     callsTaken: '#3B82F6', 
-    callsBooked: '#10B981',
-    cancelled: '#EF4444',
-    showUpRate: '#8B5CF6'
+    cancelled: '#EF4444'
   };
 
   const getMetricColor = (metric: string) => {
+    // Check if it's a product-specific metric and we have product config
     if (productConfig) {
       if (metric === 'bumpProductBuyers' || metric === 'bumpRate' || metric === 'bump') {
         return productConfig.bump?.color || defaultColors.bumpProductBuyers || '#3B82F6';
@@ -98,157 +96,85 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
       }
     }
     
-    return defaultColors[metric as keyof typeof defaultColors] || '#6B7280';
+    // Default colors for other metrics - add callsBooked
+    const allColors = {
+      ...defaultColors,
+      callsBooked: '#10B981'
+    };
+    return allColors[metric as keyof typeof allColors] || '#6B7280';
   };
 
-  // Clean and validate data
-  if (!Array.isArray(data) || !Array.isArray(metrics)) {
-    return (
-      <div className="bg-white p-4 rounded-lg border border-gray-200">
-        <h3 className="text-base font-semibold text-gray-800 mb-3">{title}</h3>
-        <div className="flex items-center justify-center h-48 text-gray-500">
-          <div className="text-center">
-            <p>Invalid data format</p>
-            <p className="text-sm mt-1">Please check your data structure</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Enhanced Y-axis domain calculation for better proportionality
+  const calculateYAxisDomain = () => {
+    if (!Array.isArray(data) || !Array.isArray(metrics) || data.length === 0) {
+      return undefined;
+    }
 
-  // Filter and clean data
-  const validData = data
-    .filter(row => row && row.date)
-    .map(row => {
-      const cleanedRow = { ...row };
-      metrics.forEach(metric => {
-        if (cleanedRow[metric] !== undefined && cleanedRow[metric] !== null) {
-          const numValue = Number(cleanedRow[metric]);
-          cleanedRow[metric] = isNaN(numValue) ? 0 : numValue;
-        }
-      });
-      return cleanedRow;
-    })
-    .filter(row => 
-      metrics.some(metric => 
-        row[metric] !== undefined && 
-        row[metric] !== null &&
-        !isNaN(Number(row[metric]))
-      )
-    );
-
-  if (validData.length === 0) {
-    return (
-      <div className="bg-white p-4 rounded-lg border border-gray-200">
-        <h3 className="text-base font-semibold text-gray-800 mb-3">{title}</h3>
-        <div className="flex items-center justify-center h-48 text-gray-500">
-          <div className="text-center">
-            <p>No data available for the selected metrics</p>
-            <p className="text-sm mt-1">Try adjusting your date range or field mappings</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Calculate proper Y-axis domain and ticks
-  const calculateYAxisConfig = () => {
     const allValues: number[] = [];
     
-    validData.forEach(row => {
+    data.forEach(row => {
       metrics.forEach(metric => {
         const value = row[metric];
-        if (typeof value === 'number' && !isNaN(value)) {
-          allValues.push(value);
+        if (value !== undefined && value !== null && !isNaN(Number(value))) {
+          allValues.push(Number(value));
         }
       });
     });
 
-    if (allValues.length === 0) return { domain: [0, 10], ticks: [0, 2, 4, 6, 8, 10] };
+    if (allValues.length === 0) return undefined;
 
     const min = Math.min(...allValues);
     const max = Math.max(...allValues);
+    const range = max - min;
     
-    // If all values are the same
-    if (min === max) {
-      if (min === 0) return { domain: [0, 10], ticks: [0, 2, 4, 6, 8, 10] };
-      const padding = Math.abs(min) * 0.2;
+    // For conversion rates (percentages), use tighter bounds
+    const isPercentageMetric = metrics.some(m => m.includes('Rate') || m.includes('CTR'));
+    
+    if (isPercentageMetric && range < 10) {
+      // For small percentage ranges, add minimal padding
+      const padding = Math.max(0.5, range * 0.1);
+      return [Math.max(0, min - padding), max + padding];
+    }
+    
+    if (range > 0) {
+      // Add 10% padding for better visualization
+      const padding = range * 0.1;
       const domainMin = Math.max(0, min - padding);
       const domainMax = max + padding;
-      return { domain: [domainMin, domainMax], ticks: undefined };
+      return [domainMin, domainMax];
     }
     
-    // For percentage metrics (0-100)
-    const isPercentage = metrics.some(m => 
-      m.includes('Rate') || m.includes('CTR') || m.includes('showUp')
-    );
-    
-    if (isPercentage && max <= 100) {
-      const maxValue = Math.ceil(max / 10) * 10;
-      const tickCount = Math.min(6, Math.max(3, Math.floor(maxValue / 10)));
-      const tickInterval = maxValue / tickCount;
-      const ticks = Array.from({ length: tickCount + 1 }, (_, i) => i * tickInterval);
-      return { domain: [0, maxValue], ticks };
-    }
-    
-    // For other metrics, calculate nice ticks
-    const range = max - min;
-    const padding = range * 0.1;
-    const domainMin = Math.max(0, min - padding);
-    const domainMax = max + padding;
-    
-    // Calculate nice tick intervals
-    const tickCount = 5;
-    const roughInterval = (domainMax - domainMin) / tickCount;
-    const magnitude = Math.pow(10, Math.floor(Math.log10(roughInterval)));
-    const normalizedInterval = roughInterval / magnitude;
-    
-    let niceInterval;
-    if (normalizedInterval <= 1) niceInterval = magnitude;
-    else if (normalizedInterval <= 2) niceInterval = 2 * magnitude;
-    else if (normalizedInterval <= 5) niceInterval = 5 * magnitude;
-    else niceInterval = 10 * magnitude;
-    
-    const niceMin = Math.floor(domainMin / niceInterval) * niceInterval;
-    const niceMax = Math.ceil(domainMax / niceInterval) * niceInterval;
-    
-    const ticks = [];
-    for (let tick = niceMin; tick <= niceMax; tick += niceInterval) {
-      ticks.push(Math.round(tick * 100) / 100); // Round to avoid floating point issues
-    }
-    
-    return { domain: [niceMin, niceMax], ticks };
+    return undefined;
   };
 
   const formatTooltipValue = (value: number, name: string) => {
-    if (name.includes('Rate') || name.includes('CTR') || name.includes('showUp')) {
-      return `${value.toFixed(1)}%`;
+    if (name.includes('Rate') || name.includes('CTR')) {
+      return `${value.toFixed(2)}%`;
     }
-    if (name.includes('Revenue') || name.includes('Cost') || name.includes('Spend')) {
+    if (name.includes('Revenue') || name.includes('Cost') || name.includes('CPC') || name.includes('Spend') || name.includes('CPM')) {
       return `$${value.toLocaleString()}`;
     }
     if (name.includes('ROAS')) {
       return value.toFixed(2);
     }
-    return Math.round(value).toLocaleString();
+    return value.toLocaleString();
   };
 
+  // Enhanced Y-axis tick formatting
   const formatYAxisTick = (value: number) => {
-    const isPercentage = metrics.some(m => 
-      m.includes('Rate') || m.includes('CTR') || m.includes('showUp')
-    );
+    const isPercentageMetric = metrics.some(m => m.includes('Rate') || m.includes('CTR'));
     
-    if (isPercentage) {
-      return `${Math.round(value)}%`;
+    if (isPercentageMetric) {
+      return `${value.toFixed(1)}%`;
     }
     if (metrics.some(m => m.includes('Revenue') || m.includes('Cost') || m.includes('Spend'))) {
       if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
       if (value >= 1000) return `$${(value / 1000).toFixed(0)}k`;
-      return `$${Math.round(value)}`;
+      return `$${value.toFixed(0)}`;
     }
     if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
     if (value >= 1000) return `${(value / 1000).toFixed(0)}k`;
-    return Math.round(value).toString();
+    return value.toFixed(0);
   };
 
   const formatMetricName = (metric: string) => {
@@ -283,49 +209,100 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
       totalBookings: 'Total Bookings',
       callsTaken: 'Calls Taken',
       callsBooked: 'Calls Booked',
-      cancelled: 'Cancelled',
-      showUpRate: 'Show Up Rate'
+      cancelled: 'Cancelled'
     };
 
     return nameMap[metric as keyof typeof nameMap] || metric.charAt(0).toUpperCase() + metric.slice(1).replace(/([A-Z])/g, ' $1');
   };
 
-  const yAxisConfig = calculateYAxisConfig();
+  // Ensure data and metrics are arrays before filtering
+  if (!Array.isArray(data) || !Array.isArray(metrics)) {
+    return (
+      <div className="bg-white p-4 rounded-lg border border-gray-200">
+        <h3 className="text-base font-semibold text-gray-800 mb-3">{title}</h3>
+        <div className="flex items-center justify-center h-48 text-gray-500">
+          <div className="text-center">
+            <p>Invalid data format</p>
+            <p className="text-sm mt-1">Please check your data structure</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Modified filtering logic - include all data points to maintain daily continuity
+  // Only filter out data where ALL metrics are undefined/null, but keep zero values
+  const filteredData = data.filter(row => 
+    metrics.length > 0 && metrics.some(metric => 
+      row[metric] !== undefined && 
+      row[metric] !== null
+    )
+  );
+
+  if (filteredData.length === 0) {
+    return (
+      <div className="bg-white p-4 rounded-lg border border-gray-200">
+        <h3 className="text-base font-semibold text-gray-800 mb-3">{title}</h3>
+        <div className="flex items-center justify-center h-48 text-gray-500">
+          <div className="text-center">
+            <p>No data available for the selected metrics</p>
+            <p className="text-sm mt-1">Try adjusting your date range or field mappings</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Calculate trend line for each metric
+  const calculateTrendLine = (metric: string) => {
+    const validData = filteredData.filter(d => d[metric] !== undefined && d[metric] !== null);
+    if (validData.length < 2) return null;
+
+    const xValues = validData.map((_, index) => index);
+    const yValues = validData.map(d => Number(d[metric]) || 0);
+    
+    const n = xValues.length;
+    const sumX = xValues.reduce((sum, x) => sum + x, 0);
+    const sumY = yValues.reduce((sum, y) => sum + y, 0);
+    const sumXY = xValues.reduce((sum, x, i) => sum + x * yValues[i], 0);
+    const sumXX = xValues.reduce((sum, x) => sum + x * x, 0);
+    
+    const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / n;
+    
+    return { slope, intercept };
+  };
+
+  const yAxisDomain = calculateYAxisDomain();
 
   return (
     <div className="bg-white">
       {title && (
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-3">
           <h3 className="text-base font-semibold text-gray-800">{title}</h3>
           <div className="text-xs text-gray-500">
-            {validData.length} data point{validData.length !== 1 ? 's' : ''}
+            {filteredData.length} data point{filteredData.length !== 1 ? 's' : ''}
           </div>
         </div>
       )}
-      <ResponsiveContainer width="100%" height={280}>
-        <LineChart 
-          data={validData}
-          margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-        >
+      <ResponsiveContainer width="100%" height={220}>
+        <LineChart data={filteredData}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
           <XAxis 
             dataKey="date" 
             stroke="#6b7280"
-            fontSize={12}
+            fontSize={10}
             angle={-45}
             textAnchor="end"
             height={60}
-            interval={validData.length > 10 ? Math.floor(validData.length / 8) : 0}
-            tick={{ fontSize: 12 }}
+            interval={0}
           />
           <YAxis 
             stroke="#6b7280" 
-            fontSize={12} 
-            domain={yAxisConfig.domain}
-            ticks={yAxisConfig.ticks}
+            fontSize={10} 
+            domain={yAxisDomain}
             tickFormatter={formatYAxisTick}
-            width={80}
-            tick={{ fontSize: 12 }}
+            width={60}
           />
           <Tooltip 
             contentStyle={{
@@ -337,33 +314,35 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
             }}
             formatter={formatTooltipValue}
             labelStyle={{ color: '#374151', fontWeight: '500' }}
-            labelFormatter={(label) => `Date: ${label}`}
           />
+          {/* Enhanced trend lines with better visibility */}
           {metrics.map(metric => {
-            const hasData = validData.some(d => 
-              d[metric] !== undefined && 
-              d[metric] !== null && 
-              !isNaN(Number(d[metric]))
-            );
+            const trendLine = calculateTrendLine(metric);
+            return trendLine && filteredData.length > 1 ? (
+              <ReferenceLine 
+                key={`trend-${metric}`}
+                segment={[
+                  { x: filteredData[0]?.date, y: trendLine.intercept },
+                  { x: filteredData[filteredData.length - 1]?.date, y: trendLine.intercept + trendLine.slope * (filteredData.length - 1) }
+                ]}
+                stroke={getMetricColor(metric)}
+                strokeDasharray="4 4"
+                strokeWidth={1.5}
+                opacity={0.7}
+              />
+            ) : null;
+          })}
+          {metrics.map(metric => {
+            const hasData = filteredData.some(d => d[metric] !== undefined && d[metric] !== null);
             return hasData ? (
               <Line 
                 key={metric}
                 type="monotone" 
                 dataKey={metric} 
                 stroke={getMetricColor(metric)}
-                strokeWidth={2}
-                dot={{ 
-                  fill: getMetricColor(metric), 
-                  strokeWidth: 2, 
-                  r: 3,
-                  stroke: getMetricColor(metric)
-                }}
-                activeDot={{ 
-                  r: 5, 
-                  strokeWidth: 2,
-                  stroke: getMetricColor(metric),
-                  fill: getMetricColor(metric)
-                }}
+                strokeWidth={2.5}
+                dot={{ fill: getMetricColor(metric), strokeWidth: 2, r: 4 }}
+                activeDot={{ r: 6, strokeWidth: 2 }}
                 connectNulls={false}
                 name={formatMetricName(metric)}
               />
