@@ -11,22 +11,28 @@ const generateCallDataFromEvents = (calendlyEvents: any[]) => {
     const date = new Date();
     date.setDate(date.getDate() - i);
     
-    // Get events for this specific day
+    // Get events created on this specific day (not scheduled for this day)
     const dayStart = startOfDay(date);
     const dayEnd = endOfDay(date);
     
     const dayEvents = calendlyEvents.filter(event => {
+      const eventCreatedDate = new Date(event.created_at);
+      return eventCreatedDate >= dayStart && eventCreatedDate <= dayEnd;
+    });
+    
+    // Get events scheduled for this day (for calls taken and cancelled calculations)
+    const scheduledEvents = calendlyEvents.filter(event => {
       const eventDate = new Date(event.scheduled_at);
       return eventDate >= dayStart && eventDate <= dayEnd;
     });
     
     // Calculate daily stats
-    const totalBookings = dayEvents.length;
-    const cancelled = dayEvents.filter(event => 
+    const totalBookings = dayEvents.length; // Based on creation date
+    const cancelled = scheduledEvents.filter(event => 
       event.status === 'canceled' || event.status === 'cancelled'
     ).length;
-    const noShows = dayEvents.filter(event => event.status === 'no_show').length;
-    const scheduled = dayEvents.filter(event => 
+    const noShows = scheduledEvents.filter(event => event.status === 'no_show').length;
+    const scheduled = scheduledEvents.filter(event => 
       event.status === 'active' || event.status === 'scheduled'
     ).length;
     const callsTaken = scheduled - noShows;
