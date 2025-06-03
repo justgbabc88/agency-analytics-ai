@@ -21,15 +21,13 @@ const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Da
   console.log('Total Calendly events available:', calendlyEvents.length);
   
   // Debug: Log all event dates to understand the data
-  console.log('All event dates in dataset:');
+  console.log('All event scheduled dates in dataset:');
   calendlyEvents.forEach((event, index) => {
     if (index < 10) { // Log first 10 events
       console.log(`Event ${index + 1}:`, {
         id: event.id,
         scheduled_at: event.scheduled_at,
-        created_at: event.created_at,
         parsed_scheduled: event.scheduled_at ? parseISO(event.scheduled_at) : null,
-        parsed_created: event.created_at ? parseISO(event.created_at) : null,
         status: event.status
       });
     }
@@ -49,60 +47,44 @@ const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Da
       end: format(dayEnd, 'yyyy-MM-dd HH:mm:ss')
     });
     
-    // Filter events for this day - check both scheduled_at and created_at
-    const eventsCreatedThisDay = calendlyEvents.filter(event => {
-      // Use created_at if available, otherwise fall back to scheduled_at
-      const eventDateStr = event.created_at || event.scheduled_at;
-      if (!eventDateStr) return false;
+    // Filter events scheduled for this day
+    const eventsScheduledThisDay = calendlyEvents.filter(event => {
+      if (!event.scheduled_at) return false;
       
       try {
-        const eventDate = parseISO(eventDateStr);
-        if (!isValid(eventDate)) {
-          console.warn('Invalid date:', eventDateStr);
+        const scheduledDate = parseISO(event.scheduled_at);
+        if (!isValid(scheduledDate)) {
+          console.warn('Invalid scheduled date:', event.scheduled_at);
           return false;
         }
         
-        const isInDay = eventDate >= dayStart && eventDate <= dayEnd;
+        const isInDay = scheduledDate >= dayStart && scheduledDate <= dayEnd;
         
         if (isInDay) {
           console.log('✓ Event found for this day:', {
             id: event.id,
-            date_used: eventDateStr,
-            parsed_date: format(eventDate, 'yyyy-MM-dd HH:mm:ss'),
+            scheduled_at: event.scheduled_at,
+            parsed_date: format(scheduledDate, 'yyyy-MM-dd HH:mm:ss'),
             status: event.status
           });
         }
         
         return isInDay;
       } catch (error) {
-        console.warn('Error parsing event date:', eventDateStr, error);
+        console.warn('Error parsing scheduled date:', event.scheduled_at, error);
         return false;
       }
     });
     
-    // Also check events scheduled for this day (for reference)
-    const eventsScheduledThisDay = calendlyEvents.filter(event => {
-      if (!event.scheduled_at) return false;
-      
-      try {
-        const scheduledDate = parseISO(event.scheduled_at);
-        if (!isValid(scheduledDate)) return false;
-        return scheduledDate >= dayStart && scheduledDate <= dayEnd;
-      } catch (error) {
-        return false;
-      }
-    });
-    
-    console.log(`Events created this day: ${eventsCreatedThisDay.length}`);
     console.log(`Events scheduled this day: ${eventsScheduledThisDay.length}`);
     
-    // Calculate daily stats based on events created this day
-    const callsBooked = eventsCreatedThisDay.length;
-    const cancelled = eventsCreatedThisDay.filter(event => 
+    // Calculate daily stats based on events scheduled this day
+    const callsBooked = eventsScheduledThisDay.length;
+    const cancelled = eventsScheduledThisDay.filter(event => 
       event.status === 'canceled' || event.status === 'cancelled'
     ).length;
-    const noShows = eventsCreatedThisDay.filter(event => event.status === 'no_show').length;
-    const scheduled = eventsCreatedThisDay.filter(event => 
+    const noShows = eventsScheduledThisDay.filter(event => event.status === 'no_show').length;
+    const scheduled = eventsScheduledThisDay.filter(event => 
       event.status === 'active' || event.status === 'scheduled'
     ).length;
     const callsTaken = Math.max(0, scheduled - noShows);
@@ -153,17 +135,15 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   const recentBookings = getRecentBookings(7);
   const monthlyComparison = getMonthlyComparison();
 
-  // Filter events within the selected date range for statistics
+  // Filter events within the selected date range for statistics (using scheduled_at)
   const filteredEvents = calendlyEvents.filter(event => {
-    // Use created_at if available, otherwise fall back to scheduled_at
-    const eventDateStr = event.created_at || event.scheduled_at;
-    if (!eventDateStr) return false;
+    if (!event.scheduled_at) return false;
     
     try {
-      const eventDate = parseISO(eventDateStr);
-      if (!isValid(eventDate)) return false;
+      const scheduledDate = parseISO(event.scheduled_at);
+      if (!isValid(scheduledDate)) return false;
       
-      return isWithinInterval(eventDate, { start: startOfDay(dateRange.from), end: endOfDay(dateRange.to) });
+      return isWithinInterval(scheduledDate, { start: startOfDay(dateRange.from), end: endOfDay(dateRange.to) });
     } catch (error) {
       console.warn('Error filtering event by date:', event, error);
       return false;
@@ -173,7 +153,6 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   console.log('Filtered events for metrics:', filteredEvents.length);
   console.log('Filtered events sample:', filteredEvents.slice(0, 5).map(e => ({ 
     id: e.id, 
-    created_at: e.created_at,
     scheduled_at: e.scheduled_at, 
     status: e.status 
   })));
@@ -205,27 +184,25 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   // Calculate show up rate
   const showUpRate = callStats.scheduled > 0 ? ((callsTaken / callStats.scheduled) * 100) : 0;
 
-  // Calculate previous period data for comparison
+  // Calculate previous period data for comparison (using scheduled_at)
   const last30Days = calendlyEvents.filter(event => {
-    const eventDateStr = event.created_at || event.scheduled_at;
-    if (!eventDateStr) return false;
+    if (!event.scheduled_at) return false;
     try {
-      const eventDate = parseISO(eventDateStr);
+      const scheduledDate = parseISO(event.scheduled_at);
       const thirtyDaysAgo = subDays(new Date(), 30);
-      return isValid(eventDate) && eventDate >= thirtyDaysAgo;
+      return isValid(scheduledDate) && scheduledDate >= thirtyDaysAgo;
     } catch (error) {
       return false;
     }
   });
 
   const previous30Days = calendlyEvents.filter(event => {
-    const eventDateStr = event.created_at || event.scheduled_at;
-    if (!eventDateStr) return false;
+    if (!event.scheduled_at) return false;
     try {
-      const eventDate = parseISO(eventDateStr);
+      const scheduledDate = parseISO(event.scheduled_at);
       const thirtyDaysAgo = subDays(new Date(), 30);
       const sixtyDaysAgo = subDays(new Date(), 60);
-      return isValid(eventDate) && eventDate >= sixtyDaysAgo && eventDate < thirtyDaysAgo;
+      return isValid(scheduledDate) && scheduledDate >= sixtyDaysAgo && scheduledDate < thirtyDaysAgo;
     } catch (error) {
       return false;
     }
