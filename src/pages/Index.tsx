@@ -2,17 +2,17 @@
 import { useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { AdvancedDateRangePicker } from "@/components/AdvancedDateRangePicker";
-import { FunnelSelector } from "@/components/FunnelSelector";
+import { ProjectSelector } from "@/components/ProjectSelector";
+import { CreateProjectModal } from "@/components/CreateProjectModal";
 import { LowTicketFunnel } from "@/components/LowTicketFunnel";
-import { WebinarFunnel } from "@/components/WebinarFunnel";
 import { BookCallFunnel } from "@/components/BookCallFunnel";
-import { IntegrationsPanel } from "@/components/IntegrationsPanel";
+import { ProjectIntegrationsPanel } from "@/components/ProjectIntegrationsPanel";
 import { AlertSystem } from "@/components/AlertSystem";
 import { PredictiveAnalytics } from "@/components/PredictiveAnalytics";
 import { AIChatPanel } from "@/components/AIChatPanel";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, BarChart3, Settings, MessageSquare, Target, TrendingUp } from "lucide-react";
+import { BarChart3, Settings, MessageSquare, Target, TrendingUp } from "lucide-react";
+import { useProjects } from "@/hooks/useProjects";
 
 interface FunnelProductConfig {
   id: string;
@@ -22,7 +22,7 @@ interface FunnelProductConfig {
 }
 
 const Index = () => {
-  const [selectedFunnel, setSelectedFunnel] = useState("low-ticket");
+  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [dateRange, setDateRange] = useState({ from: new Date(), to: new Date() });
   const [selectedProducts, setSelectedProducts] = useState<FunnelProductConfig[]>([
     { id: 'mainProduct', label: 'Main Product Rate', visible: true, color: '#10B981' },
@@ -33,14 +33,17 @@ const Index = () => {
     { id: 'downsell2', label: 'Downsell 2 Rate', visible: false, color: '#06B6D4' },
   ]);
 
+  const { projects } = useProjects();
+  const selectedProject = projects.find(p => p.id === selectedProjectId);
+
   const handleDateChange = (from: Date, to: Date) => {
     setDateRange({ from, to });
     console.log("Date range changed:", { from, to });
   };
 
-  const handleFunnelChange = (funnelType: string) => {
-    setSelectedFunnel(funnelType);
-    console.log("Funnel changed to:", funnelType);
+  const handleProjectChange = (projectId: string) => {
+    setSelectedProjectId(projectId);
+    console.log("Project changed to:", projectId);
   };
 
   const handleProductsChange = (products: FunnelProductConfig[]) => {
@@ -48,12 +51,34 @@ const Index = () => {
     console.log("Products changed:", products);
   };
 
+  const handleProjectCreated = (projectId: string) => {
+    setSelectedProjectId(projectId);
+  };
+
   const renderFunnelContent = () => {
-    switch (selectedFunnel) {
-      case "webinar":
-        return <WebinarFunnel />;
-      case "book-call":
+    if (!selectedProject) {
+      return (
+        <div className="text-center py-12">
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No Project Selected</h3>
+          <p className="text-gray-600 mb-6">Create a new project or select an existing one to view analytics.</p>
+          <CreateProjectModal onProjectCreated={handleProjectCreated} />
+        </div>
+      );
+    }
+
+    switch (selectedProject.funnel_type) {
+      case "book_call":
         return <BookCallFunnel />;
+      case "high_ticket":
+      case "webinar":
+        return (
+          <div className="text-center py-12">
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              {selectedProject.funnel_type === "high_ticket" ? "High Ticket" : "Webinar"} Funnel
+            </h3>
+            <p className="text-gray-600">This funnel type is coming soon!</p>
+          </div>
+        );
       default:
         return (
           <LowTicketFunnel 
@@ -81,14 +106,12 @@ const Index = () => {
               onDateChange={handleDateChange}
               className="w-full sm:w-auto"
             />
-            <FunnelSelector 
-              onFunnelChange={handleFunnelChange}
+            <ProjectSelector 
+              selectedProjectId={selectedProjectId}
+              onProjectChange={handleProjectChange}
               className="w-full sm:w-[200px]"
             />
-            <Button className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Add Campaign
-            </Button>
+            <CreateProjectModal onProjectCreated={handleProjectCreated} />
           </div>
         </div>
       </div>
@@ -119,7 +142,6 @@ const Index = () => {
           </TabsList>
 
           <TabsContent value="dashboard" className="space-y-6">
-            {/* Funnel-Specific Content */}
             {renderFunnelContent()}
           </TabsContent>
 
@@ -136,7 +158,7 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-6">
-            <IntegrationsPanel />
+            <ProjectIntegrationsPanel projectId={selectedProjectId} />
           </TabsContent>
         </Tabs>
       </div>
