@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { MetricCard } from "./MetricCard";
 import { ConversionChart } from "./ConversionChart";
@@ -6,9 +7,10 @@ import { useCalendlyData } from "@/hooks/useCalendlyData";
 
 interface BookCallFunnelProps {
   projectId: string;
+  dateRange: { from: Date; to: Date };
 }
 
-export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
+export const BookCallFunnel = ({ projectId, dateRange }: BookCallFunnelProps) => {
   const { 
     calendlyEvents, 
     isLoading,
@@ -16,16 +18,50 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
     getMonthlyComparison,
   } = useCalendlyData(projectId);
 
-  const recentBookings = getRecentBookings();
-  const { current: totalBookings, previous: previousMonthBookings } = getMonthlyComparison();
+  // Filter events based on the selected date range
+  const filteredEvents = calendlyEvents.filter(event => {
+    const eventDate = new Date(event.created_at);
+    return eventDate >= dateRange.from && eventDate <= dateRange.to;
+  });
 
-  const callsTaken = calendlyEvents.filter(event => event.status === 'active').length;
-  const cancelled = calendlyEvents.filter(event => event.status === 'canceled').length;
+  // Calculate metrics based on filtered events
+  const getFilteredRecentBookings = () => {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - 7);
+    
+    return filteredEvents.filter(event => 
+      new Date(event.scheduled_at) >= cutoffDate
+    ).length;
+  };
+
+  const getFilteredMonthlyComparison = () => {
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const previousMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const previousMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+    
+    const currentMonth = filteredEvents.filter(event => 
+      new Date(event.scheduled_at) >= currentMonthStart
+    ).length;
+    
+    const previousMonth = filteredEvents.filter(event => {
+      const eventDate = new Date(event.scheduled_at);
+      return eventDate >= previousMonthStart && eventDate <= previousMonthEnd;
+    }).length;
+    
+    return { current: currentMonth, previous: previousMonth };
+  };
+
+  const recentBookings = getFilteredRecentBookings();
+  const { current: totalBookings, previous: previousMonthBookings } = getFilteredMonthlyComparison();
+
+  const callsTaken = filteredEvents.filter(event => event.status === 'active').length;
+  const cancelled = filteredEvents.filter(event => event.status === 'canceled').length;
   const noShows = totalBookings - callsTaken - cancelled;
   const showUpRate = totalBookings > 0 ? (callsTaken / totalBookings) * 100 : 0;
   const conversionRate = 5;
 
-  // Transform Calendly events to chart data
+  // Transform filtered Calendly events to chart data
   const transformEventsToChartData = (events: any[]) => {
     if (!events || events.length === 0) return [];
 
@@ -68,7 +104,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
     })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   };
 
-  const chartData = transformEventsToChartData(calendlyEvents);
+  const chartData = transformEventsToChartData(filteredEvents);
 
   if (isLoading) {
     return (
@@ -179,12 +215,12 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                 <span className="font-medium text-green-800">Calendly Connected</span>
               </div>
-              <span className="text-sm text-green-600">{calendlyEvents.length} events synced</span>
+              <span className="text-sm text-green-600">{filteredEvents.length} events synced</span>
             </div>
             
-            {calendlyEvents.length === 0 && (
+            {filteredEvents.length === 0 && (
               <div className="text-center py-8 text-gray-500">
-                <p>No booking events found. Make sure your Calendly integration is properly configured.</p>
+                <p>No booking events found for the selected date range. Try adjusting your date filter.</p>
               </div>
             )}
           </div>
