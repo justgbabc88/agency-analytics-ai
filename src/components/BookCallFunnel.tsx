@@ -233,37 +233,6 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
           />
         </CardContent>
       </Card>
-
-      {/* Calendly Integration Summary */}
-      {calendlyEvents.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold">Calendly Integration Summary</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <MetricCard 
-                title="Total Events Tracked" 
-                value={calendlyEvents.length} 
-                previousValue={previous30Days.length}
-                description="All time Calendly bookings"
-              />
-              <MetricCard 
-                title="This Month" 
-                value={monthlyComparison.current} 
-                previousValue={monthlyComparison.previous}
-                description="Monthly bookings comparison"
-              />
-              <MetricCard 
-                title="Last 7 Days" 
-                value={recentBookings} 
-                previousValue={getRecentBookings(14) - recentBookings}
-                description="Recent booking activity"
-              />
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 };
