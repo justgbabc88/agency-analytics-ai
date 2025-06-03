@@ -127,7 +127,7 @@ async function handleCallback(code: string, projectId: string, supabaseClient: a
     throw new Error(tokenData.error_description || 'Failed to get access token')
   }
 
-  // Store the access token securely (you might want to encrypt this)
+  // Store the access token in the project_integrations table
   const { error: updateError } = await supabaseClient
     .from('project_integrations')
     .upsert({
@@ -138,6 +138,23 @@ async function handleCallback(code: string, projectId: string, supabaseClient: a
     })
 
   if (updateError) throw updateError
+
+  // Store the access token securely in a separate table for API calls
+  const { error: tokenError } = await supabaseClient
+    .from('project_integration_data')
+    .upsert({
+      project_id: projectId,
+      platform: 'calendly',
+      data: { 
+        access_token: tokenData.access_token,
+        refresh_token: tokenData.refresh_token,
+        token_type: tokenData.token_type,
+        expires_at: tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString() : null
+      },
+      synced_at: new Date().toISOString(),
+    })
+
+  if (tokenError) throw tokenError
 
   // Get user's event types
   const eventTypesResponse = await fetch('https://api.calendly.com/event_types', {
@@ -158,36 +175,77 @@ async function handleCallback(code: string, projectId: string, supabaseClient: a
 }
 
 async function getEventTypes(projectId: string, supabaseClient: any) {
-  // In a real implementation, you'd retrieve the stored access token
-  // For now, return mock data
-  const mockEventTypes = [
-    {
-      uri: 'https://api.calendly.com/event_types/AAAAAAAAAAAAAAAA',
-      name: 'Strategy Call',
-      duration: 30,
-      kind: 'solo'
+  // Get the stored access token
+  const { data: tokenData, error: tokenError } = await supabaseClient
+    .from('project_integration_data')
+    .select('data')
+    .eq('project_id', projectId)
+    .eq('platform', 'calendly')
+    .single()
+
+  if (tokenError || !tokenData) {
+    throw new Error('No Calendly integration found for this project')
+  }
+
+  const accessToken = tokenData.data.access_token
+
+  if (!accessToken) {
+    throw new Error('No access token found for Calendly integration')
+  }
+
+  // Make actual API call to Calendly
+  const eventTypesResponse = await fetch('https://api.calendly.com/event_types', {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
     },
-    {
-      uri: 'https://api.calendly.com/event_types/BBBBBBBBBBBBBBBB',
-      name: 'Discovery Call',
-      duration: 45,
-      kind: 'solo'
-    }
-  ]
+  })
+
+  if (!eventTypesResponse.ok) {
+    throw new Error(`Failed to fetch event types: ${eventTypesResponse.statusText}`)
+  }
+
+  const eventTypesData = await eventTypesResponse.json()
 
   return new Response(
-    JSON.stringify({ event_types: mockEventTypes }),
+    JSON.stringify({ event_types: eventTypesData.collection || [] }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   )
 }
 
 async function saveEventMapping(projectId: string, eventTypeId: string, supabaseClient: any) {
+  // Get event type details first
+  const { data: tokenData } = await supabaseClient
+    .from('project_integration_data')
+    .select('data')
+    .eq('project_id', projectId)
+    .eq('platform', 'calendly')
+    .single()
+
+  let eventTypeName = 'Unknown Event'
+
+  if (tokenData?.data?.access_token) {
+    try {
+      const eventTypeResponse = await fetch(eventTypeId, {
+        headers: {
+          'Authorization': `Bearer ${tokenData.data.access_token}`,
+        },
+      })
+      
+      if (eventTypeResponse.ok) {
+        const eventTypeData = await eventTypeResponse.json()
+        eventTypeName = eventTypeData.resource?.name || eventTypeName
+      }
+    } catch (error) {
+      console.log('Could not fetch event type details:', error)
+    }
+  }
+
   const { error } = await supabaseClient
     .from('calendly_event_mappings')
     .upsert({
       project_id: projectId,
       calendly_event_type_id: eventTypeId,
-      event_type_name: 'Strategy Call', // This would come from the event type data
+      event_type_name: eventTypeName,
       is_active: true,
     })
 
