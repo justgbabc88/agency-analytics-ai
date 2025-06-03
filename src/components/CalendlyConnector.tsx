@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ExternalLink, RefreshCw, Calendar, CheckCircle } from "lucide-react";
+import { ExternalLink, RefreshCw, Calendar, CheckCircle, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -37,7 +37,8 @@ export const CalendlyConnector = ({
   const [eventTypes, setEventTypes] = useState<EventType[]>([]);
   const [eventMappings, setEventMappings] = useState<EventMapping[]>([]);
   const [loading, setLoading] = useState(false);
-  const [syncing, setSyncing] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const { toast } = useToast();
 
   const handleConnect = async () => {
@@ -50,62 +51,154 @@ export const CalendlyConnector = ({
       return;
     }
 
-    setLoading(true);
+    setConnecting(true);
+    setRetryCount(0);
+    
     try {
+      console.log('Starting Calendly connection for project:', projectId);
+      
       const { data, error } = await supabase.functions.invoke('calendly-oauth', {
         body: { action: 'get_auth_url', projectId }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Auth URL error:', error);
+        throw error;
+      }
 
-      // Open OAuth popup
+      console.log('Auth URL received, opening popup...');
+
+      // Open OAuth popup with specific dimensions
       const popup = window.open(
         data.auth_url,
         'calendly-oauth',
-        'width=600,height=700,scrollbars=yes,resizable=yes'
+        'width=600,height=700,scrollbars=yes,resizable=yes,left=' + 
+        (window.screen.width / 2 - 300) + ',top=' + (window.screen.height / 2 - 350)
       );
 
-      // Listen for popup close
+      if (!popup) {
+        throw new Error('Popup was blocked. Please allow popups for this site.');
+      }
+
+      // Listen for messages from the popup
+      const messageHandler = (event: MessageEvent) => {
+        if (event.data.type === 'calendly_connected' && event.data.projectId === projectId) {
+          console.log('Received connection success message from popup');
+          window.removeEventListener('message', messageHandler);
+          
+          // Small delay to ensure the callback has completed
+          setTimeout(() => {
+            checkConnectionStatus();
+          }, 1000);
+        }
+      };
+
+      window.addEventListener('message', messageHandler);
+
+      // Monitor popup closure
       const checkClosed = setInterval(() => {
         if (popup?.closed) {
           clearInterval(checkClosed);
-          checkConnectionStatus();
+          window.removeEventListener('message', messageHandler);
+          
+          // If popup closed without success message, check status anyway
+          setTimeout(() => {
+            checkConnectionStatus();
+          }, 1500);
         }
       }, 1000);
 
+      // Cleanup after 5 minutes
+      setTimeout(() => {
+        clearInterval(checkClosed);
+        window.removeEventListener('message', messageHandler);
+        if (popup && !popup.closed) {
+          popup.close();
+        }
+      }, 300000);
+
     } catch (error) {
-      console.error('OAuth error:', error);
+      console.error('OAuth initiation error:', error);
+      setConnecting(false);
       toast({
         title: "Connection Failed",
-        description: "Failed to connect to Calendly",
+        description: error.message || "Failed to initiate Calendly connection",
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
     }
   };
 
   const checkConnectionStatus = async () => {
     if (!projectId) return;
 
+    console.log('Checking connection status for project:', projectId);
+    setLoading(true);
+
     try {
+      // Wait a moment for any database operations to complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       const { data, error } = await supabase.functions.invoke('calendly-oauth', {
         body: { action: 'get_event_types', projectId }
       });
 
-      if (error) throw error;
+      console.log('Event types response:', { data, error });
 
+      if (error) {
+        console.error('Connection check error:', error);
+        
+        if (error.message?.includes('No Calendly integration found') || 
+            error.message?.includes('not connected')) {
+          
+          if (retryCount < 3) {
+            console.log(`Retrying connection check (${retryCount + 1}/3)...`);
+            setRetryCount(prev => prev + 1);
+            setTimeout(() => checkConnectionStatus(), 2000);
+            return;
+          }
+          
+          setConnecting(false);
+          onConnectionChange(false);
+          toast({
+            title: "Connection Incomplete",
+            description: "The connection process may not have completed. Please try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        throw error;
+      }
+
+      // Success!
       setEventTypes(data.event_types || []);
       onConnectionChange(true);
+      setConnecting(false);
       
       toast({
-        title: "Connected Successfully",
-        description: "Calendly account connected!",
+        title: "Connected Successfully!",
+        description: `Found ${data.event_types?.length || 0} event types in your Calendly account`,
       });
 
       loadEventMappings();
+      
     } catch (error) {
-      console.error('Failed to fetch event types:', error);
+      console.error('Failed to check connection status:', error);
+      setConnecting(false);
+      
+      if (retryCount < 2) {
+        console.log(`Retrying connection check (${retryCount + 1}/3)...`);
+        setRetryCount(prev => prev + 1);
+        setTimeout(() => checkConnectionStatus(), 3000);
+      } else {
+        toast({
+          title: "Connection Check Failed",
+          description: error.message || "Failed to verify Calendly connection",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -124,7 +217,7 @@ export const CalendlyConnector = ({
       console.error('Failed to load event types:', error);
       toast({
         title: "Error",
-        description: "Failed to load event types",
+        description: "Failed to load event types. Please try reconnecting.",
         variant: "destructive",
       });
     } finally {
@@ -208,6 +301,7 @@ export const CalendlyConnector = ({
     return (
       <Card>
         <CardContent className="text-center py-8">
+          <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <p className="text-gray-500">Please select a project to configure Calendly.</p>
         </CardContent>
       </Card>
@@ -228,19 +322,34 @@ export const CalendlyConnector = ({
             <p className="text-gray-600">
               Connect your Calendly account to automatically track scheduled calls and sync them with your Book Call funnel.
             </p>
+            
+            {connecting && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center justify-center gap-2 text-blue-700">
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  <span>Connecting to Calendly...</span>
+                </div>
+                <p className="text-sm text-blue-600 mt-2">
+                  {retryCount > 0 && `Attempt ${retryCount + 1}/3 - `}
+                  Please complete the authorization in the popup window.
+                </p>
+              </div>
+            )}
+            
             <Button 
               onClick={handleConnect} 
-              disabled={loading}
+              disabled={connecting || loading}
               className="w-full"
             >
               <ExternalLink className="h-4 w-4 mr-2" />
-              {loading ? "Connecting..." : "Connect Calendly"}
+              {connecting ? "Connecting..." : "Connect Calendly"}
             </Button>
           </div>
         ) : (
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="text-green-600 border-green-600">
+                <CheckCircle className="h-3 w-3 mr-1" />
                 Connected
               </Badge>
               <Button variant="ghost" size="sm" onClick={loadEventTypes} disabled={loading}>
@@ -290,6 +399,16 @@ export const CalendlyConnector = ({
                     </p>
                   </div>
                 )}
+              </div>
+            )}
+            
+            {eventTypes.length === 0 && !loading && (
+              <div className="text-center py-4">
+                <p className="text-gray-500">No event types found in your Calendly account.</p>
+                <Button variant="outline" onClick={loadEventTypes} className="mt-2">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refresh
+                </Button>
               </div>
             )}
           </div>
