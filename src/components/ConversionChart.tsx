@@ -1,5 +1,5 @@
 
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface FunnelProductConfig {
   id: string;
@@ -81,7 +81,6 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
   };
 
   const getMetricColor = (metric: string) => {
-    // Check if it's a product-specific metric and we have product config
     if (productConfig) {
       if (metric === 'bumpProductBuyers' || metric === 'bumpRate' || metric === 'bump') {
         return productConfig.bump?.color || defaultColors.bumpProductBuyers || '#3B82F6';
@@ -103,63 +102,100 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     return defaultColors[metric as keyof typeof defaultColors] || '#6B7280';
   };
 
-  // Enhanced Y-axis domain calculation with better proportionality
-  const calculateYAxisDomain = () => {
-    if (!Array.isArray(data) || !Array.isArray(metrics) || data.length === 0) {
-      return undefined;
-    }
+  // Clean and validate data
+  if (!Array.isArray(data) || !Array.isArray(metrics)) {
+    return (
+      <div className="bg-white p-4 rounded-lg border border-gray-200">
+        <h3 className="text-base font-semibold text-gray-800 mb-3">{title}</h3>
+        <div className="flex items-center justify-center h-48 text-gray-500">
+          <div className="text-center">
+            <p>Invalid data format</p>
+            <p className="text-sm mt-1">Please check your data structure</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
+  // Filter and clean data
+  const validData = data
+    .filter(row => row && row.date)
+    .map(row => {
+      const cleanedRow = { ...row };
+      metrics.forEach(metric => {
+        if (cleanedRow[metric] !== undefined && cleanedRow[metric] !== null) {
+          const numValue = Number(cleanedRow[metric]);
+          cleanedRow[metric] = isNaN(numValue) ? 0 : numValue;
+        }
+      });
+      return cleanedRow;
+    })
+    .filter(row => 
+      metrics.some(metric => 
+        row[metric] !== undefined && 
+        row[metric] !== null &&
+        !isNaN(Number(row[metric]))
+      )
+    );
+
+  if (validData.length === 0) {
+    return (
+      <div className="bg-white p-4 rounded-lg border border-gray-200">
+        <h3 className="text-base font-semibold text-gray-800 mb-3">{title}</h3>
+        <div className="flex items-center justify-center h-48 text-gray-500">
+          <div className="text-center">
+            <p>No data available for the selected metrics</p>
+            <p className="text-sm mt-1">Try adjusting your date range or field mappings</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Calculate proper Y-axis domain
+  const calculateYAxisDomain = () => {
     const allValues: number[] = [];
     
-    data.forEach(row => {
+    validData.forEach(row => {
       metrics.forEach(metric => {
         const value = row[metric];
-        if (value !== undefined && value !== null && !isNaN(Number(value))) {
-          allValues.push(Number(value));
+        if (typeof value === 'number' && !isNaN(value)) {
+          allValues.push(value);
         }
       });
     });
 
-    if (allValues.length === 0) return undefined;
+    if (allValues.length === 0) return [0, 100];
 
     const min = Math.min(...allValues);
     const max = Math.max(...allValues);
     
-    // If all values are the same, create a small range around that value
+    // If all values are the same
     if (min === max) {
-      if (min === 0) {
-        return [0, 10];
-      }
-      const padding = Math.abs(min) * 0.1;
-      return [min - padding, max + padding];
+      if (min === 0) return [0, 10];
+      const padding = Math.abs(min) * 0.2;
+      return [Math.max(0, min - padding), max + padding];
     }
     
-    const range = max - min;
-    
-    // For percentage metrics, use tighter bounds
-    const isPercentageMetric = metrics.some(m => 
+    // For percentage metrics (0-100)
+    const isPercentage = metrics.some(m => 
       m.includes('Rate') || m.includes('CTR') || m.includes('showUp')
     );
     
-    if (isPercentageMetric && max <= 100) {
-      // For percentages, start from 0 and add small padding to max
-      const padding = Math.min(5, range * 0.1);
-      return [0, Math.min(100, max + padding)];
+    if (isPercentage && max <= 100) {
+      return [0, Math.min(100, max * 1.1)];
     }
     
-    // For other metrics, add proportional padding
-    const padding = range * 0.05; // Reduced padding for better fit
-    const domainMin = Math.max(0, min - padding);
-    const domainMax = max + padding;
-    
-    return [domainMin, domainMax];
+    // For other metrics, add 10% padding
+    const padding = (max - min) * 0.1;
+    return [Math.max(0, min - padding), max + padding];
   };
 
   const formatTooltipValue = (value: number, name: string) => {
     if (name.includes('Rate') || name.includes('CTR') || name.includes('showUp')) {
       return `${value.toFixed(1)}%`;
     }
-    if (name.includes('Revenue') || name.includes('Cost') || name.includes('CPC') || name.includes('Spend') || name.includes('CPM')) {
+    if (name.includes('Revenue') || name.includes('Cost') || name.includes('Spend')) {
       return `$${value.toLocaleString()}`;
     }
     if (name.includes('ROAS')) {
@@ -168,13 +204,12 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     return Math.round(value).toLocaleString();
   };
 
-  // Enhanced Y-axis tick formatting
   const formatYAxisTick = (value: number) => {
-    const isPercentageMetric = metrics.some(m => 
+    const isPercentage = metrics.some(m => 
       m.includes('Rate') || m.includes('CTR') || m.includes('showUp')
     );
     
-    if (isPercentageMetric) {
+    if (isPercentage) {
       return `${value.toFixed(0)}%`;
     }
     if (metrics.some(m => m.includes('Revenue') || m.includes('Cost') || m.includes('Spend'))) {
@@ -226,93 +261,41 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     return nameMap[metric as keyof typeof nameMap] || metric.charAt(0).toUpperCase() + metric.slice(1).replace(/([A-Z])/g, ' $1');
   };
 
-  // Ensure data and metrics are arrays before filtering
-  if (!Array.isArray(data) || !Array.isArray(metrics)) {
-    return (
-      <div className="bg-white p-4 rounded-lg border border-gray-200">
-        <h3 className="text-base font-semibold text-gray-800 mb-3">{title}</h3>
-        <div className="flex items-center justify-center h-48 text-gray-500">
-          <div className="text-center">
-            <p>Invalid data format</p>
-            <p className="text-sm mt-1">Please check your data structure</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Clean and validate data points
-  const filteredData = data
-    .filter(row => row && row.date) // Ensure we have valid data with dates
-    .map(row => {
-      const cleanedRow = { ...row };
-      // Ensure all numeric values are properly converted
-      metrics.forEach(metric => {
-        if (cleanedRow[metric] !== undefined && cleanedRow[metric] !== null) {
-          const numValue = Number(cleanedRow[metric]);
-          cleanedRow[metric] = isNaN(numValue) ? 0 : numValue;
-        }
-      });
-      return cleanedRow;
-    })
-    .filter(row => 
-      metrics.length > 0 && metrics.some(metric => 
-        row[metric] !== undefined && 
-        row[metric] !== null &&
-        !isNaN(Number(row[metric]))
-      )
-    );
-
-  if (filteredData.length === 0) {
-    return (
-      <div className="bg-white p-4 rounded-lg border border-gray-200">
-        <h3 className="text-base font-semibold text-gray-800 mb-3">{title}</h3>
-        <div className="flex items-center justify-center h-48 text-gray-500">
-          <div className="text-center">
-            <p>No data available for the selected metrics</p>
-            <p className="text-sm mt-1">Try adjusting your date range or field mappings</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   const yAxisDomain = calculateYAxisDomain();
 
   return (
     <div className="bg-white">
       {title && (
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-semibold text-gray-800">{title}</h3>
           <div className="text-xs text-gray-500">
-            {filteredData.length} data point{filteredData.length !== 1 ? 's' : ''}
+            {validData.length} data point{validData.length !== 1 ? 's' : ''}
           </div>
         </div>
       )}
-      <ResponsiveContainer width="100%" height={240}>
+      <ResponsiveContainer width="100%" height={280}>
         <LineChart 
-          data={filteredData}
-          margin={{ top: 5, right: 20, left: 10, bottom: 60 }}
+          data={validData}
+          margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
           <XAxis 
             dataKey="date" 
             stroke="#6b7280"
-            fontSize={11}
+            fontSize={12}
             angle={-45}
             textAnchor="end"
             height={60}
-            interval={0}
-            tick={{ fontSize: 11 }}
+            interval={validData.length > 10 ? Math.floor(validData.length / 8) : 0}
+            tick={{ fontSize: 12 }}
           />
           <YAxis 
             stroke="#6b7280" 
-            fontSize={11} 
+            fontSize={12} 
             domain={yAxisDomain}
             tickFormatter={formatYAxisTick}
-            width={70}
-            tick={{ fontSize: 11 }}
-            tickCount={6}
+            width={80}
+            tick={{ fontSize: 12 }}
           />
           <Tooltip 
             contentStyle={{
@@ -327,7 +310,7 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
             labelFormatter={(label) => `Date: ${label}`}
           />
           {metrics.map(metric => {
-            const hasData = filteredData.some(d => 
+            const hasData = validData.some(d => 
               d[metric] !== undefined && 
               d[metric] !== null && 
               !isNaN(Number(d[metric]))
@@ -338,15 +321,15 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
                 type="monotone" 
                 dataKey={metric} 
                 stroke={getMetricColor(metric)}
-                strokeWidth={2.5}
+                strokeWidth={2}
                 dot={{ 
                   fill: getMetricColor(metric), 
                   strokeWidth: 2, 
-                  r: 4,
+                  r: 3,
                   stroke: getMetricColor(metric)
                 }}
                 activeDot={{ 
-                  r: 6, 
+                  r: 5, 
                   strokeWidth: 2,
                   stroke: getMetricColor(metric),
                   fill: getMetricColor(metric)
