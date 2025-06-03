@@ -1,46 +1,38 @@
+import React from 'react'
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+} from "react-router-dom";
+import {
+  QueryClient,
+  QueryClientProvider,
+} from '@tanstack/react-query'
 
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as SonnerToaster } from "@/components/ui/sonner";
-import Index from "./pages/Index";
-import AuthPage from "./pages/auth";
-import NotFound from "./pages/NotFound";
-import { ProtectedRoute } from "./components/ProtectedRoute";
-import "./App.css";
+import Home from "./pages/Home"
+import Projects from "./pages/Projects"
+import Integrations from "./pages/Integrations"
+import { Toaster } from "@/components/ui/toaster"
+import { TooltipProvider } from "@/components/ui/tooltip"
+import GoogleOAuthCallback from './components/GoogleOAuthCallback';
+import CalendlyOAuthCallback from "@/pages/CalendlyOAuthCallback";
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 5 * 60 * 1000,
-      retry: 1,
-    },
-  },
-});
+const queryClient = new QueryClient()
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <div className="min-h-screen bg-gray-50">
-          <Router>
-            <Routes>
-              <Route path="/auth" element={<AuthPage />} />
-              <Route
-                path="/"
-                element={
-                  <ProtectedRoute>
-                    <Index />
-                  </ProtectedRoute>
-                }
-              />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Router>
-          <Toaster />
-          <SonnerToaster />
-        </div>
+        <Toaster />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/projects" element={<Projects />} />
+            <Route path="/integrations" element={<Integrations />} />
+            <Route path="/google-oauth-callback" element={<GoogleOAuthCallback />} />
+            <Route path="/calendly-callback" element={<CalendlyOAuthCallback />} />
+          </Routes>
+        </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
   );

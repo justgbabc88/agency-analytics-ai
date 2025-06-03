@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -6,65 +5,6 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
-
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
-
-  try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
-
-    const url = new URL(req.url)
-    console.log('=== CALENDLY OAUTH REQUEST ===')
-    console.log('Method:', req.method)
-    console.log('URL:', url.toString())
-    
-    // Handle OAuth callback - simplified approach
-    const code = url.searchParams.get('code')
-    const state = url.searchParams.get('state')
-    
-    if (code && state) {
-      console.log('=== OAUTH CALLBACK ===')
-      return await handleOAuthCallback(code, state, supabaseClient)
-    }
-
-    // Handle JSON API requests
-    const requestBody = await req.text()
-    if (!requestBody) {
-      throw new Error('No request body provided')
-    }
-
-    const { action, projectId } = JSON.parse(requestBody)
-    console.log('Action:', action, 'ProjectId:', projectId)
-
-    switch (action) {
-      case 'get_auth_url':
-        return await getAuthUrl(projectId)
-      
-      case 'get_event_types':
-        return await getEventTypes(projectId, supabaseClient)
-      
-      case 'disconnect':
-        return await disconnectCalendly(projectId, supabaseClient)
-      
-      default:
-        throw new Error(`Invalid action: ${action}`)
-    }
-  } catch (error) {
-    console.error('=== ERROR ===', error.message)
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { 
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    )
-  }
-})
 
 async function getAuthUrl(projectId: string) {
   console.log('=== GENERATING AUTH URL ===')
@@ -78,8 +18,8 @@ async function getAuthUrl(projectId: string) {
     throw new Error('CALENDLY_CLIENT_ID not configured')
   }
   
-  // Use a simpler redirect approach
-  const redirectUri = `${Deno.env.get('SUPABASE_URL')}/functions/v1/calendly-oauth`
+  // Use the actual app domain for redirect
+  const redirectUri = 'https://agency-analytics-ai.lovable.app/calendly-callback'
   
   const authUrl = `https://auth.calendly.com/oauth/authorize?` +
     `client_id=${clientId}&` +
@@ -96,13 +36,13 @@ async function getAuthUrl(projectId: string) {
   )
 }
 
-async function handleOAuthCallback(code: string, projectId: string, supabaseClient: any) {
+async function handleCallback(code: string, projectId: string, supabaseClient: any) {
   console.log('=== PROCESSING OAUTH CALLBACK ===')
   console.log('Project ID:', projectId)
   
   const clientId = Deno.env.get('CALENDLY_CLIENT_ID')
   const clientSecret = Deno.env.get('CALENDLY_CLIENT_SECRET')
-  const redirectUri = `${Deno.env.get('SUPABASE_URL')}/functions/v1/calendly-oauth`
+  const redirectUri = 'https://agency-analytics-ai.lovable.app/calendly-callback'
 
   if (!clientId || !clientSecret) {
     throw new Error('Calendly OAuth credentials not configured')
@@ -205,139 +145,66 @@ async function handleOAuthCallback(code: string, projectId: string, supabaseClie
 
     console.log('=== OAUTH CALLBACK SUCCESS ===')
 
-    // Return a success page that closes itself
-    const successHtml = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Calendly Connected</title>
-        <style>
-          body { 
-            font-family: system-ui, sans-serif; 
-            text-align: center; 
-            padding: 60px 20px; 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            margin: 0;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-          .container { 
-            max-width: 400px; 
-            background: white; 
-            color: #333;
-            padding: 40px; 
-            border-radius: 16px; 
-            box-shadow: 0 20px 40px rgba(0,0,0,0.2); 
-          }
-          .success { color: #10b981; font-size: 24px; margin-bottom: 20px; font-weight: 600; }
-          .check { font-size: 48px; margin-bottom: 20px; }
-          .message { color: #6b7280; margin-bottom: 20px; line-height: 1.6; }
-          .info { font-size: 14px; color: #9ca3af; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="check">✅</div>
-          <div class="success">Successfully Connected!</div>
-          <div class="message">
-            Your Calendly account has been connected.<br>
-            You can now close this window and return to your dashboard.
-          </div>
-          <div class="info">
-            This window will close automatically in a few seconds.
-          </div>
-        </div>
-        <script>
-          // Notify parent window of success
-          try {
-            if (window.opener) {
-              window.opener.postMessage({ 
-                type: 'calendly_connected', 
-                projectId: '${projectId}',
-                success: true 
-              }, '*');
-            }
-          } catch (e) {
-            console.log('Could not notify parent window');
-          }
-          
-          // Auto-close after 3 seconds
-          setTimeout(() => {
-            window.close();
-          }, 3000);
-        </script>
-      </body>
-      </html>
-    `
-
-    return new Response(successHtml, {
-      headers: { ...corsHeaders, 'Content-Type': 'text/html' }
-    })
+    return new Response(
+      JSON.stringify({ success: true }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
 
   } catch (error) {
     console.error('OAuth callback error:', error)
-    
-    const errorHtml = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Connection Failed</title>
-        <style>
-          body { 
-            font-family: system-ui, sans-serif; 
-            text-align: center; 
-            padding: 60px 20px; 
-            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-            color: white;
-            margin: 0;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-          .container { 
-            max-width: 500px; 
-            background: white; 
-            color: #333;
-            padding: 40px; 
-            border-radius: 16px; 
-            box-shadow: 0 20px 40px rgba(0,0,0,0.2); 
-          }
-          .error { color: #ef4444; font-size: 24px; margin-bottom: 20px; font-weight: 600; }
-          .cross { font-size: 48px; margin-bottom: 20px; }
-          button { 
-            background: #ef4444; 
-            color: white; 
-            border: none; 
-            padding: 12px 24px; 
-            border-radius: 8px; 
-            cursor: pointer; 
-            margin-top: 20px;
-            font-size: 16px;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="cross">❌</div>
-          <div class="error">Connection Failed</div>
-          <p><strong>Error:</strong> ${error.message}</p>
-          <p>Please close this window and try connecting again.</p>
-          <button onclick="window.close()">Close Window</button>
-        </div>
-      </body>
-      </html>
-    `
-    
-    return new Response(errorHtml, {
-      status: 400,
-      headers: { ...corsHeaders, 'Content-Type': 'text/html' }
-    })
+    throw error
   }
 }
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
+  try {
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
+
+    console.log('=== CALENDLY OAUTH REQUEST ===')
+    console.log('Method:', req.method)
+    
+    const requestBody = await req.text()
+    if (!requestBody) {
+      throw new Error('No request body provided')
+    }
+
+    const { action, projectId, code } = JSON.parse(requestBody)
+    console.log('Action:', action, 'ProjectId:', projectId)
+
+    switch (action) {
+      case 'get_auth_url':
+        return await getAuthUrl(projectId)
+      
+      case 'handle_callback':
+        return await handleCallback(code, projectId, supabaseClient)
+      
+      case 'get_event_types':
+        return await getEventTypes(projectId, supabaseClient)
+      
+      case 'disconnect':
+        return await disconnectCalendly(projectId, supabaseClient)
+      
+      default:
+        throw new Error(`Invalid action: ${action}`)
+    }
+  } catch (error) {
+    console.error('=== ERROR ===', error.message)
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { 
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    )
+  }
+})
 
 async function getEventTypes(projectId: string, supabaseClient: any) {
   console.log('=== GET EVENT TYPES ===')
