@@ -1,4 +1,3 @@
-
 import { MetricCard } from "./MetricCard";
 import { ConversionChart } from "./ConversionChart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,7 +15,7 @@ const generateCallDataFromEvents = (calendlyEvents: any[]) => {
     const dayStart = startOfDay(date);
     const dayEnd = endOfDay(date);
     
-    const dayEvents = calendlyEvents.filter(event => {
+    const dayEventsCreated = calendlyEvents.filter(event => {
       const eventCreatedDate = new Date(event.created_at);
       return eventCreatedDate >= dayStart && eventCreatedDate <= dayEnd;
     });
@@ -28,7 +27,7 @@ const generateCallDataFromEvents = (calendlyEvents: any[]) => {
     });
     
     // Calculate daily stats - calls booked based on creation date
-    const callsBooked = dayEvents.length; // Based on creation date
+    const callsBooked = dayEventsCreated.length; // Based on creation date
     const cancelled = scheduledEvents.filter(event => 
       event.status === 'canceled' || event.status === 'cancelled'
     ).length;
@@ -38,6 +37,8 @@ const generateCallDataFromEvents = (calendlyEvents: any[]) => {
     ).length;
     const callsTaken = scheduled - noShows;
     const showUpRate = scheduled > 0 ? ((callsTaken / scheduled) * 100) : 0;
+    
+    console.log(`Date: ${date.toLocaleDateString()}, Calls Booked: ${callsBooked}, Events Created:`, dayEventsCreated.map(e => e.created_at));
     
     dates.push({
       date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
@@ -59,10 +60,14 @@ interface BookCallFunnelProps {
 export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   const { calendlyEvents, getRecentBookings, getMonthlyComparison } = useCalendlyData(projectId);
   
+  console.log('All Calendly Events:', calendlyEvents);
+  
   // Calculate chart data based on real Calendly events
   const chartData = generateCallDataFromEvents(calendlyEvents);
   const recentBookings = getRecentBookings(7);
   const monthlyComparison = getMonthlyComparison();
+
+  console.log('Generated Chart Data:', chartData);
 
   // Calculate call statistics from real data
   const callStats = calendlyEvents.reduce((stats, event) => {
