@@ -92,7 +92,7 @@ async function getAuthUrl(projectId: string) {
     `client_id=${clientId}&` +
     `response_type=code&` +
     `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-    `scope=read&` +
+    `scope=default&` +
     `state=${projectId}`
 
   return new Response(
