@@ -238,7 +238,7 @@ export const CalendlyConnector = ({
       
       const today = new Date();
 
-      console.log('Auto-syncing last 30 days of historical events...');
+      console.log('Auto-syncing last 30 days of historical events with proper creation timestamps...');
       
       const { data, error } = await supabase.functions.invoke('calendly-oauth', {
         body: { 
@@ -260,15 +260,71 @@ export const CalendlyConnector = ({
 
       if (data.synced_events > 0) {
         toast({
-          title: "Historical Events Synced",
-          description: `Automatically synced ${data.synced_events} events from the last 30 days`,
+          title: "Historical Events Re-synced",
+          description: `Successfully re-imported ${data.synced_events} events with correct creation timestamps from the last 30 days`,
+        });
+      } else {
+        toast({
+          title: "Sync Complete",
+          description: data.message || "No events found in the selected date range",
         });
       }
 
     } catch (error) {
       console.error('Auto historical sync error:', error);
-      // Don't show error toast for auto sync - it's less intrusive
-      console.log('Auto sync failed silently:', error.message);
+      toast({
+        title: "Sync Failed", 
+        description: error.message || "Failed to sync historical events",
+        variant: "destructive"
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const manualResyncEvents = async () => {
+    if (!projectId) return;
+
+    setSyncing(true);
+    
+    try {
+      const sixtyDaysAgo = new Date();
+      sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+      
+      const today = new Date();
+
+      console.log('Manually re-syncing last 60 days with proper creation timestamps...');
+      
+      const { data, error } = await supabase.functions.invoke('calendly-oauth', {
+        body: { 
+          action: 'sync_historical_events', 
+          projectId,
+          dateRange: {
+            startDate: sixtyDaysAgo.toISOString(),
+            endDate: today.toISOString()
+          }
+        }
+      });
+
+      if (error) {
+        console.error('Manual sync error:', error);
+        throw new Error(error.message || 'Failed to sync historical events');
+      }
+
+      console.log('Manual sync result:', data);
+
+      toast({
+        title: "Events Re-synced Successfully",
+        description: `Re-imported ${data.synced_events} events with correct creation timestamps`,
+      });
+
+    } catch (error) {
+      console.error('Manual sync error:', error);
+      toast({
+        title: "Sync Failed", 
+        description: error.message || "Failed to sync historical events",
+        variant: "destructive"
+      });
     } finally {
       setSyncing(false);
     }
@@ -394,16 +450,27 @@ export const CalendlyConnector = ({
                   <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                 </Button>
               </div>
-              <Button variant="outline" size="sm" onClick={handleDisconnect}>
-                Disconnect
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={manualResyncEvents}
+                  disabled={syncing}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-1 ${syncing ? 'animate-spin' : ''}`} />
+                  Re-sync Events
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleDisconnect}>
+                  Disconnect
+                </Button>
+              </div>
             </div>
 
             {syncing && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                 <div className="flex items-center gap-2 text-blue-700">
                   <RefreshCw className="h-4 w-4 animate-spin" />
-                  <span className="text-sm">Syncing historical events...</span>
+                  <span className="text-sm">Re-syncing events with correct creation timestamps...</span>
                 </div>
               </div>
             )}
@@ -446,7 +513,7 @@ export const CalendlyConnector = ({
                       {eventMappings.filter(m => m.is_active).length} event type(s) are being tracked
                     </p>
                     <p className="text-xs text-green-600 mt-1">
-                      New bookings and historical events (last 30 days) will automatically appear in your Book Call funnel dashboard
+                      Events are synced with proper creation timestamps. Use "Re-sync Events" if you need to refresh the data.
                     </p>
                   </div>
                 )}

@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -318,6 +319,18 @@ async function syncHistoricalEvents(projectId: string, dateRange: { startDate: s
 
   console.log(`Found ${eventMappings.length} active event type mappings`)
 
+  // Clear existing events for this project before re-importing with correct timestamps
+  console.log('Clearing existing events for fresh import...')
+  const { error: deleteError } = await supabaseClient
+    .from('calendly_events')
+    .delete()
+    .eq('project_id', projectId)
+
+  if (deleteError) {
+    console.error('Failed to clear existing events:', deleteError)
+    throw new Error('Failed to clear existing events for re-import')
+  }
+
   // Fetch scheduled events from Calendly
   const eventsUrl = `https://api.calendly.com/scheduled_events?user=${encodeURIComponent(userInfo.uri)}&min_start_time=${dateRange.startDate}&max_start_time=${dateRange.endDate}&count=100&sort=start_time:desc`
   console.log('Fetching events from:', eventsUrl)
@@ -361,7 +374,7 @@ async function syncHistoricalEvents(projectId: string, dateRange: { startDate: s
 
   let syncedCount = 0
 
-  // Store events in database
+  // Store events in database with proper created_at timestamps
   for (const event of relevantEvents) {
     try {
       // Get event type name from mappings
@@ -378,7 +391,14 @@ async function syncHistoricalEvents(projectId: string, dateRange: { startDate: s
         inviteeEmail = invitee.user_email || null
       }
 
-      // Upsert event to avoid duplicates
+      console.log('Processing event:', {
+        uri: event.uri,
+        created_time: event.created_time,
+        start_time: event.start_time,
+        status: event.status
+      })
+
+      // Upsert event with proper created_at timestamp from Calendly
       const { error: insertError } = await supabaseClient
         .from('calendly_events')
         .upsert({
@@ -387,6 +407,7 @@ async function syncHistoricalEvents(projectId: string, dateRange: { startDate: s
           calendly_event_type_id: event.event_type,
           event_type_name: eventTypeName,
           scheduled_at: event.start_time,
+          created_at: event.created_time, // THIS IS THE KEY FIX - use Calendly's created_time
           status: event.status,
           invitee_name: inviteeName,
           invitee_email: inviteeEmail,
@@ -398,13 +419,14 @@ async function syncHistoricalEvents(projectId: string, dateRange: { startDate: s
         console.error('Failed to insert event:', event.uri, insertError)
       } else {
         syncedCount++
+        console.log('Successfully synced event with created_at:', event.created_time)
       }
     } catch (error) {
       console.error('Error processing event:', event.uri, error)
     }
   }
 
-  console.log(`Successfully synced ${syncedCount} events`)
+  console.log(`Successfully synced ${syncedCount} events with proper creation timestamps`)
 
   return new Response(
     JSON.stringify({ 
@@ -412,7 +434,8 @@ async function syncHistoricalEvents(projectId: string, dateRange: { startDate: s
       synced_events: syncedCount,
       total_events_found: events.length,
       relevant_events: relevantEvents.length,
-      date_range: dateRange
+      date_range: dateRange,
+      message: 'Events re-imported with correct creation timestamps'
     }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   )
