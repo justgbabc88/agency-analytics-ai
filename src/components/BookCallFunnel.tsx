@@ -1,4 +1,3 @@
-
 import { MetricCard } from "./MetricCard";
 import { ConversionChart } from "./ConversionChart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,12 +39,17 @@ const generateCallDataFromEvents = (calendlyEvents: any[]) => {
 };
 
 interface BookCallFunnelProps {
-  projectId?: string;
+  projectId: string;
 }
 
 export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
+  console.log('BookCallFunnel rendering with projectId:', projectId);
+  
   const { calendlyEvents, getRecentBookings, getMonthlyComparison } = useCalendlyData(projectId);
   
+  console.log('Calendly events loaded:', calendlyEvents.length, calendlyEvents);
+  
+  // Calculate chart data based on real Calendly events
   const chartData = generateCallDataFromEvents(calendlyEvents);
   const recentBookings = getRecentBookings(7);
   const monthlyComparison = getMonthlyComparison();
@@ -113,6 +117,16 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
         return 'outline';
     }
   };
+
+  // Show a message if no project is selected
+  if (!projectId) {
+    return (
+      <div className="text-center py-12">
+        <h3 className="text-lg font-medium text-gray-900 mb-2">No Project Selected</h3>
+        <p className="text-gray-600">Please select a project to view Calendly booking data.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
