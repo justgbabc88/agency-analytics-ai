@@ -8,7 +8,8 @@ import { useProjectIntegrations } from "@/hooks/useProjectIntegrations";
 import { GoogleSheetsConnector } from "./GoogleSheetsConnector";
 import { FacebookConnector } from "./FacebookConnector";
 import { ClickFunnelsOAuthConnector } from "./ClickFunnelsOAuthConnector";
-import { Settings, CheckCircle, XCircle, RefreshCw, FileSpreadsheet, BarChart3, ChevronDown, ChevronRight, Target } from "lucide-react";
+import { CalendlyConnector } from "./CalendlyConnector";
+import { Settings, CheckCircle, XCircle, RefreshCw, FileSpreadsheet, BarChart3, ChevronDown, ChevronRight, Target, Calendar } from "lucide-react";
 import { useState } from "react";
 
 const integrationPlatforms = [
@@ -32,6 +33,13 @@ const integrationPlatforms = [
     description: 'Funnel analytics and conversions',
     color: 'bg-orange-100 text-orange-700',
     icon: Target
+  },
+  { 
+    id: 'calendly', 
+    name: 'Calendly', 
+    description: 'Track scheduled calls and appointments',
+    color: 'bg-purple-100 text-purple-700',
+    icon: Calendar
   },
 ];
 
@@ -127,6 +135,18 @@ export const ProjectIntegrationsPanel = ({ projectId }: ProjectIntegrationsPanel
       case 'clickfunnels':
         return (
           <ClickFunnelsOAuthConnector
+            projectId={projectId}
+            isConnected={isConnected}
+            onConnectionChange={(connected) => {
+              if (connected) {
+                handleToggleIntegration(platform.id, true);
+              }
+            }}
+          />
+        );
+      case 'calendly':
+        return (
+          <CalendlyConnector
             projectId={projectId}
             isConnected={isConnected}
             onConnectionChange={(connected) => {

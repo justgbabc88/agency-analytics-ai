@@ -2,6 +2,7 @@
 import { MetricCard } from "./MetricCard";
 import { ConversionChart } from "./ConversionChart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useCalendlyData } from "@/hooks/useCalendlyData";
 
 const generateCallData = () => {
   const dates = [];
@@ -18,8 +19,16 @@ const generateCallData = () => {
   return dates;
 };
 
-export const BookCallFunnel = () => {
+interface BookCallFunnelProps {
+  projectId?: string;
+}
+
+export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   const chartData = generateCallData();
+  const { calendlyEvents, getRecentBookings, getMonthlyComparison } = useCalendlyData(projectId);
+  
+  const recentBookings = getRecentBookings(7);
+  const monthlyComparison = getMonthlyComparison();
 
   return (
     <div className="space-y-6">
@@ -31,8 +40,18 @@ export const BookCallFunnel = () => {
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <MetricCard title="Page Views" value={5420} previousValue={4950} />
-            <MetricCard title="Booking Rate" value={12.8} previousValue={11.2} format="percentage" />
-            <MetricCard title="Total Bookings" value={694} previousValue={555} />
+            <MetricCard 
+              title="Booking Rate" 
+              value={12.8} 
+              previousValue={11.2} 
+              format="percentage" 
+            />
+            <MetricCard 
+              title="Total Bookings" 
+              value={monthlyComparison.current} 
+              previousValue={monthlyComparison.previous}
+              description="Calendly bookings this month"
+            />
             <MetricCard title="Cost Per Booking" value={28.50} previousValue={32.80} format="currency" />
           </div>
         </CardContent>
@@ -47,7 +66,12 @@ export const BookCallFunnel = () => {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <MetricCard title="Show Up Rate" value={68.5} previousValue={65.2} format="percentage" />
             <MetricCard title="Calls Completed" value={475} previousValue={362} />
-            <MetricCard title="No Shows" value={219} previousValue={193} />
+            <MetricCard 
+              title="Recent Bookings" 
+              value={recentBookings} 
+              previousValue={getRecentBookings(14) - recentBookings}
+              description="Last 7 days from Calendly"
+            />
             <MetricCard title="Avg. Call Duration" value="25 min" previousValue="23 min" />
           </div>
           <ConversionChart 
@@ -77,6 +101,37 @@ export const BookCallFunnel = () => {
           />
         </CardContent>
       </Card>
+
+      {/* Calendly Integration Status */}
+      {calendlyEvents.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold">Calendly Integration</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <MetricCard 
+                title="Total Events Tracked" 
+                value={calendlyEvents.length} 
+                previousValue={0}
+                description="All time Calendly bookings"
+              />
+              <MetricCard 
+                title="This Month" 
+                value={monthlyComparison.current} 
+                previousValue={monthlyComparison.previous}
+                description="Monthly bookings comparison"
+              />
+              <MetricCard 
+                title="Last 7 Days" 
+                value={recentBookings} 
+                previousValue={getRecentBookings(14) - recentBookings}
+                description="Recent booking activity"
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

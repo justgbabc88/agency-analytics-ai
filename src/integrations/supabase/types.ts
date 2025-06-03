@@ -77,6 +77,78 @@ export type Database = {
           },
         ]
       }
+      calendly_event_mappings: {
+        Row: {
+          calendly_event_type_id: string
+          created_at: string
+          event_type_name: string
+          id: string
+          is_active: boolean
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          calendly_event_type_id: string
+          created_at?: string
+          event_type_name: string
+          id?: string
+          is_active?: boolean
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          calendly_event_type_id?: string
+          created_at?: string
+          event_type_name?: string
+          id?: string
+          is_active?: boolean
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      calendly_events: {
+        Row: {
+          calendly_event_id: string
+          calendly_event_type_id: string
+          created_at: string
+          event_type_name: string
+          id: string
+          invitee_email: string | null
+          invitee_name: string | null
+          project_id: string
+          scheduled_at: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          calendly_event_id: string
+          calendly_event_type_id: string
+          created_at?: string
+          event_type_name: string
+          id?: string
+          invitee_email?: string | null
+          invitee_name?: string | null
+          project_id: string
+          scheduled_at: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          calendly_event_id?: string
+          calendly_event_type_id?: string
+          created_at?: string
+          event_type_name?: string
+          id?: string
+          invitee_email?: string | null
+          invitee_name?: string | null
+          project_id?: string
+          scheduled_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       campaigns: {
         Row: {
           activecampaign_list_id: string | null
