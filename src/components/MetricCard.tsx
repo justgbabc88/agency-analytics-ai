@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 
@@ -8,6 +7,7 @@ interface MetricCardProps {
   previousValue?: string | number;
   format?: 'currency' | 'percentage' | 'number';
   className?: string;
+  description?: string;
 }
 
 export const MetricCard = ({ 
@@ -15,7 +15,8 @@ export const MetricCard = ({
   value, 
   previousValue, 
   format = 'number',
-  className = ""
+  className = "",
+  description
 }: MetricCardProps) => {
   const formatValue = (val: string | number) => {
     const numVal = typeof val === 'string' ? parseFloat(val) : val;
@@ -95,6 +96,9 @@ export const MetricCard = ({
             </div>
           )}
         </div>
+        {description && (
+          <p className="text-xs text-gray-500 mt-1">{description}</p>
+        )}
       </CardContent>
     </Card>
   );
