@@ -27,6 +27,7 @@ interface ConversionChartProps {
     downsell2?: number;
     totalBookings?: number;
     callsTaken?: number;
+    callsBooked?: number;
     cancelled?: number;
     [key: string]: any;
   }>;
@@ -36,7 +37,6 @@ interface ConversionChartProps {
 }
 
 export const ConversionChart = ({ data, title, metrics = [], productConfig }: ConversionChartProps) => {
-  // ... keep existing code (defaultColors object)
   const defaultColors = {
     pageViews: '#6B7280',
     optins: '#8B5CF6',
@@ -76,7 +76,6 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     cancelled: '#EF4444'
   };
 
-  // ... keep existing code (getMetricColor function)
   const getMetricColor = (metric: string) => {
     // Check if it's a product-specific metric and we have product config
     if (productConfig) {
@@ -97,8 +96,12 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
       }
     }
     
-    // Default colors for other metrics
-    return defaultColors[metric as keyof typeof defaultColors] || '#6B7280';
+    // Default colors for other metrics - add callsBooked
+    const allColors = {
+      ...defaultColors,
+      callsBooked: '#10B981'
+    };
+    return allColors[metric as keyof typeof allColors] || '#6B7280';
   };
 
   // Enhanced Y-axis domain calculation for better proportionality
@@ -144,7 +147,6 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     return undefined;
   };
 
-  // ... keep existing code (formatTooltipValue function)
   const formatTooltipValue = (value: number, name: string) => {
     if (name.includes('Rate') || name.includes('CTR')) {
       return `${value.toFixed(2)}%`;
@@ -175,7 +177,6 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     return value.toFixed(0);
   };
 
-  // ... keep existing code (formatMetricName function)
   const formatMetricName = (metric: string) => {
     const nameMap = {
       pageViews: 'Page Views',
@@ -207,6 +208,7 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
       frequency: 'Frequency',
       totalBookings: 'Total Bookings',
       callsTaken: 'Calls Taken',
+      callsBooked: 'Calls Booked',
       cancelled: 'Cancelled'
     };
 
@@ -228,12 +230,12 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     );
   }
 
-  // Filter data to only include rows where at least one metric has a value
+  // Modified filtering logic - include all data points to maintain daily continuity
+  // Only filter out data where ALL metrics are undefined/null, but keep zero values
   const filteredData = data.filter(row => 
     metrics.length > 0 && metrics.some(metric => 
       row[metric] !== undefined && 
-      row[metric] !== null && 
-      row[metric] !== 0
+      row[metric] !== null
     )
   );
 
@@ -253,11 +255,11 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
 
   // Calculate trend line for each metric
   const calculateTrendLine = (metric: string) => {
-    const validData = filteredData.filter(d => d[metric] !== undefined && d[metric] !== null && d[metric] !== 0);
+    const validData = filteredData.filter(d => d[metric] !== undefined && d[metric] !== null);
     if (validData.length < 2) return null;
 
     const xValues = validData.map((_, index) => index);
-    const yValues = validData.map(d => Number(d[metric]));
+    const yValues = validData.map(d => Number(d[metric]) || 0);
     
     const n = xValues.length;
     const sumX = xValues.reduce((sum, x) => sum + x, 0);
@@ -293,7 +295,7 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
             angle={-45}
             textAnchor="end"
             height={60}
-            interval="preserveStartEnd"
+            interval={0}
           />
           <YAxis 
             stroke="#6b7280" 
@@ -331,7 +333,7 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
             ) : null;
           })}
           {metrics.map(metric => {
-            const hasData = filteredData.some(d => d[metric] !== undefined && d[metric] !== null && d[metric] !== 0);
+            const hasData = filteredData.some(d => d[metric] !== undefined && d[metric] !== null);
             return hasData ? (
               <Line 
                 key={metric}
