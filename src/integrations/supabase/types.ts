@@ -244,6 +244,13 @@ export type Database = {
             referencedRelation: "agencies"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_clients_agency_id"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
         ]
       }
       daily_metrics: {
@@ -309,7 +316,15 @@ export type Database = {
           synced_at?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_integration_data_agency_id"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       integrations: {
         Row: {
@@ -340,6 +355,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_integrations_agency_id"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "integrations_agency_id_fkey"
             columns: ["agency_id"]
@@ -379,6 +401,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_project_integration_data_project_id"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "project_integration_data_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
@@ -417,6 +446,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_project_integrations_project_id"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "project_integrations_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
@@ -452,6 +488,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_projects_agency_id"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "projects_agency_id_fkey"
             columns: ["agency_id"]
             isOneToOne: false
@@ -465,7 +508,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_agency_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      user_owns_project: {
+        Args: { project_uuid: string }
+        Returns: boolean
+      }
     }
     Enums: {
       campaign_status: "active" | "paused" | "completed" | "draft"
