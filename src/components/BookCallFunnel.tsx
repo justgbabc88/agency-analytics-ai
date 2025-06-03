@@ -1,15 +1,23 @@
+
 import { MetricCard } from "./MetricCard";
 import { ConversionChart } from "./ConversionChart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCalendlyData } from "@/hooks/useCalendlyData";
-import { format, subDays, startOfDay, endOfDay } from "date-fns";
+import { format, subDays, startOfDay, endOfDay, isWithinInterval } from "date-fns";
+import { DateRangePicker } from "./DateRangePicker";
+import { useState } from "react";
 
-// Generate chart data based on real Calendly events
-const generateCallDataFromEvents = (calendlyEvents: any[]) => {
+// Generate chart data based on real Calendly events with date filtering
+const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Date; to: Date }) => {
   const dates = [];
-  for (let i = 29; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
+  const { from: startDate, to: endDate } = dateRange;
+  
+  // Calculate the number of days in the range
+  const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  
+  for (let i = 0; i <= daysDiff; i++) {
+    const date = new Date(startDate);
+    date.setDate(date.getDate() + i);
     
     // Get events created on this specific day (not scheduled for this day)
     const dayStart = startOfDay(date);
@@ -59,18 +67,29 @@ interface BookCallFunnelProps {
 
 export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   const { calendlyEvents, getRecentBookings, getMonthlyComparison } = useCalendlyData(projectId);
+  const [dateRange, setDateRange] = useState({
+    from: subDays(new Date(), 30),
+    to: new Date()
+  });
   
   console.log('All Calendly Events:', calendlyEvents);
   
-  // Calculate chart data based on real Calendly events
-  const chartData = generateCallDataFromEvents(calendlyEvents);
+  // Calculate chart data based on real Calendly events and date range
+  const chartData = generateCallDataFromEvents(calendlyEvents, dateRange);
   const recentBookings = getRecentBookings(7);
   const monthlyComparison = getMonthlyComparison();
 
   console.log('Generated Chart Data:', chartData);
+  console.log('Date Range:', dateRange);
 
-  // Calculate call statistics from real data
-  const callStats = calendlyEvents.reduce((stats, event) => {
+  // Filter events within the selected date range for statistics
+  const filteredEvents = calendlyEvents.filter(event => {
+    const eventDate = new Date(event.created_at);
+    return isWithinInterval(eventDate, { start: dateRange.from, end: dateRange.to });
+  });
+
+  // Calculate call statistics from filtered data
+  const callStats = filteredEvents.reduce((stats, event) => {
     stats.totalBookings++;
     switch (event.status) {
       case 'active':
@@ -140,6 +159,10 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   const costPerBooking = callStats.totalBookings > 0 ? (1500 / callStats.totalBookings) : 0; // Mock cost calculation
   const previousCostPerBooking = previous30Days.length > 0 ? costPerBooking * 1.15 : 0;
 
+  const handleDateChange = (from: Date, to: Date) => {
+    setDateRange({ from, to });
+  };
+
   // Show a message if no project is selected
   if (!projectId) {
     return (
@@ -152,6 +175,12 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
 
   return (
     <div className="space-y-6">
+      {/* Date Range Picker */}
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Book Call Funnel</h2>
+        <DateRangePicker onDateChange={handleDateChange} />
+      </div>
+
       {/* Landing Page */}
       <Card>
         <CardHeader>
@@ -170,7 +199,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
               title="Total Bookings" 
               value={callStats.totalBookings} 
               previousValue={previousStats.totalBookings}
-              description="All time Calendly bookings"
+              description="Filtered by date range"
             />
             <MetricCard 
               title="Cost Per Booking" 
@@ -193,7 +222,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
               title="Total Bookings" 
               value={callStats.totalBookings} 
               previousValue={previousStats.totalBookings}
-              description="All Calendly bookings"
+              description="Filtered by date range"
             />
             <MetricCard 
               title="Calls Taken" 
@@ -216,8 +245,9 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
             />
           </div>
           <ConversionChart 
+            key={`${dateRange.from.getTime()}-${dateRange.to.getTime()}-${chartData.length}`}
             data={chartData}
-            title="Call Performance Trends (Last 30 Days)"
+            title="Call Performance Trends"
             metrics={['callsBooked', 'cancelled']}
           />
         </CardContent>
@@ -236,6 +266,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
             <MetricCard title="ROAS" value={8.2} previousValue={6.8} />
           </div>
           <ConversionChart 
+            key={`sales-${dateRange.from.getTime()}-${dateRange.to.getTime()}`}
             data={chartData}
             title="Sales Performance"
             metrics={['showUpRate']}
