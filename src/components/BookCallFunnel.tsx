@@ -21,14 +21,14 @@ const generateCallDataFromEvents = (calendlyEvents: any[]) => {
       return eventCreatedDate >= dayStart && eventCreatedDate <= dayEnd;
     });
     
-    // Get events scheduled for this day (for calls taken and cancelled calculations)
+    // Get events scheduled for this day (for cancelled calculations)
     const scheduledEvents = calendlyEvents.filter(event => {
       const eventDate = new Date(event.scheduled_at);
       return eventDate >= dayStart && eventDate <= dayEnd;
     });
     
-    // Calculate daily stats
-    const totalBookings = dayEvents.length; // Based on creation date
+    // Calculate daily stats - calls booked based on creation date
+    const callsBooked = dayEvents.length; // Based on creation date
     const cancelled = scheduledEvents.filter(event => 
       event.status === 'canceled' || event.status === 'cancelled'
     ).length;
@@ -41,7 +41,8 @@ const generateCallDataFromEvents = (calendlyEvents: any[]) => {
     
     dates.push({
       date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      totalBookings,
+      totalBookings: callsBooked, // Keep for other metrics
+      callsBooked, // New metric based on creation date
       callsTaken,
       cancelled,
       showUpRate: Math.max(showUpRate, 0),
@@ -212,7 +213,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
           <ConversionChart 
             data={chartData}
             title="Call Performance Trends (Last 30 Days)"
-            metrics={['callsTaken', 'cancelled']}
+            metrics={['callsBooked', 'cancelled']}
           />
         </CardContent>
       </Card>
