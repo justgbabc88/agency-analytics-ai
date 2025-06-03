@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -18,6 +17,13 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    const url = new URL(req.url)
+    
+    // Check if this is a webhook request
+    if (url.pathname.includes('/webhook') || req.headers.get('calendly-webhook')) {
+      return await handleWebhook(req, supabaseClient)
+    }
+
     const { action, projectId, code, eventTypeId } = await req.json()
 
     switch (action) {
@@ -33,9 +39,6 @@ serve(async (req) => {
       case 'save_event_mapping':
         return await saveEventMapping(projectId, eventTypeId, supabaseClient)
       
-      case 'webhook':
-        return await handleWebhook(req, supabaseClient)
-      
       default:
         throw new Error('Invalid action')
     }
@@ -50,6 +53,36 @@ serve(async (req) => {
     )
   }
 })
+
+async function verifyWebhookSignature(payload: string, signature: string): Promise<boolean> {
+  const signingKey = Deno.env.get('CALENDLY_WEBHOOK_SIGNING_KEY')
+  if (!signingKey) {
+    console.error('CALENDLY_WEBHOOK_SIGNING_KEY not configured')
+    return false
+  }
+
+  try {
+    const encoder = new TextEncoder()
+    const keyData = encoder.encode(signingKey)
+    const payloadData = encoder.encode(payload)
+
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw',
+      keyData,
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    )
+
+    const signatureBuffer = await crypto.subtle.sign('HMAC', cryptoKey, payloadData)
+    const expectedSignature = btoa(String.fromCharCode(...new Uint8Array(signatureBuffer)))
+
+    return signature === expectedSignature
+  } catch (error) {
+    console.error('Error verifying webhook signature:', error)
+    return false
+  }
+}
 
 async function getAuthUrl(projectId: string) {
   const clientId = Deno.env.get('CALENDLY_CLIENT_ID')
@@ -167,42 +200,92 @@ async function saveEventMapping(projectId: string, eventTypeId: string, supabase
 }
 
 async function handleWebhook(req: Request, supabaseClient: any) {
-  const payload = await req.json()
-  
-  if (payload.event === 'invitee.created') {
-    const event = payload.payload
+  try {
+    const signature = req.headers.get('calendly-webhook-signature')
+    if (!signature) {
+      console.error('Missing webhook signature')
+      return new Response(
+        JSON.stringify({ error: 'Missing signature' }),
+        { 
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    const payloadText = await req.text()
     
-    // Find the project mapping for this event type
-    const { data: mapping } = await supabaseClient
-      .from('calendly_event_mappings')
-      .select('project_id')
-      .eq('calendly_event_type_id', event.event_type.uri)
-      .eq('is_active', true)
-      .single()
+    // Verify the webhook signature
+    const isValidSignature = await verifyWebhookSignature(payloadText, signature)
+    if (!isValidSignature) {
+      console.error('Invalid webhook signature')
+      return new Response(
+        JSON.stringify({ error: 'Invalid signature' }),
+        { 
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
 
-    if (mapping) {
-      // Store the scheduled event
-      const { error } = await supabaseClient
-        .from('calendly_events')
-        .insert({
-          project_id: mapping.project_id,
-          calendly_event_id: event.uri,
-          calendly_event_type_id: event.event_type.uri,
-          event_type_name: event.event_type.name,
-          invitee_name: event.name,
-          invitee_email: event.email,
-          scheduled_at: event.start_time,
-          status: 'scheduled',
-        })
+    const payload = JSON.parse(payloadText)
+    console.log('Verified webhook payload:', payload)
+    
+    if (payload.event === 'invitee.created') {
+      const event = payload.payload
+      
+      // Find the project mapping for this event type
+      const { data: mapping } = await supabaseClient
+        .from('calendly_event_mappings')
+        .select('project_id')
+        .eq('calendly_event_type_id', event.event_type.uri)
+        .eq('is_active', true)
+        .single()
 
-      if (error) {
-        console.error('Error storing Calendly event:', error)
+      if (mapping) {
+        // Store the scheduled event
+        const { error } = await supabaseClient
+          .from('calendly_events')
+          .insert({
+            project_id: mapping.project_id,
+            calendly_event_id: event.uri,
+            calendly_event_type_id: event.event_type.uri,
+            event_type_name: event.event_type.name,
+            invitee_name: event.name,
+            invitee_email: event.email,
+            scheduled_at: event.start_time,
+            status: 'scheduled',
+          })
+
+        if (error) {
+          console.error('Error storing Calendly event:', error)
+          return new Response(
+            JSON.stringify({ error: 'Failed to store event' }),
+            { 
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            }
+          )
+        }
+
+        console.log('Successfully stored Calendly event for project:', mapping.project_id)
+      } else {
+        console.log('No active mapping found for event type:', event.event_type.uri)
       }
     }
-  }
 
-  return new Response(
-    JSON.stringify({ received: true }),
-    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-  )
+    return new Response(
+      JSON.stringify({ received: true }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+  } catch (error) {
+    console.error('Webhook processing error:', error)
+    return new Response(
+      JSON.stringify({ error: 'Webhook processing failed' }),
+      { 
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    )
+  }
 }
