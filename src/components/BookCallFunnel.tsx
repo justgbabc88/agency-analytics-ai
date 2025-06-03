@@ -4,7 +4,7 @@ import { ConversionChart } from "./ConversionChart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCalendlyData } from "@/hooks/useCalendlyData";
 import { format, subDays, startOfDay, endOfDay, isWithinInterval } from "date-fns";
-import { DateRangePicker } from "./DateRangePicker";
+import { AdvancedDateRangePicker } from "./AdvancedDateRangePicker";
 import { useState } from "react";
 
 // Generate chart data based on real Calendly events with date filtering
@@ -14,6 +14,9 @@ const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Da
   
   // Calculate the number of days in the range
   const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  
+  console.log('Generating chart data for date range:', startDate, 'to', endDate, 'Total days:', daysDiff);
+  console.log('Available Calendly events:', calendlyEvents.length);
   
   for (let i = 0; i <= daysDiff; i++) {
     const date = new Date(startDate);
@@ -46,18 +49,23 @@ const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Da
     const callsTaken = scheduled - noShows;
     const showUpRate = scheduled > 0 ? ((callsTaken / scheduled) * 100) : 0;
     
-    console.log(`Date: ${date.toLocaleDateString()}, Calls Booked: ${callsBooked}, Events Created:`, dayEventsCreated.map(e => e.created_at));
+    // Generate mock page views only for the selected date range
+    const pageViews = Math.floor(Math.random() * 300) + 150;
+    
+    console.log(`Date: ${date.toLocaleDateString()}, Calls Booked: ${callsBooked}, Page Views: ${pageViews}`);
     
     dates.push({
       date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      totalBookings: callsBooked, // Keep for other metrics
-      callsBooked, // New metric based on creation date
+      totalBookings: callsBooked,
+      callsBooked,
       callsTaken,
       cancelled,
       showUpRate: Math.max(showUpRate, 0),
-      pageViews: Math.floor(Math.random() * 300) + 150 // Mock page views
+      pageViews
     });
   }
+  
+  console.log('Generated chart data points:', dates.length);
   return dates;
 };
 
@@ -73,20 +81,20 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   });
   
   console.log('All Calendly Events:', calendlyEvents);
+  console.log('Current Date Range:', dateRange);
   
   // Calculate chart data based on real Calendly events and date range
   const chartData = generateCallDataFromEvents(calendlyEvents, dateRange);
   const recentBookings = getRecentBookings(7);
   const monthlyComparison = getMonthlyComparison();
 
-  console.log('Generated Chart Data:', chartData);
-  console.log('Date Range:', dateRange);
-
-  // Filter events within the selected date range for statistics
+  // Filter events within the selected date range for statistics (by creation date)
   const filteredEvents = calendlyEvents.filter(event => {
-    const eventDate = new Date(event.created_at);
-    return isWithinInterval(eventDate, { start: dateRange.from, end: dateRange.to });
+    const eventCreatedDate = new Date(event.created_at);
+    return isWithinInterval(eventCreatedDate, { start: dateRange.from, end: dateRange.to });
   });
+
+  console.log('Filtered events for metrics:', filteredEvents.length);
 
   // Calculate call statistics from filtered data
   const callStats = filteredEvents.reduce((stats, event) => {
@@ -160,6 +168,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   const previousCostPerBooking = previous30Days.length > 0 ? costPerBooking * 1.15 : 0;
 
   const handleDateChange = (from: Date, to: Date) => {
+    console.log('Date range changed:', from, 'to', to);
     setDateRange({ from, to });
   };
 
@@ -178,7 +187,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
       {/* Date Range Picker */}
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Book Call Funnel</h2>
-        <DateRangePicker onDateChange={handleDateChange} />
+        <AdvancedDateRangePicker onDateChange={handleDateChange} />
       </div>
 
       {/* Landing Page */}
@@ -245,7 +254,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
             />
           </div>
           <ConversionChart 
-            key={`${dateRange.from.getTime()}-${dateRange.to.getTime()}-${chartData.length}`}
+            key={`calls-${dateRange.from.getTime()}-${dateRange.to.getTime()}`}
             data={chartData}
             title="Call Performance Trends"
             metrics={['callsBooked', 'cancelled']}
