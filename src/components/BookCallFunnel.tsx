@@ -1,4 +1,3 @@
-
 import { MetricCard } from "./MetricCard";
 import { ConversionChart } from "./ConversionChart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -210,7 +209,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
           <ConversionChart 
             data={chartData}
             title="Call Performance Trends (Last 30 Days)"
-            metrics={['totalBookings', 'callsTaken', 'cancelled', 'showUpRate']}
+            metrics={['totalBookings', 'callsTaken', 'cancelled']}
           />
         </CardContent>
       </Card>
