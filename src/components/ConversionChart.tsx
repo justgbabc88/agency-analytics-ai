@@ -25,6 +25,9 @@ interface ConversionChartProps {
     downsell1?: number;
     upsell2?: number;
     downsell2?: number;
+    totalBookings?: number;
+    callsTaken?: number;
+    cancelled?: number;
     [key: string]: any;
   }>;
   title: string;
@@ -67,7 +70,10 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     upsell1Rate: '#F59E0B',
     downsell1Rate: '#8B5CF6',
     upsell2Rate: '#EF4444',
-    downsell2Rate: '#06B6D4'
+    downsell2Rate: '#06B6D4',
+    totalBookings: '#10B981',
+    callsTaken: '#3B82F6', 
+    cancelled: '#EF4444'
   };
 
   // ... keep existing code (getMetricColor function)
@@ -198,7 +204,10 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
       ctrAll: 'CTR (All)',
       ctrLink: 'CTR (Link)',
       cpm: 'CPM',
-      frequency: 'Frequency'
+      frequency: 'Frequency',
+      totalBookings: 'Total Bookings',
+      callsTaken: 'Calls Taken',
+      cancelled: 'Cancelled'
     };
 
     return nameMap[metric as keyof typeof nameMap] || metric.charAt(0).toUpperCase() + metric.slice(1).replace(/([A-Z])/g, ' $1');
