@@ -212,7 +212,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
           <ConversionChart 
             data={chartData}
             title="Call Performance Trends (Last 30 Days)"
-            metrics={['totalBookings', 'callsTaken', 'cancelled']}
+            metrics={['callsTaken', 'cancelled']}
           />
         </CardContent>
       </Card>
