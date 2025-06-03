@@ -1,3 +1,4 @@
+
 import { MetricCard } from "./MetricCard";
 import { ConversionChart } from "./ConversionChart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,9 +55,9 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   const recentBookings = getRecentBookings(7);
   const monthlyComparison = getMonthlyComparison();
 
-  // Calculate call status statistics from real data
+  // Calculate call statistics from real data
   const callStats = calendlyEvents.reduce((stats, event) => {
-    stats.total++;
+    stats.totalBookings++;
     switch (event.status) {
       case 'active':
       case 'scheduled':
@@ -66,20 +67,25 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
       case 'cancelled':
         stats.cancelled++;
         break;
-      case 'rescheduled':
-        stats.rescheduled++;
+      case 'no_show':
+        stats.noShows++;
         break;
       default:
         stats.other++;
     }
     return stats;
-  }, { total: 0, scheduled: 0, cancelled: 0, rescheduled: 0, other: 0 });
+  }, { totalBookings: 0, scheduled: 0, cancelled: 0, noShows: 0, other: 0 });
+
+  // Calculate calls taken (assuming scheduled calls that aren't no-shows are taken)
+  const callsTaken = callStats.scheduled - callStats.noShows;
+  
+  // Calculate show up rate
+  const showUpRate = callStats.scheduled > 0 ? ((callsTaken / callStats.scheduled) * 100) : 0;
 
   // Calculate previous period data for comparison
   const last30Days = calendlyEvents.filter(event => {
     const eventDate = new Date(event.scheduled_at);
     const thirtyDaysAgo = subDays(new Date(), 30);
-    const sixtyDaysAgo = subDays(new Date(), 60);
     return eventDate >= thirtyDaysAgo;
   });
 
@@ -90,12 +96,34 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
     return eventDate >= sixtyDaysAgo && eventDate < thirtyDaysAgo;
   });
 
+  // Calculate previous period stats for comparison
+  const previousStats = previous30Days.reduce((stats, event) => {
+    stats.totalBookings++;
+    switch (event.status) {
+      case 'active':
+      case 'scheduled':
+        stats.scheduled++;
+        break;
+      case 'canceled':
+      case 'cancelled':
+        stats.cancelled++;
+        break;
+      case 'no_show':
+        stats.noShows++;
+        break;
+    }
+    return stats;
+  }, { totalBookings: 0, scheduled: 0, cancelled: 0, noShows: 0 });
+
+  const previousCallsTaken = previousStats.scheduled - previousStats.noShows;
+  const previousShowUpRate = previousStats.scheduled > 0 ? ((previousCallsTaken / previousStats.scheduled) * 100) : 0;
+
   // Calculate booking metrics
   const totalPageViews = chartData.reduce((sum, day) => sum + day.pageViews, 0);
-  const bookingRate = totalPageViews > 0 ? ((callStats.total / totalPageViews) * 100) : 0;
+  const bookingRate = totalPageViews > 0 ? ((callStats.totalBookings / totalPageViews) * 100) : 0;
   const previousBookingRate = previous30Days.length > 0 ? bookingRate * 0.85 : 0; // Mock previous rate
   
-  const costPerBooking = callStats.total > 0 ? (1500 / callStats.total) : 0; // Mock cost calculation
+  const costPerBooking = callStats.totalBookings > 0 ? (1500 / callStats.totalBookings) : 0; // Mock cost calculation
   const previousCostPerBooking = previous30Days.length > 0 ? costPerBooking * 1.15 : 0;
 
   // Get recent events for the table
@@ -111,7 +139,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
       case 'canceled':
       case 'cancelled':
         return 'destructive';
-      case 'rescheduled':
+      case 'no_show':
         return 'secondary';
       default:
         return 'outline';
@@ -146,8 +174,8 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
             />
             <MetricCard 
               title="Total Bookings" 
-              value={callStats.total} 
-              previousValue={previous30Days.length}
+              value={callStats.totalBookings} 
+              previousValue={previousStats.totalBookings}
               description="All time Calendly bookings"
             />
             <MetricCard 
@@ -160,63 +188,44 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
         </CardContent>
       </Card>
 
-      {/* Call Status Overview */}
+      {/* Call Stats */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg font-semibold">Call Status Overview</CardTitle>
+          <CardTitle className="text-lg font-semibold">Call Stats</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <MetricCard 
-              title="Scheduled Calls" 
+              title="Total Bookings" 
+              value={callStats.totalBookings} 
+              previousValue={previousStats.totalBookings}
+              description="All Calendly bookings"
+            />
+            <MetricCard 
+              title="Calls Scheduled" 
               value={callStats.scheduled} 
-              previousValue={Math.floor(previous30Days.filter(e => e.status === 'active' || e.status === 'scheduled').length)}
+              previousValue={previousStats.scheduled}
               description="Active bookings"
             />
             <MetricCard 
-              title="Cancelled Calls" 
+              title="Calls Taken" 
+              value={callsTaken} 
+              previousValue={previousCallsTaken}
+              description="Completed calls"
+            />
+            <MetricCard 
+              title="Calls Cancelled" 
               value={callStats.cancelled} 
-              previousValue={Math.floor(previous30Days.filter(e => e.status === 'canceled' || e.status === 'cancelled').length)}
+              previousValue={previousStats.cancelled}
               description="Cancelled bookings"
             />
             <MetricCard 
-              title="Rescheduled Calls" 
-              value={callStats.rescheduled} 
-              previousValue={Math.floor(previous30Days.filter(e => e.status === 'rescheduled').length)}
-              description="Rescheduled bookings"
-            />
-            <MetricCard 
-              title="Cancellation Rate" 
-              value={callStats.total > 0 ? ((callStats.cancelled / callStats.total) * 100) : 0} 
-              previousValue={previous30Days.length > 0 ? ((previous30Days.filter(e => e.status === 'canceled' || e.status === 'cancelled').length / previous30Days.length) * 100) : 0}
+              title="Show Up Rate" 
+              value={showUpRate} 
+              previousValue={previousShowUpRate} 
               format="percentage"
-              description="% of cancelled calls"
+              description="% of scheduled calls attended"
             />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Call Attendance */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold">Call Attendance</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <MetricCard title="Show Up Rate" value={68.5} previousValue={65.2} format="percentage" />
-            <MetricCard 
-              title="Calls Completed" 
-              value={callStats.scheduled} 
-              previousValue={previous30Days.filter(e => e.status === 'active' || e.status === 'scheduled').length}
-              description="Scheduled calls"
-            />
-            <MetricCard 
-              title="Recent Bookings" 
-              value={recentBookings} 
-              previousValue={getRecentBookings(14) - recentBookings}
-              description="Last 7 days from Calendly"
-            />
-            <MetricCard title="Avg. Call Duration" value="25 min" previousValue="23 min" />
           </div>
           <ConversionChart 
             data={chartData}
