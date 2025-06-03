@@ -1,3 +1,4 @@
+
 import React from 'react'
 import {
   BrowserRouter,
@@ -9,12 +10,11 @@ import {
   QueryClientProvider,
 } from '@tanstack/react-query'
 
-import Home from "./pages/Home"
-import Projects from "./pages/Projects"
+import Index from "./pages/Index"
 import Integrations from "./pages/Integrations"
 import { Toaster } from "@/components/ui/toaster"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import GoogleOAuthCallback from './components/GoogleOAuthCallback';
+import { GoogleOAuthCallback } from './components/GoogleOAuthCallback';
 import CalendlyOAuthCallback from "@/pages/CalendlyOAuthCallback";
 
 const queryClient = new QueryClient()
@@ -26,8 +26,7 @@ function App() {
         <Toaster />
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/projects" element={<Projects />} />
+            <Route path="/" element={<Index />} />
             <Route path="/integrations" element={<Integrations />} />
             <Route path="/google-oauth-callback" element={<GoogleOAuthCallback />} />
             <Route path="/calendly-callback" element={<CalendlyOAuthCallback />} />
