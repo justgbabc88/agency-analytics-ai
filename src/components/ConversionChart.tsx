@@ -1,3 +1,4 @@
+
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 interface FunnelProductConfig {
@@ -29,6 +30,7 @@ interface ConversionChartProps {
     callsTaken?: number;
     callsBooked?: number;
     cancelled?: number;
+    showUpRate?: number;
     [key: string]: any;
   }>;
   title: string;
@@ -73,7 +75,9 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     downsell2Rate: '#06B6D4',
     totalBookings: '#10B981',
     callsTaken: '#3B82F6', 
-    cancelled: '#EF4444'
+    callsBooked: '#10B981',
+    cancelled: '#EF4444',
+    showUpRate: '#8B5CF6'
   };
 
   const getMetricColor = (metric: string) => {
@@ -96,15 +100,10 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
       }
     }
     
-    // Default colors for other metrics - add callsBooked
-    const allColors = {
-      ...defaultColors,
-      callsBooked: '#10B981'
-    };
-    return allColors[metric as keyof typeof allColors] || '#6B7280';
+    return defaultColors[metric as keyof typeof defaultColors] || '#6B7280';
   };
 
-  // Enhanced Y-axis domain calculation for better proportionality
+  // Enhanced Y-axis domain calculation with better proportionality
   const calculateYAxisDomain = () => {
     if (!Array.isArray(data) || !Array.isArray(metrics) || data.length === 0) {
       return undefined;
@@ -125,31 +124,40 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
 
     const min = Math.min(...allValues);
     const max = Math.max(...allValues);
+    
+    // If all values are the same, create a small range around that value
+    if (min === max) {
+      if (min === 0) {
+        return [0, 10];
+      }
+      const padding = Math.abs(min) * 0.1;
+      return [min - padding, max + padding];
+    }
+    
     const range = max - min;
     
-    // For conversion rates (percentages), use tighter bounds
-    const isPercentageMetric = metrics.some(m => m.includes('Rate') || m.includes('CTR'));
+    // For percentage metrics, use tighter bounds
+    const isPercentageMetric = metrics.some(m => 
+      m.includes('Rate') || m.includes('CTR') || m.includes('showUp')
+    );
     
-    if (isPercentageMetric && range < 10) {
-      // For small percentage ranges, add minimal padding
-      const padding = Math.max(0.5, range * 0.1);
-      return [Math.max(0, min - padding), max + padding];
+    if (isPercentageMetric && max <= 100) {
+      // For percentages, start from 0 and add small padding to max
+      const padding = Math.min(5, range * 0.1);
+      return [0, Math.min(100, max + padding)];
     }
     
-    if (range > 0) {
-      // Add 10% padding for better visualization
-      const padding = range * 0.1;
-      const domainMin = Math.max(0, min - padding);
-      const domainMax = max + padding;
-      return [domainMin, domainMax];
-    }
+    // For other metrics, add proportional padding
+    const padding = range * 0.05; // Reduced padding for better fit
+    const domainMin = Math.max(0, min - padding);
+    const domainMax = max + padding;
     
-    return undefined;
+    return [domainMin, domainMax];
   };
 
   const formatTooltipValue = (value: number, name: string) => {
-    if (name.includes('Rate') || name.includes('CTR')) {
-      return `${value.toFixed(2)}%`;
+    if (name.includes('Rate') || name.includes('CTR') || name.includes('showUp')) {
+      return `${value.toFixed(1)}%`;
     }
     if (name.includes('Revenue') || name.includes('Cost') || name.includes('CPC') || name.includes('Spend') || name.includes('CPM')) {
       return `$${value.toLocaleString()}`;
@@ -157,15 +165,17 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     if (name.includes('ROAS')) {
       return value.toFixed(2);
     }
-    return value.toLocaleString();
+    return Math.round(value).toLocaleString();
   };
 
   // Enhanced Y-axis tick formatting
   const formatYAxisTick = (value: number) => {
-    const isPercentageMetric = metrics.some(m => m.includes('Rate') || m.includes('CTR'));
+    const isPercentageMetric = metrics.some(m => 
+      m.includes('Rate') || m.includes('CTR') || m.includes('showUp')
+    );
     
     if (isPercentageMetric) {
-      return `${value.toFixed(1)}%`;
+      return `${value.toFixed(0)}%`;
     }
     if (metrics.some(m => m.includes('Revenue') || m.includes('Cost') || m.includes('Spend'))) {
       if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
@@ -174,7 +184,7 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     }
     if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
     if (value >= 1000) return `${(value / 1000).toFixed(0)}k`;
-    return value.toFixed(0);
+    return Math.round(value).toString();
   };
 
   const formatMetricName = (metric: string) => {
@@ -209,7 +219,8 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
       totalBookings: 'Total Bookings',
       callsTaken: 'Calls Taken',
       callsBooked: 'Calls Booked',
-      cancelled: 'Cancelled'
+      cancelled: 'Cancelled',
+      showUpRate: 'Show Up Rate'
     };
 
     return nameMap[metric as keyof typeof nameMap] || metric.charAt(0).toUpperCase() + metric.slice(1).replace(/([A-Z])/g, ' $1');
@@ -230,14 +241,27 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     );
   }
 
-  // Modified filtering logic - include all data points to maintain daily continuity
-  // Only filter out data where ALL metrics are undefined/null, but keep zero values
-  const filteredData = data.filter(row => 
-    metrics.length > 0 && metrics.some(metric => 
-      row[metric] !== undefined && 
-      row[metric] !== null
-    )
-  );
+  // Clean and validate data points
+  const filteredData = data
+    .filter(row => row && row.date) // Ensure we have valid data with dates
+    .map(row => {
+      const cleanedRow = { ...row };
+      // Ensure all numeric values are properly converted
+      metrics.forEach(metric => {
+        if (cleanedRow[metric] !== undefined && cleanedRow[metric] !== null) {
+          const numValue = Number(cleanedRow[metric]);
+          cleanedRow[metric] = isNaN(numValue) ? 0 : numValue;
+        }
+      });
+      return cleanedRow;
+    })
+    .filter(row => 
+      metrics.length > 0 && metrics.some(metric => 
+        row[metric] !== undefined && 
+        row[metric] !== null &&
+        !isNaN(Number(row[metric]))
+      )
+    );
 
   if (filteredData.length === 0) {
     return (
@@ -253,26 +277,6 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     );
   }
 
-  // Calculate trend line for each metric
-  const calculateTrendLine = (metric: string) => {
-    const validData = filteredData.filter(d => d[metric] !== undefined && d[metric] !== null);
-    if (validData.length < 2) return null;
-
-    const xValues = validData.map((_, index) => index);
-    const yValues = validData.map(d => Number(d[metric]) || 0);
-    
-    const n = xValues.length;
-    const sumX = xValues.reduce((sum, x) => sum + x, 0);
-    const sumY = yValues.reduce((sum, y) => sum + y, 0);
-    const sumXY = xValues.reduce((sum, x, i) => sum + x * yValues[i], 0);
-    const sumXX = xValues.reduce((sum, x) => sum + x * x, 0);
-    
-    const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
-    const intercept = (sumY - slope * sumX) / n;
-    
-    return { slope, intercept };
-  };
-
   const yAxisDomain = calculateYAxisDomain();
 
   return (
@@ -285,24 +289,30 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
           </div>
         </div>
       )}
-      <ResponsiveContainer width="100%" height={220}>
-        <LineChart data={filteredData}>
+      <ResponsiveContainer width="100%" height={240}>
+        <LineChart 
+          data={filteredData}
+          margin={{ top: 5, right: 20, left: 10, bottom: 60 }}
+        >
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
           <XAxis 
             dataKey="date" 
             stroke="#6b7280"
-            fontSize={10}
+            fontSize={11}
             angle={-45}
             textAnchor="end"
             height={60}
             interval={0}
+            tick={{ fontSize: 11 }}
           />
           <YAxis 
             stroke="#6b7280" 
-            fontSize={10} 
+            fontSize={11} 
             domain={yAxisDomain}
             tickFormatter={formatYAxisTick}
-            width={60}
+            width={70}
+            tick={{ fontSize: 11 }}
+            tickCount={6}
           />
           <Tooltip 
             contentStyle={{
@@ -314,26 +324,14 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
             }}
             formatter={formatTooltipValue}
             labelStyle={{ color: '#374151', fontWeight: '500' }}
+            labelFormatter={(label) => `Date: ${label}`}
           />
-          {/* Enhanced trend lines with better visibility */}
           {metrics.map(metric => {
-            const trendLine = calculateTrendLine(metric);
-            return trendLine && filteredData.length > 1 ? (
-              <ReferenceLine 
-                key={`trend-${metric}`}
-                segment={[
-                  { x: filteredData[0]?.date, y: trendLine.intercept },
-                  { x: filteredData[filteredData.length - 1]?.date, y: trendLine.intercept + trendLine.slope * (filteredData.length - 1) }
-                ]}
-                stroke={getMetricColor(metric)}
-                strokeDasharray="4 4"
-                strokeWidth={1.5}
-                opacity={0.7}
-              />
-            ) : null;
-          })}
-          {metrics.map(metric => {
-            const hasData = filteredData.some(d => d[metric] !== undefined && d[metric] !== null);
+            const hasData = filteredData.some(d => 
+              d[metric] !== undefined && 
+              d[metric] !== null && 
+              !isNaN(Number(d[metric]))
+            );
             return hasData ? (
               <Line 
                 key={metric}
@@ -341,8 +339,18 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
                 dataKey={metric} 
                 stroke={getMetricColor(metric)}
                 strokeWidth={2.5}
-                dot={{ fill: getMetricColor(metric), strokeWidth: 2, r: 4 }}
-                activeDot={{ r: 6, strokeWidth: 2 }}
+                dot={{ 
+                  fill: getMetricColor(metric), 
+                  strokeWidth: 2, 
+                  r: 4,
+                  stroke: getMetricColor(metric)
+                }}
+                activeDot={{ 
+                  r: 6, 
+                  strokeWidth: 2,
+                  stroke: getMetricColor(metric),
+                  fill: getMetricColor(metric)
+                }}
                 connectNulls={false}
                 name={formatMetricName(metric)}
               />
