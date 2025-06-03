@@ -5,11 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useProjectIntegrations } from "@/hooks/useProjectIntegrations";
-import { useApiKeys } from "@/hooks/useApiKeys";
-import { ApiKeyManager } from "./ApiKeyManager";
 import { GoogleSheetsConnector } from "./GoogleSheetsConnector";
 import { FacebookConnector } from "./FacebookConnector";
-import { Settings, CheckCircle, XCircle, RefreshCw, Key, FileSpreadsheet, BarChart3, ChevronDown, ChevronRight, Target } from "lucide-react";
+import { ClickFunnelsOAuthConnector } from "./ClickFunnelsOAuthConnector";
+import { Settings, CheckCircle, XCircle, RefreshCw, FileSpreadsheet, BarChart3, ChevronDown, ChevronRight, Target } from "lucide-react";
 import { useState } from "react";
 
 const integrationPlatforms = [
@@ -42,7 +41,6 @@ interface ProjectIntegrationsPanelProps {
 
 export const ProjectIntegrationsPanel = ({ projectId }: ProjectIntegrationsPanelProps) => {
   const { integrations, updateIntegration } = useProjectIntegrations(projectId);
-  const { saveApiKeys, getApiKeys, hasApiKeys } = useApiKeys();
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
 
   const getIntegrationStatus = (platformId: string) => {
@@ -69,7 +67,6 @@ export const ProjectIntegrationsPanel = ({ projectId }: ProjectIntegrationsPanel
 
   const renderIntegrationHeader = (platform: any) => {
     const isConnected = getIntegrationStatus(platform.id);
-    const hasKeys = hasApiKeys(platform.id);
     const integration = integrations?.find(i => i.platform === platform.id);
     const IconComponent = platform.icon;
     const isOpen = openSections[platform.id];
@@ -93,12 +90,6 @@ export const ProjectIntegrationsPanel = ({ projectId }: ProjectIntegrationsPanel
                 <Badge className={platform.color} variant="secondary">
                   {isConnected ? 'Connected' : 'Not Connected'}
                 </Badge>
-                {hasKeys && platform.id === 'clickfunnels' && (
-                  <Badge variant="outline" className="text-xs">
-                    <Key className="h-3 w-3 mr-1" />
-                    API Keys Set
-                  </Badge>
-                )}
               </div>
               <p className="text-sm text-gray-600">{platform.description}</p>
               {integration?.last_sync && (
@@ -117,7 +108,6 @@ export const ProjectIntegrationsPanel = ({ projectId }: ProjectIntegrationsPanel
             <Switch
               checked={isConnected}
               onCheckedChange={(checked) => handleToggleIntegration(platform.id, checked)}
-              disabled={!hasKeys && platform.id === 'clickfunnels'}
               onClick={(e) => e.stopPropagation()}
             />
           </div>
@@ -127,6 +117,8 @@ export const ProjectIntegrationsPanel = ({ projectId }: ProjectIntegrationsPanel
   };
 
   const renderIntegrationContent = (platform: any) => {
+    const isConnected = getIntegrationStatus(platform.id);
+    
     switch (platform.id) {
       case 'google_sheets':
         return <GoogleSheetsConnector />;
@@ -134,10 +126,14 @@ export const ProjectIntegrationsPanel = ({ projectId }: ProjectIntegrationsPanel
         return <FacebookConnector />;
       case 'clickfunnels':
         return (
-          <ApiKeyManager
-            platform={platform.id}
-            onSave={(keys) => saveApiKeys(platform.id, keys)}
-            savedKeys={getApiKeys(platform.id)}
+          <ClickFunnelsOAuthConnector
+            projectId={projectId}
+            isConnected={isConnected}
+            onConnectionChange={(connected) => {
+              if (connected) {
+                handleToggleIntegration(platform.id, true);
+              }
+            }}
           />
         );
       default:

@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -35,7 +34,21 @@ serve(async (req) => {
         syncResult = await syncFacebook(apiKeys)
         break
       case 'clickfunnels':
-        syncResult = await syncClickFunnels(apiKeys)
+        // Check if we have OAuth data for this project
+        const { data: oauthData, error: oauthError } = await supabase
+          .from('project_integration_data')
+          .select('data')
+          .eq('project_id', projectId)
+          .eq('platform', 'clickfunnels_oauth')
+          .single()
+
+        if (oauthData && !oauthError) {
+          // Use OAuth token for sync
+          syncResult = await syncClickFunnelsOAuth(oauthData.data, projectId, supabase)
+        } else {
+          // Fallback to API key method
+          syncResult = await syncClickFunnels(apiKeys)
+        }
         break
       case 'google_sheets':
         syncResult = await syncGoogleSheets(apiKeys)
@@ -331,5 +344,80 @@ async function syncGoogleSheets(apiKeys: Record<string, string>) {
     sheets: [],
     message: 'Google Sheets requires OAuth2 flow completion',
     synced_at: new Date().toISOString()
+  }
+}
+
+async function syncClickFunnelsOAuth(oauthData: any, projectId: string, supabase: any) {
+  const { access_token } = oauthData
+
+  if (!access_token) {
+    throw new Error('ClickFunnels OAuth access token not found')
+  }
+
+  console.log('ClickFunnels OAuth sync initiated')
+
+  try {
+    // Get the selected funnel ID from stored data
+    const { data: funnelData, error: funnelError } = await supabase
+      .from('project_integration_data')
+      .select('data')
+      .eq('project_id', projectId)
+      .eq('platform', 'clickfunnels')
+      .single()
+
+    let funnelId = null
+    if (funnelData && !funnelError && funnelData.data.funnel_id) {
+      funnelId = funnelData.data.funnel_id
+    }
+
+    // Fetch all funnels
+    const funnelsResponse = await fetch('https://app.clickfunnels.com/api/v2/funnels', {
+      headers: {
+        'Authorization': `Bearer ${access_token}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (!funnelsResponse.ok) {
+      throw new Error('Failed to fetch ClickFunnels funnels via OAuth')
+    }
+
+    const funnelsJson = await funnelsResponse.json()
+    const funnels = funnelsJson.funnels || []
+
+    // If we have a specific funnel selected, get detailed stats
+    let selectedFunnelStats = null
+    if (funnelId) {
+      try {
+        const statsResponse = await fetch(`https://app.clickfunnels.com/api/v2/funnels/${funnelId}/stats`, {
+          headers: {
+            'Authorization': `Bearer ${access_token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (statsResponse.ok) {
+          selectedFunnelStats = await statsResponse.json()
+        }
+      } catch (error) {
+        console.error(`Failed to fetch stats for funnel ${funnelId}:`, error)
+      }
+    }
+
+    console.log(`ClickFunnels OAuth sync successful - ${funnels.length} funnels`)
+
+    return {
+      funnels,
+      selected_funnel_id: funnelId,
+      selected_funnel_stats: selectedFunnelStats,
+      total_funnels: funnels.length,
+      oauth_method: true,
+      synced_at: new Date().toISOString(),
+      last_updated: new Date().toISOString()
+    }
+
+  } catch (error) {
+    console.error('ClickFunnels OAuth API error:', error)
+    throw error
   }
 }
