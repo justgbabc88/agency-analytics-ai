@@ -168,7 +168,7 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     return Math.round(value).toLocaleString();
   };
 
-  // Enhanced Y-axis tick formatting
+  // Enhanced Y-axis tick formatting with better tick count control
   const formatYAxisTick = (value: number) => {
     const isPercentageMetric = metrics.some(m => 
       m.includes('Rate') || m.includes('CTR') || m.includes('showUp')
@@ -226,6 +226,21 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     return nameMap[metric as keyof typeof nameMap] || metric.charAt(0).toUpperCase() + metric.slice(1).replace(/([A-Z])/g, ' $1');
   };
 
+  // Calculate optimal tick count based on data range
+  const calculateTickCount = () => {
+    const yAxisDomain = calculateYAxisDomain();
+    if (!yAxisDomain) return 5;
+    
+    const [min, max] = yAxisDomain;
+    const range = max - min;
+    
+    // Adjust tick count based on range size
+    if (range <= 10) return 6;
+    if (range <= 50) return 5;
+    if (range <= 100) return 6;
+    return 5;
+  };
+
   // Ensure data and metrics are arrays before filtering
   if (!Array.isArray(data) || !Array.isArray(metrics)) {
     return (
@@ -278,6 +293,7 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
   }
 
   const yAxisDomain = calculateYAxisDomain();
+  const tickCount = calculateTickCount();
 
   return (
     <div className="bg-white">
@@ -312,7 +328,8 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
             tickFormatter={formatYAxisTick}
             width={70}
             tick={{ fontSize: 11 }}
-            tickCount={6}
+            tickCount={tickCount}
+            allowDecimals={false}
           />
           <Tooltip 
             contentStyle={{
