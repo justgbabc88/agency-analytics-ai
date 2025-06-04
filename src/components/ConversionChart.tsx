@@ -433,12 +433,7 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
                 dataKey={metric} 
                 stroke={getMetricColor(metric)}
                 strokeWidth={2.5}
-                dot={{ 
-                  fill: getMetricColor(metric), 
-                  strokeWidth: 2, 
-                  r: 4,
-                  stroke: getMetricColor(metric)
-                }}
+                dot={false}
                 activeDot={{ 
                   r: 6, 
                   strokeWidth: 2,
