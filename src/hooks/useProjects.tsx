@@ -40,18 +40,24 @@ export const useProjects = () => {
 
       if (error) throw error;
 
-      // Create default integrations for the project
+      // Create default integrations for the project using upsert to avoid duplicates
       const defaultIntegrations = [
-        { project_id: data.id, platform: 'facebook' },
-        { project_id: data.id, platform: 'google_sheets' },
-        { project_id: data.id, platform: 'clickfunnels' },
+        { project_id: data.id, platform: 'facebook', is_connected: false },
+        { project_id: data.id, platform: 'google_sheets', is_connected: false },
+        { project_id: data.id, platform: 'clickfunnels', is_connected: false },
       ];
 
       const { error: integrationsError } = await supabase
         .from('project_integrations')
-        .insert(defaultIntegrations);
+        .upsert(defaultIntegrations, { 
+          onConflict: 'project_id,platform',
+          ignoreDuplicates: true 
+        });
 
-      if (integrationsError) throw integrationsError;
+      if (integrationsError) {
+        console.error('Error creating default integrations:', integrationsError);
+        // Don't throw here as the project was created successfully
+      }
 
       return data;
     },
