@@ -255,6 +255,46 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     return 6;
   };
 
+  // Calculate optimal X-axis label display based on data points
+  const calculateXAxisProps = () => {
+    const dataLength = filteredData.length;
+    
+    if (dataLength <= 7) {
+      // Show all labels for small datasets
+      return {
+        interval: 0,
+        angle: 0,
+        textAnchor: "middle" as const,
+        height: 40
+      };
+    } else if (dataLength <= 14) {
+      // Show every other label and angle them slightly
+      return {
+        interval: 1,
+        angle: -30,
+        textAnchor: "end" as const,
+        height: 50
+      };
+    } else if (dataLength <= 30) {
+      // Show every third label with more angle
+      return {
+        interval: 2,
+        angle: -45,
+        textAnchor: "end" as const,
+        height: 60
+      };
+    } else {
+      // For large datasets, show even fewer labels
+      const interval = Math.ceil(dataLength / 8); // Show approximately 8 labels max
+      return {
+        interval: interval - 1,
+        angle: -45,
+        textAnchor: "end" as const,
+        height: 60
+      };
+    }
+  };
+
   // Ensure data and metrics are arrays before filtering
   if (!Array.isArray(data) || !Array.isArray(metrics)) {
     return (
@@ -324,6 +364,7 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
 
   const yAxisDomain = calculateYAxisDomain();
   const tickCount = calculateTickCount();
+  const xAxisProps = calculateXAxisProps();
 
   return (
     <div className="bg-white">
@@ -338,17 +379,17 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
       <ResponsiveContainer width="100%" height={240}>
         <LineChart 
           data={filteredData}
-          margin={{ top: 5, right: 20, left: 20, bottom: 60 }}
+          margin={{ top: 5, right: 20, left: 20, bottom: xAxisProps.height }}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
           <XAxis 
             dataKey="date" 
             stroke="#6b7280"
             fontSize={11}
-            angle={-45}
-            textAnchor="end"
-            height={60}
-            interval={0}
+            angle={xAxisProps.angle}
+            textAnchor={xAxisProps.textAnchor}
+            height={xAxisProps.height}
+            interval={xAxisProps.interval}
             tick={{ fontSize: 11, fill: '#6b7280' }}
             axisLine={{ stroke: '#d1d5db' }}
             tickLine={{ stroke: '#d1d5db' }}
