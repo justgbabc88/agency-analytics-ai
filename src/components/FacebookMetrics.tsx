@@ -141,10 +141,7 @@ export const FacebookMetrics = ({ dateRange }: FacebookMetricsProps) => {
 
   return (
     <div className="space-y-6">
-      {/* AI Insights Section */}
-      <FacebookAIInsights dateRange={dateRange} />
-
-      {/* Existing Metrics Cards */}
+      {/* Performance Metrics Cards */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
@@ -311,6 +308,9 @@ export const FacebookMetrics = ({ dateRange }: FacebookMetricsProps) => {
           </CardContent>
         </Card>
       </div>
+
+      {/* AI Insights Section - Now moved below stats and charts */}
+      <FacebookAIInsights dateRange={dateRange} />
     </div>
   );
 };
