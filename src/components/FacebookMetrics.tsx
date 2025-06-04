@@ -1,8 +1,8 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useFacebookData } from "@/hooks/useFacebookData";
 import { ConversionChart } from "./ConversionChart";
+import { FacebookAIInsights } from "./FacebookAIInsights";
 import { BarChart3, TrendingUp, Users, DollarSign, MousePointer, Eye, ArrowUpRight, ArrowDownRight } from "lucide-react";
 
 interface FacebookMetricsProps {
@@ -140,7 +140,11 @@ export const FacebookMetrics = ({ dateRange }: FacebookMetricsProps) => {
   const frequencyChange = calculatePercentageChange(frequency, previousPeriodData.frequency);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* AI Insights Section */}
+      <FacebookAIInsights dateRange={dateRange} />
+
+      {/* Existing Metrics Cards */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
