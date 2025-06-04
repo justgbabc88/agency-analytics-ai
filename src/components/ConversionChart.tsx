@@ -1,4 +1,3 @@
-
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 interface FunnelProductConfig {
@@ -103,10 +102,10 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     return defaultColors[metric as keyof typeof defaultColors] || '#6B7280';
   };
 
-  // Enhanced Y-axis domain calculation with better proportionality
+  // Improved Y-axis domain calculation for better proportionality
   const calculateYAxisDomain = () => {
     if (!Array.isArray(data) || !Array.isArray(metrics) || data.length === 0) {
-      return undefined;
+      return [0, 100];
     }
 
     const allValues: number[] = [];
@@ -120,35 +119,42 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
       });
     });
 
-    if (allValues.length === 0) return undefined;
+    if (allValues.length === 0) return [0, 100];
 
     const min = Math.min(...allValues);
     const max = Math.max(...allValues);
     
-    // If all values are the same, create a small range around that value
+    // If all values are the same, create a range around that value
     if (min === max) {
       if (min === 0) {
         return [0, 10];
       }
-      const padding = Math.abs(min) * 0.1;
-      return [min - padding, max + padding];
+      const padding = Math.abs(min) * 0.2;
+      return [Math.max(0, min - padding), max + padding];
     }
     
     const range = max - min;
     
-    // For percentage metrics, use tighter bounds
+    // For percentage metrics, ensure proper bounds
     const isPercentageMetric = metrics.some(m => 
-      m.includes('Rate') || m.includes('CTR') || m.includes('showUp')
+      m.includes('Rate') || m.includes('CTR') || m.includes('showUp') || m.includes('ctr')
     );
     
     if (isPercentageMetric && max <= 100) {
-      // For percentages, start from 0 and add small padding to max
-      const padding = Math.min(5, range * 0.1);
-      return [0, Math.min(100, max + padding)];
+      return [0, Math.min(100, max * 1.1)];
     }
     
-    // For other metrics, add proportional padding
-    const padding = range * 0.05; // Reduced padding for better fit
+    // For currency/spend metrics, start from 0
+    const isCurrencyMetric = metrics.some(m => 
+      m.includes('spend') || m.includes('revenue') || m.includes('cost') || m.includes('cpm')
+    );
+    
+    if (isCurrencyMetric) {
+      return [0, max * 1.1];
+    }
+    
+    // For other metrics, use smart padding
+    const padding = range * 0.1;
     const domainMin = Math.max(0, min - padding);
     const domainMax = max + padding;
     
@@ -156,34 +162,44 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
   };
 
   const formatTooltipValue = (value: number, name: string) => {
-    if (name.includes('Rate') || name.includes('CTR') || name.includes('showUp')) {
-      return `${value.toFixed(1)}%`;
+    if (name.includes('Rate') || name.includes('CTR') || name.includes('showUp') || name.includes('ctr')) {
+      return `${value.toFixed(2)}%`;
     }
-    if (name.includes('Revenue') || name.includes('Cost') || name.includes('CPC') || name.includes('Spend') || name.includes('CPM')) {
-      return `$${value.toLocaleString()}`;
+    if (name.includes('Revenue') || name.includes('Cost') || name.includes('CPC') || name.includes('Spend') || name.includes('CPM') || name.includes('spend') || name.includes('cpm')) {
+      return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
-    if (name.includes('ROAS')) {
+    if (name.includes('ROAS') || name.includes('frequency')) {
       return value.toFixed(2);
     }
     return Math.round(value).toLocaleString();
   };
 
-  // Enhanced Y-axis tick formatting with better tick count control
+  // Improved Y-axis tick formatting with consistent alignment
   const formatYAxisTick = (value: number) => {
     const isPercentageMetric = metrics.some(m => 
-      m.includes('Rate') || m.includes('CTR') || m.includes('showUp')
+      m.includes('Rate') || m.includes('CTR') || m.includes('showUp') || m.includes('ctr')
     );
     
     if (isPercentageMetric) {
-      return `${value.toFixed(0)}%`;
+      return `${value.toFixed(1)}%`;
     }
-    if (metrics.some(m => m.includes('Revenue') || m.includes('Cost') || m.includes('Spend'))) {
+    
+    const isCurrencyMetric = metrics.some(m => 
+      m.includes('Revenue') || m.includes('Cost') || m.includes('Spend') || m.includes('spend') || m.includes('cpm')
+    );
+    
+    if (isCurrencyMetric) {
       if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
-      if (value >= 1000) return `$${(value / 1000).toFixed(0)}k`;
+      if (value >= 1000) return `$${(value / 1000).toFixed(1)}K`;
       return `$${value.toFixed(0)}`;
     }
+    
+    if (metrics.some(m => m.includes('frequency') || m.includes('ROAS'))) {
+      return value.toFixed(1);
+    }
+    
     if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
-    if (value >= 1000) return `${(value / 1000).toFixed(0)}k`;
+    if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
     return Math.round(value).toString();
   };
 
@@ -226,19 +242,17 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     return nameMap[metric as keyof typeof nameMap] || metric.charAt(0).toUpperCase() + metric.slice(1).replace(/([A-Z])/g, ' $1');
   };
 
-  // Calculate optimal tick count based on data range
+  // Calculate optimal tick count for better alignment
   const calculateTickCount = () => {
     const yAxisDomain = calculateYAxisDomain();
-    if (!yAxisDomain) return 5;
-    
     const [min, max] = yAxisDomain;
     const range = max - min;
     
-    // Adjust tick count based on range size
-    if (range <= 10) return 6;
+    // Use fewer ticks for better readability and alignment
+    if (range <= 10) return 4;
     if (range <= 50) return 5;
-    if (range <= 100) return 6;
-    return 5;
+    if (range <= 100) return 5;
+    return 6;
   };
 
   // Ensure data and metrics are arrays before filtering
@@ -256,22 +270,38 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     );
   }
 
-  // Clean and validate data points
+  // Clean and validate data points with better error handling
   const filteredData = data
-    .filter(row => row && row.date) // Ensure we have valid data with dates
-    .map(row => {
+    .filter(row => row && row.date)
+    .map((row, index) => {
       const cleanedRow = { ...row };
-      // Ensure all numeric values are properly converted
+      
+      // Ensure date is properly formatted for consistent X-axis labels
+      if (cleanedRow.date) {
+        // Try to parse and reformat the date for consistency
+        try {
+          const dateObj = new Date(cleanedRow.date);
+          if (!isNaN(dateObj.getTime())) {
+            cleanedRow.date = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          }
+        } catch (e) {
+          // Keep original date if parsing fails
+        }
+      }
+      
+      // Ensure all numeric values are properly converted and valid
       metrics.forEach(metric => {
         if (cleanedRow[metric] !== undefined && cleanedRow[metric] !== null) {
           const numValue = Number(cleanedRow[metric]);
           cleanedRow[metric] = isNaN(numValue) ? 0 : numValue;
+        } else {
+          cleanedRow[metric] = 0;
         }
       });
       return cleanedRow;
     })
     .filter(row => 
-      metrics.length > 0 && metrics.some(metric => 
+      row.date && metrics.some(metric => 
         row[metric] !== undefined && 
         row[metric] !== null &&
         !isNaN(Number(row[metric]))
@@ -308,7 +338,7 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
       <ResponsiveContainer width="100%" height={240}>
         <LineChart 
           data={filteredData}
-          margin={{ top: 5, right: 20, left: 10, bottom: 60 }}
+          margin={{ top: 5, right: 20, left: 20, bottom: 60 }}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
           <XAxis 
@@ -319,17 +349,22 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
             textAnchor="end"
             height={60}
             interval={0}
-            tick={{ fontSize: 11 }}
+            tick={{ fontSize: 11, fill: '#6b7280' }}
+            axisLine={{ stroke: '#d1d5db' }}
+            tickLine={{ stroke: '#d1d5db' }}
           />
           <YAxis 
             stroke="#6b7280" 
             fontSize={11} 
             domain={yAxisDomain}
             tickFormatter={formatYAxisTick}
-            width={70}
-            tick={{ fontSize: 11 }}
+            width={80}
+            tick={{ fontSize: 11, fill: '#6b7280' }}
             tickCount={tickCount}
-            allowDecimals={false}
+            allowDecimals={true}
+            type="number"
+            axisLine={{ stroke: '#d1d5db' }}
+            tickLine={{ stroke: '#d1d5db' }}
           />
           <Tooltip 
             contentStyle={{
@@ -347,7 +382,8 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
             const hasData = filteredData.some(d => 
               d[metric] !== undefined && 
               d[metric] !== null && 
-              !isNaN(Number(d[metric]))
+              !isNaN(Number(d[metric])) &&
+              Number(d[metric]) !== 0
             );
             return hasData ? (
               <Line 
