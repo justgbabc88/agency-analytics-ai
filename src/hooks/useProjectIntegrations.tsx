@@ -47,33 +47,68 @@ export const useProjectIntegrations = (projectId?: string) => {
       console.log('Updating integration:', { projectId, platform, isConnected });
       
       try {
-        const updateData = {
-          project_id: projectId,
-          platform,
-          is_connected: isConnected,
-          last_sync: isConnected ? new Date().toISOString() : null,
-          updated_at: new Date().toISOString(),
-        };
-        
-        // Use upsert to handle both insert and update cases
-        const { data, error } = await supabase
+        // First check if the integration exists
+        const { data: existing, error: checkError } = await supabase
           .from('project_integrations')
-          .upsert(updateData, {
-            onConflict: 'project_id,platform',
-            ignoreDuplicates: false
-          })
-          .select()
-          .single();
+          .select('id, is_connected, last_sync')
+          .eq('project_id', projectId)
+          .eq('platform', platform)
+          .maybeSingle();
 
-        if (error) {
-          console.error('Error upserting integration:', error);
-          throw error;
+        if (checkError) {
+          console.error('Error checking existing integration:', checkError);
+          throw checkError;
+        }
+
+        let result;
+        const timestamp = new Date().toISOString();
+
+        if (existing) {
+          // Update existing integration
+          console.log('Updating existing integration:', existing.id);
+          const { data, error } = await supabase
+            .from('project_integrations')
+            .update({
+              is_connected: isConnected,
+              last_sync: isConnected ? timestamp : existing.last_sync,
+              updated_at: timestamp,
+            })
+            .eq('id', existing.id)
+            .select()
+            .single();
+
+          if (error) {
+            console.error('Error updating existing integration:', error);
+            throw error;
+          }
+          result = data;
+        } else {
+          // Create new integration
+          console.log('Creating new integration for platform:', platform);
+          const { data, error } = await supabase
+            .from('project_integrations')
+            .insert({
+              project_id: projectId,
+              platform,
+              is_connected: isConnected,
+              last_sync: isConnected ? timestamp : null,
+              created_at: timestamp,
+              updated_at: timestamp,
+            })
+            .select()
+            .single();
+
+          if (error) {
+            console.error('Error creating new integration:', error);
+            throw error;
+          }
+          result = data;
         }
         
-        console.log('Updated integration successfully:', data);
-        return data;
+        console.log('Integration operation completed successfully:', result);
+        return result;
       } catch (error) {
-        console.error('Error updating integration:', error);
+        console.error('Error in updateIntegration:', error);
         throw error;
       }
     },

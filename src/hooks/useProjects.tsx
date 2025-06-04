@@ -64,10 +64,16 @@ export const useProjects = () => {
           throw error;
         }
 
-        console.log('Created project:', data);
+        console.log('Created project successfully:', data);
 
-        // Create default integrations using a more robust approach
-        await createDefaultIntegrations(data.id);
+        // Create default integrations with better error handling
+        try {
+          await createDefaultIntegrations(data.id);
+          console.log('Default integrations created successfully for project:', data.id);
+        } catch (integrationError) {
+          console.warn('Some default integrations failed to create, but project was created successfully:', integrationError);
+          // Don't throw here as the project was created successfully
+        }
 
         return data;
       } catch (error) {
@@ -85,34 +91,59 @@ export const useProjects = () => {
 
   const createDefaultIntegrations = async (projectId: string) => {
     const defaultPlatforms = ['facebook', 'google_sheets', 'clickfunnels'];
+    const results = [];
     
     for (const platform of defaultPlatforms) {
       try {
-        // Use upsert to handle conflicts gracefully
-        const { error: upsertError } = await supabase
+        console.log(`Creating default integration for ${platform} on project ${projectId}`);
+        
+        // First check if integration already exists to prevent conflicts
+        const { data: existing, error: checkError } = await supabase
           .from('project_integrations')
-          .upsert({
+          .select('id, platform')
+          .eq('project_id', projectId)
+          .eq('platform', platform)
+          .maybeSingle();
+
+        if (checkError) {
+          console.error(`Error checking existing ${platform} integration:`, checkError);
+          continue;
+        }
+
+        if (existing) {
+          console.log(`Integration ${platform} already exists for project ${projectId}, skipping`);
+          results.push({ platform, status: 'exists', data: existing });
+          continue;
+        }
+
+        // Create new integration
+        const { data, error } = await supabase
+          .from('project_integrations')
+          .insert({
             project_id: projectId,
             platform,
             is_connected: false,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
-          }, {
-            onConflict: 'project_id,platform',
-            ignoreDuplicates: true
-          });
+          })
+          .select()
+          .single();
 
-        if (upsertError) {
-          console.error(`Error upserting ${platform} integration:`, upsertError);
-          // Don't throw here as the project was created successfully
+        if (error) {
+          console.error(`Error creating ${platform} integration:`, error);
+          results.push({ platform, status: 'error', error });
         } else {
-          console.log(`Successfully upserted ${platform} integration for project ${projectId}`);
+          console.log(`Successfully created ${platform} integration for project ${projectId}:`, data);
+          results.push({ platform, status: 'created', data });
         }
       } catch (integrationError) {
         console.error(`Failed to process ${platform} integration:`, integrationError);
-        // Continue with other integrations
+        results.push({ platform, status: 'failed', error: integrationError });
       }
     }
+    
+    console.log('Default integrations creation results:', results);
+    return results;
   };
 
   const deleteProject = useMutation({
@@ -120,6 +151,27 @@ export const useProjects = () => {
       console.log('Deleting project:', projectId);
       
       try {
+        // First delete related project integrations to prevent foreign key conflicts
+        const { error: integrationsError } = await supabase
+          .from('project_integrations')
+          .delete()
+          .eq('project_id', projectId);
+
+        if (integrationsError) {
+          console.warn('Error deleting project integrations (continuing):', integrationsError);
+        }
+
+        // Delete project integration data
+        const { error: dataError } = await supabase
+          .from('project_integration_data')
+          .delete()
+          .eq('project_id', projectId);
+
+        if (dataError) {
+          console.warn('Error deleting project integration data (continuing):', dataError);
+        }
+
+        // Finally delete the project
         const { error } = await supabase
           .from('projects')
           .delete()
