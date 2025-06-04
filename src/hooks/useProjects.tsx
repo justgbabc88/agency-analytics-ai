@@ -14,91 +14,109 @@ export const useProjects = () => {
       
       console.log('Fetching projects for agency:', agency.id);
       
-      const { data, error } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('agency_id', agency.id)
-        .order('created_at', { ascending: false });
+      try {
+        const { data, error } = await supabase
+          .from('projects')
+          .select('*')
+          .eq('agency_id', agency.id)
+          .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching projects:', error);
+        if (error) {
+          console.error('Error fetching projects:', error);
+          throw error;
+        }
+        
+        console.log('Fetched projects:', data);
+        return data || [];
+      } catch (error) {
+        console.error('Failed to fetch projects:', error);
         throw error;
       }
-      
-      console.log('Fetched projects:', data);
-      return data || [];
     },
     enabled: !!agency,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 
   const createProject = useMutation({
     mutationFn: async (projectData: { name: string; funnel_type: string }) => {
-      if (!agency) throw new Error('No agency found');
+      if (!agency) {
+        const error = new Error('No agency found');
+        console.error('Create project failed:', error.message);
+        throw error;
+      }
       
       console.log('Creating project:', projectData);
       
-      const { data, error } = await supabase
-        .from('projects')
-        .insert({
-          agency_id: agency.id,
-          name: projectData.name,
-          funnel_type: projectData.funnel_type,
-        })
-        .select()
-        .single();
+      try {
+        const { data, error } = await supabase
+          .from('projects')
+          .insert({
+            agency_id: agency.id,
+            name: projectData.name,
+            funnel_type: projectData.funnel_type,
+          })
+          .select()
+          .single();
 
-      if (error) {
-        console.error('Error creating project:', error);
+        if (error) {
+          console.error('Error creating project:', error);
+          throw error;
+        }
+
+        console.log('Created project:', data);
+
+        // Create default integrations for the project - check if they exist first
+        const defaultPlatforms = ['facebook', 'google_sheets', 'clickfunnels'];
+        
+        for (const platform of defaultPlatforms) {
+          try {
+            // Check if integration already exists
+            const { data: existingIntegration } = await supabase
+              .from('project_integrations')
+              .select('id')
+              .eq('project_id', data.id)
+              .eq('platform', platform)
+              .maybeSingle();
+
+            if (!existingIntegration) {
+              // Only insert if it doesn't exist
+              const { error: insertError } = await supabase
+                .from('project_integrations')
+                .insert({
+                  project_id: data.id,
+                  platform,
+                  is_connected: false,
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                });
+
+              if (insertError) {
+                console.error(`Error creating ${platform} integration:`, insertError);
+                // Don't throw here as the project was created successfully
+              } else {
+                console.log(`Successfully created ${platform} integration`);
+              }
+            } else {
+              console.log(`Integration for ${platform} already exists, skipping`);
+            }
+          } catch (integrationError) {
+            console.error(`Failed to process ${platform} integration:`, integrationError);
+            // Continue with other integrations
+          }
+        }
+
+        return data;
+      } catch (error) {
+        console.error('Failed to create project:', error);
         throw error;
       }
-
-      console.log('Created project:', data);
-
-      // Create default integrations for the project using upsert to avoid duplicates
-      const defaultIntegrations = [
-        { 
-          project_id: data.id, 
-          platform: 'facebook', 
-          is_connected: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        { 
-          project_id: data.id, 
-          platform: 'google_sheets', 
-          is_connected: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        { 
-          project_id: data.id, 
-          platform: 'clickfunnels', 
-          is_connected: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-      ];
-
-      console.log('Creating default integrations:', defaultIntegrations);
-
-      const { error: integrationsError } = await supabase
-        .from('project_integrations')
-        .upsert(defaultIntegrations, { 
-          onConflict: 'project_id,platform',
-          ignoreDuplicates: true 
-        });
-
-      if (integrationsError) {
-        console.error('Error creating default integrations:', integrationsError);
-        // Don't throw here as the project was created successfully
-      } else {
-        console.log('Successfully created default integrations');
-      }
-
-      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
+    },
+    onError: (error) => {
+      console.error('Create project mutation failed:', error);
     },
   });
 
@@ -106,20 +124,28 @@ export const useProjects = () => {
     mutationFn: async (projectId: string) => {
       console.log('Deleting project:', projectId);
       
-      const { error } = await supabase
-        .from('projects')
-        .delete()
-        .eq('id', projectId);
+      try {
+        const { error } = await supabase
+          .from('projects')
+          .delete()
+          .eq('id', projectId);
 
-      if (error) {
-        console.error('Error deleting project:', error);
+        if (error) {
+          console.error('Error deleting project:', error);
+          throw error;
+        }
+        
+        console.log('Successfully deleted project:', projectId);
+      } catch (error) {
+        console.error('Failed to delete project:', error);
         throw error;
       }
-      
-      console.log('Successfully deleted project:', projectId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
+    },
+    onError: (error) => {
+      console.error('Delete project mutation failed:', error);
     },
   });
 
