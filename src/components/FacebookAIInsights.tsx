@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,13 +27,13 @@ export const FacebookAIInsights = ({ dateRange }: FacebookAIInsightsProps) => {
   const [chatHistory, setChatHistory] = useState<Array<{ type: 'user' | 'ai'; message: string; timestamp: Date }>>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  // Generate AI insights based on the Facebook data
+  // Generate AI insights based only on the displayed Facebook metrics
   const generateInsights = (): AIInsight[] => {
     if (!insights || isLoading) return [];
 
     const aiInsights: AIInsight[] = [];
 
-    // CTR Analysis
+    // CTR Analysis - only for displayed metrics
     if (insights.ctr > 0) {
       if (insights.ctr < 1.0) {
         aiInsights.push({
@@ -59,15 +58,65 @@ export const FacebookAIInsights = ({ dateRange }: FacebookAIInsightsProps) => {
       }
     }
 
-    // CPC Analysis
-    const cpc = insights.clicks > 0 ? insights.spend / insights.clicks : 0;
-    if (cpc > 0) {
-      if (cpc > 2.0) {
+    // CPM Analysis - based on displayed metrics
+    const cpm = insights.spend && insights.impressions ? (insights.spend / insights.impressions) * 1000 : 0;
+    if (cpm > 0) {
+      if (cpm > 15.0) {
+        aiInsights.push({
+          id: 'cpm-high',
+          type: 'optimization',
+          title: 'High Cost Per Mille',
+          description: `Your CPM of $${cpm.toFixed(2)} is elevated. Consider optimizing your audience targeting or adjusting your bidding strategy to reduce costs.`,
+          priority: 'high',
+          metric: 'CPM',
+          value: cpm
+        });
+      } else if (cpm < 5.0) {
+        aiInsights.push({
+          id: 'cpm-low',
+          type: 'opportunity',
+          title: 'Excellent CPM Performance',
+          description: `Your CPM of $${cpm.toFixed(2)} is very competitive. This is a great opportunity to scale your campaign budget.`,
+          priority: 'medium',
+          metric: 'CPM',
+          value: cpm
+        });
+      }
+    }
+
+    // Frequency Analysis - based on displayed metrics
+    const frequency = insights.reach > 0 ? insights.impressions / insights.reach : 1;
+    if (frequency > 3.0) {
+      aiInsights.push({
+        id: 'frequency-high',
+        type: 'warning',
+        title: 'High Ad Frequency',
+        description: `Your frequency of ${frequency.toFixed(1)} indicates users are seeing your ads frequently. Consider refreshing your creative or expanding your audience to avoid ad fatigue.`,
+        priority: 'medium',
+        metric: 'Frequency',
+        value: frequency
+      });
+    } else if (frequency < 1.5) {
+      aiInsights.push({
+        id: 'frequency-low',
+        type: 'opportunity',
+        title: 'Low Ad Frequency',
+        description: `Your frequency of ${frequency.toFixed(1)} suggests there's room to increase reach. Consider expanding your audience or increasing budget.`,
+        priority: 'low',
+        metric: 'Frequency',
+        value: frequency
+      });
+    }
+
+    // Spend Analysis - focusing on efficiency relative to displayed metrics
+    if (insights.spend > 0 && insights.clicks > 0) {
+      const cpc = insights.spend / insights.clicks;
+      if (cpc > 3.0) {
         aiInsights.push({
           id: 'cpc-high',
-          type: 'optimization',
+          type: 'warning',
           title: 'High Cost Per Click',
-          description: `Your CPC of $${cpc.toFixed(2)} is elevated. Consider optimizing your bidding strategy or improving your ad relevance score.`,
+          description: `Your cost per click of $${cpc.toFixed(2)} is elevated. Consider optimizing your ad relevance or refining your targeting.`,
           priority: 'high',
           metric: 'CPC',
           value: cpc
@@ -75,47 +124,18 @@ export const FacebookAIInsights = ({ dateRange }: FacebookAIInsightsProps) => {
       }
     }
 
-    // Frequency Analysis
-    const frequency = insights.reach > 0 ? insights.impressions / insights.reach : 1;
-    if (frequency > 3.0) {
-      aiInsights.push({
-        id: 'frequency-high',
-        type: 'warning',
-        title: 'High Ad Frequency',
-        description: `Your frequency of ${frequency.toFixed(1)} indicates users are seeing your ads frequently. Consider refreshing your creative or expanding your audience.`,
-        priority: 'medium',
-        metric: 'Frequency',
-        value: frequency
-      });
-    }
-
-    // Conversion Analysis
-    if (insights.conversions > 0 && insights.clicks > 0) {
-      const conversionRate = (insights.conversions / insights.clicks) * 100;
-      if (conversionRate < 2.0) {
+    // Impressions vs Spend efficiency
+    if (insights.spend > 0 && insights.impressions > 0) {
+      const impressionsPerDollar = insights.impressions / insights.spend;
+      if (impressionsPerDollar < 100) {
         aiInsights.push({
-          id: 'conversion-low',
-          type: 'opportunity',
-          title: 'Conversion Rate Opportunity',
-          description: `Your conversion rate of ${conversionRate.toFixed(2)}% has room for improvement. Consider optimizing your landing page or refining your audience.`,
+          id: 'impression-efficiency',
+          type: 'optimization',
+          title: 'Low Impression Efficiency',
+          description: `You're getting ${Math.round(impressionsPerDollar)} impressions per dollar spent. Consider optimizing your targeting or creative to improve reach efficiency.`,
           priority: 'medium',
-          metric: 'Conversion Rate',
-          value: conversionRate
-        });
-      }
-    }
-
-    // Spend Analysis
-    if (insights.spend > 0) {
-      if (insights.spend > 1000 && insights.conversions < 10) {
-        aiInsights.push({
-          id: 'spend-efficiency',
-          type: 'warning',
-          title: 'Spend Efficiency Alert',
-          description: `You've spent $${insights.spend.toFixed(2)} with ${insights.conversions} conversions. Consider pausing underperforming ads and reallocating budget.`,
-          priority: 'high',
-          metric: 'Spend Efficiency',
-          value: insights.spend / Math.max(insights.conversions, 1)
+          metric: 'Impression Efficiency',
+          value: impressionsPerDollar
         });
       }
     }
@@ -168,23 +188,25 @@ export const FacebookAIInsights = ({ dateRange }: FacebookAIInsightsProps) => {
       timestamp: new Date()
     }]);
 
-    // Simulate AI response based on the data
+    // Generate AI responses based only on displayed metrics
     setTimeout(() => {
       let aiResponse = '';
 
       if (userMessage.toLowerCase().includes('ctr') || userMessage.toLowerCase().includes('click')) {
         aiResponse = `Your current CTR is ${insights.ctr?.toFixed(2)}%. ${insights.ctr && insights.ctr < 1.5 ? 'This is below the industry average of 1.5-2%. Consider testing new ad creatives or refining your audience targeting.' : 'This is performing well! Consider scaling successful campaigns.'}`;
       } else if (userMessage.toLowerCase().includes('spend') || userMessage.toLowerCase().includes('cost')) {
-        const cpc = insights.clicks > 0 ? insights.spend / insights.clicks : 0;
-        aiResponse = `You've spent $${insights.spend?.toFixed(2)} with a CPC of $${cpc.toFixed(2)}. ${cpc > 2 ? 'Your CPC is elevated - consider optimizing your bidding strategy.' : 'Your CPC is reasonable for your industry.'}`;
-      } else if (userMessage.toLowerCase().includes('conversion')) {
-        const conversionRate = insights.clicks > 0 ? (insights.conversions / insights.clicks) * 100 : 0;
-        aiResponse = `Your conversion rate is ${conversionRate.toFixed(2)}%. ${conversionRate < 2 ? 'There\'s room for improvement - consider optimizing your landing page experience.' : 'Your conversion rate is performing well!'}`;
+        const cpm = insights.spend && insights.impressions ? (insights.spend / insights.impressions) * 1000 : 0;
+        aiResponse = `You've spent $${insights.spend?.toFixed(2)} with a CPM of $${cpm.toFixed(2)}. ${cpm > 15 ? 'Your CPM is elevated - consider optimizing your audience targeting.' : 'Your CPM is reasonable for your industry.'}`;
+      } else if (userMessage.toLowerCase().includes('cpm')) {
+        const cpm = insights.spend && insights.impressions ? (insights.spend / insights.impressions) * 1000 : 0;
+        aiResponse = `Your CPM is $${cpm.toFixed(2)}. ${cpm > 15 ? 'This is high - consider refining your targeting to reduce costs.' : cpm < 5 ? 'This is excellent - consider scaling your budget.' : 'This is within a reasonable range.'}`;
       } else if (userMessage.toLowerCase().includes('frequency')) {
         const frequency = insights.reach > 0 ? insights.impressions / insights.reach : 1;
-        aiResponse = `Your ad frequency is ${frequency.toFixed(1)}. ${frequency > 3 ? 'This is high - users are seeing your ads frequently. Consider refreshing your creative.' : 'Your frequency is healthy.'}`;
+        aiResponse = `Your ad frequency is ${frequency.toFixed(1)}. ${frequency > 3 ? 'This is high - users are seeing your ads frequently. Consider refreshing your creative.' : frequency < 1.5 ? 'This is low - there may be room to increase reach.' : 'Your frequency is healthy.'}`;
+      } else if (userMessage.toLowerCase().includes('impressions')) {
+        aiResponse = `You have ${insights.impressions?.toLocaleString()} impressions from $${insights.spend?.toFixed(2)} spend. ${insights.spend && insights.impressions ? `That's ${Math.round(insights.impressions / insights.spend)} impressions per dollar.` : ''} ${insights.impressions && insights.spend && (insights.impressions / insights.spend) < 100 ? 'Consider optimizing targeting for better reach efficiency.' : ''}`;
       } else {
-        aiResponse = `Based on your Facebook Ads data: You have ${insights.impressions?.toLocaleString()} impressions, ${insights.clicks?.toLocaleString()} clicks, and spent $${insights.spend?.toFixed(2)}. Your CTR is ${insights.ctr?.toFixed(2)}% and you have ${insights.conversions} conversions. Is there a specific metric you'd like me to analyze further?`;
+        aiResponse = `Based on your Facebook Ads data: You have ${insights.impressions?.toLocaleString()} impressions, ${insights.clicks?.toLocaleString()} clicks, and spent $${insights.spend?.toFixed(2)}. Your CTR is ${insights.ctr?.toFixed(2)}% and your CPM is $${insights.spend && insights.impressions ? ((insights.spend / insights.impressions) * 1000).toFixed(2) : '0'}. Is there a specific metric you'd like me to analyze further?`;
       }
 
       setChatHistory(prev => [...prev, {
@@ -318,9 +340,9 @@ export const FacebookAIInsights = ({ dateRange }: FacebookAIInsightsProps) => {
               <div className="flex flex-wrap gap-2">
                 {[
                   "How is my CTR performing?",
-                  "Is my spend efficient?",
-                  "What about my conversion rate?",
-                  "Should I adjust my frequency?"
+                  "Is my CPM competitive?",
+                  "What about my frequency?",
+                  "How efficient is my spend?"
                 ].map((quickQuestion) => (
                   <Button
                     key={quickQuestion}
