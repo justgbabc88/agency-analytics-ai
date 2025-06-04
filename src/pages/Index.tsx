@@ -10,8 +10,9 @@ import { ProjectIntegrationsPanel } from "@/components/ProjectIntegrationsPanel"
 import { AlertSystem } from "@/components/AlertSystem";
 import { PredictiveAnalytics } from "@/components/PredictiveAnalytics";
 import { AIChatPanel } from "@/components/AIChatPanel";
+import { FacebookMetrics } from "@/components/FacebookMetrics";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, Settings, MessageSquare, Target, TrendingUp } from "lucide-react";
+import { BarChart3, Settings, MessageSquare, Target, TrendingUp, Facebook } from "lucide-react";
 import { useProjects } from "@/hooks/useProjects";
 
 interface FunnelProductConfig {
@@ -118,10 +119,14 @@ const Index = () => {
 
       <div className="p-6">
         <Tabs defaultValue="dashboard" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
               Dashboard
+            </TabsTrigger>
+            <TabsTrigger value="facebook" className="flex items-center gap-2">
+              <Facebook className="h-4 w-4" />
+              Facebook Ads
             </TabsTrigger>
             <TabsTrigger value="predictions" className="flex items-center gap-2">
               <Target className="h-4 w-4" />
@@ -143,6 +148,10 @@ const Index = () => {
 
           <TabsContent value="dashboard" className="space-y-6">
             {renderFunnelContent()}
+          </TabsContent>
+
+          <TabsContent value="facebook" className="space-y-6">
+            <FacebookMetrics dateRange={dateRange} />
           </TabsContent>
 
           <TabsContent value="predictions" className="space-y-6">
