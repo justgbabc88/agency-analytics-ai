@@ -1,7 +1,5 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConversionChart } from "./ConversionChart";
-import { FacebookMetrics } from "./FacebookMetrics";
 import { useGoogleSheetsData } from "@/hooks/useGoogleSheetsData";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
@@ -18,7 +16,6 @@ import {
   ArrowDownRight,
   ChevronDown,
   ChevronUp,
-  Facebook,
   Eye,
   EyeOff,
   Settings2
@@ -40,7 +37,6 @@ interface LowTicketFunnelProps {
 
 export const LowTicketFunnel = ({ dateRange, selectedProducts, onProductsChange }: LowTicketFunnelProps) => {
   const { syncedData, calculateMetricsFromSyncedData } = useGoogleSheetsData();
-  const [isAdsOpen, setIsAdsOpen] = useState(true);
   const [isFunnelOpen, setIsFunnelOpen] = useState(true);
   const [isCustomizerExpanded, setIsCustomizerExpanded] = useState(false);
   
@@ -162,27 +158,6 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts, onProductsChange 
 
   return (
     <div className="space-y-6">
-      {/* Facebook Analysis Section */}
-      <div className="bg-blue-50/30 rounded-lg border border-blue-100/80 p-4 shadow-sm">
-        <Collapsible open={isAdsOpen} onOpenChange={setIsAdsOpen}>
-          <CollapsibleTrigger asChild>
-            <Button 
-              variant="ghost" 
-              className="w-full justify-between p-0 h-auto hover:bg-transparent"
-            >
-              <h3 className="text-lg font-semibold text-blue-700 flex items-center gap-2">
-                <Facebook className="h-5 w-5 text-blue-600" />
-                Facebook Analysis
-              </h3>
-              {isAdsOpen ? <ChevronUp className="h-4 w-4 text-blue-600" /> : <ChevronDown className="h-4 w-4 text-blue-600" />}
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="mt-4">
-            <FacebookMetrics dateRange={dateRange} />
-          </CollapsibleContent>
-        </Collapsible>
-      </div>
-
       {/* Funnel Analysis Section */}
       <div className="bg-amber-50/30 rounded-lg border border-amber-100/80 p-4 shadow-sm">
         <Collapsible open={isFunnelOpen} onOpenChange={setIsFunnelOpen}>
