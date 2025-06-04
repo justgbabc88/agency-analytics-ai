@@ -34,6 +34,21 @@ export const FacebookConnector = () => {
   const savedKeys = getApiKeys('facebook');
   const hasAdsPermissions = savedKeys.permissions?.includes('ads_read') || false;
 
+  console.log('FacebookConnector - Current state:', {
+    isConnected,
+    hasAdsPermissions,
+    selectedAccount,
+    savedKeys: Object.keys(savedKeys)
+  });
+
+  useEffect(() => {
+    // Load saved ad account selection
+    if (savedKeys.selected_ad_account_id) {
+      setSelectedAccount(savedKeys.selected_ad_account_id);
+      console.log('FacebookConnector - Loaded saved ad account:', savedKeys.selected_ad_account_id);
+    }
+  }, [savedKeys.selected_ad_account_id]);
+
   useEffect(() => {
     if (isConnected && savedKeys.access_token && hasAdsPermissions) {
       loadAdAccounts();
@@ -257,8 +272,16 @@ export const FacebookConnector = () => {
       console.log('Successfully loaded ad accounts:', data.adAccounts?.length || 0);
       setAdAccounts(data.adAccounts || []);
       
+      // Auto-select first account if none selected and we have accounts
       if (data.adAccounts?.length > 0 && !selectedAccount) {
-        setSelectedAccount(data.adAccounts[0].id);
+        const firstAccountId = data.adAccounts[0].id;
+        setSelectedAccount(firstAccountId);
+        // Automatically save the first account
+        saveApiKeys('facebook', {
+          ...savedKeys,
+          selected_ad_account_id: firstAccountId
+        });
+        console.log('Auto-selected first ad account:', firstAccountId);
       }
 
     } catch (error) {
@@ -270,6 +293,27 @@ export const FacebookConnector = () => {
       });
     } finally {
       setIsLoadingAccounts(false);
+    }
+  };
+
+  const handleAdAccountChange = (accountId: string) => {
+    setSelectedAccount(accountId);
+    // Automatically save when selection changes
+    saveApiKeys('facebook', {
+      ...savedKeys,
+      selected_ad_account_id: accountId
+    });
+
+    console.log('Ad account selection changed and saved:', accountId);
+
+    toast({
+      title: "Ad Account Selected",
+      description: "Your ad account selection has been saved and will be used for data syncing.",
+    });
+
+    // Automatically trigger a sync after selection
+    if (accountId) {
+      handleSync();
     }
   };
 
@@ -308,6 +352,8 @@ export const FacebookConnector = () => {
     }
 
     setIsSyncing(true);
+    console.log('Starting manual sync for ad account:', selectedAccount);
+    
     try {
       await syncIntegration.mutateAsync('facebook');
       toast({
@@ -315,6 +361,7 @@ export const FacebookConnector = () => {
         description: "Facebook Ads data has been synchronized successfully.",
       });
     } catch (error) {
+      console.error('Sync failed:', error);
       toast({
         title: "Sync Failed",
         description: "Failed to sync Facebook Ads data. Please try again.",
@@ -322,20 +369,6 @@ export const FacebookConnector = () => {
       });
     } finally {
       setIsSyncing(false);
-    }
-  };
-
-  const saveAdAccountSelection = () => {
-    if (selectedAccount) {
-      saveApiKeys('facebook', {
-        ...savedKeys,
-        selected_ad_account_id: selectedAccount
-      });
-
-      toast({
-        title: "Ad Account Selected",
-        description: "Your ad account selection has been saved.",
-      });
     }
   };
 
@@ -462,7 +495,7 @@ export const FacebookConnector = () => {
                       <div className="space-y-3">
                         <div className="space-y-2">
                           <Label htmlFor="adAccount">Choose an ad account to sync data from:</Label>
-                          <Select value={selectedAccount} onValueChange={setSelectedAccount}>
+                          <Select value={selectedAccount} onValueChange={handleAdAccountChange}>
                             <SelectTrigger>
                               <SelectValue placeholder="Select an ad account" />
                             </SelectTrigger>
@@ -482,9 +515,10 @@ export const FacebookConnector = () => {
                         </div>
                         
                         {selectedAccount && (
-                          <Button onClick={saveAdAccountSelection} variant="outline" className="w-full">
-                            Save Ad Account Selection
-                          </Button>
+                          <div className="text-xs text-green-600 flex items-center gap-1">
+                            <CheckCircle className="h-3 w-3" />
+                            Ad account automatically saved and will be used for syncing
+                          </div>
                         )}
                       </div>
                     ) : (
@@ -534,8 +568,8 @@ export const FacebookConnector = () => {
                   <li>• Connect with basic permissions first (no approval needed)</li>
                   <li>• Test the connection to enable ads permission requests</li>
                   <li>• Upgrade to ads permissions when available (may take up to 24 hours)</li>
-                  <li>• Select which ad account you want to sync data from</li>
-                  <li>• Your advertising data will be automatically imported</li>
+                  <li>• Select which ad account you want to sync data from (auto-saved)</li>
+                  <li>• Your advertising data will be automatically imported and synced</li>
                 </ul>
               </div>
             </div>

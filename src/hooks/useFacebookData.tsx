@@ -43,6 +43,8 @@ export const useFacebookData = ({ dateRange }: UseFacebookDataProps = {}) => {
     queryFn: async () => {
       if (!agency) return null;
       
+      console.log('useFacebookData - Starting data fetch for agency:', agency.id);
+      
       // First check if Facebook integration is connected
       const { data: integration, error: integrationError } = await supabase
         .from('integrations')
@@ -62,39 +64,48 @@ export const useFacebookData = ({ dateRange }: UseFacebookDataProps = {}) => {
         return null;
       }
 
-      // If date range is provided, trigger a new sync with the date range
-      if (dateRange) {
+      // Get API keys including the selected ad account
+      const apiKeys = getApiKeys('facebook');
+      console.log('useFacebookData - API keys retrieved:', {
+        hasAccessToken: !!apiKeys.access_token,
+        selectedAdAccount: apiKeys.selected_ad_account_id
+      });
+
+      // If we have a selected ad account, trigger a sync with that account
+      if (apiKeys.selected_ad_account_id && apiKeys.access_token) {
         try {
-          const dateRangeFormatted = {
-            since: format(dateRange.from, 'yyyy-MM-dd'),
-            until: format(dateRange.to, 'yyyy-MM-dd')
+          const syncPayload = {
+            platform: 'facebook',
+            apiKeys: {
+              access_token: apiKeys.access_token,
+              selected_ad_account_id: apiKeys.selected_ad_account_id,
+              ...(dateRange && {
+                date_range: {
+                  since: format(dateRange.from, 'yyyy-MM-dd'),
+                  until: format(dateRange.to, 'yyyy-MM-dd')
+                }
+              })
+            },
+            agencyId: agency.id
           };
 
-          // Get API keys from the useApiKeys hook
-          const apiKeys = getApiKeys('facebook');
+          console.log('useFacebookData - Triggering sync with payload:', syncPayload);
 
-          // Call sync function with date range
           const syncResponse = await supabase.functions.invoke('sync-integrations', {
-            body: {
-              platform: 'facebook',
-              apiKeys: {
-                access_token: apiKeys.access_token || 'demo_token',
-                selected_ad_account_id: apiKeys.selected_ad_account_id || 'act_123456789',
-                date_range: dateRangeFormatted
-              },
-              agencyId: agency.id
-            }
+            body: syncPayload
           });
 
           if (syncResponse.error) {
             console.error('Sync error:', syncResponse.error);
+          } else {
+            console.log('Sync response:', syncResponse.data);
           }
         } catch (error) {
           console.error('Error triggering sync:', error);
         }
       }
 
-      // Then fetch the actual synced data
+      // Fetch the synced data
       const { data: syncedData, error: syncError } = await supabase
         .from('integration_data')
         .select('*')
@@ -108,6 +119,8 @@ export const useFacebookData = ({ dateRange }: UseFacebookDataProps = {}) => {
         console.error('Error fetching Facebook data:', syncError);
         throw syncError;
       }
+
+      console.log('useFacebookData - Synced data retrieved:', syncedData);
 
       if (syncedData && syncedData.data) {
         const fbData = syncedData.data as any;
@@ -131,6 +144,7 @@ export const useFacebookData = ({ dateRange }: UseFacebookDataProps = {}) => {
       return null;
     },
     enabled: !!agency,
+    refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
   });
 
   // Default insights with proper typing
