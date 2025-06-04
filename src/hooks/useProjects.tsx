@@ -12,14 +12,21 @@ export const useProjects = () => {
     queryFn: async () => {
       if (!agency) return [];
       
+      console.log('Fetching projects for agency:', agency.id);
+      
       const { data, error } = await supabase
         .from('projects')
         .select('*')
         .eq('agency_id', agency.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      return data;
+      if (error) {
+        console.error('Error fetching projects:', error);
+        throw error;
+      }
+      
+      console.log('Fetched projects:', data);
+      return data || [];
     },
     enabled: !!agency,
   });
@@ -27,6 +34,8 @@ export const useProjects = () => {
   const createProject = useMutation({
     mutationFn: async (projectData: { name: string; funnel_type: string }) => {
       if (!agency) throw new Error('No agency found');
+      
+      console.log('Creating project:', projectData);
       
       const { data, error } = await supabase
         .from('projects')
@@ -38,14 +47,39 @@ export const useProjects = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error creating project:', error);
+        throw error;
+      }
+
+      console.log('Created project:', data);
 
       // Create default integrations for the project using upsert to avoid duplicates
       const defaultIntegrations = [
-        { project_id: data.id, platform: 'facebook', is_connected: false },
-        { project_id: data.id, platform: 'google_sheets', is_connected: false },
-        { project_id: data.id, platform: 'clickfunnels', is_connected: false },
+        { 
+          project_id: data.id, 
+          platform: 'facebook', 
+          is_connected: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        { 
+          project_id: data.id, 
+          platform: 'google_sheets', 
+          is_connected: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        { 
+          project_id: data.id, 
+          platform: 'clickfunnels', 
+          is_connected: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
       ];
+
+      console.log('Creating default integrations:', defaultIntegrations);
 
       const { error: integrationsError } = await supabase
         .from('project_integrations')
@@ -57,6 +91,8 @@ export const useProjects = () => {
       if (integrationsError) {
         console.error('Error creating default integrations:', integrationsError);
         // Don't throw here as the project was created successfully
+      } else {
+        console.log('Successfully created default integrations');
       }
 
       return data;
@@ -68,12 +104,19 @@ export const useProjects = () => {
 
   const deleteProject = useMutation({
     mutationFn: async (projectId: string) => {
+      console.log('Deleting project:', projectId);
+      
       const { error } = await supabase
         .from('projects')
         .delete()
         .eq('id', projectId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error deleting project:', error);
+        throw error;
+      }
+      
+      console.log('Successfully deleted project:', projectId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
