@@ -18,14 +18,14 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
     to: new Date() 
   });
   
-  const { calendlyEvents, isLoading: calendlyLoading } = useCalendlyData(projectId);
+  const { calendlyData, isLoading: calendlyLoading } = useCalendlyData({ projectId, dateRange });
   const { facebookData, isLoading: facebookLoading } = useFacebookData({ dateRange });
 
   // Calculate booking metrics
-  const totalBookings = calendlyEvents?.length || 0;
-  const scheduledBookings = calendlyEvents?.filter(event => event.status === 'scheduled')?.length || 0;
-  const completedBookings = calendlyEvents?.filter(event => event.status === 'completed')?.length || 0;
-  const cancelledBookings = calendlyEvents?.filter(event => event.status === 'cancelled')?.length || 0;
+  const totalBookings = calendlyData?.events?.length || 0;
+  const scheduledBookings = calendlyData?.events?.filter(event => event.status === 'scheduled')?.length || 0;
+  const completedBookings = calendlyData?.events?.filter(event => event.status === 'completed')?.length || 0;
+  const cancelledBookings = calendlyData?.events?.filter(event => event.status === 'cancelled')?.length || 0;
 
   // Calculate Facebook to booking conversion if both data sources are available
   const facebookClicks = facebookData?.insights?.clicks || 0;
@@ -271,7 +271,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {calendlyEvents?.slice(0, 5).map((event, index) => (
+                  {calendlyData?.events?.slice(0, 5).map((event, index) => (
                     <div key={index} className="flex justify-between items-center p-2 border rounded">
                       <div>
                         <p className="text-sm font-medium">{event.invitee_name || 'Unknown'}</p>
