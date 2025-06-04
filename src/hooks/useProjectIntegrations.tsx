@@ -55,45 +55,23 @@ export const useProjectIntegrations = (projectId?: string) => {
           updated_at: new Date().toISOString(),
         };
         
-        // First try to check if the record exists
-        const { data: existingData } = await supabase
+        // Use upsert to handle both insert and update cases
+        const { data, error } = await supabase
           .from('project_integrations')
-          .select('id')
-          .eq('project_id', projectId)
-          .eq('platform', platform)
-          .maybeSingle();
+          .upsert(updateData, {
+            onConflict: 'project_id,platform',
+            ignoreDuplicates: false
+          })
+          .select()
+          .single();
 
-        let result;
-        if (existingData) {
-          // Update existing record
-          const { data, error } = await supabase
-            .from('project_integrations')
-            .update({
-              is_connected: isConnected,
-              last_sync: isConnected ? new Date().toISOString() : null,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('project_id', projectId)
-            .eq('platform', platform)
-            .select()
-            .single();
-
-          if (error) throw error;
-          result = data;
-        } else {
-          // Insert new record
-          const { data, error } = await supabase
-            .from('project_integrations')
-            .insert(updateData)
-            .select()
-            .single();
-
-          if (error) throw error;
-          result = data;
+        if (error) {
+          console.error('Error upserting integration:', error);
+          throw error;
         }
         
-        console.log('Updated integration successfully:', result);
-        return result;
+        console.log('Updated integration successfully:', data);
+        return data;
       } catch (error) {
         console.error('Error updating integration:', error);
         throw error;

@@ -66,45 +66,8 @@ export const useProjects = () => {
 
         console.log('Created project:', data);
 
-        // Create default integrations for the project - check if they exist first
-        const defaultPlatforms = ['facebook', 'google_sheets', 'clickfunnels'];
-        
-        for (const platform of defaultPlatforms) {
-          try {
-            // Check if integration already exists
-            const { data: existingIntegration } = await supabase
-              .from('project_integrations')
-              .select('id')
-              .eq('project_id', data.id)
-              .eq('platform', platform)
-              .maybeSingle();
-
-            if (!existingIntegration) {
-              // Only insert if it doesn't exist
-              const { error: insertError } = await supabase
-                .from('project_integrations')
-                .insert({
-                  project_id: data.id,
-                  platform,
-                  is_connected: false,
-                  created_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString(),
-                });
-
-              if (insertError) {
-                console.error(`Error creating ${platform} integration:`, insertError);
-                // Don't throw here as the project was created successfully
-              } else {
-                console.log(`Successfully created ${platform} integration`);
-              }
-            } else {
-              console.log(`Integration for ${platform} already exists, skipping`);
-            }
-          } catch (integrationError) {
-            console.error(`Failed to process ${platform} integration:`, integrationError);
-            // Continue with other integrations
-          }
-        }
+        // Create default integrations using a more robust approach
+        await createDefaultIntegrations(data.id);
 
         return data;
       } catch (error) {
@@ -119,6 +82,38 @@ export const useProjects = () => {
       console.error('Create project mutation failed:', error);
     },
   });
+
+  const createDefaultIntegrations = async (projectId: string) => {
+    const defaultPlatforms = ['facebook', 'google_sheets', 'clickfunnels'];
+    
+    for (const platform of defaultPlatforms) {
+      try {
+        // Use upsert to handle conflicts gracefully
+        const { error: upsertError } = await supabase
+          .from('project_integrations')
+          .upsert({
+            project_id: projectId,
+            platform,
+            is_connected: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }, {
+            onConflict: 'project_id,platform',
+            ignoreDuplicates: true
+          });
+
+        if (upsertError) {
+          console.error(`Error upserting ${platform} integration:`, upsertError);
+          // Don't throw here as the project was created successfully
+        } else {
+          console.log(`Successfully upserted ${platform} integration for project ${projectId}`);
+        }
+      } catch (integrationError) {
+        console.error(`Failed to process ${platform} integration:`, integrationError);
+        // Continue with other integrations
+      }
+    }
+  };
 
   const deleteProject = useMutation({
     mutationFn: async (projectId: string) => {
