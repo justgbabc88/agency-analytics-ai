@@ -118,7 +118,7 @@ const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Da
     // Generate mock page views for the selected date range
     const pageViews = Math.floor(Math.random() * 300) + 150;
     
-    dates.push({
+    const dayData = {
       date: format(currentDate, 'MMM d'),
       totalBookings: callsBooked,
       callsBooked,
@@ -126,13 +126,17 @@ const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Da
       cancelled,
       showUpRate: Math.max(showUpRate, 0),
       pageViews
-    });
+    };
+    
+    console.log(`Day data for ${currentDateStr}:`, dayData);
+    dates.push(dayData);
   }
   
   console.log('\n=== FINAL CHART DATA SUMMARY (CREATED EVENTS) ===');
   console.log('Generated data points:', dates.length);
   console.log('Calls booked by day:', dates.map(d => ({ date: d.date, callsBooked: d.callsBooked })));
   console.log('Total calls booked across all days:', dates.reduce((sum, d) => sum + d.callsBooked, 0));
+  console.log('Full chart data:', dates);
   
   return dates;
 };
@@ -211,7 +215,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   const monthlyComparison = getMonthlyComparison();
 
   // Filter events within the selected date range for statistics (using created_at)
-  // Use string-based date comparison for accuracy
+  // Use exact date matching to ensure we get all events in range
   const filteredEvents = calendlyEvents.filter(event => {
     if (!event.created_at) return false;
     
@@ -224,13 +228,25 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
       const startDateStr = format(dateRange.from, 'yyyy-MM-dd');
       const endDateStr = format(dateRange.to, 'yyyy-MM-dd');
       
-      return createdDateStr >= startDateStr && createdDateStr <= endDateStr;
+      const isInRange = createdDateStr >= startDateStr && createdDateStr <= endDateStr;
+      
+      if (isInRange) {
+        console.log(`✅ Event IN RANGE for metrics:`, {
+          id: event.id,
+          created_at: createdDateStr,
+          range: `${startDateStr} to ${endDateStr}`,
+          status: event.status
+        });
+      }
+      
+      return isInRange;
     } catch (error) {
       console.warn('Error filtering event by created date:', event, error);
       return false;
     }
   });
 
+  console.log('\n=== METRICS CALCULATION ===');
   console.log('Filtered events for metrics (by created_at):', filteredEvents.length);
   console.log('Filtered events sample:', filteredEvents.slice(0, 5).map(e => ({ 
     id: e.id, 
@@ -259,6 +275,8 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
     }
     return stats;
   }, { totalBookings: 0, scheduled: 0, cancelled: 0, noShows: 0, other: 0 });
+
+  console.log('Calculated call stats:', callStats);
 
   // Calculate calls taken (assuming scheduled calls that aren't no-shows are taken)
   const callsTaken = callStats.scheduled - callStats.noShows;
@@ -325,6 +343,11 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
     console.log('Today is:', format(new Date(), 'yyyy-MM-dd'));
     setDateRange({ from, to });
   };
+
+  console.log('\n=== FINAL COMPONENT STATE ===');
+  console.log('Chart data length:', chartData.length);
+  console.log('Total bookings for metrics:', callStats.totalBookings);
+  console.log('Chart data summary:', chartData.map(d => ({ date: d.date, bookings: d.callsBooked })));
 
   // Show a message if no project is selected
   if (!projectId) {
