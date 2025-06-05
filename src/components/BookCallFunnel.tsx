@@ -1,4 +1,3 @@
-
 import { MetricCard } from "./MetricCard";
 import { ConversionChart } from "./ConversionChart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,6 +5,26 @@ import { useCalendlyData } from "@/hooks/useCalendlyData";
 import { format, subDays, startOfDay, endOfDay, parseISO, isValid } from "date-fns";
 import { AdvancedDateRangePicker } from "./AdvancedDateRangePicker";
 import { useState, useEffect, useMemo } from "react";
+
+// Standardized date filtering function to ensure consistency
+const isEventInDateRange = (eventCreatedAt: string, startDate: Date, endDate: Date): boolean => {
+  if (!eventCreatedAt) return false;
+  
+  try {
+    const createdDate = parseISO(eventCreatedAt);
+    if (!isValid(createdDate)) return false;
+    
+    // Use consistent date comparison - convert all to timestamp for precision
+    const eventTime = createdDate.getTime();
+    const rangeStart = startOfDay(startDate).getTime();
+    const rangeEnd = endOfDay(endDate).getTime();
+    
+    return eventTime >= rangeStart && eventTime <= rangeEnd;
+  } catch (error) {
+    console.warn('Error parsing event date:', eventCreatedAt, error);
+    return false;
+  }
+};
 
 // Generate chart data based on real Calendly events with date filtering using created_at
 const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Date; to: Date }) => {
@@ -30,38 +49,10 @@ const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Da
     
     console.log(`\n--- Processing ${currentDateStr} ---`);
     
-    // Use consistent Date-based filtering
-    const dayStart = startOfDay(currentDate);
-    const dayEnd = endOfDay(currentDate);
-    
-    const eventsCreatedThisDay = calendlyEvents.filter(event => {
-      if (!event.created_at) {
-        return false;
-      }
-      
-      try {
-        const createdDate = parseISO(event.created_at);
-        if (!isValid(createdDate)) {
-          return false;
-        }
-        
-        const isOnThisDay = createdDate >= dayStart && createdDate <= dayEnd;
-        
-        if (isOnThisDay) {
-          console.log('✓ Event created on this day:', {
-            id: event.id,
-            created_at: format(createdDate, 'yyyy-MM-dd HH:mm:ss'),
-            target_date: currentDateStr,
-            status: event.status
-          });
-        }
-        
-        return isOnThisDay;
-      } catch (error) {
-        console.warn('Error parsing created date:', event.created_at, error);
-        return false;
-      }
-    });
+    // Use the standardized filtering function
+    const eventsCreatedThisDay = calendlyEvents.filter(event => 
+      isEventInDateRange(event.created_at, currentDate, currentDate)
+    );
     
     console.log(`Events created on ${currentDateStr}: ${eventsCreatedThisDay.length}`);
     
@@ -108,35 +99,15 @@ const filterEventsByDateRange = (events: any[], dateRange: { from: Date; to: Dat
     from: format(dateRange.from, 'yyyy-MM-dd HH:mm:ss'),
     to: format(dateRange.to, 'yyyy-MM-dd HH:mm:ss')
   });
+  console.log('Total events to filter:', events.length);
   
-  const rangeStart = startOfDay(dateRange.from);
-  const rangeEnd = endOfDay(dateRange.to);
-  
-  const filtered = events.filter(event => {
-    if (!event.created_at) return false;
-    
-    try {
-      const createdDate = parseISO(event.created_at);
-      if (!isValid(createdDate)) return false;
-      
-      const isInRange = createdDate >= rangeStart && createdDate <= rangeEnd;
-      
-      if (isInRange) {
-        console.log(`✅ Event IN RANGE:`, {
-          id: event.id,
-          created_at: format(createdDate, 'yyyy-MM-dd HH:mm:ss'),
-          status: event.status
-        });
-      }
-      
-      return isInRange;
-    } catch (error) {
-      console.warn('Error filtering event by created date:', event, error);
-      return false;
-    }
-  });
+  const filtered = events.filter(event => 
+    isEventInDateRange(event.created_at, dateRange.from, dateRange.to)
+  );
   
   console.log('Filtered events count:', filtered.length);
+  console.log('Filtered event IDs:', filtered.map(e => ({ id: e.id, created_at: e.created_at, status: e.status })));
+  
   return filtered;
 };
 
@@ -146,23 +117,29 @@ interface BookCallFunnelProps {
 
 export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   const { calendlyEvents, getRecentBookings, getMonthlyComparison } = useCalendlyData(projectId);
-  const [dateRange, setDateRange] = useState({
-    from: subDays(new Date(), 30),
-    to: new Date()
+  
+  // Initialize with normalized dates to ensure consistency
+  const [dateRange, setDateRange] = useState(() => {
+    const today = new Date();
+    return {
+      from: startOfDay(subDays(today, 29)), // 30 days total including today
+      to: endOfDay(today)
+    };
   });
   
   console.log('BookCallFunnel render - Project ID:', projectId);
   console.log('Current date range:', {
-    from: format(dateRange.from, 'yyyy-MM-dd'),
-    to: format(dateRange.to, 'yyyy-MM-dd')
+    from: format(dateRange.from, 'yyyy-MM-dd HH:mm:ss'),
+    to: format(dateRange.to, 'yyyy-MM-dd HH:mm:ss')
   });
   console.log('All Calendly events:', calendlyEvents.length);
   
-  // Create a stable date range key to ensure proper memoization
-  const dateRangeKey = useMemo(() => 
-    `${dateRange.from.getTime()}-${dateRange.to.getTime()}`, 
-    [dateRange.from, dateRange.to]
-  );
+  // Create a stable date range key using ISO strings for consistency
+  const dateRangeKey = useMemo(() => {
+    const fromISO = dateRange.from.toISOString();
+    const toISO = dateRange.to.toISOString();
+    return `${fromISO}-${toISO}`;
+  }, [dateRange.from, dateRange.to]);
   
   // Use useMemo to recalculate chart data when dependencies change
   const chartData = useMemo(() => {
@@ -178,6 +155,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   // Filter events for metrics using the same logic
   const filteredEvents = useMemo(() => {
     console.log('🔄 Recalculating filtered events for metrics');
+    console.log('Using date range:', dateRangeKey);
     return filterEventsByDateRange(calendlyEvents, dateRange);
   }, [calendlyEvents, dateRangeKey]);
   
@@ -190,7 +168,8 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
       filteredEvents: filteredEvents.length
     });
   }, [dateRange, calendlyEvents.length, filteredEvents.length]);
-  
+
+  // ... keep existing code (recentBookings and monthlyComparison)
   const recentBookings = getRecentBookings(7);
   const monthlyComparison = getMonthlyComparison();
 
@@ -283,10 +262,16 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   const handleDateChange = (from: Date, to: Date) => {
     console.log('🚀 Date range changed FROM PICKER:', format(from, 'yyyy-MM-dd HH:mm:ss'), 'to', format(to, 'yyyy-MM-dd HH:mm:ss'));
     
-    // Create completely new Date objects to ensure state change detection
+    // Normalize dates to ensure consistency
+    const normalizedFrom = startOfDay(from);
+    const normalizedTo = endOfDay(to);
+    
+    console.log('🚀 Normalized dates:', format(normalizedFrom, 'yyyy-MM-dd HH:mm:ss'), 'to', format(normalizedTo, 'yyyy-MM-dd HH:mm:ss'));
+    
+    // Set the normalized date range
     setDateRange({ 
-      from: new Date(from.getTime()), 
-      to: new Date(to.getTime()) 
+      from: normalizedFrom, 
+      to: normalizedTo 
     });
   };
 
