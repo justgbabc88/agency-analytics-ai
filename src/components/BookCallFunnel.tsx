@@ -33,13 +33,43 @@ const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Da
     });
   });
   
+  // Special check for today's events
+  const today = new Date();
+  const todayStr = format(today, 'yyyy-MM-dd');
+  console.log('\n=== TODAY\'S EVENTS CHECK ===');
+  console.log('Looking for events created on:', todayStr);
+  
+  const todayEvents = calendlyEvents.filter(event => {
+    if (!event.created_at) return false;
+    try {
+      const createdDate = parseISO(event.created_at);
+      if (!isValid(createdDate)) return false;
+      const createdDateStr = format(createdDate, 'yyyy-MM-dd');
+      const isToday = createdDateStr === todayStr;
+      if (isToday) {
+        console.log('✅ Found TODAY event:', {
+          id: event.id,
+          created_at: event.created_at,
+          formatted: format(createdDate, 'yyyy-MM-dd HH:mm:ss'),
+          status: event.status
+        });
+      }
+      return isToday;
+    } catch (error) {
+      return false;
+    }
+  });
+  
+  console.log(`Total events created TODAY (${todayStr}):`, todayEvents.length);
+  
   for (let i = 0; i <= daysDiff; i++) {
     const currentDate = new Date(startDate);
     currentDate.setDate(currentDate.getDate() + i);
+    const currentDateStr = format(currentDate, 'yyyy-MM-dd');
     
-    console.log(`\n--- Processing ${format(currentDate, 'yyyy-MM-dd')} ---`);
+    console.log(`\n--- Processing ${currentDateStr} ---`);
     
-    // Filter events CREATED on this specific day using isSameDay for accuracy
+    // Filter events CREATED on this specific day using string comparison for accuracy
     const eventsCreatedThisDay = calendlyEvents.filter(event => {
       if (!event.created_at) {
         return false;
@@ -51,14 +81,15 @@ const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Da
           return false;
         }
         
-        // Use isSameDay to avoid timezone boundary issues
-        const isOnThisDay = isSameDay(createdDate, currentDate);
+        // Use string comparison for exact date matching
+        const createdDateStr = format(createdDate, 'yyyy-MM-dd');
+        const isOnThisDay = createdDateStr === currentDateStr;
         
         if (isOnThisDay) {
           console.log('✓ Event created on this day:', {
             id: event.id,
             created_at: format(createdDate, 'yyyy-MM-dd HH:mm:ss'),
-            target_date: format(currentDate, 'yyyy-MM-dd'),
+            target_date: currentDateStr,
             status: event.status
           });
         }
@@ -70,7 +101,7 @@ const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Da
       }
     });
     
-    console.log(`Events created this day: ${eventsCreatedThisDay.length}`);
+    console.log(`Events created on ${currentDateStr}: ${eventsCreatedThisDay.length}`);
     
     // Calculate daily stats based on events created this day
     const callsBooked = eventsCreatedThisDay.length;
@@ -125,24 +156,54 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   console.log('Today is:', format(new Date(), 'yyyy-MM-dd'));
   console.log('All Calendly events:', calendlyEvents.length);
   
-  // Filter events that were created today for debugging
+  // Enhanced debugging for today's events
+  const today = new Date();
+  const todayStr = format(today, 'yyyy-MM-dd');
+  
+  console.log('\n=== DETAILED TODAY EVENTS ANALYSIS ===');
+  console.log('Searching for events created on:', todayStr);
+  
   const todayEvents = calendlyEvents.filter(event => {
-    if (!event.created_at) return false;
+    if (!event.created_at) {
+      console.log('❌ Event missing created_at:', event.id);
+      return false;
+    }
     try {
       const createdDate = parseISO(event.created_at);
-      return isValid(createdDate) && isSameDay(createdDate, new Date());
+      if (!isValid(createdDate)) {
+        console.log('❌ Invalid created_at date:', event.created_at);
+        return false;
+      }
+      const createdDateStr = format(createdDate, 'yyyy-MM-dd');
+      const isToday = createdDateStr === todayStr;
+      
+      console.log(`${isToday ? '✅' : '⏭️'} Event check:`, {
+        id: event.id,
+        created_at: event.created_at,
+        parsed_date: createdDateStr,
+        is_today: isToday,
+        status: event.status
+      });
+      
+      return isToday;
     } catch (error) {
+      console.log('❌ Error parsing event:', event.id, error);
       return false;
     }
   });
   
-  console.log('Events created today:', todayEvents.length);
-  console.log('Today events details:', todayEvents.map(e => ({
-    id: e.id,
-    created_at: e.created_at,
-    scheduled_at: e.scheduled_at,
-    status: e.status
-  })));
+  console.log(`\n📊 FINAL COUNT - Events created TODAY (${todayStr}):`, todayEvents.length);
+  if (todayEvents.length > 0) {
+    console.log('Today\'s events details:', todayEvents.map(e => ({
+      id: e.id,
+      created_at: e.created_at,
+      scheduled_at: e.scheduled_at,
+      status: e.status
+    })));
+  } else {
+    console.log('⚠️ NO EVENTS FOUND FOR TODAY');
+    console.log('All event created_at dates:', calendlyEvents.map(e => e.created_at).filter(Boolean));
+  }
   
   // Calculate chart data based on real Calendly events and date range (using created_at)
   const chartData = generateCallDataFromEvents(calendlyEvents, dateRange);
@@ -150,7 +211,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   const monthlyComparison = getMonthlyComparison();
 
   // Filter events within the selected date range for statistics (using created_at)
-  // Use isSameDay for start and end dates to be more inclusive
+  // Use string-based date comparison for accuracy
   const filteredEvents = calendlyEvents.filter(event => {
     if (!event.created_at) return false;
     
@@ -158,11 +219,12 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
       const createdDate = parseISO(event.created_at);
       if (!isValid(createdDate)) return false;
       
-      // Check if the created date is within our range (inclusive)
-      const isAfterStart = createdDate >= startOfDay(dateRange.from);
-      const isBeforeEnd = createdDate <= endOfDay(dateRange.to);
+      // Use string comparison for exact date matching within range
+      const createdDateStr = format(createdDate, 'yyyy-MM-dd');
+      const startDateStr = format(dateRange.from, 'yyyy-MM-dd');
+      const endDateStr = format(dateRange.to, 'yyyy-MM-dd');
       
-      return isAfterStart && isBeforeEnd;
+      return createdDateStr >= startDateStr && createdDateStr <= endDateStr;
     } catch (error) {
       console.warn('Error filtering event by created date:', event, error);
       return false;
