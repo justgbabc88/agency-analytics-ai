@@ -1,4 +1,3 @@
-
 import { MetricCard } from "./MetricCard";
 import { ConversionChart } from "./ConversionChart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,35 +32,6 @@ const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Da
     });
   });
   
-  // Special check for today's events
-  const today = new Date();
-  const todayStr = format(today, 'yyyy-MM-dd');
-  console.log('\n=== TODAY\'S EVENTS CHECK ===');
-  console.log('Looking for events created on:', todayStr);
-  
-  const todayEvents = calendlyEvents.filter(event => {
-    if (!event.created_at) return false;
-    try {
-      const createdDate = parseISO(event.created_at);
-      if (!isValid(createdDate)) return false;
-      const createdDateStr = format(createdDate, 'yyyy-MM-dd');
-      const isToday = createdDateStr === todayStr;
-      if (isToday) {
-        console.log('✅ Found TODAY event:', {
-          id: event.id,
-          created_at: event.created_at,
-          formatted: format(createdDate, 'yyyy-MM-dd HH:mm:ss'),
-          status: event.status
-        });
-      }
-      return isToday;
-    } catch (error) {
-      return false;
-    }
-  });
-  
-  console.log(`Total events created TODAY (${todayStr}):`, todayEvents.length);
-  
   // Fix: Ensure we include all days in the range, including single day ranges
   const totalDays = daysDiff === 0 ? 1 : daysDiff + 1;
   
@@ -72,7 +42,10 @@ const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Da
     
     console.log(`\n--- Processing ${currentDateStr} ---`);
     
-    // Filter events CREATED on this specific day using string comparison for accuracy
+    // FIXED: Use consistent Date-based filtering instead of string comparison
+    const dayStart = startOfDay(currentDate);
+    const dayEnd = endOfDay(currentDate);
+    
     const eventsCreatedThisDay = calendlyEvents.filter(event => {
       if (!event.created_at) {
         return false;
@@ -84,16 +57,17 @@ const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Da
           return false;
         }
         
-        // Use string comparison for exact date matching
-        const createdDateStr = format(createdDate, 'yyyy-MM-dd');
-        const isOnThisDay = createdDateStr === currentDateStr;
+        // Use Date object comparison for consistency with metrics calculation
+        const isOnThisDay = createdDate >= dayStart && createdDate <= dayEnd;
         
         if (isOnThisDay) {
           console.log('✓ Event created on this day:', {
             id: event.id,
             created_at: format(createdDate, 'yyyy-MM-dd HH:mm:ss'),
             target_date: currentDateStr,
-            status: event.status
+            status: event.status,
+            dayStart: format(dayStart, 'yyyy-MM-dd HH:mm:ss'),
+            dayEnd: format(dayEnd, 'yyyy-MM-dd HH:mm:ss')
           });
         }
         
@@ -227,7 +201,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   const monthlyComparison = getMonthlyComparison();
 
   // Filter events within the selected date range for statistics (using created_at)
-  // Fix: Use inclusive date comparison and ensure we capture all events in range
+  // FIXED: Ensure consistent date filtering
   const filteredEvents = calendlyEvents.filter(event => {
     if (!event.created_at) return false;
     
@@ -235,20 +209,18 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
       const createdDate = parseISO(event.created_at);
       if (!isValid(createdDate)) return false;
       
-      // Fix: Use Date objects for proper comparison instead of string comparison
-      const createdDateOnly = startOfDay(createdDate);
+      // Use consistent Date object comparison
       const rangeStart = startOfDay(dateRange.from);
       const rangeEnd = endOfDay(dateRange.to);
       
-      const isInRange = createdDateOnly >= rangeStart && createdDateOnly <= rangeEnd;
+      const isInRange = createdDate >= rangeStart && createdDate <= rangeEnd;
       
       if (isInRange) {
         console.log(`✅ Event IN RANGE for metrics:`, {
           id: event.id,
           created_at: format(createdDate, 'yyyy-MM-dd HH:mm:ss'),
-          created_date_only: format(createdDateOnly, 'yyyy-MM-dd'),
-          range_start: format(rangeStart, 'yyyy-MM-dd'),
-          range_end: format(rangeEnd, 'yyyy-MM-dd'),
+          range_start: format(rangeStart, 'yyyy-MM-dd HH:mm:ss'),
+          range_end: format(rangeEnd, 'yyyy-MM-dd HH:mm:ss'),
           status: event.status
         });
       }
