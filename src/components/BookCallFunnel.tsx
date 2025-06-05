@@ -1,109 +1,13 @@
-import { MetricCard } from "./MetricCard";
-import { ConversionChart } from "./ConversionChart";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
 import { useCalendlyData } from "@/hooks/useCalendlyData";
-import { format, subDays, startOfDay, endOfDay, parseISO, isValid } from "date-fns";
+import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { AdvancedDateRangePicker } from "./AdvancedDateRangePicker";
+import { LandingPageMetrics } from "./LandingPageMetrics";
+import { CallStatsMetrics } from "./CallStatsMetrics";
+import { SalesConversionMetrics } from "./SalesConversionMetrics";
 import { useState, useEffect, useMemo } from "react";
-
-// Standardized date filtering function to ensure consistency
-const isEventInDateRange = (eventCreatedAt: string, startDate: Date, endDate: Date): boolean => {
-  if (!eventCreatedAt) return false;
-  
-  try {
-    const createdDate = parseISO(eventCreatedAt);
-    if (!isValid(createdDate)) return false;
-    
-    const eventTime = createdDate.getTime();
-    const rangeStart = startOfDay(startDate).getTime();
-    const rangeEnd = endOfDay(endDate).getTime();
-    
-    return eventTime >= rangeStart && eventTime <= rangeEnd;
-  } catch (error) {
-    console.warn('Error parsing event date:', eventCreatedAt, error);
-    return false;
-  }
-};
-
-// Generate chart data based on real Calendly events with date filtering using created_at
-const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Date; to: Date }) => {
-  const dates = [];
-  const { from: startDate, to: endDate } = dateRange;
-  
-  const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-  
-  console.log('=== CHART DATA GENERATION DEBUG ===');
-  console.log('Date range:', format(startDate, 'yyyy-MM-dd'), 'to', format(endDate, 'yyyy-MM-dd'));
-  console.log('Total days in range:', daysDiff);
-  console.log('Total Calendly events available:', calendlyEvents.length);
-  
-  const totalDays = daysDiff === 0 ? 1 : daysDiff + 1;
-  
-  for (let i = 0; i < totalDays; i++) {
-    const currentDate = new Date(startDate);
-    currentDate.setDate(currentDate.getDate() + i);
-    const currentDateStr = format(currentDate, 'yyyy-MM-dd');
-    
-    console.log(`\n--- Processing ${currentDateStr} ---`);
-    
-    const eventsCreatedThisDay = calendlyEvents.filter(event => 
-      isEventInDateRange(event.created_at, currentDate, currentDate)
-    );
-    
-    console.log(`Events created on ${currentDateStr}: ${eventsCreatedThisDay.length}`);
-    
-    const callsBooked = eventsCreatedThisDay.length;
-    const cancelled = eventsCreatedThisDay.filter(event => 
-      event.status === 'canceled' || event.status === 'cancelled'
-    ).length;
-    const noShows = eventsCreatedThisDay.filter(event => event.status === 'no_show').length;
-    const scheduled = eventsCreatedThisDay.filter(event => 
-      event.status === 'active' || event.status === 'scheduled'
-    ).length;
-    const callsTaken = Math.max(0, scheduled - noShows);
-    const showUpRate = scheduled > 0 ? ((callsTaken / scheduled) * 100) : 0;
-    
-    const pageViews = Math.floor(Math.random() * 300) + 150;
-    
-    const dayData = {
-      date: format(currentDate, 'MMM d'),
-      totalBookings: callsBooked,
-      callsBooked,
-      callsTaken,
-      cancelled,
-      showUpRate: Math.max(showUpRate, 0),
-      pageViews
-    };
-    
-    console.log(`Day data for ${currentDateStr}:`, dayData);
-    dates.push(dayData);
-  }
-  
-  console.log('\n=== FINAL CHART DATA SUMMARY ===');
-  console.log('Generated data points:', dates.length);
-  console.log('Total calls booked across all days:', dates.reduce((sum, d) => sum + d.callsBooked, 0));
-  console.log('Sample data point:', dates[0]);
-  
-  return dates;
-};
-
-// Helper function to filter events by date range consistently
-const filterEventsByDateRange = (events: any[], dateRange: { from: Date; to: Date }) => {
-  console.log('\n=== FILTERING EVENTS FOR METRICS ===');
-  console.log('Date range:', {
-    from: format(dateRange.from, 'yyyy-MM-dd HH:mm:ss'),
-    to: format(dateRange.to, 'yyyy-MM-dd HH:mm:ss')
-  });
-  console.log('Total events to filter:', events.length);
-  
-  const filtered = events.filter(event => 
-    isEventInDateRange(event.created_at, dateRange.from, dateRange.to)
-  );
-  
-  console.log('Filtered events count:', filtered.length);
-  
-  return filtered;
-};
+import { generateCallDataFromEvents } from "@/utils/chartDataGeneration";
+import { useCallStatsCalculations } from "@/hooks/useCallStatsCalculations";
 
 interface BookCallFunnelProps {
   projectId: string;
@@ -143,101 +47,32 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
     return data;
   }, [calendlyEvents, dateRangeKey]);
   
-  const filteredEvents = useMemo(() => {
-    console.log('🔄 Recalculating filtered events for metrics');
-    return filterEventsByDateRange(calendlyEvents, dateRange);
-  }, [calendlyEvents, dateRangeKey]);
+  const {
+    callStats,
+    previousStats,
+    callsTaken,
+    showUpRate,
+    previousCallsTaken,
+    previousShowUpRate,
+  } = useCallStatsCalculations(calendlyEvents, dateRange);
   
   useEffect(() => {
     console.log('🔄 BookCallFunnel dateRange changed:', {
       from: format(dateRange.from, 'yyyy-MM-dd HH:mm:ss'),
       to: format(dateRange.to, 'yyyy-MM-dd HH:mm:ss'),
-      totalEvents: calendlyEvents.length,
-      filteredEvents: filteredEvents.length
+      totalEvents: calendlyEvents.length
     });
-  }, [dateRange, calendlyEvents.length, filteredEvents.length]);
+  }, [dateRange, calendlyEvents.length]);
 
   const recentBookings = getRecentBookings(7);
   const monthlyComparison = getMonthlyComparison();
 
-  console.log('\n=== METRICS CALCULATION ===');
-  console.log('Filtered events for metrics (by created_at):', filteredEvents.length);
-
-  const callStats = filteredEvents.reduce((stats, event) => {
-    stats.totalBookings++;
-    switch (event.status) {
-      case 'active':
-      case 'scheduled':
-        stats.scheduled++;
-        break;
-      case 'canceled':
-      case 'cancelled':
-        stats.cancelled++;
-        break;
-      case 'no_show':
-        stats.noShows++;
-        break;
-      default:
-        stats.other++;
-    }
-    return stats;
-  }, { totalBookings: 0, scheduled: 0, cancelled: 0, noShows: 0, other: 0 });
-
-  console.log('Calculated call stats:', callStats);
-
-  const callsTaken = callStats.scheduled - callStats.noShows;
-  const showUpRate = callStats.scheduled > 0 ? ((callsTaken / callStats.scheduled) * 100) : 0;
-
-  const last30Days = calendlyEvents.filter(event => {
-    if (!event.created_at) return false;
-    try {
-      const createdDate = parseISO(event.created_at);
-      const thirtyDaysAgo = subDays(new Date(), 30);
-      return isValid(createdDate) && createdDate >= thirtyDaysAgo;
-    } catch (error) {
-      return false;
-    }
-  });
-
-  const previous30Days = calendlyEvents.filter(event => {
-    if (!event.created_at) return false;
-    try {
-      const createdDate = parseISO(event.created_at);
-      const thirtyDaysAgo = subDays(new Date(), 30);
-      const sixtyDaysAgo = subDays(new Date(), 60);
-      return isValid(createdDate) && createdDate >= sixtyDaysAgo && createdDate < thirtyDaysAgo;
-    } catch (error) {
-      return false;
-    }
-  });
-
-  const previousStats = previous30Days.reduce((stats, event) => {
-    stats.totalBookings++;
-    switch (event.status) {
-      case 'active':
-      case 'scheduled':
-        stats.scheduled++;
-        break;
-      case 'canceled':
-      case 'cancelled':
-        stats.cancelled++;
-        break;
-      case 'no_show':
-        stats.noShows++;
-        break;
-    }
-    return stats;
-  }, { totalBookings: 0, scheduled: 0, cancelled: 0, noShows: 0 });
-
-  const previousCallsTaken = previousStats.scheduled - previousStats.noShows;
-  const previousShowUpRate = previousStats.scheduled > 0 ? ((previousCallsTaken / previousStats.scheduled) * 100) : 0;
-
   const totalPageViews = chartData.reduce((sum, day) => sum + day.pageViews, 0);
   const bookingRate = totalPageViews > 0 ? ((callStats.totalBookings / totalPageViews) * 100) : 0;
-  const previousBookingRate = previous30Days.length > 0 ? bookingRate * 0.85 : 0;
+  const previousBookingRate = previousStats.totalBookings > 0 ? bookingRate * 0.85 : 0;
   
   const costPerBooking = callStats.totalBookings > 0 ? (1500 / callStats.totalBookings) : 0;
-  const previousCostPerBooking = previous30Days.length > 0 ? costPerBooking * 1.15 : 0;
+  const previousCostPerBooking = previousStats.totalBookings > 0 ? costPerBooking * 1.15 : 0;
 
   const handleDateChange = (from: Date, to: Date) => {
     console.log('🚀 Date range changed FROM PICKER:', format(from, 'yyyy-MM-dd HH:mm:ss'), 'to', format(to, 'yyyy-MM-dd HH:mm:ss'));
@@ -255,10 +90,10 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
 
   console.log('\n=== FINAL COMPONENT STATE ===');
   console.log('Chart data length:', chartData.length);
-  console.log('Total bookings for metrics:', filteredEvents.length);
+  console.log('Total bookings for metrics:', callStats.totalBookings);
   console.log('Date range key:', dateRangeKey);
 
-  const chartKey = `${dateRangeKey}-${filteredEvents.length}`;
+  const chartKey = `${dateRangeKey}-${callStats.totalBookings}`;
 
   if (!projectId) {
     return (
@@ -277,98 +112,33 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
         <AdvancedDateRangePicker onDateChange={handleDateChange} />
       </div>
 
-      {/* Landing Page */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold">Landing Page</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <MetricCard title="Page Views" value={totalPageViews} previousValue={Math.floor(totalPageViews * 0.9)} />
-            <MetricCard 
-              title="Booking Rate" 
-              value={bookingRate} 
-              previousValue={previousBookingRate} 
-              format="percentage" 
-            />
-            <MetricCard 
-              title="Total Bookings" 
-              value={callStats.totalBookings} 
-              previousValue={previousStats.totalBookings}
-              description="Events created in date range"
-            />
-            <MetricCard 
-              title="Cost Per Booking" 
-              value={costPerBooking} 
-              previousValue={previousCostPerBooking} 
-              format="currency" 
-            />
-          </div>
-        </CardContent>
-      </Card>
+      <LandingPageMetrics
+        totalPageViews={totalPageViews}
+        bookingRate={bookingRate}
+        previousBookingRate={previousBookingRate}
+        totalBookings={callStats.totalBookings}
+        previousTotalBookings={previousStats.totalBookings}
+        costPerBooking={costPerBooking}
+        previousCostPerBooking={previousCostPerBooking}
+      />
 
-      {/* Call Stats */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold">Call Stats</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <MetricCard 
-              title="Total Bookings" 
-              value={callStats.totalBookings} 
-              previousValue={previousStats.totalBookings}
-              description="Events created in date range"
-            />
-            <MetricCard 
-              title="Calls Taken" 
-              value={callsTaken} 
-              previousValue={previousCallsTaken}
-              description="Completed calls"
-            />
-            <MetricCard 
-              title="Calls Cancelled" 
-              value={callStats.cancelled} 
-              previousValue={previousStats.cancelled}
-              description="Cancelled bookings"
-            />
-            <MetricCard 
-              title="Show Up Rate" 
-              value={showUpRate} 
-              previousValue={previousShowUpRate} 
-              format="percentage"
-              description="% of scheduled calls attended"
-            />
-          </div>
-          <ConversionChart 
-            key={`calls-${chartKey}`}
-            data={chartData}
-            title="Call Performance Trends"
-            metrics={['callsBooked', 'callsTaken', 'cancelled']}
-          />
-        </CardContent>
-      </Card>
+      <CallStatsMetrics
+        totalBookings={callStats.totalBookings}
+        previousTotalBookings={previousStats.totalBookings}
+        callsTaken={callsTaken}
+        previousCallsTaken={previousCallsTaken}
+        cancelled={callStats.cancelled}
+        previousCancelled={previousStats.cancelled}
+        showUpRate={showUpRate}
+        previousShowUpRate={previousShowUpRate}
+        chartData={chartData}
+        chartKey={chartKey}
+      />
 
-      {/* Sales Conversion */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold">Sales Conversion</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <MetricCard title="Close Rate" value={28.4} previousValue={25.1} format="percentage" />
-            <MetricCard title="Total Closes" value={135} previousValue={91} />
-            <MetricCard title="Revenue" value={405000} previousValue={273000} format="currency" />
-            <MetricCard title="ROAS" value={8.2} previousValue={6.8} />
-          </div>
-          <ConversionChart 
-            key={`sales-${chartKey}`}
-            data={chartData}
-            title="Sales Performance"
-            metrics={['showUpRate']}
-          />
-        </CardContent>
-      </Card>
+      <SalesConversionMetrics
+        chartData={chartData}
+        chartKey={chartKey}
+      />
     </div>
   );
 };
