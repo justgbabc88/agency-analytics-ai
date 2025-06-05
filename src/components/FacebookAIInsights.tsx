@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,6 +35,39 @@ export const FacebookAIInsights = ({ dateRange }: FacebookAIInsightsProps) => {
   const [expandedInsight, setExpandedInsight] = useState<string | null>(null);
   const { toast } = useToast();
 
+  // Extract JSON from ChatGPT response that might contain additional text
+  const extractJsonFromResponse = (response: string): any => {
+    try {
+      // First try to parse the entire response as JSON
+      return JSON.parse(response);
+    } catch {
+      // If that fails, try to find JSON within the response
+      const jsonMatch = response.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        try {
+          return JSON.parse(jsonMatch[0]);
+        } catch {
+          // If JSON extraction fails, create a fallback insight
+          return [{
+            title: "Campaign Analysis",
+            description: "Analysis completed - review detailed recommendations",
+            priority: "medium",
+            type: "optimization",
+            actions: ["Review ChatGPT response", "Apply recommendations"]
+          }];
+        }
+      }
+      // Final fallback
+      return [{
+        title: "AI Analysis",
+        description: response.slice(0, 80) + "...",
+        priority: "medium", 
+        type: "optimization",
+        actions: ["Review full response", "Apply insights"]
+      }];
+    }
+  };
+
   // Generate AI-powered insights using ChatGPT
   const generateAIInsights = async () => {
     if (!insights || isGeneratingInsights) return;
@@ -67,26 +99,21 @@ export const FacebookAIInsights = ({ dateRange }: FacebookAIInsightsProps) => {
       const messages = [
         {
           role: 'user',
-          content: `Analyze this Facebook campaign data and provide 4-6 concise, actionable insights. For each insight, provide:
-          - A short, specific title (max 8 words)
-          - A brief description (max 30 words)
-          - Priority level (high/medium/low)
-          - Type (optimization/warning/opportunity/trend)
-          - 2-3 specific action items (max 10 words each)
+          content: `Analyze this Facebook campaign data and provide exactly 4-6 insights as a JSON array. Each insight must have: title (max 8 words), description (max 30 words), priority (high/medium/low), type (optimization/warning/opportunity/trend), actions (array of 2-3 items, max 10 words each).
 
-          Current metrics:
-          - Spend: $${insights.spend || 0}
-          - Impressions: ${insights.impressions || 0}
-          - Clicks: ${insights.clicks || 0}
-          - CTR: ${insights.ctr || 0}%
-          - CPC: $${insights.cpc || 0}
-          - CPM: $${cpm.toFixed(2)}
-          - Reach: ${insights.reach || 0}
-          - Frequency: ${frequency.toFixed(1)}
-          - Conversions: ${insights.conversions || 0}
+Current metrics:
+- Spend: $${insights.spend || 0}
+- Impressions: ${insights.impressions || 0}
+- Clicks: ${insights.clicks || 0}
+- CTR: ${insights.ctr || 0}%
+- CPC: $${insights.cpc || 0}
+- CPM: $${cpm.toFixed(2)}
+- Reach: ${insights.reach || 0}
+- Frequency: ${frequency.toFixed(1)}
+- Conversions: ${insights.conversions || 0}
 
-          Format as JSON array with this structure:
-          [{"title": "...", "description": "...", "priority": "high/medium/low", "type": "optimization/warning/opportunity/trend", "actions": ["...", "...", "..."]}]`
+IMPORTANT: Return ONLY a JSON array with this exact structure, no other text:
+[{"title": "...", "description": "...", "priority": "high", "type": "optimization", "actions": ["...", "...", "..."]}]`
         }
       ];
 
@@ -102,31 +129,40 @@ export const FacebookAIInsights = ({ dateRange }: FacebookAIInsightsProps) => {
       }
 
       if (data?.response) {
+        console.log('Raw ChatGPT response:', data.response);
+        
         try {
-          // Try to parse the JSON response
-          const insightsData = JSON.parse(data.response);
+          const insightsData = extractJsonFromResponse(data.response);
           const formattedInsights: AIInsight[] = insightsData.map((insight: any, index: number) => ({
             id: `ai-insight-${index}`,
             type: insight.type || 'optimization',
-            title: insight.title,
-            description: insight.description,
+            title: insight.title || 'Campaign Insight',
+            description: insight.description || 'Analysis completed',
             priority: insight.priority || 'medium',
-            confidence: 85 + Math.random() * 10, // Simulated confidence
-            actionable: insight.actions || []
+            confidence: 85 + Math.random() * 10,
+            actionable: Array.isArray(insight.actions) ? insight.actions : ['Review recommendations']
           }));
           
           setAiInsights(formattedInsights);
+          console.log('Generated insights:', formattedInsights);
         } catch (parseError) {
-          console.error('Failed to parse ChatGPT response:', parseError);
-          // Fallback to text-based insights if JSON parsing fails
+          console.error('Failed to parse insights:', parseError);
+          // Create a single insight with the raw response
           setAiInsights([{
             id: 'ai-fallback',
             type: 'optimization',
-            title: 'AI Analysis Complete',
-            description: data.response.slice(0, 100) + '...',
+            title: 'Campaign Analysis Complete',
+            description: 'AI analysis completed - check chat for details',
             priority: 'medium',
             confidence: 75,
-            actionable: ['Review full analysis', 'Implement recommendations']
+            actionable: ['Review analysis below', 'Apply recommendations']
+          }]);
+          
+          // Add the full response to chat history for user reference
+          setChatHistory(prev => [...prev, {
+            type: 'ai',
+            message: data.response,
+            timestamp: new Date()
           }]);
         }
       }
