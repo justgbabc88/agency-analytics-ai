@@ -40,6 +40,7 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
   const [isCustom, setIsCustom] = useState(false);
 
   const handlePresetChange = (preset: string) => {
+    console.log('📅 Preset changed to:', preset);
     setSelectedPreset(preset);
     if (preset === "custom") {
       setIsCustom(true);
@@ -50,21 +51,35 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
     const presetConfig = datePresets.find(p => p.value === preset);
     if (presetConfig) {
       const dates = presetConfig.getDates();
+      console.log('📅 New dates from preset:', {
+        from: format(dates.from, 'yyyy-MM-dd HH:mm:ss'),
+        to: format(dates.to, 'yyyy-MM-dd HH:mm:ss'),
+        preset
+      });
       setDateRange(dates);
       onDateChange(dates.from, dates.to);
     }
   };
 
   const handleCustomDateChange = (range: any) => {
+    console.log('📅 Custom date range selected:', range);
     if (range?.from && range?.to) {
       const from = startOfDay(range.from);
       const to = endOfDay(range.to);
+      console.log('📅 Custom dates processed:', {
+        from: format(from, 'yyyy-MM-dd HH:mm:ss'),
+        to: format(to, 'yyyy-MM-dd HH:mm:ss')
+      });
       setDateRange({ from, to });
       onDateChange(from, to);
     } else if (range?.from && !range?.to) {
       // Single date selected, set both from and to to the same date
       const from = startOfDay(range.from);
       const to = endOfDay(range.from);
+      console.log('📅 Single date selected:', {
+        from: format(from, 'yyyy-MM-dd HH:mm:ss'),
+        to: format(to, 'yyyy-MM-dd HH:mm:ss')
+      });
       setDateRange({ from, to });
       onDateChange(from, to);
     }

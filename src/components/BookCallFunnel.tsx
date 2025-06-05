@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCalendlyData } from "@/hooks/useCalendlyData";
 import { format, subDays, startOfDay, endOfDay, isWithinInterval, parseISO, isValid, isSameDay } from "date-fns";
 import { AdvancedDateRangePicker } from "./AdvancedDateRangePicker";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 // Generate chart data based on real Calendly events with date filtering using created_at
 const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Date; to: Date }) => {
@@ -154,6 +154,15 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
     from: subDays(new Date(), 30),
     to: new Date() // This should include today
   });
+  
+  // Add useEffect to force re-render when dateRange changes
+  useEffect(() => {
+    console.log('🔄 BookCallFunnel dateRange changed:', {
+      from: format(dateRange.from, 'yyyy-MM-dd HH:mm:ss'),
+      to: format(dateRange.to, 'yyyy-MM-dd HH:mm:ss'),
+      totalEvents: calendlyEvents.length
+    });
+  }, [dateRange, calendlyEvents.length]);
   
   console.log('BookCallFunnel render - Project ID:', projectId);
   console.log('Current date range:', {
@@ -344,15 +353,20 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   const previousCostPerBooking = previous30Days.length > 0 ? costPerBooking * 1.15 : 0;
 
   const handleDateChange = (from: Date, to: Date) => {
-    console.log('Date range changed:', format(from, 'yyyy-MM-dd'), 'to', format(to, 'yyyy-MM-dd'));
+    console.log('🚀 Date range changed FROM PICKER:', format(from, 'yyyy-MM-dd HH:mm:ss'), 'to', format(to, 'yyyy-MM-dd HH:mm:ss'));
     console.log('Today is:', format(new Date(), 'yyyy-MM-dd'));
     console.log('Is today in new range?', format(new Date(), 'yyyy-MM-dd') >= format(from, 'yyyy-MM-dd') && format(new Date(), 'yyyy-MM-dd') <= format(to, 'yyyy-MM-dd'));
-    setDateRange({ from, to });
+    
+    // Force component re-render by creating new objects
+    setDateRange({ 
+      from: new Date(from.getTime()), 
+      to: new Date(to.getTime()) 
+    });
   };
 
   console.log('\n=== FINAL COMPONENT STATE ===');
   console.log('Chart data length:', chartData.length);
-  console.log('Total bookings for metrics:', callStats.totalBookings);
+  console.log('Total bookings for metrics:', filteredEvents.length);
   console.log('Chart data summary:', chartData.map(d => ({ date: d.date, bookings: d.callsBooked })));
 
   // Show a message if no project is selected
