@@ -48,3 +48,6 @@ verify_jwt = true
 
 [functions.google-oauth]
 verify_jwt = false
+
+[functions.track-event]
+verify_jwt = false

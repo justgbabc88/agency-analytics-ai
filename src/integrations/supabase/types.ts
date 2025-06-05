@@ -77,6 +77,79 @@ export type Database = {
           },
         ]
       }
+      attribution_data: {
+        Row: {
+          attributed_revenue: number
+          attribution_model: string
+          contact_email: string | null
+          contact_phone: string | null
+          conversion_date: string
+          created_at: string
+          event_id: string | null
+          id: string
+          project_id: string
+          session_id: string
+          updated_at: string
+          utm_campaign: string | null
+          utm_medium: string | null
+          utm_source: string | null
+        }
+        Insert: {
+          attributed_revenue?: number
+          attribution_model?: string
+          contact_email?: string | null
+          contact_phone?: string | null
+          conversion_date?: string
+          created_at?: string
+          event_id?: string | null
+          id?: string
+          project_id: string
+          session_id: string
+          updated_at?: string
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Update: {
+          attributed_revenue?: number
+          attribution_model?: string
+          contact_email?: string | null
+          contact_phone?: string | null
+          conversion_date?: string
+          created_at?: string
+          event_id?: string | null
+          id?: string
+          project_id?: string
+          session_id?: string
+          updated_at?: string
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attribution_data_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "tracking_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attribution_data_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attribution_data_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "tracking_sessions"
+            referencedColumns: ["session_id"]
+          },
+        ]
+      }
       calendly_event_mappings: {
         Row: {
           calendly_event_type_id: string
@@ -499,6 +572,202 @@ export type Database = {
             columns: ["agency_id"]
             isOneToOne: false
             referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tracking_events: {
+        Row: {
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          created_at: string
+          currency: string | null
+          custom_data: Json | null
+          event_name: string | null
+          event_timestamp: string
+          event_type: string
+          form_data: Json | null
+          id: string
+          page_url: string
+          project_id: string
+          revenue_amount: number | null
+          session_id: string
+        }
+        Insert: {
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          currency?: string | null
+          custom_data?: Json | null
+          event_name?: string | null
+          event_timestamp?: string
+          event_type: string
+          form_data?: Json | null
+          id?: string
+          page_url: string
+          project_id: string
+          revenue_amount?: number | null
+          session_id: string
+        }
+        Update: {
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          currency?: string | null
+          custom_data?: Json | null
+          event_name?: string | null
+          event_timestamp?: string
+          event_type?: string
+          form_data?: Json | null
+          id?: string
+          page_url?: string
+          project_id?: string
+          revenue_amount?: number | null
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tracking_events_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tracking_events_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "tracking_sessions"
+            referencedColumns: ["session_id"]
+          },
+        ]
+      }
+      tracking_pixels: {
+        Row: {
+          conversion_events: string[] | null
+          created_at: string
+          domains: string[] | null
+          id: string
+          is_active: boolean
+          name: string
+          pixel_id: string
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          conversion_events?: string[] | null
+          created_at?: string
+          domains?: string[] | null
+          id?: string
+          is_active?: boolean
+          name: string
+          pixel_id: string
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          conversion_events?: string[] | null
+          created_at?: string
+          domains?: string[] | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          pixel_id?: string
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tracking_pixels_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tracking_sessions: {
+        Row: {
+          browser: string | null
+          click_id_facebook: string | null
+          click_id_google: string | null
+          click_id_tiktok: string | null
+          created_at: string
+          device_type: string | null
+          first_visit_at: string
+          id: string
+          ip_hash: string | null
+          landing_page_url: string
+          last_activity_at: string
+          operating_system: string | null
+          project_id: string
+          referrer_url: string | null
+          session_id: string
+          updated_at: string
+          user_agent: string | null
+          utm_campaign: string | null
+          utm_content: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          utm_term: string | null
+        }
+        Insert: {
+          browser?: string | null
+          click_id_facebook?: string | null
+          click_id_google?: string | null
+          click_id_tiktok?: string | null
+          created_at?: string
+          device_type?: string | null
+          first_visit_at?: string
+          id?: string
+          ip_hash?: string | null
+          landing_page_url: string
+          last_activity_at?: string
+          operating_system?: string | null
+          project_id: string
+          referrer_url?: string | null
+          session_id: string
+          updated_at?: string
+          user_agent?: string | null
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
+        }
+        Update: {
+          browser?: string | null
+          click_id_facebook?: string | null
+          click_id_google?: string | null
+          click_id_tiktok?: string | null
+          created_at?: string
+          device_type?: string | null
+          first_visit_at?: string
+          id?: string
+          ip_hash?: string | null
+          landing_page_url?: string
+          last_activity_at?: string
+          operating_system?: string | null
+          project_id?: string
+          referrer_url?: string | null
+          session_id?: string
+          updated_at?: string
+          user_agent?: string | null
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tracking_sessions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
