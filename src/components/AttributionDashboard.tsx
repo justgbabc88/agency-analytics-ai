@@ -68,7 +68,7 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
     if (!acc[source]) {
       acc[source] = { source, revenue: 0, conversions: 0 };
     }
-    acc[source].revenue += parseFloat(attr.attributed_revenue || 0);
+    acc[source].revenue += parseFloat(attr.attributed_revenue?.toString() || '0');
     acc[source].conversions += 1;
     return acc;
   }, {} as any);
@@ -80,7 +80,7 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
     if (!acc[campaign]) {
       acc[campaign] = { campaign, revenue: 0, conversions: 0 };
     }
-    acc[campaign].revenue += parseFloat(attr.attributed_revenue || 0);
+    acc[campaign].revenue += parseFloat(attr.attributed_revenue?.toString() || '0');
     acc[campaign].conversions += 1;
     return acc;
   }, {} as any);
@@ -88,7 +88,7 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
   const campaignChartData = Object.values(campaignData || {});
 
   // Calculate key metrics
-  const totalRevenue = attributionData?.reduce((sum, attr) => sum + parseFloat(attr.attributed_revenue || 0), 0) || 0;
+  const totalRevenue = attributionData?.reduce((sum, attr) => sum + parseFloat(attr.attributed_revenue?.toString() || '0'), 0) || 0;
   const totalConversions = attributionData?.length || 0;
   const totalEvents = eventStats?.length || 0;
   const conversionRate = totalEvents > 0 ? ((totalConversions / totalEvents) * 100).toFixed(2) : '0';
@@ -199,7 +199,7 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
                   outerRadius={80}
                   fill="#8884d8"
                   dataKey="revenue"
-                  label={({ campaign, revenue }) => `${campaign}: $${revenue.toFixed(0)}`}
+                  label={({ campaign, revenue }) => `${campaign}: $${Number(revenue).toFixed(0)}`}
                 >
                   {campaignChartData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -243,7 +243,7 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
                   </div>
                   <div className="text-right">
                     <p className="font-semibold text-green-600">
-                      ${parseFloat(attr.attributed_revenue || 0).toFixed(2)}
+                      ${parseFloat(attr.attributed_revenue?.toString() || '0').toFixed(2)}
                     </p>
                     <p className="text-xs text-gray-500">{attr.attribution_model}</p>
                   </div>

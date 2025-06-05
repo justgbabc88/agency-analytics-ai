@@ -23,7 +23,7 @@ const Tracking = () => {
         <div className="w-80">
           <ProjectSelector
             selectedProjectId={selectedProjectId}
-            onProjectSelect={setSelectedProjectId}
+            onProjectChange={setSelectedProjectId}
           />
         </div>
       </div>
