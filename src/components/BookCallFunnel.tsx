@@ -1,3 +1,4 @@
+
 import { MetricCard } from "./MetricCard";
 import { ConversionChart } from "./ConversionChart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +17,7 @@ const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Da
   
   console.log('=== CHART DATA GENERATION DEBUG (CREATED EVENTS) ===');
   console.log('Date range:', format(startDate, 'yyyy-MM-dd'), 'to', format(endDate, 'yyyy-MM-dd'));
+  console.log('Today is:', format(new Date(), 'yyyy-MM-dd'));
   console.log('Total days in range:', daysDiff);
   console.log('Total Calendly events available:', calendlyEvents.length);
   
@@ -112,7 +114,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   const { calendlyEvents, getRecentBookings, getMonthlyComparison } = useCalendlyData(projectId);
   const [dateRange, setDateRange] = useState({
     from: subDays(new Date(), 30),
-    to: new Date()
+    to: new Date() // This should include today
   });
   
   console.log('BookCallFunnel render - Project ID:', projectId);
@@ -120,7 +122,27 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
     from: format(dateRange.from, 'yyyy-MM-dd'),
     to: format(dateRange.to, 'yyyy-MM-dd')
   });
+  console.log('Today is:', format(new Date(), 'yyyy-MM-dd'));
   console.log('All Calendly events:', calendlyEvents.length);
+  
+  // Filter events that were created today for debugging
+  const todayEvents = calendlyEvents.filter(event => {
+    if (!event.created_at) return false;
+    try {
+      const createdDate = parseISO(event.created_at);
+      return isValid(createdDate) && isSameDay(createdDate, new Date());
+    } catch (error) {
+      return false;
+    }
+  });
+  
+  console.log('Events created today:', todayEvents.length);
+  console.log('Today events details:', todayEvents.map(e => ({
+    id: e.id,
+    created_at: e.created_at,
+    scheduled_at: e.scheduled_at,
+    status: e.status
+  })));
   
   // Calculate chart data based on real Calendly events and date range (using created_at)
   const chartData = generateCallDataFromEvents(calendlyEvents, dateRange);
@@ -135,7 +157,11 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
       const createdDate = parseISO(event.created_at);
       if (!isValid(createdDate)) return false;
       
-      return isWithinInterval(createdDate, { start: startOfDay(dateRange.from), end: endOfDay(dateRange.to) });
+      // Use inclusive date range that properly includes the end date
+      return isWithinInterval(createdDate, { 
+        start: startOfDay(dateRange.from), 
+        end: endOfDay(dateRange.to) 
+      });
     } catch (error) {
       console.warn('Error filtering event by created date:', event, error);
       return false;
@@ -233,6 +259,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
 
   const handleDateChange = (from: Date, to: Date) => {
     console.log('Date range changed:', format(from, 'yyyy-MM-dd'), 'to', format(to, 'yyyy-MM-dd'));
+    console.log('Today is:', format(new Date(), 'yyyy-MM-dd'));
     setDateRange({ from, to });
   };
 

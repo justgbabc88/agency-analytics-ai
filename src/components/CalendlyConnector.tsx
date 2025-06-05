@@ -236,9 +236,12 @@ export const CalendlyConnector = ({
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       
+      // Make sure we include today's date properly
       const today = new Date();
+      today.setHours(23, 59, 59, 999); // End of today
 
-      console.log('Auto-syncing last 30 days of historical events with proper creation timestamps...');
+      console.log('Auto-syncing last 30 days including today with proper creation timestamps...');
+      console.log('Date range:', thirtyDaysAgo.toISOString(), 'to', today.toISOString());
       
       const { data, error } = await supabase.functions.invoke('calendly-oauth', {
         body: { 
@@ -291,9 +294,12 @@ export const CalendlyConnector = ({
       const sixtyDaysAgo = new Date();
       sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
       
+      // Make sure we include today's date properly
       const today = new Date();
+      today.setHours(23, 59, 59, 999); // End of today
 
-      console.log('Manually re-syncing last 60 days with proper creation timestamps...');
+      console.log('Manually re-syncing last 60 days including today with proper creation timestamps...');
+      console.log('Date range:', sixtyDaysAgo.toISOString(), 'to', today.toISOString());
       
       const { data, error } = await supabase.functions.invoke('calendly-oauth', {
         body: { 
@@ -315,7 +321,7 @@ export const CalendlyConnector = ({
 
       toast({
         title: "Events Re-synced Successfully",
-        description: `Re-imported ${data.synced_events} events with correct creation timestamps`,
+        description: `Re-imported ${data.synced_events} events with correct creation timestamps including today`,
       });
 
     } catch (error) {
