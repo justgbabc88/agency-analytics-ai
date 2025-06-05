@@ -1,10 +1,11 @@
+
 import { MetricCard } from "./MetricCard";
 import { ConversionChart } from "./ConversionChart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCalendlyData } from "@/hooks/useCalendlyData";
 import { format, subDays, startOfDay, endOfDay, isWithinInterval, parseISO, isValid, isSameDay } from "date-fns";
 import { AdvancedDateRangePicker } from "./AdvancedDateRangePicker";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 // Generate chart data based on real Calendly events with date filtering using created_at
 const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Date; to: Date }) => {
@@ -129,6 +130,20 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
     to: new Date() // This should include today
   });
   
+  // Use useMemo to recalculate chart data when dependencies change
+  const chartData = useMemo(() => {
+    console.log('🔄 Recalculating chart data due to dependency change');
+    console.log('Date range for chart:', {
+      from: format(dateRange.from, 'yyyy-MM-dd HH:mm:ss'),
+      to: format(dateRange.to, 'yyyy-MM-dd HH:mm:ss')
+    });
+    console.log('Events available:', calendlyEvents.length);
+    
+    const data = generateCallDataFromEvents(calendlyEvents, dateRange);
+    console.log('Generated chart data:', data);
+    return data;
+  }, [calendlyEvents, dateRange.from.getTime(), dateRange.to.getTime()]);
+  
   // Add useEffect to force re-render when dateRange changes
   useEffect(() => {
     console.log('🔄 BookCallFunnel dateRange changed:', {
@@ -146,100 +161,60 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   console.log('Today is:', format(new Date(), 'yyyy-MM-dd'));
   console.log('All Calendly events:', calendlyEvents.length);
   
-  // Enhanced debugging for today's events
-  const today = new Date();
-  const todayStr = format(today, 'yyyy-MM-dd');
-  
-  console.log('\n=== DETAILED TODAY EVENTS ANALYSIS ===');
-  console.log('Searching for events created on:', todayStr);
-  
-  const todayEvents = calendlyEvents.filter(event => {
-    if (!event.created_at) {
-      console.log('❌ Event missing created_at:', event.id);
-      return false;
-    }
-    try {
-      const createdDate = parseISO(event.created_at);
-      if (!isValid(createdDate)) {
-        console.log('❌ Invalid created_at date:', event.created_at);
-        return false;
-      }
-      const createdDateStr = format(createdDate, 'yyyy-MM-dd');
-      const isToday = createdDateStr === todayStr;
-      
-      console.log(`${isToday ? '✅' : '⏭️'} Event check:`, {
-        id: event.id,
-        created_at: event.created_at,
-        parsed_date: createdDateStr,
-        is_today: isToday,
-        status: event.status
-      });
-      
-      return isToday;
-    } catch (error) {
-      console.log('❌ Error parsing event:', event.id, error);
-      return false;
-    }
-  });
-  
-  console.log(`\n📊 FINAL COUNT - Events created TODAY (${todayStr}):`, todayEvents.length);
-  if (todayEvents.length > 0) {
-    console.log('Today\'s events details:', todayEvents.map(e => ({
-      id: e.id,
-      created_at: e.created_at,
-      scheduled_at: e.scheduled_at,
-      status: e.status
-    })));
-  } else {
-    console.log('⚠️ NO EVENTS FOUND FOR TODAY');
-    console.log('All event created_at dates:', calendlyEvents.map(e => e.created_at).filter(Boolean));
-  }
-  
-  // Calculate chart data based on real Calendly events and date range (using created_at)
-  const chartData = generateCallDataFromEvents(calendlyEvents, dateRange);
   const recentBookings = getRecentBookings(7);
   const monthlyComparison = getMonthlyComparison();
 
   // Filter events within the selected date range for statistics (using created_at)
-  // FIXED: Ensure consistent date filtering
-  const filteredEvents = calendlyEvents.filter(event => {
-    if (!event.created_at) return false;
+  // FIXED: Ensure consistent date filtering with useMemo for performance
+  const filteredEvents = useMemo(() => {
+    console.log('\n=== FILTERING EVENTS FOR METRICS ===');
+    console.log('Filtering events for date range:', {
+      from: format(dateRange.from, 'yyyy-MM-dd HH:mm:ss'),
+      to: format(dateRange.to, 'yyyy-MM-dd HH:mm:ss')
+    });
     
-    try {
-      const createdDate = parseISO(event.created_at);
-      if (!isValid(createdDate)) return false;
+    const filtered = calendlyEvents.filter(event => {
+      if (!event.created_at) return false;
       
-      // Use consistent Date object comparison
-      const rangeStart = startOfDay(dateRange.from);
-      const rangeEnd = endOfDay(dateRange.to);
-      
-      const isInRange = createdDate >= rangeStart && createdDate <= rangeEnd;
-      
-      if (isInRange) {
-        console.log(`✅ Event IN RANGE for metrics:`, {
-          id: event.id,
-          created_at: format(createdDate, 'yyyy-MM-dd HH:mm:ss'),
-          range_start: format(rangeStart, 'yyyy-MM-dd HH:mm:ss'),
-          range_end: format(rangeEnd, 'yyyy-MM-dd HH:mm:ss'),
-          status: event.status
-        });
+      try {
+        const createdDate = parseISO(event.created_at);
+        if (!isValid(createdDate)) return false;
+        
+        // Use consistent Date object comparison
+        const rangeStart = startOfDay(dateRange.from);
+        const rangeEnd = endOfDay(dateRange.to);
+        
+        const isInRange = createdDate >= rangeStart && createdDate <= rangeEnd;
+        
+        if (isInRange) {
+          console.log(`✅ Event IN RANGE for metrics:`, {
+            id: event.id,
+            created_at: format(createdDate, 'yyyy-MM-dd HH:mm:ss'),
+            range_start: format(rangeStart, 'yyyy-MM-dd HH:mm:ss'),
+            range_end: format(rangeEnd, 'yyyy-MM-dd HH:mm:ss'),
+            status: event.status
+          });
+        }
+        
+        return isInRange;
+      } catch (error) {
+        console.warn('Error filtering event by created date:', event, error);
+        return false;
       }
-      
-      return isInRange;
-    } catch (error) {
-      console.warn('Error filtering event by created date:', event, error);
-      return false;
-    }
-  });
+    });
+    
+    console.log('Filtered events count:', filtered.length);
+    console.log('Filtered events sample:', filtered.slice(0, 3).map(e => ({ 
+      id: e.id, 
+      created_at: e.created_at, 
+      status: e.status 
+    })));
+    
+    return filtered;
+  }, [calendlyEvents, dateRange.from.getTime(), dateRange.to.getTime()]);
 
   console.log('\n=== METRICS CALCULATION ===');
   console.log('Filtered events for metrics (by created_at):', filteredEvents.length);
-  console.log('Filtered events sample:', filteredEvents.slice(0, 5).map(e => ({ 
-    id: e.id, 
-    created_at: e.created_at, 
-    scheduled_at: e.scheduled_at,
-    status: e.status 
-  })));
 
   // Calculate call statistics from filtered data
   const callStats = filteredEvents.reduce((stats, event) => {
@@ -341,6 +316,9 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   console.log('Total bookings for metrics:', filteredEvents.length);
   console.log('Chart data summary:', chartData.map(d => ({ date: d.date, bookings: d.callsBooked })));
 
+  // Create unique key for chart components to force re-render
+  const chartKey = `${dateRange.from.getTime()}-${dateRange.to.getTime()}-${filteredEvents.length}`;
+
   // Show a message if no project is selected
   if (!projectId) {
     return (
@@ -423,7 +401,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
             />
           </div>
           <ConversionChart 
-            key={`calls-${dateRange.from.getTime()}-${dateRange.to.getTime()}`}
+            key={`calls-${chartKey}`}
             data={chartData}
             title="Call Performance Trends"
             metrics={['callsBooked', 'cancelled']}
@@ -444,7 +422,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
             <MetricCard title="ROAS" value={8.2} previousValue={6.8} />
           </div>
           <ConversionChart 
-            key={`sales-${dateRange.from.getTime()}-${dateRange.to.getTime()}`}
+            key={`sales-${chartKey}`}
             data={chartData}
             title="Sales Performance"
             metrics={['showUpRate']}
