@@ -150,6 +150,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   const monthlyComparison = getMonthlyComparison();
 
   // Filter events within the selected date range for statistics (using created_at)
+  // Use isSameDay for start and end dates to be more inclusive
   const filteredEvents = calendlyEvents.filter(event => {
     if (!event.created_at) return false;
     
@@ -157,11 +158,11 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
       const createdDate = parseISO(event.created_at);
       if (!isValid(createdDate)) return false;
       
-      // Use inclusive date range that properly includes the end date
-      return isWithinInterval(createdDate, { 
-        start: startOfDay(dateRange.from), 
-        end: endOfDay(dateRange.to) 
-      });
+      // Check if the created date is within our range (inclusive)
+      const isAfterStart = createdDate >= startOfDay(dateRange.from);
+      const isBeforeEnd = createdDate <= endOfDay(dateRange.to);
+      
+      return isAfterStart && isBeforeEnd;
     } catch (error) {
       console.warn('Error filtering event by created date:', event, error);
       return false;
