@@ -62,7 +62,10 @@ const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Da
   
   console.log(`Total events created TODAY (${todayStr}):`, todayEvents.length);
   
-  for (let i = 0; i <= daysDiff; i++) {
+  // Fix: Ensure we include all days in the range, including single day ranges
+  const totalDays = daysDiff === 0 ? 1 : daysDiff + 1;
+  
+  for (let i = 0; i < totalDays; i++) {
     const currentDate = new Date(startDate);
     currentDate.setDate(currentDate.getDate() + i);
     const currentDateStr = format(currentDate, 'yyyy-MM-dd');
@@ -215,7 +218,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   const monthlyComparison = getMonthlyComparison();
 
   // Filter events within the selected date range for statistics (using created_at)
-  // Use exact date matching to ensure we get all events in range
+  // Fix: Use inclusive date comparison and ensure we capture all events in range
   const filteredEvents = calendlyEvents.filter(event => {
     if (!event.created_at) return false;
     
@@ -223,18 +226,20 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
       const createdDate = parseISO(event.created_at);
       if (!isValid(createdDate)) return false;
       
-      // Use string comparison for exact date matching within range
-      const createdDateStr = format(createdDate, 'yyyy-MM-dd');
-      const startDateStr = format(dateRange.from, 'yyyy-MM-dd');
-      const endDateStr = format(dateRange.to, 'yyyy-MM-dd');
+      // Fix: Use Date objects for proper comparison instead of string comparison
+      const createdDateOnly = startOfDay(createdDate);
+      const rangeStart = startOfDay(dateRange.from);
+      const rangeEnd = endOfDay(dateRange.to);
       
-      const isInRange = createdDateStr >= startDateStr && createdDateStr <= endDateStr;
+      const isInRange = createdDateOnly >= rangeStart && createdDateOnly <= rangeEnd;
       
       if (isInRange) {
         console.log(`✅ Event IN RANGE for metrics:`, {
           id: event.id,
-          created_at: createdDateStr,
-          range: `${startDateStr} to ${endDateStr}`,
+          created_at: format(createdDate, 'yyyy-MM-dd HH:mm:ss'),
+          created_date_only: format(createdDateOnly, 'yyyy-MM-dd'),
+          range_start: format(rangeStart, 'yyyy-MM-dd'),
+          range_end: format(rangeEnd, 'yyyy-MM-dd'),
           status: event.status
         });
       }
@@ -341,6 +346,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   const handleDateChange = (from: Date, to: Date) => {
     console.log('Date range changed:', format(from, 'yyyy-MM-dd'), 'to', format(to, 'yyyy-MM-dd'));
     console.log('Today is:', format(new Date(), 'yyyy-MM-dd'));
+    console.log('Is today in new range?', format(new Date(), 'yyyy-MM-dd') >= format(from, 'yyyy-MM-dd') && format(new Date(), 'yyyy-MM-dd') <= format(to, 'yyyy-MM-dd'));
     setDateRange({ from, to });
   };
 
