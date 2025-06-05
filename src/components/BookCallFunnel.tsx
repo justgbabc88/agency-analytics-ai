@@ -14,7 +14,6 @@ const isEventInDateRange = (eventCreatedAt: string, startDate: Date, endDate: Da
     const createdDate = parseISO(eventCreatedAt);
     if (!isValid(createdDate)) return false;
     
-    // Use consistent date comparison - convert all to timestamp for precision
     const eventTime = createdDate.getTime();
     const rangeStart = startOfDay(startDate).getTime();
     const rangeEnd = endOfDay(endDate).getTime();
@@ -31,7 +30,6 @@ const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Da
   const dates = [];
   const { from: startDate, to: endDate } = dateRange;
   
-  // Calculate the number of days in the range
   const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
   
   console.log('=== CHART DATA GENERATION DEBUG ===');
@@ -39,7 +37,6 @@ const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Da
   console.log('Total days in range:', daysDiff);
   console.log('Total Calendly events available:', calendlyEvents.length);
   
-  // Fix: Ensure we include all days in the range, including single day ranges
   const totalDays = daysDiff === 0 ? 1 : daysDiff + 1;
   
   for (let i = 0; i < totalDays; i++) {
@@ -49,14 +46,12 @@ const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Da
     
     console.log(`\n--- Processing ${currentDateStr} ---`);
     
-    // Use the standardized filtering function
     const eventsCreatedThisDay = calendlyEvents.filter(event => 
       isEventInDateRange(event.created_at, currentDate, currentDate)
     );
     
     console.log(`Events created on ${currentDateStr}: ${eventsCreatedThisDay.length}`);
     
-    // Calculate daily stats based on events created this day
     const callsBooked = eventsCreatedThisDay.length;
     const cancelled = eventsCreatedThisDay.filter(event => 
       event.status === 'canceled' || event.status === 'cancelled'
@@ -68,7 +63,6 @@ const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Da
     const callsTaken = Math.max(0, scheduled - noShows);
     const showUpRate = scheduled > 0 ? ((callsTaken / scheduled) * 100) : 0;
     
-    // Generate mock page views for the selected date range
     const pageViews = Math.floor(Math.random() * 300) + 150;
     
     const dayData = {
@@ -88,6 +82,7 @@ const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Da
   console.log('\n=== FINAL CHART DATA SUMMARY ===');
   console.log('Generated data points:', dates.length);
   console.log('Total calls booked across all days:', dates.reduce((sum, d) => sum + d.callsBooked, 0));
+  console.log('Sample data point:', dates[0]);
   
   return dates;
 };
@@ -106,7 +101,6 @@ const filterEventsByDateRange = (events: any[], dateRange: { from: Date; to: Dat
   );
   
   console.log('Filtered events count:', filtered.length);
-  console.log('Filtered event IDs:', filtered.map(e => ({ id: e.id, created_at: e.created_at, status: e.status })));
   
   return filtered;
 };
@@ -118,11 +112,10 @@ interface BookCallFunnelProps {
 export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   const { calendlyEvents, getRecentBookings, getMonthlyComparison } = useCalendlyData(projectId);
   
-  // Initialize with normalized dates to ensure consistency
   const [dateRange, setDateRange] = useState(() => {
     const today = new Date();
     return {
-      from: startOfDay(subDays(today, 29)), // 30 days total including today
+      from: startOfDay(subDays(today, 29)),
       to: endOfDay(today)
     };
   });
@@ -134,14 +127,12 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   });
   console.log('All Calendly events:', calendlyEvents.length);
   
-  // Create a stable date range key using ISO strings for consistency
   const dateRangeKey = useMemo(() => {
     const fromISO = dateRange.from.toISOString();
     const toISO = dateRange.to.toISOString();
     return `${fromISO}-${toISO}`;
   }, [dateRange.from, dateRange.to]);
   
-  // Use useMemo to recalculate chart data when dependencies change
   const chartData = useMemo(() => {
     console.log('🔄 Recalculating chart data due to dependency change');
     console.log('Date range key:', dateRangeKey);
@@ -152,14 +143,11 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
     return data;
   }, [calendlyEvents, dateRangeKey]);
   
-  // Filter events for metrics using the same logic
   const filteredEvents = useMemo(() => {
     console.log('🔄 Recalculating filtered events for metrics');
-    console.log('Using date range:', dateRangeKey);
     return filterEventsByDateRange(calendlyEvents, dateRange);
   }, [calendlyEvents, dateRangeKey]);
   
-  // Add useEffect to log when dateRange changes
   useEffect(() => {
     console.log('🔄 BookCallFunnel dateRange changed:', {
       from: format(dateRange.from, 'yyyy-MM-dd HH:mm:ss'),
@@ -169,14 +157,12 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
     });
   }, [dateRange, calendlyEvents.length, filteredEvents.length]);
 
-  // ... keep existing code (recentBookings and monthlyComparison)
   const recentBookings = getRecentBookings(7);
   const monthlyComparison = getMonthlyComparison();
 
   console.log('\n=== METRICS CALCULATION ===');
   console.log('Filtered events for metrics (by created_at):', filteredEvents.length);
 
-  // Calculate call statistics from filtered data
   const callStats = filteredEvents.reduce((stats, event) => {
     stats.totalBookings++;
     switch (event.status) {
@@ -199,13 +185,9 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
 
   console.log('Calculated call stats:', callStats);
 
-  // Calculate calls taken (assuming scheduled calls that aren't no-shows are taken)
   const callsTaken = callStats.scheduled - callStats.noShows;
-  
-  // Calculate show up rate
   const showUpRate = callStats.scheduled > 0 ? ((callsTaken / callStats.scheduled) * 100) : 0;
 
-  // Calculate previous period data for comparison (using created_at)
   const last30Days = calendlyEvents.filter(event => {
     if (!event.created_at) return false;
     try {
@@ -229,7 +211,6 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
     }
   });
 
-  // Calculate previous period stats for comparison
   const previousStats = previous30Days.reduce((stats, event) => {
     stats.totalBookings++;
     switch (event.status) {
@@ -251,24 +232,21 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   const previousCallsTaken = previousStats.scheduled - previousStats.noShows;
   const previousShowUpRate = previousStats.scheduled > 0 ? ((previousCallsTaken / previousStats.scheduled) * 100) : 0;
 
-  // Calculate booking metrics
   const totalPageViews = chartData.reduce((sum, day) => sum + day.pageViews, 0);
   const bookingRate = totalPageViews > 0 ? ((callStats.totalBookings / totalPageViews) * 100) : 0;
-  const previousBookingRate = previous30Days.length > 0 ? bookingRate * 0.85 : 0; // Mock previous rate
+  const previousBookingRate = previous30Days.length > 0 ? bookingRate * 0.85 : 0;
   
-  const costPerBooking = callStats.totalBookings > 0 ? (1500 / callStats.totalBookings) : 0; // Mock cost calculation
+  const costPerBooking = callStats.totalBookings > 0 ? (1500 / callStats.totalBookings) : 0;
   const previousCostPerBooking = previous30Days.length > 0 ? costPerBooking * 1.15 : 0;
 
   const handleDateChange = (from: Date, to: Date) => {
     console.log('🚀 Date range changed FROM PICKER:', format(from, 'yyyy-MM-dd HH:mm:ss'), 'to', format(to, 'yyyy-MM-dd HH:mm:ss'));
     
-    // Normalize dates to ensure consistency
     const normalizedFrom = startOfDay(from);
     const normalizedTo = endOfDay(to);
     
     console.log('🚀 Normalized dates:', format(normalizedFrom, 'yyyy-MM-dd HH:mm:ss'), 'to', format(normalizedTo, 'yyyy-MM-dd HH:mm:ss'));
     
-    // Set the normalized date range
     setDateRange({ 
       from: normalizedFrom, 
       to: normalizedTo 
@@ -280,10 +258,8 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   console.log('Total bookings for metrics:', filteredEvents.length);
   console.log('Date range key:', dateRangeKey);
 
-  // Create unique key for chart components to force re-render
   const chartKey = `${dateRangeKey}-${filteredEvents.length}`;
 
-  // Show a message if no project is selected
   if (!projectId) {
     return (
       <div className="text-center py-12">
@@ -368,7 +344,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
             key={`calls-${chartKey}`}
             data={chartData}
             title="Call Performance Trends"
-            metrics={['callsBooked', 'cancelled']}
+            metrics={['callsBooked', 'callsTaken', 'cancelled']}
           />
         </CardContent>
       </Card>
