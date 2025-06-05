@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Brain, MessageSquare, TrendingUp, AlertTriangle, CheckCircle, Send, Sparkles, Target, BarChart3, Zap } from "lucide-react";
 import { useFacebookData } from "@/hooks/useFacebookData";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface FacebookAIInsightsProps {
   dateRange?: { from: Date; to: Date };
@@ -29,6 +30,7 @@ export const FacebookAIInsights = ({ dateRange }: FacebookAIInsightsProps) => {
   const [question, setQuestion] = useState('');
   const [chatHistory, setChatHistory] = useState<Array<{ type: 'user' | 'ai'; message: string; timestamp: Date }>>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const { toast } = useToast();
 
   // Advanced AI insights with deep pattern analysis
   const generateAdvancedInsights = (): AIInsight[] => {
@@ -295,34 +297,70 @@ export const FacebookAIInsights = ({ dateRange }: FacebookAIInsightsProps) => {
       timestamp: new Date()
     }]);
 
-    // Enhanced AI responses with deeper analysis
-    setTimeout(() => {
-      let aiResponse = '';
-      const cpm = insights.spend && insights.impressions ? (insights.spend / insights.impressions) * 1000 : 0;
-      const cpc = insights.spend && insights.clicks ? insights.spend / insights.clicks : 0;
-      const frequency = insights.reach > 0 ? insights.impressions / insights.reach : 1;
+    try {
+      // Prepare context for ChatGPT
+      const context = {
+        type: 'facebook_analysis',
+        metrics: insights,
+        dateRange: dateRange ? {
+          from: dateRange.from.toISOString(),
+          to: dateRange.to.toISOString()
+        } : null,
+        campaignData: {
+          spend: insights.spend,
+          impressions: insights.impressions,
+          clicks: insights.clicks,
+          ctr: insights.ctr,
+          cpc: insights.cpc,
+          reach: insights.reach,
+          conversions: insights.conversions
+        }
+      };
 
-      if (userMessage.toLowerCase().includes('pattern') || userMessage.toLowerCase().includes('trend')) {
-        aiResponse = `I've identified several key patterns: 1) Your CTR of ${insights.ctr?.toFixed(2)}% ${insights.ctr && insights.ctr > 2 ? 'shows strong creative-audience alignment' : 'suggests creative optimization needed'}. 2) Frequency at ${frequency.toFixed(1)} indicates ${frequency > 3 ? 'potential ad fatigue' : frequency < 1.5 ? 'untapped reach' : 'healthy exposure'}. 3) Cost efficiency shows ${cpm < 10 ? 'excellent' : cpm > 20 ? 'poor' : 'moderate'} performance at $${cpm.toFixed(2)} CPM.`;
-      } else if (userMessage.toLowerCase().includes('optimization') || userMessage.toLowerCase().includes('improve')) {
-        const topRecommendation = aiInsights.length > 0 ? aiInsights[0] : null;
-        aiResponse = topRecommendation 
-          ? `Top optimization opportunity: ${topRecommendation.title}. ${topRecommendation.description} Key actions: ${topRecommendation.actionable.slice(0, 2).join(', ')}.`
-          : `Focus on: 1) ${insights.ctr && insights.ctr < 1.5 ? 'Creative testing to improve CTR' : 'Scaling successful elements'}, 2) ${cpm > 15 ? 'Audience refinement to reduce CPM' : 'Maintaining cost efficiency'}, 3) ${frequency > 3 ? 'Creative refresh to combat fatigue' : 'Monitoring performance trends'}.`;
-      } else if (userMessage.toLowerCase().includes('scale') || userMessage.toLowerCase().includes('budget')) {
-        aiResponse = `Scaling analysis: With CTR at ${insights.ctr?.toFixed(2)}% and CPM at $${cpm.toFixed(2)}, ${insights.ctr && insights.ctr > 2 && cpm < 15 ? 'this campaign is ready for 20-30% budget increases' : insights.ctr && insights.ctr > 1.5 ? 'cautious 10-15% budget increases are recommended' : 'hold scaling until performance improves'}. Monitor frequency (currently ${frequency.toFixed(1)}) to avoid audience fatigue.`;
-      } else {
-        const performanceLevel = insights.ctr && insights.ctr > 2.5 && cpm < 10 ? 'excellent' : insights.ctr && insights.ctr > 1.5 && cpm < 20 ? 'good' : 'needs improvement';
-        aiResponse = `Campaign performance summary: ${performanceLevel} overall. CTR: ${insights.ctr?.toFixed(2)}% (${insights.ctr && insights.ctr > 2 ? 'above' : insights.ctr && insights.ctr > 1 ? 'average' : 'below'} benchmark), CPM: $${cpm.toFixed(2)} (${cpm < 10 ? 'efficient' : cpm > 20 ? 'expensive' : 'moderate'}), Frequency: ${frequency.toFixed(1)} (${frequency > 3 ? 'high' : frequency < 1.5 ? 'low' : 'optimal'}). What specific aspect would you like me to analyze deeper?`;
+      const messages = [
+        {
+          role: 'user',
+          content: `Please analyze my Facebook campaign data and answer this question: "${userMessage}"\n\nCurrent metrics:\n- Spend: $${insights.spend || 0}\n- Impressions: ${insights.impressions || 0}\n- Clicks: ${insights.clicks || 0}\n- CTR: ${insights.ctr || 0}%\n- CPC: $${insights.cpc || 0}\n- Reach: ${insights.reach || 0}\n- Conversions: ${insights.conversions || 0}`
+        }
+      ];
+
+      console.log('Sending request to ChatGPT...', { userMessage, context });
+
+      const { data, error } = await supabase.functions.invoke('chat-gpt', {
+        body: { messages, context }
+      });
+
+      if (error) {
+        console.error('ChatGPT API error:', error);
+        throw new Error(error.message || 'Failed to get AI response');
       }
 
+      if (data?.response) {
+        setChatHistory(prev => [...prev, {
+          type: 'ai',
+          message: data.response,
+          timestamp: new Date()
+        }]);
+      } else {
+        throw new Error('No response received from AI');
+      }
+    } catch (error) {
+      console.error('Error getting AI response:', error);
+      toast({
+        title: "AI Error",
+        description: "Failed to get AI response. Please try again.",
+        variant: "destructive",
+      });
+      
+      // Fallback response
       setChatHistory(prev => [...prev, {
         type: 'ai',
-        message: aiResponse,
+        message: "I apologize, but I'm having trouble analyzing your data right now. Please ensure your Facebook integration is properly connected and try again.",
         timestamp: new Date()
       }]);
+    } finally {
       setIsAnalyzing(false);
-    }, 2000);
+    }
   };
 
   if (isLoading) {
@@ -363,6 +401,7 @@ export const FacebookAIInsights = ({ dateRange }: FacebookAIInsightsProps) => {
           <CardTitle className="flex items-center gap-2">
             <Brain className="h-5 w-5 text-purple-600" />
             Advanced AI Insights & Pattern Analysis
+            <Badge className="bg-green-100 text-green-700 text-xs">Powered by ChatGPT</Badge>
           </CardTitle>
           <p className="text-sm text-gray-600 mt-1">Deep learning analysis of your campaign performance with actionable recommendations</p>
         </CardHeader>
@@ -428,9 +467,10 @@ export const FacebookAIInsights = ({ dateRange }: FacebookAIInsightsProps) => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <MessageSquare className="h-5 w-5 text-blue-600" />
-            Advanced AI Analysis Chat
+            ChatGPT Analysis Chat
+            <Badge className="bg-blue-100 text-blue-700 text-xs">GPT-4o Mini</Badge>
           </CardTitle>
-          <p className="text-sm text-gray-600 mt-1">Ask about patterns, trends, optimization strategies, and performance analysis</p>
+          <p className="text-sm text-gray-600 mt-1">Ask ChatGPT about patterns, trends, optimization strategies, and performance analysis</p>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -444,7 +484,7 @@ export const FacebookAIInsights = ({ dateRange }: FacebookAIInsightsProps) => {
                         ? 'bg-blue-600 text-white' 
                         : 'bg-white text-gray-800 border'
                     }`}>
-                      <p className="text-sm">{message.message}</p>
+                      <p className="text-sm whitespace-pre-wrap">{message.message}</p>
                       <p className={`text-xs mt-1 ${message.type === 'user' ? 'text-blue-100' : 'text-gray-500'}`}>
                         {message.timestamp.toLocaleTimeString()}
                       </p>
@@ -454,7 +494,7 @@ export const FacebookAIInsights = ({ dateRange }: FacebookAIInsightsProps) => {
                 {isAnalyzing && (
                   <div className="flex justify-start">
                     <div className="bg-white text-gray-800 border px-4 py-2 rounded-lg">
-                      <p className="text-sm">AI is performing deep analysis...</p>
+                      <p className="text-sm">ChatGPT is analyzing your data...</p>
                     </div>
                   </div>
                 )}
@@ -463,14 +503,14 @@ export const FacebookAIInsights = ({ dateRange }: FacebookAIInsightsProps) => {
 
             {/* Quick Questions */}
             <div className="space-y-2">
-              <p className="text-sm font-medium text-gray-700">Advanced analysis questions:</p>
+              <p className="text-sm font-medium text-gray-700">Ask ChatGPT:</p>
               <div className="flex flex-wrap gap-2">
                 {[
-                  "What patterns do you see?",
-                  "How can I optimize performance?",
+                  "What patterns do you see in my data?",
+                  "How can I optimize my campaigns?",
                   "Should I scale this campaign?",
-                  "What trends are emerging?",
-                  "Analyze my audience quality",
+                  "What's my audience quality?",
+                  "Analyze my cost efficiency",
                   "Predict future performance"
                 ].map((quickQuestion) => (
                   <Button
@@ -493,10 +533,10 @@ export const FacebookAIInsights = ({ dateRange }: FacebookAIInsightsProps) => {
             {/* Question Input */}
             <div className="flex gap-2">
               <Input
-                placeholder="Ask about performance patterns, optimization strategies, or forecasting..."
+                placeholder="Ask ChatGPT about your campaign performance, optimization strategies, or any marketing questions..."
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleAskQuestion()}
+                onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleAskQuestion()}
                 disabled={isAnalyzing}
               />
               <Button 

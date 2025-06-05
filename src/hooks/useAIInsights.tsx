@@ -51,27 +51,71 @@ export const useAIInsights = (campaignId?: string) => {
   });
 
   const generateInsight = useMutation({
-    mutationFn: async ({ campaignId, type, title, description, priority }: {
+    mutationFn: async ({ campaignId, type, title, description, priority, campaignData }: {
       campaignId: string;
       type: string;
       title: string;
       description: string;
       priority: string;
+      campaignData?: any;
     }) => {
-      const { data, error } = await supabase
-        .from('ai_insights')
-        .insert({
-          campaign_id: campaignId,
-          insight_type: type,
-          title,
-          description,
-          priority,
-        })
-        .select()
-        .single();
+      try {
+        // Use ChatGPT to generate more detailed insights
+        const messages = [
+          {
+            role: 'user',
+            content: `Generate a detailed marketing insight for a campaign with this data: ${JSON.stringify(campaignData || {})}. The insight should be about: ${description}. Make it actionable and specific.`
+          }
+        ];
 
-      if (error) throw error;
-      return data;
+        const { data: aiResponse, error: aiError } = await supabase.functions.invoke('chat-gpt', {
+          body: { 
+            messages, 
+            context: { 
+              type: 'general_insights',
+              campaignData 
+            }
+          }
+        });
+
+        let enhancedDescription = description;
+        if (!aiError && aiResponse?.response) {
+          enhancedDescription = aiResponse.response;
+        }
+
+        const { data, error } = await supabase
+          .from('ai_insights')
+          .insert({
+            campaign_id: campaignId,
+            insight_type: type,
+            title,
+            description: enhancedDescription,
+            priority,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        return data;
+      } catch (error) {
+        console.error('Error generating AI insight:', error);
+        
+        // Fallback to original description if ChatGPT fails
+        const { data, error: dbError } = await supabase
+          .from('ai_insights')
+          .insert({
+            campaign_id: campaignId,
+            insight_type: type,
+            title,
+            description,
+            priority,
+          })
+          .select()
+          .single();
+
+        if (dbError) throw dbError;
+        return data;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ai-insights'] });
