@@ -3,7 +3,7 @@ import { MetricCard } from "./MetricCard";
 import { ConversionChart } from "./ConversionChart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCalendlyData } from "@/hooks/useCalendlyData";
-import { format, subDays, startOfDay, endOfDay, isWithinInterval, parseISO, isValid, isSameDay } from "date-fns";
+import { format, subDays, startOfDay, endOfDay, parseISO, isValid } from "date-fns";
 import { AdvancedDateRangePicker } from "./AdvancedDateRangePicker";
 import { useState, useEffect, useMemo } from "react";
 
@@ -15,23 +15,10 @@ const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Da
   // Calculate the number of days in the range
   const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
   
-  console.log('=== CHART DATA GENERATION DEBUG (CREATED EVENTS) ===');
+  console.log('=== CHART DATA GENERATION DEBUG ===');
   console.log('Date range:', format(startDate, 'yyyy-MM-dd'), 'to', format(endDate, 'yyyy-MM-dd'));
-  console.log('Today is:', format(new Date(), 'yyyy-MM-dd'));
   console.log('Total days in range:', daysDiff);
   console.log('Total Calendly events available:', calendlyEvents.length);
-  
-  // Debug: Log first few events with their actual created dates
-  console.log('Sample events with created_at dates:');
-  calendlyEvents.slice(0, 5).forEach((event, index) => {
-    console.log(`Event ${index + 1}:`, {
-      id: event.id,
-      created_at: event.created_at,
-      parsed_created: event.created_at ? parseISO(event.created_at) : null,
-      formatted_created: event.created_at ? format(parseISO(event.created_at), 'yyyy-MM-dd HH:mm:ss') : null,
-      status: event.status
-    });
-  });
   
   // Fix: Ensure we include all days in the range, including single day ranges
   const totalDays = daysDiff === 0 ? 1 : daysDiff + 1;
@@ -43,7 +30,7 @@ const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Da
     
     console.log(`\n--- Processing ${currentDateStr} ---`);
     
-    // FIXED: Use consistent Date-based filtering instead of string comparison
+    // Use consistent Date-based filtering
     const dayStart = startOfDay(currentDate);
     const dayEnd = endOfDay(currentDate);
     
@@ -58,7 +45,6 @@ const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Da
           return false;
         }
         
-        // Use Date object comparison for consistency with metrics calculation
         const isOnThisDay = createdDate >= dayStart && createdDate <= dayEnd;
         
         if (isOnThisDay) {
@@ -66,9 +52,7 @@ const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Da
             id: event.id,
             created_at: format(createdDate, 'yyyy-MM-dd HH:mm:ss'),
             target_date: currentDateStr,
-            status: event.status,
-            dayStart: format(dayStart, 'yyyy-MM-dd HH:mm:ss'),
-            dayEnd: format(dayEnd, 'yyyy-MM-dd HH:mm:ss')
+            status: event.status
           });
         }
         
@@ -110,13 +94,50 @@ const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Da
     dates.push(dayData);
   }
   
-  console.log('\n=== FINAL CHART DATA SUMMARY (CREATED EVENTS) ===');
+  console.log('\n=== FINAL CHART DATA SUMMARY ===');
   console.log('Generated data points:', dates.length);
-  console.log('Calls booked by day:', dates.map(d => ({ date: d.date, callsBooked: d.callsBooked })));
   console.log('Total calls booked across all days:', dates.reduce((sum, d) => sum + d.callsBooked, 0));
-  console.log('Full chart data:', dates);
   
   return dates;
+};
+
+// Helper function to filter events by date range consistently
+const filterEventsByDateRange = (events: any[], dateRange: { from: Date; to: Date }) => {
+  console.log('\n=== FILTERING EVENTS FOR METRICS ===');
+  console.log('Date range:', {
+    from: format(dateRange.from, 'yyyy-MM-dd HH:mm:ss'),
+    to: format(dateRange.to, 'yyyy-MM-dd HH:mm:ss')
+  });
+  
+  const rangeStart = startOfDay(dateRange.from);
+  const rangeEnd = endOfDay(dateRange.to);
+  
+  const filtered = events.filter(event => {
+    if (!event.created_at) return false;
+    
+    try {
+      const createdDate = parseISO(event.created_at);
+      if (!isValid(createdDate)) return false;
+      
+      const isInRange = createdDate >= rangeStart && createdDate <= rangeEnd;
+      
+      if (isInRange) {
+        console.log(`✅ Event IN RANGE:`, {
+          id: event.id,
+          created_at: format(createdDate, 'yyyy-MM-dd HH:mm:ss'),
+          status: event.status
+        });
+      }
+      
+      return isInRange;
+    } catch (error) {
+      console.warn('Error filtering event by created date:', event, error);
+      return false;
+    }
+  });
+  
+  console.log('Filtered events count:', filtered.length);
+  return filtered;
 };
 
 interface BookCallFunnelProps {
@@ -127,91 +148,51 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   const { calendlyEvents, getRecentBookings, getMonthlyComparison } = useCalendlyData(projectId);
   const [dateRange, setDateRange] = useState({
     from: subDays(new Date(), 30),
-    to: new Date() // This should include today
+    to: new Date()
   });
-  
-  // Use useMemo to recalculate chart data when dependencies change
-  const chartData = useMemo(() => {
-    console.log('🔄 Recalculating chart data due to dependency change');
-    console.log('Date range for chart:', {
-      from: format(dateRange.from, 'yyyy-MM-dd HH:mm:ss'),
-      to: format(dateRange.to, 'yyyy-MM-dd HH:mm:ss')
-    });
-    console.log('Events available:', calendlyEvents.length);
-    
-    const data = generateCallDataFromEvents(calendlyEvents, dateRange);
-    console.log('Generated chart data:', data);
-    return data;
-  }, [calendlyEvents, dateRange.from.getTime(), dateRange.to.getTime()]);
-  
-  // Add useEffect to force re-render when dateRange changes
-  useEffect(() => {
-    console.log('🔄 BookCallFunnel dateRange changed:', {
-      from: format(dateRange.from, 'yyyy-MM-dd HH:mm:ss'),
-      to: format(dateRange.to, 'yyyy-MM-dd HH:mm:ss'),
-      totalEvents: calendlyEvents.length
-    });
-  }, [dateRange, calendlyEvents.length]);
   
   console.log('BookCallFunnel render - Project ID:', projectId);
   console.log('Current date range:', {
     from: format(dateRange.from, 'yyyy-MM-dd'),
     to: format(dateRange.to, 'yyyy-MM-dd')
   });
-  console.log('Today is:', format(new Date(), 'yyyy-MM-dd'));
   console.log('All Calendly events:', calendlyEvents.length);
+  
+  // Create a stable date range key to ensure proper memoization
+  const dateRangeKey = useMemo(() => 
+    `${dateRange.from.getTime()}-${dateRange.to.getTime()}`, 
+    [dateRange.from, dateRange.to]
+  );
+  
+  // Use useMemo to recalculate chart data when dependencies change
+  const chartData = useMemo(() => {
+    console.log('🔄 Recalculating chart data due to dependency change');
+    console.log('Date range key:', dateRangeKey);
+    console.log('Events available:', calendlyEvents.length);
+    
+    const data = generateCallDataFromEvents(calendlyEvents, dateRange);
+    console.log('Generated chart data:', data);
+    return data;
+  }, [calendlyEvents, dateRangeKey]);
+  
+  // Filter events for metrics using the same logic
+  const filteredEvents = useMemo(() => {
+    console.log('🔄 Recalculating filtered events for metrics');
+    return filterEventsByDateRange(calendlyEvents, dateRange);
+  }, [calendlyEvents, dateRangeKey]);
+  
+  // Add useEffect to log when dateRange changes
+  useEffect(() => {
+    console.log('🔄 BookCallFunnel dateRange changed:', {
+      from: format(dateRange.from, 'yyyy-MM-dd HH:mm:ss'),
+      to: format(dateRange.to, 'yyyy-MM-dd HH:mm:ss'),
+      totalEvents: calendlyEvents.length,
+      filteredEvents: filteredEvents.length
+    });
+  }, [dateRange, calendlyEvents.length, filteredEvents.length]);
   
   const recentBookings = getRecentBookings(7);
   const monthlyComparison = getMonthlyComparison();
-
-  // Filter events within the selected date range for statistics (using created_at)
-  // FIXED: Ensure consistent date filtering with useMemo for performance
-  const filteredEvents = useMemo(() => {
-    console.log('\n=== FILTERING EVENTS FOR METRICS ===');
-    console.log('Filtering events for date range:', {
-      from: format(dateRange.from, 'yyyy-MM-dd HH:mm:ss'),
-      to: format(dateRange.to, 'yyyy-MM-dd HH:mm:ss')
-    });
-    
-    const filtered = calendlyEvents.filter(event => {
-      if (!event.created_at) return false;
-      
-      try {
-        const createdDate = parseISO(event.created_at);
-        if (!isValid(createdDate)) return false;
-        
-        // Use consistent Date object comparison
-        const rangeStart = startOfDay(dateRange.from);
-        const rangeEnd = endOfDay(dateRange.to);
-        
-        const isInRange = createdDate >= rangeStart && createdDate <= rangeEnd;
-        
-        if (isInRange) {
-          console.log(`✅ Event IN RANGE for metrics:`, {
-            id: event.id,
-            created_at: format(createdDate, 'yyyy-MM-dd HH:mm:ss'),
-            range_start: format(rangeStart, 'yyyy-MM-dd HH:mm:ss'),
-            range_end: format(rangeEnd, 'yyyy-MM-dd HH:mm:ss'),
-            status: event.status
-          });
-        }
-        
-        return isInRange;
-      } catch (error) {
-        console.warn('Error filtering event by created date:', event, error);
-        return false;
-      }
-    });
-    
-    console.log('Filtered events count:', filtered.length);
-    console.log('Filtered events sample:', filtered.slice(0, 3).map(e => ({ 
-      id: e.id, 
-      created_at: e.created_at, 
-      status: e.status 
-    })));
-    
-    return filtered;
-  }, [calendlyEvents, dateRange.from.getTime(), dateRange.to.getTime()]);
 
   console.log('\n=== METRICS CALCULATION ===');
   console.log('Filtered events for metrics (by created_at):', filteredEvents.length);
@@ -301,10 +282,8 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
 
   const handleDateChange = (from: Date, to: Date) => {
     console.log('🚀 Date range changed FROM PICKER:', format(from, 'yyyy-MM-dd HH:mm:ss'), 'to', format(to, 'yyyy-MM-dd HH:mm:ss'));
-    console.log('Today is:', format(new Date(), 'yyyy-MM-dd'));
-    console.log('Is today in new range?', format(new Date(), 'yyyy-MM-dd') >= format(from, 'yyyy-MM-dd') && format(new Date(), 'yyyy-MM-dd') <= format(to, 'yyyy-MM-dd'));
     
-    // Force component re-render by creating new objects
+    // Create completely new Date objects to ensure state change detection
     setDateRange({ 
       from: new Date(from.getTime()), 
       to: new Date(to.getTime()) 
@@ -314,10 +293,10 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   console.log('\n=== FINAL COMPONENT STATE ===');
   console.log('Chart data length:', chartData.length);
   console.log('Total bookings for metrics:', filteredEvents.length);
-  console.log('Chart data summary:', chartData.map(d => ({ date: d.date, bookings: d.callsBooked })));
+  console.log('Date range key:', dateRangeKey);
 
   // Create unique key for chart components to force re-render
-  const chartKey = `${dateRange.from.getTime()}-${dateRange.to.getTime()}-${filteredEvents.length}`;
+  const chartKey = `${dateRangeKey}-${filteredEvents.length}`;
 
   // Show a message if no project is selected
   if (!projectId) {
