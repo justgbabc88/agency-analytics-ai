@@ -31,7 +31,7 @@ export const TrackingPixelGenerator = ({ projectId }: TrackingPixelGeneratorProp
   const generateTrackingScript = () => {
     const supabaseUrl = "https://iqxvtfupjjxjkbajgcve.supabase.co";
     
-    return `<!-- Hyros-Style Tracking Pixel -->
+    return `<!-- Advanced Marketing Attribution Tracking Pixel -->
 <script>
 (function() {
   // Configuration
@@ -204,6 +204,18 @@ export const TrackingPixelGenerator = ({ projectId }: TrackingPixelGeneratorProp
     });
   };
 
+  // Expose split test tracking function
+  window.trackSplitTest = function(testName, variant, customData = {}) {
+    track('split_test_view', {
+      eventName: 'Split Test View',
+      customData: {
+        testName: testName,
+        variant: variant,
+        ...customData
+      }
+    });
+  };
+
   // Initialize when DOM is ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
@@ -304,6 +316,7 @@ export const TrackingPixelGenerator = ({ projectId }: TrackingPixelGeneratorProp
             <li>3. The script will automatically track page views and form submissions</li>
             <li>4. Use trackPurchase(amount, currency, customerInfo) to track conversions</li>
             <li>5. Use trackEvent(eventType, data) for custom events</li>
+            <li>6. Use trackSplitTest(testName, variant) for A/B testing</li>
           </ol>
         </div>
 
@@ -312,6 +325,9 @@ export const TrackingPixelGenerator = ({ projectId }: TrackingPixelGeneratorProp
           <div className="text-sm text-green-800 space-y-2">
             <div className="font-mono bg-white p-2 rounded">
               trackPurchase(99.99, 'USD', {'{'}email: 'customer@email.com', name: 'John Doe'{'}'});
+            </div>
+            <div className="font-mono bg-white p-2 rounded">
+              trackSplitTest('homepage_hero', 'variant_b');
             </div>
             <div className="font-mono bg-white p-2 rounded">
               trackEvent('button_click', {'{'}buttonName: 'Get Started'{'}'});
