@@ -12,7 +12,7 @@ interface AttributionDashboardProps {
   projectId: string;
 }
 
-interface PixelWithConfig {
+interface PixelData {
   id: string;
   name: string;
   pixel_id: string;
@@ -27,7 +27,7 @@ interface PixelWithConfig {
   };
 }
 
-interface AttributionDataItem {
+interface AttributionRecord {
   id: string;
   project_id: string;
   pixel_id: string;
@@ -52,7 +52,7 @@ interface AttributionDataItem {
   };
 }
 
-interface EventStatsItem {
+interface EventRecord {
   event_type: string;
   event_name: string | null;
   page_url: string;
@@ -64,9 +64,9 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
   const [selectedPixelId, setSelectedPixelId] = useState<string>('');
 
   // Get tracking pixels for this project
-  const { data: pixels } = useQuery<PixelWithConfig[]>({
+  const { data: pixels } = useQuery({
     queryKey: ['tracking-pixels', projectId],
-    queryFn: async (): Promise<PixelWithConfig[]> => {
+    queryFn: async () => {
       const { data, error } = await supabase
         .from('tracking_pixels')
         .select('*')
@@ -74,15 +74,15 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
         .eq('is_active', true);
 
       if (error) throw error;
-      return data || [];
+      return (data || []) as PixelData[];
     },
     enabled: !!projectId,
   });
 
   // Get attribution data for selected pixel
-  const { data: attributionData, isLoading } = useQuery<AttributionDataItem[]>({
+  const { data: attributionData, isLoading } = useQuery({
     queryKey: ['attribution-data', projectId, selectedPixelId, timeRange],
-    queryFn: async (): Promise<AttributionDataItem[]> => {
+    queryFn: async () => {
       if (!selectedPixelId) return [];
       
       const daysAgo = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
@@ -102,19 +102,18 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
           )
         `)
         .eq('project_id', projectId)
-        .eq('pixel_id', selectedPixelId)
         .gte('created_at', startDate.toISOString());
 
       if (error) throw error;
-      return data || [];
+      return (data || []) as AttributionRecord[];
     },
     enabled: !!projectId && !!selectedPixelId,
   });
 
   // Get event stats by page and event type
-  const { data: eventStats } = useQuery<EventStatsItem[]>({
+  const { data: eventStats } = useQuery({
     queryKey: ['event-stats', projectId, selectedPixelId, timeRange],
-    queryFn: async (): Promise<EventStatsItem[]> => {
+    queryFn: async () => {
       if (!selectedPixelId) return [];
       
       const daysAgo = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
@@ -125,11 +124,10 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
         .from('tracking_events')
         .select('event_type, event_name, page_url, created_at')
         .eq('project_id', projectId)
-        .eq('pixel_id', selectedPixelId)
         .gte('created_at', startDate.toISOString());
 
       if (error) throw error;
-      return data || [];
+      return (data || []) as EventRecord[];
     },
     enabled: !!projectId && !!selectedPixelId,
   });
@@ -158,7 +156,7 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
   });
 
   // Process attribution data for charts
-  const sourceData = attributionData?.reduce((acc: any, attr) => {
+  const sourceData = attributionData?.reduce((acc: Record<string, any>, attr) => {
     const source = attr.utm_source || 'Direct';
     if (!acc[source]) {
       acc[source] = { source, revenue: 0, conversions: 0 };
@@ -166,7 +164,7 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
     acc[source].revenue += parseFloat(attr.attributed_revenue?.toString() || '0');
     acc[source].conversions += 1;
     return acc;
-  }, {} as any);
+  }, {} as Record<string, any>);
 
   const sourceChartData = Object.values(sourceData || {});
 
