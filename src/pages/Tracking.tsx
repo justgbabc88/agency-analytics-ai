@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PixelSetupWizard } from '@/components/PixelSetupWizard';
@@ -5,10 +6,92 @@ import { TrackingPixelManager } from '@/components/TrackingPixelManager';
 import { AttributionDashboard } from '@/components/AttributionDashboard';
 import { ProjectSelector } from '@/components/ProjectSelector';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, Target, Zap, BarChart3 } from "lucide-react";
+import { Activity, Target, Zap, BarChart3, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 const Tracking = () => {
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+
+  const { data: recentEvents, isLoading: eventsLoading, refetch: refetchEvents } = useQuery({
+    queryKey: ['recent-events', selectedProjectId],
+    queryFn: async () => {
+      if (!selectedProjectId) return [];
+      
+      console.log('Fetching recent events for project:', selectedProjectId);
+      const { data, error } = await supabase
+        .from('tracking_events')
+        .select('*')
+        .eq('project_id', selectedProjectId)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) {
+        console.error('Error fetching recent events:', error);
+        throw error;
+      }
+
+      console.log('Fetched recent events:', data);
+      return data || [];
+    },
+    enabled: !!selectedProjectId,
+    refetchInterval: 5000,
+  });
+
+  const { data: eventStats } = useQuery({
+    queryKey: ['event-stats', selectedProjectId],
+    queryFn: async () => {
+      if (!selectedProjectId) return { total: 0, types: {} };
+      
+      console.log('Fetching event stats for project:', selectedProjectId);
+      const { data, error } = await supabase
+        .from('tracking_events')
+        .select('event_type, created_at')
+        .eq('project_id', selectedProjectId)
+        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+
+      if (error) {
+        console.error('Error fetching event stats:', error);
+        throw error;
+      }
+
+      const stats = data?.reduce((acc, event) => {
+        acc.total = (acc.total || 0) + 1;
+        acc.types = acc.types || {};
+        acc.types[event.event_type] = (acc.types[event.event_type] || 0) + 1;
+        return acc;
+      }, {} as any);
+
+      return stats || { total: 0, types: {} };
+    },
+    enabled: !!selectedProjectId,
+    refetchInterval: 10000,
+  });
+
+  const getEventTypeColor = (eventType: string) => {
+    switch (eventType) {
+      case 'page_view': return 'bg-blue-100 text-blue-800';
+      case 'form_submission': return 'bg-green-100 text-green-800';
+      case 'click': return 'bg-purple-100 text-purple-800';
+      case 'purchase': return 'bg-yellow-100 text-yellow-800';
+      case 'webinar_registration': return 'bg-orange-100 text-orange-800';
+      case 'call_booking': return 'bg-indigo-100 text-indigo-800';
+      case 'custom_event': return 'bg-pink-100 text-pink-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const formatEventType = (eventType: string) => {
+    return eventType.split('_').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+  };
+
+  const handleRefreshEvents = () => {
+    refetchEvents();
+  };
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -52,9 +135,9 @@ const Tracking = () => {
               <Target className="h-4 w-4" />
               Attribution
             </TabsTrigger>
-            <TabsTrigger value="overview" className="flex items-center gap-2">
+            <TabsTrigger value="events" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
-              Overview
+              Recent Events
             </TabsTrigger>
           </TabsList>
 
@@ -70,65 +153,115 @@ const Tracking = () => {
             <AttributionDashboard projectId={selectedProjectId} />
           </TabsContent>
 
-          <TabsContent value="overview">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <TabsContent value="events">
+            <div className="space-y-6">
+              {/* Event Stats Overview */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Zap className="h-5 w-5 text-blue-600" />
-                    Tracking Pixel
-                  </CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <BarChart3 className="h-5 w-5" />
+                      Event Statistics (Last 24h)
+                    </CardTitle>
+                    <Button onClick={handleRefreshEvents} variant="outline" size="sm">
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Refresh
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Generate a JavaScript tracking pixel to capture visitor data, UTM parameters, and conversions.
-                  </p>
-                  <ul className="text-xs space-y-1 text-gray-500">
-                    <li>• Automatic page view tracking</li>
-                    <li>• Form submission capture</li>
-                    <li>• UTM parameter storage</li>
-                    <li>• Click ID preservation</li>
-                  </ul>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-blue-600">
+                        {eventStats?.total || 0}
+                      </div>
+                      <div className="text-sm text-gray-600">Total Events</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-green-600">
+                        {Object.keys(eventStats?.types || {}).length}
+                      </div>
+                      <div className="text-sm text-gray-600">Event Types</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-purple-600">
+                        {recentEvents?.length || 0}
+                      </div>
+                      <div className="text-sm text-gray-600">Recent Events</div>
+                    </div>
+                  </div>
+
+                  {/* Event Types Breakdown */}
+                  {eventStats?.types && Object.keys(eventStats.types).length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-medium">Event Types Breakdown:</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {Object.entries(eventStats.types).map(([eventType, count]: [string, any]) => (
+                          <Badge key={eventType} className={getEventTypeColor(eventType)}>
+                            {formatEventType(eventType)}: {count}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
+              {/* Recent Events Feed */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Target className="h-5 w-5 text-green-600" />
-                    Attribution
+                    <Activity className="h-5 w-5" />
+                    Live Event Feed
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Attribute revenue back to the original traffic source and campaign that drove the conversion.
-                  </p>
-                  <ul className="text-xs space-y-1 text-gray-500">
-                    <li>• First-touch attribution</li>
-                    <li>• Contact matching</li>
-                    <li>• Revenue tracking</li>
-                    <li>• Campaign performance</li>
-                  </ul>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5 text-purple-600" />
-                    Analytics
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Get detailed insights into your marketing performance with AI-powered recommendations.
-                  </p>
-                  <ul className="text-xs space-y-1 text-gray-500">
-                    <li>• Source performance analysis</li>
-                    <li>• Conversion rate tracking</li>
-                    <li>• ROI calculations</li>
-                    <li>• Optimization insights</li>
-                  </ul>
+                  {eventsLoading ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      Loading events...
+                    </div>
+                  ) : recentEvents && recentEvents.length > 0 ? (
+                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                      {recentEvents.map((event, index) => (
+                        <div key={event.id} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div className="flex items-center space-x-3">
+                            <Badge className={getEventTypeColor(event.event_type)}>
+                              {formatEventType(event.event_type)}
+                            </Badge>
+                            <div>
+                              <p className="font-medium">
+                                {event.event_name || formatEventType(event.event_type)}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {new URL(event.page_url).pathname}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm text-muted-foreground">
+                              {new Date(event.created_at).toLocaleString()}
+                            </p>
+                            {event.revenue_amount && (
+                              <p className="text-sm font-medium text-green-600">
+                                ${event.revenue_amount}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <h3 className="font-semibold mb-2">No Events Yet</h3>
+                      <p className="text-muted-foreground mb-4">
+                        Set up your tracking pixel and start collecting events to see them here.
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Events will automatically refresh every 5 seconds.
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
