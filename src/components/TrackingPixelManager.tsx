@@ -205,6 +205,9 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
       queryClient.invalidateQueries({ queryKey: ['tracking-pixels', projectId] });
       queryClient.invalidateQueries({ queryKey: ['recent-events', projectId] });
       queryClient.invalidateQueries({ queryKey: ['event-stats', projectId] });
+      // Add attribution-related query invalidations
+      queryClient.invalidateQueries({ queryKey: ['event-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['tracking-pixels'] });
       toast({
         title: "Success",
         description: "All tracking data cleared successfully",
