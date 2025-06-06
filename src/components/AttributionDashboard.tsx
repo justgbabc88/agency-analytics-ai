@@ -33,7 +33,7 @@ interface EventRecord {
   event_name: string | null;
   page_url: string;
   created_at: string;
-  revenue_amount: number | null;
+  session_id: string;
   contact_email: string | null;
   contact_phone: string | null;
   contact_name: string | null;
@@ -120,27 +120,33 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
     if (!eventUrl || !configuredUrl) return false;
     
     try {
-      // Simple contains check first
-      if (eventUrl.includes(configuredUrl) || configuredUrl.includes(eventUrl)) {
-        return true;
-      }
-
       // Normalize URLs for comparison
       const normalizeUrl = (url: string) => {
-        if (url.startsWith('http')) {
-          return new URL(url).pathname.toLowerCase();
+        // Remove protocol and domain if present
+        let cleanUrl = url.replace(/^https?:\/\/[^\/]+/, '');
+        // Ensure it starts with /
+        if (!cleanUrl.startsWith('/')) {
+          cleanUrl = '/' + cleanUrl;
         }
-        return url.startsWith('/') ? url.toLowerCase() : `/${url.toLowerCase()}`;
+        // Remove trailing slash and convert to lowercase
+        return cleanUrl.replace(/\/$/, '').toLowerCase();
       };
 
       const eventPath = normalizeUrl(eventUrl);
       const configuredPath = normalizeUrl(configuredUrl);
 
+      console.log('URL matching:', { eventPath, configuredPath });
+
       // Exact match
       if (eventPath === configuredPath) return true;
       
-      // Check if one contains the other
-      return eventPath.includes(configuredPath) || configuredPath.includes(eventPath);
+      // Check if event URL contains the configured path
+      if (eventPath.includes(configuredPath)) return true;
+      
+      // Check if configured path contains the event URL (for shorter event URLs)
+      if (configuredPath.includes(eventPath) && eventPath.length > 1) return true;
+
+      return false;
     } catch (error) {
       console.warn('URL matching error:', error);
       // Fallback to simple string matching
@@ -186,10 +192,10 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
 
       const totalEvents = pageEvents.length;
       
-      // Count unique visitors based on session_id or a combination of identifiers
+      // Count unique visitors based on session_id or contact_email
       const uniqueVisitorIds = new Set();
       pageEvents.forEach(event => {
-        // Use session_id if available, otherwise fall back to email or IP-like identifier
+        // Use session_id if available, otherwise fall back to email or create a daily identifier
         const visitorId = event.session_id || 
                          event.contact_email || 
                          `${event.page_url}-${event.created_at.split('T')[0]}`;
