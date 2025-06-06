@@ -7,14 +7,7 @@ import { RefreshCw, CheckCircle, AlertCircle, Activity, TrendingUp, Save } from 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from "@/hooks/use-toast";
-
-interface PixelData {
-  id?: string;
-  name: string;
-  pixelId: string;
-  domains: string;
-  config: any;
-}
+import { PixelData } from './types';
 
 interface TestVerifyStepProps {
   projectId: string;
