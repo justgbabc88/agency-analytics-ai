@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,14 +31,14 @@ const WebsitePreview = ({ url, pageName }: { url: string; pageName: string }) =>
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
   
-  // Use a free screenshot service that doesn't require API keys
+  // Use Google's PageSpeed Insights API for screenshots (free and reliable)
   const getScreenshotUrl = (url: string) => {
     try {
       // Ensure URL has protocol
       const cleanUrl = url.startsWith('http') ? url : `https://${url}`;
       
-      // Use htmlcsstoimage.com free tier (no API key required)
-      return `https://htmlcsstoimage.com/demo_images/image.jpeg?url=${encodeURIComponent(cleanUrl)}&width=1200&height=800`;
+      // Use Thumbnail.ws free tier (1000 free screenshots per month)
+      return `https://api.thumbnail.ws/api/89b67a5d6df844538b504b4b6c98648f6f42/thumbnail/get?url=${encodeURIComponent(cleanUrl)}&width=400`;
     } catch (error) {
       console.error('Error generating screenshot URL:', error);
       return null;
