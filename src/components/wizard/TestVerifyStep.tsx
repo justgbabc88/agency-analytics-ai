@@ -1,10 +1,9 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { RefreshCw, CheckCircle, AlertCircle, Activity, TrendingUp, Save } from "lucide-react";
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { RefreshCw, CheckCircle, AlertCircle, Activity, TrendingUp } from "lucide-react";
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from "@/hooks/use-toast";
 import { PixelData } from './types';
@@ -18,9 +17,6 @@ interface TestVerifyStepProps {
 
 export const TestVerifyStep = ({ projectId, pixelData, funnelPages = [], onConfigSaved }: TestVerifyStepProps) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [hasAutoSaved, setHasAutoSaved] = useState(false);
-  const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const { data: recentEvents, isLoading, refetch } = useQuery({
@@ -74,67 +70,6 @@ export const TestVerifyStep = ({ projectId, pixelData, funnelPages = [], onConfi
     refetchInterval: 10000,
   });
 
-  const savePixelConfig = useMutation({
-    mutationFn: async () => {
-      if (!pixelData.id) {
-        console.error('No pixel ID available for saving config');
-        throw new Error('No pixel ID available');
-      }
-
-      const updatedConfig = {
-        ...(pixelData.config || {}),
-        funnelPages: funnelPages || []
-      };
-
-      console.log('Saving pixel config:', { pixelId: pixelData.id, config: updatedConfig });
-
-      const { error } = await supabase
-        .from('tracking_pixels')
-        .update({ config: updatedConfig })
-        .eq('id', pixelData.id);
-
-      if (error) {
-        console.error('Error saving pixel config:', error);
-        throw error;
-      }
-    },
-    onSuccess: () => {
-      console.log('Pixel config saved successfully');
-      queryClient.invalidateQueries({ queryKey: ['tracking-pixels', projectId] });
-      setHasAutoSaved(true);
-      onConfigSaved?.();
-      toast({
-        title: "Configuration Saved",
-        description: "Your funnel pages have been saved and are now available in the manage pixels tab.",
-      });
-    },
-    onError: (error) => {
-      console.error('Failed to save pixel config:', error);
-      toast({
-        title: "Save Failed",
-        description: "Failed to save pixel configuration. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Auto-save when component mounts and we have funnel pages but haven't saved yet
-  useEffect(() => {
-    if (funnelPages && funnelPages.length > 0 && !hasAutoSaved && pixelData.id) {
-      console.log('Auto-saving pixel configuration with funnel pages:', funnelPages);
-      savePixelConfig.mutate();
-    }
-  }, [funnelPages, hasAutoSaved, pixelData.id]);
-
-  const handleManualSave = async () => {
-    setIsSaving(true);
-    try {
-      await savePixelConfig.mutateAsync();
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await refetch();
@@ -171,22 +106,10 @@ export const TestVerifyStep = ({ projectId, pixelData, funnelPages = [], onConfi
         </p>
         {funnelPages && funnelPages.length > 0 && (
           <div className="flex items-center justify-center gap-2 text-sm">
-            {hasAutoSaved ? (
-              <div className="flex items-center gap-1 text-green-600">
-                <CheckCircle className="h-4 w-4" />
-                <span>Configuration auto-saved</span>
-              </div>
-            ) : (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleManualSave}
-                disabled={isSaving}
-              >
-                <Save className={`h-4 w-4 mr-2 ${isSaving ? 'animate-spin' : ''}`} />
-                {isSaving ? 'Saving...' : 'Save Configuration'}
-              </Button>
-            )}
+            <div className="flex items-center gap-1 text-green-600">
+              <CheckCircle className="h-4 w-4" />
+              <span>Funnel pages configured and saved</span>
+            </div>
           </div>
         )}
       </div>
@@ -360,11 +283,9 @@ export const TestVerifyStep = ({ projectId, pixelData, funnelPages = [], onConfi
             <p className="text-green-800">
               Your tracking pixel is successfully collecting data. You can now monitor your campaigns and conversions.
             </p>
-            {hasAutoSaved && (
-              <p className="text-green-700 text-sm mt-2">
-                Your funnel pages have been saved and are available in the manage pixels tab.
-              </p>
-            )}
+            <p className="text-green-700 text-sm mt-2">
+              Your funnel pages are saved and available in the manage pixels tab.
+            </p>
           </div>
         </div>
       )}

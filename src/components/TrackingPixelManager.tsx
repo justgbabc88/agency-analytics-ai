@@ -49,6 +49,13 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
         throw error;
       }
       console.log('TrackingPixelManager: Fetched pixels:', data);
+      
+      // Log each pixel's config to debug
+      data?.forEach(pixel => {
+        console.log(`Pixel ${pixel.name} config:`, pixel.config);
+        console.log(`Pixel ${pixel.name} funnel pages:`, pixel.config?.funnelPages?.length || 0);
+      });
+      
       return (data || []) as PixelWithConfig[];
     },
     enabled: !!projectId,
@@ -393,9 +400,11 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
   const handleRefreshEvents = () => {
     refetchEvents();
     refetchStats();
+    // Also refresh the pixels data to get latest config
+    queryClient.invalidateQueries({ queryKey: ['tracking-pixels', projectId] });
     toast({
       title: "Refreshed",
-      description: "Event data has been updated",
+      description: "All data has been updated",
     });
   };
 
@@ -493,6 +502,8 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
                 const isExpanded = expandedPixels.has(pixel.id);
                 const isEditing = editingPixels.has(pixel.id);
                 
+                console.log(`Rendering pixel ${pixel.name} with ${funnelPages.length} funnel pages:`, funnelPages);
+                
                 return (
                   <div key={pixel.id} className="border rounded-lg p-4 space-y-4">
                     <div className="flex items-center justify-between">
@@ -516,6 +527,9 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
                         )}
                         <p className="text-xs text-gray-500 mt-1">
                           {funnelPages.length} funnel pages configured
+                          {funnelPages.length > 0 && (
+                            <span className="text-green-600 ml-1">✓ Pages saved</span>
+                          )}
                         </p>
                       </div>
                       <div className="flex gap-2">

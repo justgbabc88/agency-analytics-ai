@@ -1,8 +1,10 @@
 
 export interface PixelData {
-  id?: string;
+  id: string; // Make this required instead of optional
   name: string;
   pixelId: string;
   domains: string;
-  config?: any;
+  config?: {
+    funnelPages?: any[];
+  };
 }

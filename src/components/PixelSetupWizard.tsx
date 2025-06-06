@@ -8,7 +8,9 @@ import { ConfigureInstallStep } from './wizard/ConfigureInstallStep';
 import { TestVerifyStep } from './wizard/TestVerifyStep';
 import { ExistingPixelManager } from './wizard/ExistingPixelManager';
 import { ArrowLeft, ArrowRight, Zap, Settings, Eye, Archive } from "lucide-react";
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useMutation } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from "@/hooks/use-toast";
 import { PixelData } from './wizard/types';
 
 interface PixelSetupWizardProps {
@@ -21,6 +23,7 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
   const [funnelPages, setFunnelPages] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('new');
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const steps = [
     { id: 1, title: 'Create Pixel', icon: Zap },
@@ -28,17 +31,58 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
     { id: 3, title: 'Test & Verify', icon: Eye },
   ];
 
+  const savePixelConfig = useMutation({
+    mutationFn: async ({ pixelId, pages }: { pixelId: string; pages: any[] }) => {
+      console.log('Saving pixel config for pixel:', pixelId, 'with pages:', pages);
+      
+      const { error } = await supabase
+        .from('tracking_pixels')
+        .update({ 
+          config: { funnelPages: pages }
+        })
+        .eq('id', pixelId);
+
+      if (error) {
+        console.error('Error saving pixel config:', error);
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      console.log('Pixel config saved successfully');
+      queryClient.invalidateQueries({ queryKey: ['tracking-pixels', projectId] });
+      toast({
+        title: "Success",
+        description: "Funnel pages saved successfully",
+      });
+    },
+    onError: (error) => {
+      console.error('Failed to save pixel config:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save funnel pages",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handlePixelCreated = (data: PixelData) => {
     console.log('PixelSetupWizard: Pixel created:', data);
     setPixelData(data);
     setCurrentStep(2);
   };
 
-  const handlePagesConfigured = (pages: any[]) => {
+  const handlePagesConfigured = async (pages: any[]) => {
     console.log('PixelSetupWizard: Funnel pages configured:', pages);
     setFunnelPages(pages);
     
-    if (pixelData) {
+    if (pixelData?.id) {
+      // Save the pages immediately when configured
+      await savePixelConfig.mutateAsync({
+        pixelId: pixelData.id,
+        pages: pages
+      });
+      
+      // Update local pixel data
       const updatedPixelData = {
         ...pixelData,
         config: {
