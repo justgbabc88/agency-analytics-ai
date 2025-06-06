@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Eye, Trash2, BarChart3, Copy, Globe, ShoppingCart, CheckCircle, Video, Calendar, FileText, Settings, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
+import { Eye, Trash2, BarChart3, Copy, Globe, ShoppingCart, CheckCircle, Video, Calendar, FileText, Settings, ChevronDown, ChevronUp, RefreshCw, ExternalLink } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from "@/hooks/use-toast";
@@ -25,6 +25,70 @@ interface PixelWithConfig {
   conversion_events: string[];
   config: any; // Database Json type - we'll safely access this
 }
+
+// Component for website preview screenshot
+const WebsitePreview = ({ url, pageName }: { url: string; pageName: string }) => {
+  const [imageError, setImageError] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
+  
+  // Generate screenshot URL using a service like microlink.io or similar
+  const screenshotUrl = `https://api.microlink.io/screenshot?url=${encodeURIComponent(url)}&viewport.width=1200&viewport.height=800&type=png&overlay.browser=dark`;
+  
+  if (imageError) {
+    return (
+      <div className="w-full h-32 bg-gray-100 rounded border flex items-center justify-center">
+        <div className="text-center">
+          <Globe className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+          <p className="text-xs text-gray-500">Preview unavailable</p>
+          <a 
+            href={url} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-xs text-blue-600 hover:underline flex items-center justify-center mt-1"
+          >
+            Visit page <ExternalLink className="h-3 w-3 ml-1" />
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative w-full h-32 bg-gray-100 rounded border overflow-hidden">
+      {imageLoading && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="animate-pulse flex items-center">
+            <Globe className="h-6 w-6 text-gray-400 mr-2" />
+            <span className="text-xs text-gray-500">Loading preview...</span>
+          </div>
+        </div>
+      )}
+      <img
+        src={screenshotUrl}
+        alt={`Preview of ${pageName}`}
+        className="w-full h-full object-cover"
+        onLoad={() => setImageLoading(false)}
+        onError={() => {
+          setImageError(true);
+          setImageLoading(false);
+        }}
+      />
+      <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-10 transition-all duration-200 flex items-end">
+        <div className="w-full bg-gradient-to-t from-black/50 to-transparent p-2">
+          <a 
+            href={url} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-white text-xs hover:underline flex items-center"
+          >
+            {url.length > 40 ? `${url.substring(0, 40)}...` : url}
+            <ExternalLink className="h-3 w-3 ml-1" />
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) => {
   const [expandedPixels, setExpandedPixels] = useState<Set<string>>(new Set());
@@ -597,6 +661,47 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
                         </Button>
                       </div>
                     </div>
+
+                    {/* Display funnel pages with preview screenshots */}
+                    {funnelPages.length > 0 && !isEditing && (
+                      <div className="border-t pt-4">
+                        <h4 className="font-medium mb-3">Connected Pages</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {funnelPages.map((page: any, index: number) => {
+                            const PageIcon = getPageIcon(page.type);
+                            
+                            return (
+                              <Card key={page.id || index} className="p-3">
+                                <div className="space-y-3">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <PageIcon className="h-4 w-4 text-primary" />
+                                      <h5 className="font-medium text-sm">{page.name}</h5>
+                                    </div>
+                                    <Badge variant="outline" className="text-xs">
+                                      {page.type}
+                                    </Badge>
+                                  </div>
+                                  
+                                  {/* Website Preview Screenshot */}
+                                  <WebsitePreview url={page.url} pageName={page.name} />
+                                  
+                                  <div className="space-y-2">
+                                    <div className="flex flex-wrap gap-1">
+                                      {(page.events || []).map((event: string) => (
+                                        <Badge key={event} variant="secondary" className="text-xs px-1 py-0">
+                                          {event.replace(/_/g, ' ')}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              </Card>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
 
                     {isEditing && (
                       <div className="border-t pt-4">
