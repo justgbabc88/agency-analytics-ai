@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -202,23 +203,31 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
       console.log('Successfully cleared all tracking data for pixel');
     },
     onSuccess: () => {
-      // Invalidate all relevant query keys to refresh the UI
+      // Clear ALL query cache to ensure complete refresh
+      queryClient.clear();
+      
+      // Force immediate refetch of all relevant queries
       queryClient.invalidateQueries({ queryKey: ['tracking-pixels', projectId] });
       queryClient.invalidateQueries({ queryKey: ['recent-events', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['event-stats', projectId] });
       
-      // Specifically target AttributionDashboard queries with all possible combinations
+      // Invalidate any possible AttributionDashboard query combinations
       queryClient.invalidateQueries({ 
         predicate: (query) => {
           const key = query.queryKey as string[];
-          // Target the exact pattern used by AttributionDashboard: ['event-stats', projectId, selectedPixelId, timeRange]
-          return (key[0] === 'event-stats' && key[1] === projectId) ||
-                 (key[0] === 'tracking-pixels' && key[1] === projectId) ||
+          return key.includes(projectId) || 
+                 key.includes('event-stats') ||
                  key.includes('attribution') ||
                  key.includes('tracking-events') ||
                  key.includes('tracking-sessions') ||
                  key.includes('attribution-data');
         }
       });
+      
+      // Force a complete re-render by clearing the entire cache
+      setTimeout(() => {
+        queryClient.refetchQueries({ queryKey: ['tracking-pixels', projectId] });
+      }, 100);
       
       toast({
         title: "Success",
