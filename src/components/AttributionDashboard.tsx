@@ -1,10 +1,11 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, FunnelChart, Funnel, LabelList } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { TrendingUp, DollarSign, Users, MousePointer, Activity, Globe, ShoppingCart, CheckCircle, Video, Calendar, FileText, TrendingDown, ArrowUpRight, ArrowDownRight } from "lucide-react";
 
 interface AttributionDashboardProps {
@@ -130,6 +131,7 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
   // Get configured pages for the selected pixel
   const selectedPixel = pixels?.find(p => p.id === selectedPixelId);
   const configuredPages = selectedPixel?.config?.funnelPages || [];
+  const tracksPurchases = selectedPixel?.conversion_events?.includes('purchase') || false;
 
   // Helper function to get page name and details from URL
   const getPageDetails = (pageUrl: string): { name: string; type: string; order: number } => {
@@ -177,8 +179,8 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
     }
   };
 
-  // Process funnel analytics
-  const funnelAnalytics = React.useMemo(() => {
+  // Process page analytics
+  const pageAnalytics = React.useMemo(() => {
     if (!eventStats || !configuredPages.length) return null;
 
     // Group events by page and calculate metrics
@@ -200,26 +202,14 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
         totalEvents,
         uniqueVisitors,
         conversions,
-        revenue,
+        revenue: tracksPurchases ? revenue : 0,
         conversionRate: totalEvents > 0 ? (conversions / totalEvents) * 100 : 0,
-        revenuePerVisitor: uniqueVisitors > 0 ? revenue / uniqueVisitors : 0
+        revenuePerVisitor: tracksPurchases && uniqueVisitors > 0 ? revenue / uniqueVisitors : 0
       };
     });
 
-    // Calculate funnel conversion rates
-    const funnelData = pageMetrics.map((page, index) => {
-      const dropOffRate = index > 0 ? 
-        ((pageMetrics[index - 1].uniqueVisitors - page.uniqueVisitors) / pageMetrics[index - 1].uniqueVisitors) * 100 : 0;
-      
-      return {
-        ...page,
-        dropOffRate,
-        fill: getPageTypeColor(page.type)
-      };
-    });
-
-    return { pageMetrics, funnelData };
-  }, [eventStats, configuredPages]);
+    return { pageMetrics };
+  }, [eventStats, configuredPages, tracksPurchases]);
 
   // Process daily trends
   const dailyTrends = React.useMemo(() => {
@@ -231,7 +221,7 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
         acc[date] = { date, events: 0, revenue: 0, conversions: 0, uniqueVisitors: new Set() };
       }
       acc[date].events += 1;
-      if (event.revenue_amount && event.revenue_amount > 0) {
+      if (tracksPurchases && event.revenue_amount && event.revenue_amount > 0) {
         acc[date].revenue += parseFloat(event.revenue_amount.toString());
         acc[date].conversions += 1;
       }
@@ -246,7 +236,7 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
       uniqueVisitors: day.uniqueVisitors.size,
       conversionRate: day.events > 0 ? (day.conversions / day.events) * 100 : 0
     })).sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [eventStats]);
+  }, [eventStats, tracksPurchases]);
 
   // Process event type breakdown
   const eventTypeBreakdown = React.useMemo(() => {
@@ -268,8 +258,8 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
   const keyMetrics = React.useMemo(() => {
     if (!eventStats) return null;
 
-    const totalRevenue = eventStats.reduce((sum, event) => sum + parseFloat(event.revenue_amount?.toString() || '0'), 0);
-    const totalConversions = eventStats.filter(event => event.revenue_amount && event.revenue_amount > 0).length;
+    const totalRevenue = tracksPurchases ? eventStats.reduce((sum, event) => sum + parseFloat(event.revenue_amount?.toString() || '0'), 0) : 0;
+    const totalConversions = tracksPurchases ? eventStats.filter(event => event.revenue_amount && event.revenue_amount > 0).length : 0;
     const totalEvents = eventStats.length;
     const uniqueVisitors = new Set(eventStats.map(e => e.contact_email || e.page_url)).size;
     const conversionRate = totalEvents > 0 ? ((totalConversions / totalEvents) * 100) : 0;
@@ -280,10 +270,10 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
     const recentEvents = eventStats.slice(0, midPoint);
     const olderEvents = eventStats.slice(midPoint);
 
-    const recentRevenue = recentEvents.reduce((sum, event) => sum + parseFloat(event.revenue_amount?.toString() || '0'), 0);
-    const olderRevenue = olderEvents.reduce((sum, event) => sum + parseFloat(event.revenue_amount?.toString() || '0'), 0);
+    const recentRevenue = tracksPurchases ? recentEvents.reduce((sum, event) => sum + parseFloat(event.revenue_amount?.toString() || '0'), 0) : 0;
+    const olderRevenue = tracksPurchases ? olderEvents.reduce((sum, event) => sum + parseFloat(event.revenue_amount?.toString() || '0'), 0) : 0;
     
-    const revenueTrend = olderRevenue > 0 ? ((recentRevenue - olderRevenue) / olderRevenue) * 100 : 0;
+    const revenueTrend = tracksPurchases && olderRevenue > 0 ? ((recentRevenue - olderRevenue) / olderRevenue) * 100 : 0;
     const eventsTrend = olderEvents.length > 0 ? ((recentEvents.length - olderEvents.length) / olderEvents.length) * 100 : 0;
 
     return {
@@ -296,7 +286,7 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
       revenueTrend,
       eventsTrend
     };
-  }, [eventStats]);
+  }, [eventStats, tracksPurchases]);
 
   if (isLoading) {
     return <div>Loading attribution data...</div>;
@@ -338,7 +328,7 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
             <Activity className="h-16 w-16 mx-auto text-gray-400 mb-4" />
             <h3 className="text-lg font-semibold mb-2">Select a Tracking Pixel</h3>
             <p className="text-gray-600">
-              Choose a tracking pixel to view its attribution analytics and funnel performance.
+              Choose a tracking pixel to view its attribution analytics and performance.
             </p>
           </CardContent>
         </Card>
@@ -356,41 +346,45 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
         <>
           {/* Key Metrics with Trends */}
           {keyMetrics && (
-            <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="h-5 w-5 text-green-600" />
-                      <div>
-                        <p className="text-sm text-gray-600">Total Revenue</p>
-                        <p className="text-2xl font-bold">{formatCurrency(keyMetrics.totalRevenue)}</p>
+            <div className={`grid grid-cols-1 md:grid-cols-${tracksPurchases ? '6' : '4'} gap-4`}>
+              {tracksPurchases && (
+                <>
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <DollarSign className="h-5 w-5 text-green-600" />
+                          <div>
+                            <p className="text-sm text-gray-600">Total Revenue</p>
+                            <p className="text-2xl font-bold">{formatCurrency(keyMetrics.totalRevenue)}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {keyMetrics.revenueTrend >= 0 ? 
+                            <ArrowUpRight className="h-4 w-4 text-green-600" /> : 
+                            <ArrowDownRight className="h-4 w-4 text-red-600" />
+                          }
+                          <span className={`text-sm font-medium ${keyMetrics.revenueTrend >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {formatPercentage(keyMetrics.revenueTrend)}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {keyMetrics.revenueTrend >= 0 ? 
-                        <ArrowUpRight className="h-4 w-4 text-green-600" /> : 
-                        <ArrowDownRight className="h-4 w-4 text-red-600" />
-                      }
-                      <span className={`text-sm font-medium ${keyMetrics.revenueTrend >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {formatPercentage(keyMetrics.revenueTrend)}
-                      </span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                    </CardContent>
+                  </Card>
 
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5 text-blue-600" />
-                    <div>
-                      <p className="text-sm text-gray-600">Conversions</p>
-                      <p className="text-2xl font-bold">{keyMetrics.totalConversions}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="h-5 w-5 text-blue-600" />
+                        <div>
+                          <p className="text-sm text-gray-600">Conversions</p>
+                          <p className="text-2xl font-bold">{keyMetrics.totalConversions}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
 
               <Card>
                 <CardContent className="p-6">
@@ -427,109 +421,91 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-2">
-                    <Activity className="h-5 w-5 text-indigo-600" />
-                    <div>
-                      <p className="text-sm text-gray-600">Conversion Rate</p>
-                      <p className="text-2xl font-bold">{keyMetrics.conversionRate.toFixed(1)}%</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              {tracksPurchases && (
+                <>
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="flex items-center gap-2">
+                        <Activity className="h-5 w-5 text-indigo-600" />
+                        <div>
+                          <p className="text-sm text-gray-600">Conversion Rate</p>
+                          <p className="text-2xl font-bold">{keyMetrics.conversionRate.toFixed(1)}%</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
 
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="h-5 w-5 text-emerald-600" />
-                    <div>
-                      <p className="text-sm text-gray-600">Avg Order Value</p>
-                      <p className="text-2xl font-bold">{formatCurrency(keyMetrics.avgOrderValue)}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="h-5 w-5 text-emerald-600" />
+                        <div>
+                          <p className="text-sm text-gray-600">Avg Order Value</p>
+                          <p className="text-2xl font-bold">{formatCurrency(keyMetrics.avgOrderValue)}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
             </div>
           )}
 
-          {/* Funnel Visualization */}
-          {funnelAnalytics && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Funnel Performance</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={400}>
-                    <FunnelChart>
-                      <Funnel
-                        dataKey="uniqueVisitors"
-                        data={funnelAnalytics.funnelData}
-                        isAnimationActive
-                      >
-                        <LabelList position="center" fill="#fff" stroke="none" />
-                      </Funnel>
-                      <Tooltip formatter={(value) => [`${value} visitors`, 'Unique Visitors']} />
-                    </FunnelChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Page Performance Metrics</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {funnelAnalytics.pageMetrics.map((page: any, index: number) => {
-                      const PageIcon = getPageIcon(page.type);
-                      return (
-                        <div key={index} className="border rounded-lg p-4">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-3">
-                              <PageIcon className="h-5 w-5 text-primary" />
-                              <div>
-                                <h4 className="font-medium">{page.name}</h4>
-                                <Badge variant="outline">{page.type}</Badge>
-                              </div>
+          {/* Page Performance Metrics */}
+          {pageAnalytics && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Page Performance Metrics</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {pageAnalytics.pageMetrics.map((page: any, index: number) => {
+                    const PageIcon = getPageIcon(page.type);
+                    return (
+                      <div key={index} className="border rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <PageIcon className="h-5 w-5 text-primary" />
+                            <div>
+                              <h4 className="font-medium">{page.name}</h4>
+                              <Badge variant="outline">{page.type}</Badge>
                             </div>
+                          </div>
+                          {tracksPurchases && (
                             <div className="text-right">
                               <div className="text-lg font-bold">{page.conversionRate.toFixed(1)}%</div>
                               <div className="text-sm text-gray-600">Conv. Rate</div>
                             </div>
-                          </div>
-                          <div className="grid grid-cols-4 gap-4 text-sm">
-                            <div className="text-center">
-                              <div className="font-medium">{page.totalEvents}</div>
-                              <div className="text-gray-600">Events</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="font-medium">{page.uniqueVisitors}</div>
-                              <div className="text-gray-600">Visitors</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="font-medium">{page.conversions}</div>
-                              <div className="text-gray-600">Conversions</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="font-medium">{formatCurrency(page.revenue)}</div>
-                              <div className="text-gray-600">Revenue</div>
-                            </div>
-                          </div>
-                          {page.dropOffRate > 0 && (
-                            <div className="mt-2 flex items-center gap-1 text-sm text-red-600">
-                              <TrendingDown className="h-4 w-4" />
-                              {page.dropOffRate.toFixed(1)}% drop-off from previous step
-                            </div>
                           )}
                         </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                        <div className={`grid grid-cols-${tracksPurchases ? '4' : '2'} gap-4 text-sm`}>
+                          <div className="text-center">
+                            <div className="font-medium">{page.totalEvents}</div>
+                            <div className="text-gray-600">Events</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="font-medium">{page.uniqueVisitors}</div>
+                            <div className="text-gray-600">Visitors</div>
+                          </div>
+                          {tracksPurchases && (
+                            <>
+                              <div className="text-center">
+                                <div className="font-medium">{page.conversions}</div>
+                                <div className="text-gray-600">Conversions</div>
+                              </div>
+                              <div className="text-center">
+                                <div className="font-medium">{formatCurrency(page.revenue)}</div>
+                                <div className="text-gray-600">Revenue</div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           {/* Charts */}
@@ -548,7 +524,7 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
                       <YAxis />
                       <Tooltip />
                       <Line type="monotone" dataKey="events" stroke="#8884d8" name="Events" />
-                      <Line type="monotone" dataKey="conversions" stroke="#82ca9d" name="Conversions" />
+                      {tracksPurchases && <Line type="monotone" dataKey="conversions" stroke="#82ca9d" name="Conversions" />}
                       <Line type="monotone" dataKey="uniqueVisitors" stroke="#ffc658" name="Unique Visitors" />
                     </LineChart>
                   </ResponsiveContainer>
@@ -584,15 +560,15 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
               </Card>
             )}
 
-            {/* Revenue by Page */}
-            {funnelAnalytics && (
+            {/* Revenue by Page - Only show if tracking purchases */}
+            {tracksPurchases && pageAnalytics && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Revenue by Funnel Page</CardTitle>
+                  <CardTitle>Revenue by Page</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={funnelAnalytics.pageMetrics}>
+                    <BarChart data={pageAnalytics.pageMetrics}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="name" />
                       <YAxis />
@@ -604,15 +580,15 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
               </Card>
             )}
 
-            {/* Conversion Rates by Page */}
-            {funnelAnalytics && (
+            {/* Conversion Rates by Page - Only show if tracking purchases */}
+            {tracksPurchases && pageAnalytics && (
               <Card>
                 <CardHeader>
                   <CardTitle>Conversion Rates by Page</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={funnelAnalytics.pageMetrics}>
+                    <BarChart data={pageAnalytics.pageMetrics}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="name" />
                       <YAxis />
