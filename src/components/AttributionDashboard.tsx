@@ -12,14 +12,61 @@ interface AttributionDashboardProps {
   projectId: string;
 }
 
+interface PixelWithConfig {
+  id: string;
+  name: string;
+  pixel_id: string;
+  project_id: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  domains: string[] | null;
+  conversion_events: string[];
+  config?: {
+    funnelPages?: any[];
+  };
+}
+
+interface AttributionDataItem {
+  id: string;
+  project_id: string;
+  pixel_id: string;
+  session_id: string;
+  contact_email: string | null;
+  contact_phone: string | null;
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  attributed_revenue: number;
+  attribution_model: string;
+  conversion_date: string;
+  created_at: string;
+  updated_at: string;
+  event_id: string | null;
+  tracking_sessions: {
+    utm_source: string | null;
+    utm_campaign: string | null;
+    utm_medium: string | null;
+    device_type: string | null;
+    browser: string | null;
+  };
+}
+
+interface EventStatsItem {
+  event_type: string;
+  event_name: string | null;
+  page_url: string;
+  created_at: string;
+}
+
 export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) => {
   const [timeRange, setTimeRange] = useState('7d');
   const [selectedPixelId, setSelectedPixelId] = useState<string>('');
 
   // Get tracking pixels for this project
-  const { data: pixels } = useQuery({
+  const { data: pixels } = useQuery<PixelWithConfig[]>({
     queryKey: ['tracking-pixels', projectId],
-    queryFn: async () => {
+    queryFn: async (): Promise<PixelWithConfig[]> => {
       const { data, error } = await supabase
         .from('tracking_pixels')
         .select('*')
@@ -33,9 +80,9 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
   });
 
   // Get attribution data for selected pixel
-  const { data: attributionData, isLoading } = useQuery({
+  const { data: attributionData, isLoading } = useQuery<AttributionDataItem[]>({
     queryKey: ['attribution-data', projectId, selectedPixelId, timeRange],
-    queryFn: async () => {
+    queryFn: async (): Promise<AttributionDataItem[]> => {
       if (!selectedPixelId) return [];
       
       const daysAgo = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
@@ -65,9 +112,9 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
   });
 
   // Get event stats by page and event type
-  const { data: eventStats } = useQuery({
+  const { data: eventStats } = useQuery<EventStatsItem[]>({
     queryKey: ['event-stats', projectId, selectedPixelId, timeRange],
-    queryFn: async () => {
+    queryFn: async (): Promise<EventStatsItem[]> => {
       if (!selectedPixelId) return [];
       
       const daysAgo = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
@@ -92,13 +139,13 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
   const configuredPages = selectedPixel?.config?.funnelPages || [];
 
   // Process event stats by configured pages
-  const pageStats = configuredPages.map(page => {
+  const pageStats = configuredPages.map((page: any) => {
     const pageEvents = eventStats?.filter(event => 
       event.page_url?.includes(new URL(page.url).pathname) ||
       event.event_name?.includes(page.name)
     ) || [];
 
-    const eventBreakdown = page.events.reduce((acc, eventType) => {
+    const eventBreakdown = page.events.reduce((acc: Record<string, number>, eventType: string) => {
       acc[eventType] = pageEvents.filter(e => e.event_type === eventType).length;
       return acc;
     }, {} as Record<string, number>);
@@ -111,7 +158,7 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
   });
 
   // Process attribution data for charts
-  const sourceData = attributionData?.reduce((acc, attr) => {
+  const sourceData = attributionData?.reduce((acc: any, attr) => {
     const source = attr.utm_source || 'Direct';
     if (!acc[source]) {
       acc[source] = { source, revenue: 0, conversions: 0 };
@@ -236,14 +283,14 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {pageStats.map((page) => (
+                  {pageStats.map((page: any) => (
                     <div key={page.id} className="border rounded-lg p-4">
                       <div className="flex items-center justify-between mb-3">
                         <h4 className="font-medium">{page.name}</h4>
                         <Badge variant="outline">{page.totalEvents} events</Badge>
                       </div>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        {page.events.map((eventType) => (
+                        {page.events.map((eventType: string) => (
                           <div key={eventType} className="text-center">
                             <div className="font-medium text-lg">
                               {page.eventBreakdown[eventType] || 0}
