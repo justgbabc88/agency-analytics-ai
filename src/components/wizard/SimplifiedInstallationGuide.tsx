@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Copy, AlertTriangle, CheckCircle, Globe, ShoppingCart, Calendar, Video, FileText } from "lucide-react";
+import { Copy, AlertTriangle, CheckCircle, Globe, ShoppingCart, Calendar, Video, FileText, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface FunnelPage {
@@ -37,7 +37,7 @@ export const SimplifiedInstallationGuide = ({ pixelData, funnelPages }: Simplifi
       
       if (events.includes('form_submission')) {
         trackingCode += `
-    // Track form submissions
+    // Track form submissions (registration attempts)
     document.addEventListener('submit', function(e) {
       const form = e.target;
       const formData = new FormData(form);
@@ -54,47 +54,24 @@ export const SimplifiedInstallationGuide = ({ pixelData, funnelPages }: Simplifi
     });`;
       }
 
-      if (events.includes('button_click')) {
-        trackingCode += `
-    // Track important button clicks
-    document.addEventListener('click', function(e) {
-      if (e.target.matches('button, .btn, .cta-button, [class*="buy"], [class*="purchase"], [class*="order"]')) {
-        track('button_click', {
-          eventName: '${page.name} - Button Click',
-          buttonText: e.target.textContent || e.target.value
-        });
-      }
-    });`;
-      }
-
-      if (events.includes('checkout_start')) {
-        trackingCode += `
-    // Track checkout start
-    setTimeout(() => {
-      track('checkout_start', {
-        eventName: 'Checkout Process Started'
-      });
-    }, 2000);`;
-      }
-
       if (events.includes('webinar_registration')) {
         trackingCode += `
-    // Track webinar registration (call this after successful registration)
-    window.trackWebinarRegistration = function(webinarName, userEmail) {
+    // Track confirmed webinar registration (call this after successful registration)
+    window.trackWebinarRegistration = function(webinarName, userEmail, userName) {
       track('webinar_registration', {
-        eventName: 'Webinar Registration',
+        eventName: 'Webinar Registration Confirmed',
         webinarName: webinarName,
-        contactInfo: { email: userEmail }
+        contactInfo: { email: userEmail, name: userName }
       });
     };`;
       }
 
       if (events.includes('call_booking')) {
         trackingCode += `
-    // Track call booking (call this after successful booking)
+    // Track confirmed call booking (call this after successful booking)
     window.trackCallBooking = function(appointmentType, userEmail, userName) {
       track('call_booking', {
-        eventName: 'Call Booked',
+        eventName: 'Call Booking Confirmed',
         appointmentType: appointmentType,
         contactInfo: { email: userEmail, name: userName }
       });
@@ -103,7 +80,7 @@ export const SimplifiedInstallationGuide = ({ pixelData, funnelPages }: Simplifi
 
       if (events.includes('purchase')) {
         trackingCode += `
-    // IMPORTANT: Track purchases - you MUST call this manually after successful payment
+    // IMPORTANT: Track confirmed purchases - you MUST call this manually after successful payment
     // Example: trackPurchase(99.99, 'USD', { email: 'customer@email.com', name: 'John Doe' });
     window.trackPurchase = function(amount, currency = 'USD', customerInfo = {}) {
       track('purchase', {
@@ -203,6 +180,36 @@ export const SimplifiedInstallationGuide = ({ pixelData, funnelPages }: Simplifi
         </p>
       </div>
 
+      {/* Webinar Tracking Strategy Explanation */}
+      {funnelPages.some(page => page.type === 'webinar') && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-blue-800">
+              <Info className="h-5 w-5" />
+              Webinar Tracking Strategy
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-blue-800">
+              <strong>Best Practice:</strong> Use a two-step tracking approach for webinars:
+            </p>
+            <div className="space-y-2 text-sm text-blue-800">
+              <div className="bg-white p-3 rounded border">
+                <p className="font-medium">1. Registration Page: Track form_submission</p>
+                <p className="text-xs">Captures registration attempts (when someone submits the form)</p>
+              </div>
+              <div className="bg-white p-3 rounded border">
+                <p className="font-medium">2. Thank You Page: Track webinar_registration</p>
+                <p className="text-xs">Confirms successful registration (only counts completed registrations)</p>
+              </div>
+            </div>
+            <p className="text-xs text-blue-700">
+              This gives you conversion rates between attempts and successful registrations.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Important Revenue Tracking Alert */}
       {funnelPages.some(page => page.events.includes('purchase')) && (
         <Card className="border-red-200 bg-red-50">
@@ -297,13 +304,16 @@ export const SimplifiedInstallationGuide = ({ pixelData, funnelPages }: Simplifi
 
                 {page.events.includes('webinar_registration') && (
                   <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
-                    <h4 className="font-semibold text-blue-900 mb-2">📹 Webinar Tracking Setup</h4>
+                    <h4 className="font-semibold text-blue-900 mb-2">📹 Webinar Registration Setup</h4>
                     <p className="text-sm text-blue-800 mb-2">
-                      Call this function after successful webinar registration:
+                      Call this function after successful webinar registration (on thank you page):
                     </p>
                     <code className="block p-2 bg-white rounded text-sm border">
-                      trackWebinarRegistration('Webinar Name', 'user@email.com');
+                      trackWebinarRegistration('Webinar Name', 'user@email.com', 'John Doe');
                     </code>
+                    <p className="text-xs text-blue-700 mt-2">
+                      This should be separate from form_submission tracking on your registration page.
+                    </p>
                   </div>
                 )}
 
@@ -311,7 +321,7 @@ export const SimplifiedInstallationGuide = ({ pixelData, funnelPages }: Simplifi
                   <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
                     <h4 className="font-semibold text-green-900 mb-2">📞 Call Booking Setup</h4>
                     <p className="text-sm text-green-800 mb-2">
-                      Call this function after successful appointment booking:
+                      Call this function after successful appointment booking (on thank you page):
                     </p>
                     <code className="block p-2 bg-white rounded text-sm border">
                       trackCallBooking('Sales Call', 'user@email.com', 'John Doe');
@@ -334,9 +344,9 @@ export const SimplifiedInstallationGuide = ({ pixelData, funnelPages }: Simplifi
         <CardContent>
           <div className="space-y-2 text-sm text-green-800">
             <p>1. Copy each code and paste it in the &lt;head&gt; section of the corresponding page</p>
-            <p>2. For pages with manual setup requirements, implement the tracking calls as shown</p>
-            <p>3. Test your tracking by visiting your pages and checking the verification step</p>
-            <p>4. Contact support if you need help with implementation</p>
+            <p>2. For webinars: form_submission tracks on registration page, webinar_registration tracks on thank you page</p>
+            <p>3. For purchases and bookings: implement the manual tracking calls as shown</p>
+            <p>4. Test your tracking by visiting your pages and checking the verification step</p>
           </div>
         </CardContent>
       </Card>

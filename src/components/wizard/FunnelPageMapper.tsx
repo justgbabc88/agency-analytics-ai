@@ -52,14 +52,14 @@ export const FunnelPageMapper = ({ onPagesConfigured }: FunnelPageMapperProps) =
       name: 'Webinar Registration',
       icon: Video,
       description: 'Page to register for webinars/events',
-      defaultEvents: ['page_view', 'webinar_registration', 'form_submission']
+      defaultEvents: ['page_view', 'form_submission']
     },
     {
       type: 'booking' as const,
       name: 'Call Booking Page',
       icon: Calendar,
       description: 'Page with calendar booking widget',
-      defaultEvents: ['page_view', 'call_booking', 'form_submission']
+      defaultEvents: ['page_view', 'form_submission']
     },
     {
       type: 'general' as const,
@@ -113,10 +113,10 @@ export const FunnelPageMapper = ({ onPagesConfigured }: FunnelPageMapperProps) =
 
   const eventDescriptions = {
     page_view: 'Track when someone visits this page',
-    form_submission: 'Track when forms are submitted',
+    form_submission: 'Track when forms are submitted (registration attempts)',
     purchase: 'Track completed purchases (REVENUE TRACKING)',
-    webinar_registration: 'Track webinar signups',
-    call_booking: 'Track booked calls/appointments'
+    webinar_registration: 'Track confirmed webinar registrations (use on thank you page)',
+    call_booking: 'Track confirmed appointment bookings (use on thank you page)'
   };
 
   const savePageEditing = (pageId: string) => {
@@ -209,28 +209,42 @@ export const FunnelPageMapper = ({ onPagesConfigured }: FunnelPageMapperProps) =
 
                     <div>
                       <Label className="text-sm font-medium">What to track on this page:</Label>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
-                        {Object.entries(eventDescriptions).map(([event, description]) => (
-                          <div key={event} className="flex items-start space-x-2">
-                            <Checkbox
-                              id={`${page.id}-${event}`}
-                              checked={page.events.includes(event)}
-                              onCheckedChange={() => toggleEvent(page.id, event)}
-                            />
-                            <div className="grid gap-1.5 leading-none">
-                              <label
-                                htmlFor={`${page.id}-${event}`}
-                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                              >
-                                {event.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                                {event === 'purchase' && <Badge variant="destructive" className="ml-2 text-xs">Important</Badge>}
-                              </label>
-                              <p className="text-xs text-muted-foreground">
-                                {description}
-                              </p>
+                      <div className="grid grid-cols-1 gap-3 mt-2">
+                        {Object.entries(eventDescriptions).map(([event, description]) => {
+                          // Show specific events based on page type
+                          const shouldShow = 
+                            event === 'page_view' || 
+                            event === 'form_submission' ||
+                            (event === 'purchase' && page.type === 'thankyou') ||
+                            (event === 'webinar_registration' && page.type === 'thankyou') ||
+                            (event === 'call_booking' && page.type === 'thankyou');
+                          
+                          if (!shouldShow) return null;
+
+                          return (
+                            <div key={event} className="flex items-start space-x-2">
+                              <Checkbox
+                                id={`${page.id}-${event}`}
+                                checked={page.events.includes(event)}
+                                onCheckedChange={() => toggleEvent(page.id, event)}
+                              />
+                              <div className="grid gap-1.5 leading-none">
+                                <label
+                                  htmlFor={`${page.id}-${event}`}
+                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                >
+                                  {event.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                  {(event === 'purchase' || event === 'webinar_registration' || event === 'call_booking') && 
+                                    <Badge variant="destructive" className="ml-2 text-xs">Manual Setup</Badge>
+                                  }
+                                </label>
+                                <p className="text-xs text-muted-foreground">
+                                  {description}
+                                </p>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
 
