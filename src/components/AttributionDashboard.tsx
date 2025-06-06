@@ -115,44 +115,26 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
   const selectedPixel = pixels?.find(p => p.id === selectedPixelId);
   const configuredPages = selectedPixel?.config?.funnelPages || [];
 
-  // Helper function to check if a URL matches a configured page
-  const isPageMatch = (eventUrl: string, configuredUrl: string): boolean => {
-    if (!eventUrl || !configuredUrl) return false;
+  // Helper function to check if an event belongs to a specific page based on event name
+  const isEventForPage = (eventName: string | null, pageName: string): boolean => {
+    if (!eventName || !pageName) return false;
     
-    try {
-      // Normalize URLs for comparison
-      const normalizeUrl = (url: string) => {
-        // Remove protocol and domain if present
-        let cleanUrl = url.replace(/^https?:\/\/[^\/]+/, '');
-        // Ensure it starts with /
-        if (!cleanUrl.startsWith('/')) {
-          cleanUrl = '/' + cleanUrl;
-        }
-        // Remove trailing slash and convert to lowercase
-        return cleanUrl.replace(/\/$/, '').toLowerCase();
-      };
-
-      const eventPath = normalizeUrl(eventUrl);
-      const configuredPath = normalizeUrl(configuredUrl);
-
-      console.log('URL matching:', { eventPath, configuredPath });
-
-      // Exact match
-      if (eventPath === configuredPath) return true;
-      
-      // Check if event URL contains the configured path
-      if (eventPath.includes(configuredPath)) return true;
-      
-      // Check if configured path contains the event URL (for shorter event URLs)
-      if (configuredPath.includes(eventPath) && eventPath.length > 1) return true;
-
-      return false;
-    } catch (error) {
-      console.warn('URL matching error:', error);
-      // Fallback to simple string matching
-      return eventUrl.toLowerCase().includes(configuredUrl.toLowerCase()) || 
-             configuredUrl.toLowerCase().includes(eventUrl.toLowerCase());
+    // Check if the event name starts with the page name
+    // Format: "PageName - Event Type" (e.g., "LP - Page View", "Web - Form Submission")
+    const normalizedEventName = eventName.toLowerCase();
+    const normalizedPageName = pageName.toLowerCase();
+    
+    // Direct match with page name prefix
+    if (normalizedEventName.startsWith(`${normalizedPageName} -`)) {
+      return true;
     }
+    
+    // Also check for exact page name match in event name
+    if (normalizedEventName.includes(normalizedPageName)) {
+      return true;
+    }
+    
+    return false;
   };
 
   // Process page analytics
@@ -172,16 +154,16 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
       configuredPages: configuredPages.map(p => ({ name: p.name, url: p.url }))
     });
 
-    // Group events by page and calculate metrics
+    // Group events by page based on event names
     const pageMetrics = configuredPages.map((page: any, index: number) => {
       console.log(`\n--- Processing page: ${page.name} (${page.url}) ---`);
       
       const pageEvents = eventStats.filter(event => {
-        const matches = isPageMatch(event.page_url, page.url);
+        const matches = isEventForPage(event.event_name, page.name);
         if (matches) {
           console.log(`✓ Event matches ${page.name}:`, { 
-            eventUrl: event.page_url, 
-            pageUrl: page.url,
+            eventName: event.event_name, 
+            pageName: page.name,
             eventType: event.event_type
           });
         }
@@ -428,7 +410,7 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
           {pageAnalytics && pageAnalytics.pageMetrics.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle>Page Performance Metrics</CardTitle>
+                <CardTitle>Page Performance Metrics (Event-Based Tracking)</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -443,7 +425,7 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
                               <h4 className="font-medium">{page.name}</h4>
                               <div className="flex items-center gap-2">
                                 <Badge variant="outline">{page.type}</Badge>
-                                <span className="text-xs text-gray-500">{page.url}</span>
+                                <span className="text-xs text-gray-500">Event-based tracking</span>
                               </div>
                             </div>
                           </div>
