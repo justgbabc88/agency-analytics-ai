@@ -105,6 +105,7 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      console.log('Raw event data:', data);
       return (data || []) as EventRecord[];
     },
     enabled: !!projectId && !!selectedPixelId,
@@ -116,13 +117,20 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
 
   // Helper function to check if a URL matches a configured page
   const isPageMatch = (eventUrl: string, configuredUrl: string): boolean => {
+    if (!eventUrl || !configuredUrl) return false;
+    
     try {
-      // Handle both relative and absolute URLs
+      // Simple contains check first
+      if (eventUrl.includes(configuredUrl) || configuredUrl.includes(eventUrl)) {
+        return true;
+      }
+
+      // Normalize URLs for comparison
       const normalizeUrl = (url: string) => {
         if (url.startsWith('http')) {
-          return new URL(url).pathname;
+          return new URL(url).pathname.toLowerCase();
         }
-        return url.startsWith('/') ? url : `/${url}`;
+        return url.startsWith('/') ? url.toLowerCase() : `/${url.toLowerCase()}`;
       };
 
       const eventPath = normalizeUrl(eventUrl);
@@ -131,57 +139,91 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
       // Exact match
       if (eventPath === configuredPath) return true;
       
-      // Check if event path contains configured path (for query params, etc.)
-      if (eventPath.includes(configuredPath)) return true;
-      
-      // Check if configured path contains event path (for base paths)
-      if (configuredPath.includes(eventPath)) return true;
-
-      return false;
+      // Check if one contains the other
+      return eventPath.includes(configuredPath) || configuredPath.includes(eventPath);
     } catch (error) {
+      console.warn('URL matching error:', error);
       // Fallback to simple string matching
-      return eventUrl.includes(configuredUrl) || configuredUrl.includes(eventUrl);
+      return eventUrl.toLowerCase().includes(configuredUrl.toLowerCase()) || 
+             configuredUrl.toLowerCase().includes(eventUrl.toLowerCase());
     }
   };
 
   // Process page analytics
   const pageAnalytics = React.useMemo(() => {
-    if (!eventStats || !configuredPages.length) return null;
+    if (!eventStats || !configuredPages.length) {
+      console.log('No event stats or configured pages:', { 
+        hasEventStats: !!eventStats, 
+        eventStatsLength: eventStats?.length,
+        configuredPagesLength: configuredPages.length 
+      });
+      return null;
+    }
 
-    console.log('Processing page analytics:', { eventStats: eventStats.length, configuredPages: configuredPages.length });
+    console.log('Processing page analytics:', { 
+      eventStatsCount: eventStats.length, 
+      configuredPagesCount: configuredPages.length,
+      configuredPages: configuredPages.map(p => ({ name: p.name, url: p.url }))
+    });
 
     // Group events by page and calculate metrics
     const pageMetrics = configuredPages.map((page: any, index: number) => {
+      console.log(`\n--- Processing page: ${page.name} (${page.url}) ---`);
+      
       const pageEvents = eventStats.filter(event => {
         const matches = isPageMatch(event.page_url, page.url);
         if (matches) {
-          console.log(`Event ${event.id} matches page ${page.name}:`, { eventUrl: event.page_url, pageUrl: page.url });
+          console.log(`✓ Event matches ${page.name}:`, { 
+            eventUrl: event.page_url, 
+            pageUrl: page.url,
+            eventType: event.event_type
+          });
         }
         return matches;
       });
 
+      console.log(`Page ${page.name} - Found ${pageEvents.length} matching events`);
+
       const totalEvents = pageEvents.length;
-      const uniqueVisitors = new Set(pageEvents.map(e => e.contact_email || e.page_url)).size;
+      
+      // Count unique visitors based on session_id or a combination of identifiers
+      const uniqueVisitorIds = new Set();
+      pageEvents.forEach(event => {
+        // Use session_id if available, otherwise fall back to email or IP-like identifier
+        const visitorId = event.session_id || 
+                         event.contact_email || 
+                         `${event.page_url}-${event.created_at.split('T')[0]}`;
+        uniqueVisitorIds.add(visitorId);
+      });
+      const uniqueVisitors = uniqueVisitorIds.size;
+
+      // Count conversions (non-page_view events)
       const conversions = pageEvents.filter(e => 
-        e.event_type === 'form_submission' || 
-        e.event_type === 'purchase' || 
-        e.event_type === 'webinar_registration' || 
-        e.event_type === 'call_booking'
+        e.event_type !== 'page_view'
       ).length;
 
-      console.log(`Page ${page.name} metrics:`, { totalEvents, uniqueVisitors, conversions });
+      const conversionRate = totalEvents > 0 ? (conversions / totalEvents) * 100 : 0;
+
+      console.log(`Page ${page.name} final metrics:`, { 
+        totalEvents, 
+        uniqueVisitors, 
+        conversions, 
+        conversionRate: conversionRate.toFixed(1) + '%'
+      });
 
       return {
         name: page.name,
         type: page.type,
+        url: page.url,
         order: index,
         totalEvents,
         uniqueVisitors,
         conversions,
-        conversionRate: totalEvents > 0 ? (conversions / totalEvents) * 100 : 0
+        conversionRate
       };
     });
 
+    console.log('Final page metrics:', pageMetrics);
     return { pageMetrics };
   }, [eventStats, configuredPages]);
 
@@ -195,15 +237,11 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
         acc[date] = { date, events: 0, conversions: 0, uniqueVisitors: new Set() };
       }
       acc[date].events += 1;
-      if (event.event_type === 'form_submission' || 
-          event.event_type === 'purchase' || 
-          event.event_type === 'webinar_registration' || 
-          event.event_type === 'call_booking') {
+      if (event.event_type !== 'page_view') {
         acc[date].conversions += 1;
       }
-      if (event.contact_email) {
-        acc[date].uniqueVisitors.add(event.contact_email);
-      }
+      const visitorId = event.session_id || event.contact_email || `${event.page_url}-${date}`;
+      acc[date].uniqueVisitors.add(visitorId);
       return acc;
     }, {} as Record<string, any>);
 
@@ -230,18 +268,18 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
     }));
   }, [eventStats]);
 
-  // Calculate key metrics (no revenue metrics)
+  // Calculate key metrics
   const keyMetrics = React.useMemo(() => {
     if (!eventStats) return null;
 
-    const totalConversions = eventStats.filter(event => 
-      event.event_type === 'form_submission' || 
-      event.event_type === 'purchase' || 
-      event.event_type === 'webinar_registration' || 
-      event.event_type === 'call_booking'
-    ).length;
+    const totalConversions = eventStats.filter(event => event.event_type !== 'page_view').length;
     const totalEvents = eventStats.length;
-    const uniqueVisitors = new Set(eventStats.map(e => e.contact_email || e.page_url)).size;
+    const uniqueVisitorIds = new Set();
+    eventStats.forEach(event => {
+      const visitorId = event.session_id || event.contact_email || `${event.page_url}-${event.created_at.split('T')[0]}`;
+      uniqueVisitorIds.add(visitorId);
+    });
+    const uniqueVisitors = uniqueVisitorIds.size;
     const conversionRate = totalEvents > 0 ? ((totalConversions / totalEvents) * 100) : 0;
 
     // Calculate trends (compare with previous period)
@@ -316,7 +354,7 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
         </Card>
       ) : (
         <>
-          {/* Key Metrics without Revenue */}
+          {/* Key Metrics */}
           {keyMetrics && (
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <Card>
@@ -381,7 +419,7 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
           )}
 
           {/* Page Performance Metrics */}
-          {pageAnalytics && (
+          {pageAnalytics && pageAnalytics.pageMetrics.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle>Page Performance Metrics</CardTitle>
@@ -397,7 +435,10 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
                             <PageIcon className="h-5 w-5 text-primary" />
                             <div>
                               <h4 className="font-medium">{page.name}</h4>
-                              <Badge variant="outline">{page.type}</Badge>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline">{page.type}</Badge>
+                                <span className="text-xs text-gray-500">{page.url}</span>
+                              </div>
                             </div>
                           </div>
                           <div className="text-right">
@@ -480,7 +521,7 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
             )}
 
             {/* Conversion Rates by Page */}
-            {pageAnalytics && (
+            {pageAnalytics && pageAnalytics.pageMetrics.length > 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle>Conversion Rates by Page</CardTitle>
@@ -500,7 +541,7 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
             )}
 
             {/* Events by Page */}
-            {pageAnalytics && (
+            {pageAnalytics && pageAnalytics.pageMetrics.length > 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle>Events by Page</CardTitle>
