@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -59,6 +59,17 @@ export const ExistingPixelManager = ({ projectId }: ExistingPixelManagerProps) =
     enabled: !!projectId,
   });
 
+  // Update selected pixel when pixels data changes
+  useEffect(() => {
+    if (selectedPixelId && pixels) {
+      const updatedPixel = pixels.find(p => p.id === selectedPixelId);
+      if (updatedPixel) {
+        console.log('Updating selected pixel with fresh data:', updatedPixel);
+        setSelectedPixel(updatedPixel);
+      }
+    }
+  }, [pixels, selectedPixelId]);
+
   const updatePixelConfig = useMutation({
     mutationFn: async ({ pixelId, config }: { pixelId: string; config: any }) => {
       const { error } = await supabase
@@ -102,13 +113,20 @@ export const ExistingPixelManager = ({ projectId }: ExistingPixelManagerProps) =
       config: updatedConfig
     });
 
-    const updatedPixel = {
-      ...selectedPixel,
-      config: updatedConfig
-    };
-    setSelectedPixel(updatedPixel);
+    // The pixel will be updated via the useEffect when the query invalidates
     setEditingPages(false);
-    setShowCodes(true);
+    
+    // Show codes if we have pages configured
+    if (pages.length > 0) {
+      setShowCodes(true);
+    }
+  };
+
+  const handleBackToSelection = () => {
+    setSelectedPixelId('');
+    setSelectedPixel(null);
+    setShowCodes(false);
+    setEditingPages(false);
   };
 
   if (isLoading) {
@@ -129,7 +147,7 @@ export const ExistingPixelManager = ({ projectId }: ExistingPixelManagerProps) =
     );
   }
 
-  if (!selectedPixel && !showCodes) {
+  if (!selectedPixel) {
     return (
       <Card>
         <CardHeader>
@@ -156,31 +174,6 @@ export const ExistingPixelManager = ({ projectId }: ExistingPixelManagerProps) =
               </SelectContent>
             </Select>
           </div>
-
-          {selectedPixel && (
-            <div className="space-y-4 pt-4 border-t">
-              <div>
-                <h4 className="font-medium mb-2">Pixel Details</h4>
-                <div className="space-y-2 text-sm">
-                  <div><span className="font-medium">Name:</span> {selectedPixel.name}</div>
-                  <div><span className="font-medium">Pixel ID:</span> {selectedPixel.pixel_id}</div>
-                  <div><span className="font-medium">Domains:</span> {selectedPixel.domains?.join(', ') || 'All domains'}</div>
-                  <div><span className="font-medium">Pages:</span> {selectedPixel.config?.funnelPages?.length || 0} configured</div>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <Button onClick={() => setShowCodes(true)}>
-                  <Code className="h-4 w-4 mr-2" />
-                  Get Tracking Codes
-                </Button>
-                <Button variant="outline" onClick={() => setEditingPages(true)}>
-                  <Settings className="h-4 w-4 mr-2" />
-                  Edit Pages
-                </Button>
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
     );
@@ -198,7 +191,7 @@ export const ExistingPixelManager = ({ projectId }: ExistingPixelManagerProps) =
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Pixel
           </Button>
-          <h3 className="font-semibold">Edit Funnel Pages</h3>
+          <h3 className="font-semibold">Edit Funnel Pages for {selectedPixel.name}</h3>
         </div>
         
         <FunnelPageMapper
@@ -217,39 +210,7 @@ export const ExistingPixelManager = ({ projectId }: ExistingPixelManagerProps) =
     };
 
     const funnelPages = selectedPixel.config?.funnelPages || [];
-    console.log('Funnel pages for display:', funnelPages);
-
-    if (funnelPages.length === 0) {
-      return (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowCodes(false)}
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Pixel Selection
-            </Button>
-            <h3 className="font-semibold">Tracking Codes for {selectedPixel.name}</h3>
-          </div>
-
-          <Card>
-            <CardContent className="p-8 text-center">
-              <Settings className="h-16 w-16 mx-auto text-gray-400 mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No Pages Configured</h3>
-              <p className="text-gray-600 mb-4">
-                You need to configure your funnel pages before you can get the tracking codes.
-              </p>
-              <Button onClick={() => setEditingPages(true)}>
-                <Settings className="h-4 w-4 mr-2" />
-                Configure Pages
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      );
-    }
+    console.log('Showing codes for funnel pages:', funnelPages);
 
     return (
       <div className="space-y-4">
@@ -260,7 +221,7 @@ export const ExistingPixelManager = ({ projectId }: ExistingPixelManagerProps) =
             onClick={() => setShowCodes(false)}
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Pixel Selection
+            Back to Pixel Management
           </Button>
           <h3 className="font-semibold">Tracking Codes for {selectedPixel.name}</h3>
         </div>
@@ -273,5 +234,90 @@ export const ExistingPixelManager = ({ projectId }: ExistingPixelManagerProps) =
     );
   }
 
-  return null;
+  // Main pixel management view
+  const funnelPages = selectedPixel.config?.funnelPages || [];
+  const hasFunnelPages = funnelPages.length > 0;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleBackToSelection}
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Pixel Selection
+        </Button>
+        <h3 className="font-semibold">Manage {selectedPixel.name}</h3>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Pixel Details</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2 text-sm">
+            <div><span className="font-medium">Name:</span> {selectedPixel.name}</div>
+            <div><span className="font-medium">Pixel ID:</span> {selectedPixel.pixel_id}</div>
+            <div><span className="font-medium">Domains:</span> {selectedPixel.domains?.join(', ') || 'All domains'}</div>
+            <div><span className="font-medium">Pages Configured:</span> {funnelPages.length}</div>
+            <div><span className="font-medium">Status:</span> 
+              <Badge variant={selectedPixel.is_active ? "default" : "secondary"} className="ml-2">
+                {selectedPixel.is_active ? "Active" : "Inactive"}
+              </Badge>
+            </div>
+          </div>
+
+          {hasFunnelPages && (
+            <div className="space-y-2">
+              <h4 className="font-medium">Configured Pages:</h4>
+              <div className="space-y-1">
+                {funnelPages.map((page: any, index: number) => (
+                  <div key={page.id || index} className="text-sm border rounded p-2">
+                    <div className="font-medium">{page.name}</div>
+                    <div className="text-gray-600 text-xs">{page.url}</div>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {(page.events || []).map((event: string) => (
+                        <Badge key={event} variant="outline" className="text-xs px-1 py-0">
+                          {event.replace(/_/g, ' ')}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-2 pt-4">
+            {hasFunnelPages ? (
+              <>
+                <Button onClick={() => setShowCodes(true)}>
+                  <Code className="h-4 w-4 mr-2" />
+                  View Tracking Codes
+                </Button>
+                <Button variant="outline" onClick={() => setEditingPages(true)}>
+                  <Settings className="h-4 w-4 mr-2" />
+                  Edit Pages
+                </Button>
+              </>
+            ) : (
+              <Button onClick={() => setEditingPages(true)}>
+                <Settings className="h-4 w-4 mr-2" />
+                Configure Funnel Pages
+              </Button>
+            )}
+          </div>
+
+          {!hasFunnelPages && (
+            <div className="text-center py-4 text-gray-500 bg-gray-50 rounded">
+              <p className="text-sm">No funnel pages configured yet.</p>
+              <p className="text-xs">Configure your funnel pages to start generating tracking codes.</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
 };
