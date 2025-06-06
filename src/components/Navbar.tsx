@@ -30,9 +30,8 @@ export const Navbar = () => {
           <span className="text-xl font-bold text-gray-900">Agency Analytics</span>
         </div>
         
-        {/* All navigation items on the right */}
+        {/* Navigation items on the right */}
         <div className="flex items-center gap-4">
-          {/* Main Navigation (Dashboard, Tracking) */}
           {mainNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
@@ -49,16 +48,6 @@ export const Navbar = () => {
               </Button>
             );
           })}
-          
-          {/* Integrations */}
-          <Button
-            variant={location.pathname === '/integrations' ? "default" : "ghost"}
-            onClick={() => navigate('/integrations')}
-            className="flex items-center gap-2"
-          >
-            <Settings className="h-4 w-4" />
-            Integrations
-          </Button>
         </div>
       </div>
     </nav>
