@@ -23,9 +23,7 @@ interface PixelWithConfig {
   updated_at: string;
   domains: string[] | null;
   conversion_events: string[];
-  config: {
-    funnelPages?: any[];
-  } | null;
+  config: any; // Database Json type - we'll safely access this
 }
 
 export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) => {
@@ -33,6 +31,14 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
   const [editingPixels, setEditingPixels] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  // Helper function to safely get funnel pages from config
+  const getFunnelPages = (config: any): any[] => {
+    if (!config || typeof config !== 'object') {
+      return [];
+    }
+    return config.funnelPages || [];
+  };
 
   const { data: pixels, isLoading } = useQuery({
     queryKey: ['tracking-pixels', projectId],
@@ -52,8 +58,9 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
       
       // Log each pixel's config to debug
       data?.forEach(pixel => {
+        const funnelPages = getFunnelPages(pixel.config);
         console.log(`Pixel ${pixel.name} config:`, pixel.config);
-        console.log(`Pixel ${pixel.name} funnel pages:`, pixel.config?.funnelPages?.length || 0);
+        console.log(`Pixel ${pixel.name} funnel pages:`, funnelPages.length);
       });
       
       return (data || []) as PixelWithConfig[];
@@ -180,7 +187,7 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
     if (!pixel) return;
 
     const updatedConfig = {
-      ...(pixel.config || {}),
+      ...(pixel.config && typeof pixel.config === 'object' ? pixel.config : {}),
       funnelPages: pages
     };
 
@@ -498,7 +505,7 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
           ) : (
             <div className="space-y-6">
               {pixels?.map((pixel) => {
-                const funnelPages = pixel.config?.funnelPages || [];
+                const funnelPages = getFunnelPages(pixel.config);
                 const isExpanded = expandedPixels.has(pixel.id);
                 const isEditing = editingPixels.has(pixel.id);
                 

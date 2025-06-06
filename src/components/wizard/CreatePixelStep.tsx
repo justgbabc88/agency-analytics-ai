@@ -7,7 +7,7 @@ import { Plus, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { PixelData } from './types';
+import { PixelData, convertDatabasePixelToPixelData } from './types';
 
 interface CreatePixelStepProps {
   projectId: string;
@@ -15,11 +15,11 @@ interface CreatePixelStepProps {
 }
 
 export const CreatePixelStep = ({ projectId, onPixelCreated }: CreatePixelStepProps) => {
-  const [pixelData, setPixelData] = useState<PixelData>({
+  const [pixelData, setPixelData] = useState<Omit<PixelData, 'id'>>({
     name: '',
     pixelId: '',
     domains: '',
-    config: {}
+    config: { funnelPages: [] }
   });
   const [isCreating, setIsCreating] = useState(false);
   const { toast } = useToast();
@@ -55,17 +55,13 @@ export const CreatePixelStep = ({ projectId, onPixelCreated }: CreatePixelStepPr
       return data;
     },
     onSuccess: (data) => {
-      const updatedPixelData = {
-        ...pixelData,
-        id: data.id,
-        config: data.config || { funnelPages: [] }
-      };
+      const convertedPixelData = convertDatabasePixelToPixelData(data);
       queryClient.invalidateQueries({ queryKey: ['tracking-pixels', projectId] });
       toast({
         title: "Success!",
         description: "Tracking pixel created successfully",
       });
-      onPixelCreated(updatedPixelData);
+      onPixelCreated(convertedPixelData);
     },
     onError: (error) => {
       toast({
