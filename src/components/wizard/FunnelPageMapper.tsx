@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Plus, X, Globe, ShoppingCart, Calendar, Video, CheckCircle, FileText } from "lucide-react";
+import { Plus, X, Globe, ShoppingCart, Calendar, Video, CheckCircle, FileText, Edit } from "lucide-react";
 
 interface FunnelPage {
   id: string;
@@ -23,6 +23,7 @@ interface FunnelPageMapperProps {
 export const FunnelPageMapper = ({ onPagesConfigured }: FunnelPageMapperProps) => {
   const [pages, setPages] = useState<FunnelPage[]>([]);
   const [isAdding, setIsAdding] = useState(false);
+  const [editingPageId, setEditingPageId] = useState<string | null>(null);
 
   const pageTypeOptions = [
     {
@@ -30,21 +31,21 @@ export const FunnelPageMapper = ({ onPagesConfigured }: FunnelPageMapperProps) =
       name: 'Landing Page',
       icon: Globe,
       description: 'Where visitors first arrive (homepage, sales page)',
-      defaultEvents: ['page_view', 'form_submission', 'button_click']
+      defaultEvents: ['page_view', 'form_submission']
     },
     {
       type: 'checkout' as const,
       name: 'Checkout Page',
       icon: ShoppingCart,
       description: 'Where customers enter payment information',
-      defaultEvents: ['page_view', 'checkout_start', 'form_submission']
+      defaultEvents: ['page_view', 'form_submission']
     },
     {
       type: 'thankyou' as const,
       name: 'Thank You Page',
       icon: CheckCircle,
       description: 'Confirmation page after purchase/signup',
-      defaultEvents: ['page_view', 'purchase', 'conversion']
+      defaultEvents: ['page_view', 'purchase']
     },
     {
       type: 'webinar' as const,
@@ -78,6 +79,7 @@ export const FunnelPageMapper = ({ onPagesConfigured }: FunnelPageMapperProps) =
       events: pageType.defaultEvents
     };
     setPages([...pages, newPage]);
+    setEditingPageId(newPage.id);
     setIsAdding(false);
   };
 
@@ -89,6 +91,9 @@ export const FunnelPageMapper = ({ onPagesConfigured }: FunnelPageMapperProps) =
 
   const removePage = (pageId: string) => {
     setPages(pages.filter(page => page.id !== pageId));
+    if (editingPageId === pageId) {
+      setEditingPageId(null);
+    }
   };
 
   const toggleEvent = (pageId: string, event: string) => {
@@ -109,101 +114,159 @@ export const FunnelPageMapper = ({ onPagesConfigured }: FunnelPageMapperProps) =
   const eventDescriptions = {
     page_view: 'Track when someone visits this page',
     form_submission: 'Track when forms are submitted',
-    button_click: 'Track clicks on important buttons',
-    checkout_start: 'Track when checkout process begins',
     purchase: 'Track completed purchases (REVENUE TRACKING)',
-    conversion: 'Track successful conversions',
     webinar_registration: 'Track webinar signups',
     call_booking: 'Track booked calls/appointments'
   };
+
+  const savePageEditing = (pageId: string) => {
+    const page = pages.find(p => p.id === pageId);
+    if (page && page.name.trim() && page.url.trim()) {
+      setEditingPageId(null);
+    }
+  };
+
+  const isPageValid = (page: FunnelPage) => {
+    return page.name.trim() && page.url.trim();
+  };
+
+  const allPagesValid = pages.length > 0 && pages.every(isPageValid);
 
   return (
     <div className="space-y-6">
       <div className="text-center space-y-2">
         <h3 className="text-lg font-semibold">Tell Us About Your Funnel Pages</h3>
         <p className="text-muted-foreground">
-          We'll create the perfect tracking code for each page in your funnel.
+          Add each page in your funnel to generate the perfect tracking code.
         </p>
       </div>
 
-      {/* Added Pages */}
-      <div className="space-y-4">
-        {pages.map((page) => {
-          const pageTypeInfo = getPageTypeInfo(page.type);
-          if (!pageTypeInfo) return null;
-          
-          return (
-            <Card key={page.id} className="relative">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <pageTypeInfo.icon className="h-5 w-5 text-primary" />
-                    <CardTitle className="text-base">{pageTypeInfo.name}</CardTitle>
+      {/* Added Pages Display */}
+      {pages.length > 0 && (
+        <div className="space-y-4">
+          <h4 className="font-medium">Your Funnel Pages</h4>
+          {pages.map((page) => {
+            const pageTypeInfo = getPageTypeInfo(page.type);
+            if (!pageTypeInfo) return null;
+            
+            const isEditing = editingPageId === page.id;
+            
+            return (
+              <Card key={page.id} className={`relative ${!isPageValid(page) ? 'border-orange-200 bg-orange-50' : ''}`}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <pageTypeInfo.icon className="h-5 w-5 text-primary" />
+                      <CardTitle className="text-base">{pageTypeInfo.name}</CardTitle>
+                      {isPageValid(page) && <Badge variant="secondary">Ready</Badge>}
+                      {!isPageValid(page) && <Badge variant="destructive">Incomplete</Badge>}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {!isEditing && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setEditingPageId(page.id)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removePage(page.id)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removePage(page.id)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor={`name-${page.id}`}>Page Name</Label>
-                    <Input
-                      id={`name-${page.id}`}
-                      value={page.name}
-                      onChange={(e) => updatePage(page.id, { name: e.target.value })}
-                      placeholder="e.g., Main Sales Page"
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor={`url-${page.id}`}>Page URL (optional)</Label>
-                    <Input
-                      id={`url-${page.id}`}
-                      value={page.url}
-                      onChange={(e) => updatePage(page.id, { url: e.target.value })}
-                      placeholder="e.g., https://yoursite.com/sales"
-                      className="mt-1"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label className="text-sm font-medium">What to track on this page:</Label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
-                    {Object.entries(eventDescriptions).map(([event, description]) => (
-                      <div key={event} className="flex items-start space-x-2">
-                        <Checkbox
-                          id={`${page.id}-${event}`}
-                          checked={page.events.includes(event)}
-                          onCheckedChange={() => toggleEvent(page.id, event)}
+                </CardHeader>
+                
+                {isEditing ? (
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor={`name-${page.id}`}>Page Name *</Label>
+                        <Input
+                          id={`name-${page.id}`}
+                          value={page.name}
+                          onChange={(e) => updatePage(page.id, { name: e.target.value })}
+                          placeholder="e.g., Main Sales Page"
+                          className="mt-1"
                         />
-                        <div className="grid gap-1.5 leading-none">
-                          <label
-                            htmlFor={`${page.id}-${event}`}
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                          >
-                            {event.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                            {event === 'purchase' && <Badge variant="destructive" className="ml-2 text-xs">Important</Badge>}
-                          </label>
-                          <p className="text-xs text-muted-foreground">
-                            {description}
-                          </p>
+                      </div>
+                      <div>
+                        <Label htmlFor={`url-${page.id}`}>Page URL *</Label>
+                        <Input
+                          id={`url-${page.id}`}
+                          value={page.url}
+                          onChange={(e) => updatePage(page.id, { url: e.target.value })}
+                          placeholder="e.g., https://yoursite.com/sales"
+                          className="mt-1"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label className="text-sm font-medium">What to track on this page:</Label>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                        {Object.entries(eventDescriptions).map(([event, description]) => (
+                          <div key={event} className="flex items-start space-x-2">
+                            <Checkbox
+                              id={`${page.id}-${event}`}
+                              checked={page.events.includes(event)}
+                              onCheckedChange={() => toggleEvent(page.id, event)}
+                            />
+                            <div className="grid gap-1.5 leading-none">
+                              <label
+                                htmlFor={`${page.id}-${event}`}
+                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                              >
+                                {event.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                {event === 'purchase' && <Badge variant="destructive" className="ml-2 text-xs">Important</Badge>}
+                              </label>
+                              <p className="text-xs text-muted-foreground">
+                                {description}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end">
+                      <Button onClick={() => savePageEditing(page.id)} disabled={!page.name.trim() || !page.url.trim()}>
+                        Save Page
+                      </Button>
+                    </div>
+                  </CardContent>
+                ) : (
+                  <CardContent>
+                    <div className="space-y-2">
+                      <div>
+                        <span className="font-medium">Name:</span> {page.name || 'Not set'}
+                      </div>
+                      <div>
+                        <span className="font-medium">URL:</span> {page.url || 'Not set'}
+                      </div>
+                      <div>
+                        <span className="font-medium">Tracking:</span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {page.events.map((event) => (
+                            <Badge key={event} variant="outline" className="text-xs">
+                              {event.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                            </Badge>
+                          ))}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+                    </div>
+                  </CardContent>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
       {/* Add Page Section */}
       {!isAdding ? (
@@ -249,12 +312,11 @@ export const FunnelPageMapper = ({ onPagesConfigured }: FunnelPageMapperProps) =
         </Card>
       )}
 
-      {pages.length > 0 && (
+      {allPagesValid && (
         <div className="flex justify-end">
           <Button 
             onClick={() => onPagesConfigured(pages)}
             size="lg"
-            disabled={pages.some(page => !page.name.trim())}
           >
             Generate Tracking Codes
           </Button>
