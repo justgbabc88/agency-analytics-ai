@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -193,240 +192,65 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
   const generatePageScript = (page: any, pixelId: string) => {
     const supabaseUrl = "https://iqxvtfupjjxjkbajgcve.supabase.co";
     
-    const getTrackingEvents = (events: string[]) => {
+    const getPageLoadEvents = (events: string[]) => {
       let trackingCode = '';
       
-      if (events.includes('form_submission')) {
-        trackingCode += `
-    // Track ALL form submissions with comprehensive detection
-    function setupFormTracking() {
-      console.log('Setting up form tracking for ${page.name}');
-      
-      // Method 1: Event delegation for dynamic forms
-      document.addEventListener('submit', function(e) {
-        console.log('Form submission detected via event delegation:', e.target);
-        handleFormSubmission(e.target, 'Event Delegation');
-      }, true);
-      
-      // Method 2: Direct form detection
-      function attachToExistingForms() {
-        const forms = document.querySelectorAll('form');
-        console.log('Found ' + forms.length + ' forms on ${page.name}');
-        
-        forms.forEach(function(form, index) {
-          if (!form.hasAttribute('data-tracking-attached')) {
-            form.setAttribute('data-tracking-attached', 'true');
+      // Fire all events immediately on page load
+      events.forEach(eventType => {
+        switch (eventType) {
+          case 'page_view':
+            trackingCode += `
+    // Track page view immediately
+    track('page_view', { eventName: '${page.name} - Page View' });`;
+            break;
             
-            form.addEventListener('submit', function(e) {
-              console.log('Form ' + index + ' submitted directly:', form);
-              handleFormSubmission(form, 'Direct Attachment');
-            });
-          }
-        });
-      }
-      
-      // Method 3: Input field change detection (for AJAX forms)
-      document.addEventListener('input', function(e) {
-        if (e.target.type === 'submit' || e.target.type === 'button') {
-          console.log('Submit input detected:', e.target);
-        }
-      });
-      
-      // Method 4: Button click detection for submit buttons
-      document.addEventListener('click', function(e) {
-        const target = e.target;
-        if (target.type === 'submit' || 
-            target.classList.contains('submit') ||
-            target.classList.contains('btn-submit') ||
-            target.innerText.toLowerCase().includes('submit') ||
-            target.innerText.toLowerCase().includes('register') ||
-            target.innerText.toLowerCase().includes('sign up')) {
-          
-          console.log('Submit button clicked:', target);
-          
-          // Find the parent form
-          const form = target.closest('form');
-          if (form) {
-            setTimeout(() => {
-              handleFormSubmission(form, 'Button Click');
-            }, 100);
-          }
-        }
-      });
-      
-      function handleFormSubmission(form, method) {
-        console.log('Processing form submission via ' + method + ':', form);
-        
-        const formData = new FormData(form);
-        const data = {};
-        let hasEmailField = false;
-        
-        for (let [key, value] of formData.entries()) {
-          if (!key.toLowerCase().includes('password') && !key.toLowerCase().includes('pass')) {
-            data[key] = value;
-            if (key.toLowerCase().includes('email')) {
-              hasEmailField = true;
-            }
-          }
-        }
-        
-        console.log('Form data collected:', data);
-        
-        track('form_submission', {
-          eventName: '${page.name} - Form Submission (' + method + ')',
-          formData: data,
-          formAction: form.action || 'No action specified',
-          formMethod: form.method || 'GET',
-          hasEmail: hasEmailField
-        });
-      }
-      
-      // Run attachment initially
-      attachToExistingForms();
-      
-      // Re-run every 2 seconds to catch dynamically added forms
-      setInterval(attachToExistingForms, 2000);
-    }
-    
-    setupFormTracking();`;
-      }
-
-      if (events.includes('webinar_registration')) {
-        trackingCode += `
-    // Enhanced webinar registration tracking
-    window.trackWebinarRegistration = function(webinarName, userEmail, userName) {
-      console.log('Manual webinar registration tracking called:', webinarName, userEmail, userName);
-      track('webinar_registration', {
-        eventName: 'Webinar Registration Confirmed',
-        webinarName: webinarName || '${page.name} Webinar',
-        contactInfo: { 
-          email: userEmail, 
-          name: userName 
-        }
-      });
-    };
-    
-    // Auto-detect webinar registration patterns
-    function detectWebinarRegistration() {
-      console.log('Setting up webinar registration detection for ${page.name}');
-      
-      document.addEventListener('submit', function(e) {
-        const form = e.target;
-        const formData = new FormData(form);
-        const url = window.location.href.toLowerCase();
-        const title = document.title.toLowerCase();
-        
-        const hasEmail = Array.from(formData.keys()).some(key => 
-          key.toLowerCase().includes('email')
-        );
-        
-        const isWebinarContext = 
-          url.includes('webinar') || 
-          title.includes('webinar') ||
-          url.includes('training') ||
-          title.includes('training') ||
-          Array.from(formData.keys()).some(key => 
-            key.toLowerCase().includes('webinar') || 
-            key.toLowerCase().includes('training')
-          );
-        
-        if (hasEmail && isWebinarContext) {
-          console.log('Auto-detected webinar registration on ${page.name}');
-          
-          const email = Array.from(formData.entries()).find(([key]) => 
-            key.toLowerCase().includes('email')
-          )?.[1];
-          const name = Array.from(formData.entries()).find(([key]) => 
-            key.toLowerCase().includes('name') || key.toLowerCase().includes('first')
-          )?.[1];
-          
-          track('webinar_registration', {
-            eventName: '${page.name} - Auto-detected Webinar Registration',
-            contactInfo: { 
-              email: email, 
-              name: name 
-            }
-          });
-        }
-      });
-    }
-    
-    detectWebinarRegistration();`;
-      }
-
-      if (events.includes('call_booking')) {
-        trackingCode += `
-    // Call booking tracking
-    window.trackCallBooking = function(appointmentType, userEmail, userName) {
-      console.log('Call booking tracking called:', appointmentType, userEmail, userName);
-      track('call_booking', {
-        eventName: 'Call Booking Confirmed',
-        appointmentType: appointmentType || '${page.name} Appointment',
-        contactInfo: { 
-          email: userEmail, 
-          name: userName 
-        }
-      });
-    };
-    
-    // Auto-detect booking patterns
-    document.addEventListener('submit', function(e) {
-      const form = e.target;
-      const formData = new FormData(form);
-      const url = window.location.href.toLowerCase();
-      
-      const hasEmail = Array.from(formData.keys()).some(key => 
-        key.toLowerCase().includes('email')
-      );
-      
-      const isBookingContext = 
-        url.includes('booking') || 
-        url.includes('appointment') ||
-        url.includes('call') ||
-        url.includes('schedule') ||
-        Array.from(formData.keys()).some(key => 
-          key.toLowerCase().includes('booking') || 
-          key.toLowerCase().includes('appointment') ||
-          key.toLowerCase().includes('call') ||
-          key.toLowerCase().includes('schedule')
-        );
-      
-      if (hasEmail && isBookingContext) {
-        console.log('Auto-detected call booking on ${page.name}');
-        
-        const email = Array.from(formData.entries()).find(([key]) => 
-          key.toLowerCase().includes('email')
-        )?.[1];
-        const name = Array.from(formData.entries()).find(([key]) => 
-          key.toLowerCase().includes('name') || key.toLowerCase().includes('first')
-        )?.[1];
-        
-        track('call_booking', {
-          eventName: '${page.name} - Auto-detected Call Booking',
-          contactInfo: { 
-            email: email, 
-            name: name 
-          }
-        });
-      }
+          case 'form_submission':
+            trackingCode += `
+    // Track form submission event immediately
+    track('form_submission', { 
+      eventName: '${page.name} - Form Submission',
+      formData: { page: '${page.name}', type: 'auto_fire' }
     });`;
-      }
-
-      if (events.includes('purchase')) {
-        trackingCode += `
-    // Purchase tracking - REQUIRES MANUAL IMPLEMENTATION
-    window.trackPurchase = function(amount, currency = 'USD', customerInfo = {}) {
-      console.log('Purchase tracking called:', amount, currency, customerInfo);
-      track('purchase', {
-        eventName: 'Purchase Completed',
-        revenue: { amount: parseFloat(amount), currency: currency },
-        contactInfo: customerInfo
+            break;
+            
+          case 'webinar_registration':
+            trackingCode += `
+    // Track webinar registration immediately
+    track('webinar_registration', {
+      eventName: '${page.name} - Webinar Registration',
+      webinarName: '${page.name} Webinar',
+      contactInfo: { source: 'page_visit' }
+    });`;
+            break;
+            
+          case 'call_booking':
+            trackingCode += `
+    // Track call booking immediately
+    track('call_booking', {
+      eventName: '${page.name} - Call Booking',
+      appointmentType: '${page.name} Appointment',
+      contactInfo: { source: 'page_visit' }
+    });`;
+            break;
+            
+          case 'purchase':
+            trackingCode += `
+    // Track purchase event immediately (for testing)
+    track('purchase', {
+      eventName: '${page.name} - Purchase',
+      revenue: { amount: 99.99, currency: 'USD' },
+      contactInfo: { source: 'page_visit' }
+    });`;
+            break;
+            
+          default:
+            trackingCode += `
+    // Track custom event immediately
+    track('${eventType}', { eventName: '${page.name} - ${eventType}' });`;
+            break;
+        }
       });
-    };
-    
-    console.log('Purchase tracking function available. Call trackPurchase(amount, currency, customerInfo) after successful payment.');`;
-      }
-
+      
       return trackingCode;
     };
 
@@ -436,7 +260,7 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
   const PIXEL_ID = '${pixelId}';
   const API_URL = '${supabaseUrl}/functions/v1/track-event';
   
-  console.log('Initializing comprehensive tracking for ${page.name} with pixel:', PIXEL_ID);
+  console.log('Initializing auto-fire tracking for ${page.name} with pixel:', PIXEL_ID);
   
   function getSessionId() {
     let sessionId = localStorage.getItem('tracking_session_id');
@@ -459,7 +283,7 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
       ...data
     };
 
-    console.log('Tracking event on ${page.name}:', trackingData);
+    console.log('Auto-firing event on ${page.name}:', trackingData);
 
     fetch(API_URL, {
       method: 'POST',
@@ -467,36 +291,30 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
       body: JSON.stringify(trackingData)
     }).then(response => {
       if (response.ok) {
-        console.log('Successfully tracked ${page.name} event:', eventType);
+        console.log('Successfully auto-fired ${page.name} event:', eventType);
         return response.json();
       } else {
-        console.error('Failed to track ${page.name} event:', response.status, response.statusText);
+        console.error('Failed to auto-fire ${page.name} event:', response.status, response.statusText);
         return response.text().then(text => {
           console.error('Error details:', text);
         });
       }
     }).catch(err => {
-      console.error('Tracking failed for ${page.name}:', err);
+      console.error('Auto-fire tracking failed for ${page.name}:', err);
     });
   }
 
   function init() {
-    console.log('Initializing tracking for ${page.name}');
-    ${page.events?.includes('page_view') ? `
-    // Track page view immediately
-    track('page_view', { eventName: '${page.name} - Page View' });` : ''}
+    console.log('Auto-firing all events for ${page.name}');
     
-    ${getTrackingEvents(page.events || [])}
+    // Fire all configured events immediately on page load
+    ${getPageLoadEvents(page.events || [])}
     
-    console.log('${page.name} tracking initialization complete');
+    console.log('${page.name} auto-fire tracking complete');
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-    console.log('Waiting for DOM to load for ${page.name}');
-  } else {
-    init();
-  }
+  // Initialize immediately when script loads
+  init();
 
   // Make tracking function globally available
   window.trackEvent = track;
@@ -684,6 +502,9 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
                           <Badge variant={pixel.is_active ? "default" : "secondary"}>
                             {pixel.is_active ? "Active" : "Inactive"}
                           </Badge>
+                          <Badge variant="outline" className="bg-green-50 text-green-700">
+                            Auto-Fire Mode
+                          </Badge>
                         </div>
                         <p className="text-sm text-gray-600 mt-1">
                           Pixel ID: {pixel.pixel_id}
@@ -750,7 +571,12 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
 
                     {isExpanded && funnelPages.length > 0 && (
                       <div className="border-t pt-4">
-                        <h4 className="font-medium mb-3">Tracking Codes</h4>
+                        <h4 className="font-medium mb-3">Auto-Fire Tracking Codes</h4>
+                        <div className="bg-green-50 border border-green-200 p-3 rounded-lg mb-4">
+                          <p className="text-sm text-green-800">
+                            ✅ These codes will automatically fire all configured events when someone visits the page
+                          </p>
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                           {funnelPages.map((page: any) => {
                             const PageIcon = getPageIcon(page.type);
