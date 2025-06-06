@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,12 +17,19 @@ interface FunnelPage {
 
 interface FunnelPageMapperProps {
   onPagesConfigured: (pages: FunnelPage[]) => void;
+  initialPages?: FunnelPage[];
 }
 
-export const FunnelPageMapper = ({ onPagesConfigured }: FunnelPageMapperProps) => {
+export const FunnelPageMapper = ({ onPagesConfigured, initialPages = [] }: FunnelPageMapperProps) => {
   const [pages, setPages] = useState<FunnelPage[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialPages.length > 0) {
+      setPages(initialPages);
+    }
+  }, [initialPages]);
 
   const pageTypeOptions = [
     {
@@ -152,7 +159,7 @@ export const FunnelPageMapper = ({ onPagesConfigured }: FunnelPageMapperProps) =
             
             return (
               <Card key={page.id} className={`relative ${!isPageValid(page) ? 'border-orange-200 bg-orange-50' : ''}`}>
-                <CardHeader className="pb-2 pt-4">
+                <CardHeader className="pb-2 pt-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <pageTypeInfo.icon className="h-4 w-4 text-primary" />
@@ -257,7 +264,7 @@ export const FunnelPageMapper = ({ onPagesConfigured }: FunnelPageMapperProps) =
                     </div>
                   </CardContent>
                 ) : (
-                  <CardContent className="pt-0 pb-3">
+                  <CardContent className="pt-0 pb-2">
                     <div className="space-y-2">
                       <div className="text-xs">
                         <span className="font-medium">Name:</span> {page.name || 'Not set'}
