@@ -41,6 +41,7 @@ export const ExistingPixelManager = ({ projectId }: ExistingPixelManagerProps) =
   const { data: pixels, isLoading } = useQuery({
     queryKey: ['tracking-pixels', projectId],
     queryFn: async () => {
+      console.log('Fetching pixels for project:', projectId);
       const { data, error } = await supabase
         .from('tracking_pixels')
         .select('*')
@@ -48,7 +49,11 @@ export const ExistingPixelManager = ({ projectId }: ExistingPixelManagerProps) =
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching pixels:', error);
+        throw error;
+      }
+      console.log('Fetched pixels:', data);
       return (data || []) as PixelWithConfig[];
     },
     enabled: !!projectId,
@@ -73,8 +78,10 @@ export const ExistingPixelManager = ({ projectId }: ExistingPixelManagerProps) =
   });
 
   const handlePixelSelect = (pixelId: string) => {
+    console.log('Selecting pixel:', pixelId);
     const pixel = pixels?.find(p => p.id === pixelId);
     if (pixel) {
+      console.log('Selected pixel:', pixel);
       setSelectedPixelId(pixelId);
       setSelectedPixel(pixel);
       setShowCodes(false);
@@ -90,13 +97,11 @@ export const ExistingPixelManager = ({ projectId }: ExistingPixelManagerProps) =
       funnelPages: pages
     };
 
-    // Update the pixel configuration in the database
     await updatePixelConfig.mutateAsync({
       pixelId: selectedPixel.id,
       config: updatedConfig
     });
 
-    // Update local state
     const updatedPixel = {
       ...selectedPixel,
       config: updatedConfig
@@ -212,6 +217,7 @@ export const ExistingPixelManager = ({ projectId }: ExistingPixelManagerProps) =
     };
 
     const funnelPages = selectedPixel.config?.funnelPages || [];
+    console.log('Funnel pages for display:', funnelPages);
 
     if (funnelPages.length === 0) {
       return (

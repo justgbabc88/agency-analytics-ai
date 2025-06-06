@@ -1,8 +1,8 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
 import { Eye, Trash2, BarChart3, Copy, Globe, ShoppingCart, CheckCircle, Video, Calendar, FileText } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -34,13 +34,18 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
   const { data: pixels, isLoading } = useQuery({
     queryKey: ['tracking-pixels', projectId],
     queryFn: async () => {
+      console.log('TrackingPixelManager: Fetching pixels for project:', projectId);
       const { data, error } = await supabase
         .from('tracking_pixels')
         .select('*')
         .eq('project_id', projectId)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('TrackingPixelManager: Error fetching pixels:', error);
+        throw error;
+      }
+      console.log('TrackingPixelManager: Fetched pixels:', data);
       return (data || []) as PixelWithConfig[];
     },
     enabled: !!projectId,
@@ -183,9 +188,9 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
     }).catch(err => console.warn('Tracking failed:', err));
   }
 
-  function init() {${page.events.includes('page_view') ? `
+  function init() {${page.events?.includes('page_view') ? `
     track('page_view', { eventName: '${page.name} - Page View' });` : ''}
-    ${getTrackingEvents(page.events)}
+    ${getTrackingEvents(page.events || [])}
   }
 
   if (document.readyState === 'loading') {
@@ -268,6 +273,7 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
             <div className="space-y-6">
               {pixels?.map((pixel) => {
                 const funnelPages = pixel.config?.funnelPages || [];
+                console.log(`Pixel ${pixel.name} has ${funnelPages.length} funnel pages:`, funnelPages);
                 
                 return (
                   <div key={pixel.id} className="border rounded-lg p-4 space-y-4">
@@ -311,9 +317,9 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
                       </div>
                     </div>
 
-                    {funnelPages.length > 0 && (
+                    {funnelPages.length > 0 ? (
                       <div>
-                        <h4 className="font-medium mb-3">Page Tracking Codes</h4>
+                        <h4 className="font-medium mb-3">Page Tracking Codes ({funnelPages.length} pages)</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                           {funnelPages.map((page: any) => {
                             const PageIcon = getPageIcon(page.type);
@@ -329,14 +335,14 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
                                 </CardHeader>
                                 <CardContent className="pt-0 space-y-2">
                                   <div className="flex flex-wrap gap-1">
-                                    {page.events.slice(0, 2).map((event: string) => (
+                                    {(page.events || []).slice(0, 2).map((event: string) => (
                                       <Badge key={event} variant="secondary" className="text-xs">
                                         {event.replace(/_/g, ' ')}
                                       </Badge>
                                     ))}
-                                    {page.events.length > 2 && (
+                                    {(page.events || []).length > 2 && (
                                       <Badge variant="outline" className="text-xs">
-                                        +{page.events.length - 2} more
+                                        +{(page.events || []).length - 2} more
                                       </Badge>
                                     )}
                                   </div>
@@ -354,6 +360,11 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
                             );
                           })}
                         </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-4 text-gray-500 bg-gray-50 rounded">
+                        <p className="text-sm">No funnel pages configured yet.</p>
+                        <p className="text-xs">Use the Quick Setup to add pages and generate tracking codes.</p>
                       </div>
                     )}
                   </div>
