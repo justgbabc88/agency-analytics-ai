@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
-import { TrendingUp, DollarSign, Users, MousePointer, Activity, Globe, ShoppingCart, CheckCircle, Video, Calendar, FileText, TrendingDown, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { TrendingUp, Users, MousePointer, Activity, Globe, ShoppingCart, CheckCircle, Video, Calendar, FileText, ArrowUpRight, ArrowDownRight } from "lucide-react";
 
 interface AttributionDashboardProps {
   projectId: string;
@@ -43,7 +43,7 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
   const [timeRange, setTimeRange] = useState('7d');
   const [selectedPixelId, setSelectedPixelId] = useState<string>('');
 
-  // Helper functions defined first to avoid hoisting issues
+  // Helper functions
   const getPageIcon = (type: string) => {
     switch (type) {
       case 'landing': return Globe;
@@ -52,17 +52,6 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
       case 'webinar': return Video;
       case 'booking': return Calendar;
       default: return FileText;
-    }
-  };
-
-  const getPageTypeColor = (type: string) => {
-    switch (type) {
-      case 'landing': return '#8884d8';
-      case 'checkout': return '#82ca9d';
-      case 'thankyou': return '#ffc658';
-      case 'webinar': return '#ff7300';
-      case 'booking': return '#00ff00';
-      default: return '#8884d8';
     }
   };
 
@@ -76,13 +65,6 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
       case 'call_booking': return '#ff0000';
       default: return '#8884d8';
     }
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount);
   };
 
   const formatPercentage = (value: number) => {
@@ -131,51 +113,34 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
   // Get configured pages for the selected pixel
   const selectedPixel = pixels?.find(p => p.id === selectedPixelId);
   const configuredPages = selectedPixel?.config?.funnelPages || [];
-  const tracksPurchases = selectedPixel?.conversion_events?.includes('purchase') || false;
 
-  // Helper function to get page name and details from URL
-  const getPageDetails = (pageUrl: string): { name: string; type: string; order: number } => {
-    // First try to match with configured pages
-    const matchedPage = configuredPages.find((page: any) => {
-      try {
-        const configuredUrl = new URL(page.url.startsWith('http') ? page.url : `https://${page.url}`);
-        const eventUrl = new URL(pageUrl);
-        return configuredUrl.pathname === eventUrl.pathname || pageUrl.includes(configuredUrl.pathname);
-      } catch {
-        return pageUrl.includes(page.url) || page.url.includes(pageUrl);
-      }
-    });
-
-    if (matchedPage) {
-      return {
-        name: matchedPage.name,
-        type: matchedPage.type,
-        order: configuredPages.findIndex((p: any) => p.id === matchedPage.id)
-      };
-    }
-
-    // Fallback: Extract page name from URL
+  // Helper function to check if a URL matches a configured page
+  const isPageMatch = (eventUrl: string, configuredUrl: string): boolean => {
     try {
-      const url = new URL(pageUrl);
-      const pathname = url.pathname;
-      if (pathname === '/' || pathname === '') return { name: 'Home Page', type: 'landing', order: 0 };
+      // Handle both relative and absolute URLs
+      const normalizeUrl = (url: string) => {
+        if (url.startsWith('http')) {
+          return new URL(url).pathname;
+        }
+        return url.startsWith('/') ? url : `/${url}`;
+      };
+
+      const eventPath = normalizeUrl(eventUrl);
+      const configuredPath = normalizeUrl(configuredUrl);
+
+      // Exact match
+      if (eventPath === configuredPath) return true;
       
-      const pageName = pathname.substring(1)
-        .split('/')
-        .map(segment => segment.replace(/-/g, ' ').replace(/_/g, ' '))
-        .map(segment => segment.charAt(0).toUpperCase() + segment.slice(1))
-        .join(' / ');
+      // Check if event path contains configured path (for query params, etc.)
+      if (eventPath.includes(configuredPath)) return true;
       
-      // Infer type from URL patterns
-      let type = 'landing';
-      if (pathname.includes('checkout') || pathname.includes('payment')) type = 'checkout';
-      else if (pathname.includes('thank') || pathname.includes('success')) type = 'thankyou';
-      else if (pathname.includes('webinar') || pathname.includes('training')) type = 'webinar';
-      else if (pathname.includes('book') || pathname.includes('schedule')) type = 'booking';
-      
-      return { name: pageName || 'Unknown Page', type, order: 999 };
-    } catch {
-      return { name: pageUrl || 'Unknown Page', type: 'landing', order: 999 };
+      // Check if configured path contains event path (for base paths)
+      if (configuredPath.includes(eventPath)) return true;
+
+      return false;
+    } catch (error) {
+      // Fallback to simple string matching
+      return eventUrl.includes(configuredUrl) || configuredUrl.includes(eventUrl);
     }
   };
 
@@ -183,17 +148,28 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
   const pageAnalytics = React.useMemo(() => {
     if (!eventStats || !configuredPages.length) return null;
 
+    console.log('Processing page analytics:', { eventStats: eventStats.length, configuredPages: configuredPages.length });
+
     // Group events by page and calculate metrics
     const pageMetrics = configuredPages.map((page: any, index: number) => {
       const pageEvents = eventStats.filter(event => {
-        const { name } = getPageDetails(event.page_url);
-        return name === page.name;
+        const matches = isPageMatch(event.page_url, page.url);
+        if (matches) {
+          console.log(`Event ${event.id} matches page ${page.name}:`, { eventUrl: event.page_url, pageUrl: page.url });
+        }
+        return matches;
       });
 
       const totalEvents = pageEvents.length;
       const uniqueVisitors = new Set(pageEvents.map(e => e.contact_email || e.page_url)).size;
-      const conversions = pageEvents.filter(e => e.revenue_amount && e.revenue_amount > 0).length;
-      const revenue = pageEvents.reduce((sum, e) => sum + (parseFloat(e.revenue_amount?.toString() || '0')), 0);
+      const conversions = pageEvents.filter(e => 
+        e.event_type === 'form_submission' || 
+        e.event_type === 'purchase' || 
+        e.event_type === 'webinar_registration' || 
+        e.event_type === 'call_booking'
+      ).length;
+
+      console.log(`Page ${page.name} metrics:`, { totalEvents, uniqueVisitors, conversions });
 
       return {
         name: page.name,
@@ -202,14 +178,12 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
         totalEvents,
         uniqueVisitors,
         conversions,
-        revenue: tracksPurchases ? revenue : 0,
-        conversionRate: totalEvents > 0 ? (conversions / totalEvents) * 100 : 0,
-        revenuePerVisitor: tracksPurchases && uniqueVisitors > 0 ? revenue / uniqueVisitors : 0
+        conversionRate: totalEvents > 0 ? (conversions / totalEvents) * 100 : 0
       };
     });
 
     return { pageMetrics };
-  }, [eventStats, configuredPages, tracksPurchases]);
+  }, [eventStats, configuredPages]);
 
   // Process daily trends
   const dailyTrends = React.useMemo(() => {
@@ -218,11 +192,13 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
     const dailyData = eventStats.reduce((acc: Record<string, any>, event) => {
       const date = new Date(event.created_at).toLocaleDateString();
       if (!acc[date]) {
-        acc[date] = { date, events: 0, revenue: 0, conversions: 0, uniqueVisitors: new Set() };
+        acc[date] = { date, events: 0, conversions: 0, uniqueVisitors: new Set() };
       }
       acc[date].events += 1;
-      if (tracksPurchases && event.revenue_amount && event.revenue_amount > 0) {
-        acc[date].revenue += parseFloat(event.revenue_amount.toString());
+      if (event.event_type === 'form_submission' || 
+          event.event_type === 'purchase' || 
+          event.event_type === 'webinar_registration' || 
+          event.event_type === 'call_booking') {
         acc[date].conversions += 1;
       }
       if (event.contact_email) {
@@ -236,7 +212,7 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
       uniqueVisitors: day.uniqueVisitors.size,
       conversionRate: day.events > 0 ? (day.conversions / day.events) * 100 : 0
     })).sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [eventStats, tracksPurchases]);
+  }, [eventStats]);
 
   // Process event type breakdown
   const eventTypeBreakdown = React.useMemo(() => {
@@ -254,39 +230,35 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
     }));
   }, [eventStats]);
 
-  // Calculate key metrics
+  // Calculate key metrics (no revenue metrics)
   const keyMetrics = React.useMemo(() => {
     if (!eventStats) return null;
 
-    const totalRevenue = tracksPurchases ? eventStats.reduce((sum, event) => sum + parseFloat(event.revenue_amount?.toString() || '0'), 0) : 0;
-    const totalConversions = tracksPurchases ? eventStats.filter(event => event.revenue_amount && event.revenue_amount > 0).length : 0;
+    const totalConversions = eventStats.filter(event => 
+      event.event_type === 'form_submission' || 
+      event.event_type === 'purchase' || 
+      event.event_type === 'webinar_registration' || 
+      event.event_type === 'call_booking'
+    ).length;
     const totalEvents = eventStats.length;
     const uniqueVisitors = new Set(eventStats.map(e => e.contact_email || e.page_url)).size;
     const conversionRate = totalEvents > 0 ? ((totalConversions / totalEvents) * 100) : 0;
-    const avgOrderValue = totalConversions > 0 ? (totalRevenue / totalConversions) : 0;
 
     // Calculate trends (compare with previous period)
     const midPoint = Math.floor(eventStats.length / 2);
     const recentEvents = eventStats.slice(0, midPoint);
     const olderEvents = eventStats.slice(midPoint);
 
-    const recentRevenue = tracksPurchases ? recentEvents.reduce((sum, event) => sum + parseFloat(event.revenue_amount?.toString() || '0'), 0) : 0;
-    const olderRevenue = tracksPurchases ? olderEvents.reduce((sum, event) => sum + parseFloat(event.revenue_amount?.toString() || '0'), 0) : 0;
-    
-    const revenueTrend = tracksPurchases && olderRevenue > 0 ? ((recentRevenue - olderRevenue) / olderRevenue) * 100 : 0;
     const eventsTrend = olderEvents.length > 0 ? ((recentEvents.length - olderEvents.length) / olderEvents.length) * 100 : 0;
 
     return {
-      totalRevenue,
       totalConversions,
       totalEvents,
       uniqueVisitors,
       conversionRate,
-      avgOrderValue,
-      revenueTrend,
       eventsTrend
     };
-  }, [eventStats, tracksPurchases]);
+  }, [eventStats]);
 
   if (isLoading) {
     return <div>Loading attribution data...</div>;
@@ -344,48 +316,9 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
         </Card>
       ) : (
         <>
-          {/* Key Metrics with Trends */}
+          {/* Key Metrics without Revenue */}
           {keyMetrics && (
-            <div className={`grid grid-cols-1 md:grid-cols-${tracksPurchases ? '6' : '4'} gap-4`}>
-              {tracksPurchases && (
-                <>
-                  <Card>
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <DollarSign className="h-5 w-5 text-green-600" />
-                          <div>
-                            <p className="text-sm text-gray-600">Total Revenue</p>
-                            <p className="text-2xl font-bold">{formatCurrency(keyMetrics.totalRevenue)}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          {keyMetrics.revenueTrend >= 0 ? 
-                            <ArrowUpRight className="h-4 w-4 text-green-600" /> : 
-                            <ArrowDownRight className="h-4 w-4 text-red-600" />
-                          }
-                          <span className={`text-sm font-medium ${keyMetrics.revenueTrend >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {formatPercentage(keyMetrics.revenueTrend)}
-                          </span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardContent className="p-6">
-                      <div className="flex items-center gap-2">
-                        <TrendingUp className="h-5 w-5 text-blue-600" />
-                        <div>
-                          <p className="text-sm text-gray-600">Conversions</p>
-                          <p className="text-2xl font-bold">{keyMetrics.totalConversions}</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </>
-              )}
-
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <Card>
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
@@ -421,33 +354,29 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
                 </CardContent>
               </Card>
 
-              {tracksPurchases && (
-                <>
-                  <Card>
-                    <CardContent className="p-6">
-                      <div className="flex items-center gap-2">
-                        <Activity className="h-5 w-5 text-indigo-600" />
-                        <div>
-                          <p className="text-sm text-gray-600">Conversion Rate</p>
-                          <p className="text-2xl font-bold">{keyMetrics.conversionRate.toFixed(1)}%</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5 text-blue-600" />
+                    <div>
+                      <p className="text-sm text-gray-600">Conversions</p>
+                      <p className="text-2xl font-bold">{keyMetrics.totalConversions}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-                  <Card>
-                    <CardContent className="p-6">
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="h-5 w-5 text-emerald-600" />
-                        <div>
-                          <p className="text-sm text-gray-600">Avg Order Value</p>
-                          <p className="text-2xl font-bold">{formatCurrency(keyMetrics.avgOrderValue)}</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </>
-              )}
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-2">
+                    <Activity className="h-5 w-5 text-indigo-600" />
+                    <div>
+                      <p className="text-sm text-gray-600">Conversion Rate</p>
+                      <p className="text-2xl font-bold">{keyMetrics.conversionRate.toFixed(1)}%</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           )}
 
@@ -471,14 +400,12 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
                               <Badge variant="outline">{page.type}</Badge>
                             </div>
                           </div>
-                          {tracksPurchases && (
-                            <div className="text-right">
-                              <div className="text-lg font-bold">{page.conversionRate.toFixed(1)}%</div>
-                              <div className="text-sm text-gray-600">Conv. Rate</div>
-                            </div>
-                          )}
+                          <div className="text-right">
+                            <div className="text-lg font-bold">{page.conversionRate.toFixed(1)}%</div>
+                            <div className="text-sm text-gray-600">Conv. Rate</div>
+                          </div>
                         </div>
-                        <div className={`grid grid-cols-${tracksPurchases ? '4' : '2'} gap-4 text-sm`}>
+                        <div className="grid grid-cols-3 gap-4 text-sm">
                           <div className="text-center">
                             <div className="font-medium">{page.totalEvents}</div>
                             <div className="text-gray-600">Events</div>
@@ -487,18 +414,10 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
                             <div className="font-medium">{page.uniqueVisitors}</div>
                             <div className="text-gray-600">Visitors</div>
                           </div>
-                          {tracksPurchases && (
-                            <>
-                              <div className="text-center">
-                                <div className="font-medium">{page.conversions}</div>
-                                <div className="text-gray-600">Conversions</div>
-                              </div>
-                              <div className="text-center">
-                                <div className="font-medium">{formatCurrency(page.revenue)}</div>
-                                <div className="text-gray-600">Revenue</div>
-                              </div>
-                            </>
-                          )}
+                          <div className="text-center">
+                            <div className="font-medium">{page.conversions}</div>
+                            <div className="text-gray-600">Conversions</div>
+                          </div>
                         </div>
                       </div>
                     );
@@ -524,7 +443,7 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
                       <YAxis />
                       <Tooltip />
                       <Line type="monotone" dataKey="events" stroke="#8884d8" name="Events" />
-                      {tracksPurchases && <Line type="monotone" dataKey="conversions" stroke="#82ca9d" name="Conversions" />}
+                      <Line type="monotone" dataKey="conversions" stroke="#82ca9d" name="Conversions" />
                       <Line type="monotone" dataKey="uniqueVisitors" stroke="#ffc658" name="Unique Visitors" />
                     </LineChart>
                   </ResponsiveContainer>
@@ -560,28 +479,8 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
               </Card>
             )}
 
-            {/* Revenue by Page - Only show if tracking purchases */}
-            {tracksPurchases && pageAnalytics && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Revenue by Page</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={pageAnalytics.pageMetrics}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip formatter={(value) => [formatCurrency(Number(value)), 'Revenue']} />
-                      <Bar dataKey="revenue" fill="#8884d8" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Conversion Rates by Page - Only show if tracking purchases */}
-            {tracksPurchases && pageAnalytics && (
+            {/* Conversion Rates by Page */}
+            {pageAnalytics && (
               <Card>
                 <CardHeader>
                   <CardTitle>Conversion Rates by Page</CardTitle>
@@ -594,6 +493,26 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
                       <YAxis />
                       <Tooltip formatter={(value) => [`${Number(value).toFixed(2)}%`, 'Conversion Rate']} />
                       <Bar dataKey="conversionRate" fill="#82ca9d" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Events by Page */}
+            {pageAnalytics && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Events by Page</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={pageAnalytics.pageMetrics}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="totalEvents" fill="#8884d8" />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
