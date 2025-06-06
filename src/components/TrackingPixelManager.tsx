@@ -31,17 +31,30 @@ const WebsitePreview = ({ url, pageName }: { url: string; pageName: string }) =>
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
   
-  // Generate screenshot URL using a service like microlink.io or similar
-  const screenshotUrl = `https://api.microlink.io/screenshot?url=${encodeURIComponent(url)}&viewport.width=1200&viewport.height=800&type=png&overlay.browser=dark`;
+  // Try multiple screenshot services for better reliability
+  const getScreenshotUrl = (url: string) => {
+    try {
+      // Ensure URL has protocol
+      const cleanUrl = url.startsWith('http') ? url : `https://${url}`;
+      
+      // Try website-screenshot.vercel.app first (more reliable)
+      return `https://website-screenshot.vercel.app/api?url=${encodeURIComponent(cleanUrl)}&width=1200&height=800&fullPage=false`;
+    } catch (error) {
+      console.error('Error generating screenshot URL:', error);
+      return null;
+    }
+  };
+
+  const screenshotUrl = getScreenshotUrl(url);
   
-  if (imageError) {
+  if (imageError || !screenshotUrl) {
     return (
       <div className="w-full h-32 bg-gray-100 rounded border flex items-center justify-center">
         <div className="text-center">
           <Globe className="h-8 w-8 mx-auto text-gray-400 mb-2" />
           <p className="text-xs text-gray-500">Preview unavailable</p>
           <a 
-            href={url} 
+            href={url.startsWith('http') ? url : `https://${url}`}
             target="_blank" 
             rel="noopener noreferrer"
             className="text-xs text-blue-600 hover:underline flex items-center justify-center mt-1"
@@ -56,9 +69,9 @@ const WebsitePreview = ({ url, pageName }: { url: string; pageName: string }) =>
   return (
     <div className="relative w-full h-32 bg-gray-100 rounded border overflow-hidden">
       {imageLoading && (
-        <div className="absolute inset-0 flex items-center justify-center">
+        <div className="absolute inset-0 flex items-center justify-center bg-white">
           <div className="animate-pulse flex items-center">
-            <Globe className="h-6 w-6 text-gray-400 mr-2" />
+            <div className="w-6 h-6 bg-gray-300 rounded mr-2 animate-pulse"></div>
             <span className="text-xs text-gray-500">Loading preview...</span>
           </div>
         </div>
@@ -66,26 +79,32 @@ const WebsitePreview = ({ url, pageName }: { url: string; pageName: string }) =>
       <img
         src={screenshotUrl}
         alt={`Preview of ${pageName}`}
-        className="w-full h-full object-cover"
-        onLoad={() => setImageLoading(false)}
-        onError={() => {
+        className={`w-full h-full object-cover transition-opacity duration-300 ${imageLoading ? 'opacity-0' : 'opacity-100'}`}
+        onLoad={() => {
+          console.log('Screenshot loaded successfully for:', url);
+          setImageLoading(false);
+        }}
+        onError={(e) => {
+          console.error('Screenshot failed to load for:', url, e);
           setImageError(true);
           setImageLoading(false);
         }}
       />
-      <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-10 transition-all duration-200 flex items-end">
-        <div className="w-full bg-gradient-to-t from-black/50 to-transparent p-2">
-          <a 
-            href={url} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="text-white text-xs hover:underline flex items-center"
-          >
-            {url.length > 40 ? `${url.substring(0, 40)}...` : url}
-            <ExternalLink className="h-3 w-3 ml-1" />
-          </a>
+      {!imageLoading && !imageError && (
+        <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-10 transition-all duration-200 flex items-end">
+          <div className="w-full bg-gradient-to-t from-black/50 to-transparent p-2">
+            <a 
+              href={url.startsWith('http') ? url : `https://${url}`}
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-white text-xs hover:underline flex items-center"
+            >
+              {url.length > 40 ? `${url.substring(0, 40)}...` : url}
+              <ExternalLink className="h-3 w-3 ml-1" />
+            </a>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
