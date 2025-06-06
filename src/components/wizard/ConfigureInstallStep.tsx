@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { SimplifiedInstallationGuide } from './SimplifiedInstallationGuide';
 import { FunnelPageMapper } from './FunnelPageMapper';
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { SimplifiedInstallationGuide } from './SimplifiedInstallationGuide';
+import { Settings, ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { PixelData } from './types';
 
 interface ConfigureInstallStepProps {
@@ -13,46 +14,36 @@ interface ConfigureInstallStepProps {
 }
 
 export const ConfigureInstallStep = ({ projectId, pixelData, onPagesConfigured }: ConfigureInstallStepProps) => {
-  const [currentPages, setCurrentPages] = useState<any[]>([]);
-  const [showCodes, setShowCodes] = useState(false);
-
+  console.log('ConfigureInstallStep: Received pixelData:', pixelData);
+  
   const handlePagesConfigured = (pages: any[]) => {
-    setCurrentPages(pages);
-    setShowCodes(true);
-  };
-
-  const handleContinue = () => {
-    onPagesConfigured(currentPages);
+    console.log('ConfigureInstallStep: Pages configured:', pages);
+    onPagesConfigured(pages);
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="text-center space-y-2">
-          <h3 className="text-lg font-semibold">Configure & Install Your Pixel</h3>
-          <p className="text-muted-foreground">
-            Map your funnel pages and get installation codes.
-          </p>
-        </div>
-        {showCodes && currentPages.length > 0 && (
-          <Button onClick={handleContinue}>
-            Continue to Verification
-            <ArrowRight className="h-4 w-4 ml-2" />
-          </Button>
-        )}
+      <div className="text-center space-y-2">
+        <h3 className="text-lg font-semibold">Configure Your Funnel Pages</h3>
+        <p className="text-muted-foreground">
+          Set up the pages in your funnel to generate optimized tracking codes for each step.
+        </p>
       </div>
 
-      {!showCodes ? (
-        <FunnelPageMapper
-          onPagesConfigured={handlePagesConfigured}
-          initialPages={currentPages}
-        />
-      ) : (
-        <SimplifiedInstallationGuide
-          pixelData={pixelData}
-          funnelPages={currentPages}
-        />
-      )}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="h-5 w-5" />
+            Funnel Page Configuration
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <FunnelPageMapper
+            onPagesConfigured={handlePagesConfigured}
+            initialPages={pixelData.config?.funnelPages || []}
+          />
+        </CardContent>
+      </Card>
     </div>
   );
 };

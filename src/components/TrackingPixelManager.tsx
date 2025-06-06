@@ -40,7 +40,7 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
     return config.funnelPages || [];
   };
 
-  const { data: pixels, isLoading } = useQuery({
+  const { data: pixels, isLoading, refetch: refetchPixels } = useQuery({
     queryKey: ['tracking-pixels', projectId],
     queryFn: async () => {
       console.log('TrackingPixelManager: Fetching pixels for project:', projectId);
@@ -61,11 +61,15 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
         const funnelPages = getFunnelPages(pixel.config);
         console.log(`Pixel ${pixel.name} config:`, pixel.config);
         console.log(`Pixel ${pixel.name} funnel pages:`, funnelPages.length);
+        if (funnelPages.length > 0) {
+          console.log(`Pixel ${pixel.name} page details:`, funnelPages);
+        }
       });
       
       return (data || []) as PixelWithConfig[];
     },
     enabled: !!projectId,
+    refetchInterval: 5000, // Refetch every 5 seconds to catch updates
   });
 
   const { data: pixelStats, refetch: refetchStats } = useQuery({
@@ -123,15 +127,22 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
 
   const updatePixelConfig = useMutation({
     mutationFn: async ({ pixelId, config }: { pixelId: string; config: any }) => {
+      console.log('TrackingPixelManager: Updating pixel config for:', pixelId, 'with config:', config);
       const { error } = await supabase
         .from('tracking_pixels')
         .update({ config })
         .eq('id', pixelId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('TrackingPixelManager: Error updating pixel config:', error);
+        throw error;
+      }
+      console.log('TrackingPixelManager: Successfully updated pixel config');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tracking-pixels', projectId] });
+      // Also refetch immediately to ensure fresh data
+      refetchPixels();
       toast({
         title: "Success",
         description: "Pixel configuration updated successfully",
@@ -183,13 +194,19 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
   });
 
   const handlePagesUpdate = async (pixelId: string, pages: any[]) => {
+    console.log('TrackingPixelManager: Handling pages update for pixel:', pixelId, 'pages:', pages);
     const pixel = pixels?.find(p => p.id === pixelId);
-    if (!pixel) return;
+    if (!pixel) {
+      console.error('TrackingPixelManager: Pixel not found:', pixelId);
+      return;
+    }
 
     const updatedConfig = {
       ...(pixel.config && typeof pixel.config === 'object' ? pixel.config : {}),
       funnelPages: pages
     };
+
+    console.log('TrackingPixelManager: Updated config:', updatedConfig);
 
     await updatePixelConfig.mutateAsync({
       pixelId: pixelId,
@@ -405,10 +422,10 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
   };
 
   const handleRefreshEvents = () => {
+    console.log('TrackingPixelManager: Manually refreshing all data');
     refetchEvents();
     refetchStats();
-    // Also refresh the pixels data to get latest config
-    queryClient.invalidateQueries({ queryKey: ['tracking-pixels', projectId] });
+    refetchPixels(); // Also refresh pixels to get latest config
     toast({
       title: "Refreshed",
       description: "All data has been updated",
@@ -429,7 +446,8 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
               Tracking Overview
             </CardTitle>
             <Button onClick={handleRefreshEvents} variant="outline" size="sm">
-              Refresh Events
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh Data
             </Button>
           </div>
         </CardHeader>

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,7 +34,7 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
 
   const savePixelConfig = useMutation({
     mutationFn: async ({ pixelId, pages }: { pixelId: string; pages: any[] }) => {
-      console.log('Saving pixel config for pixel:', pixelId, 'with pages:', pages);
+      console.log('PixelSetupWizard: Saving pixel config for pixel:', pixelId, 'with pages:', pages);
       
       const { error } = await supabase
         .from('tracking_pixels')
@@ -43,20 +44,35 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
         .eq('id', pixelId);
 
       if (error) {
-        console.error('Error saving pixel config:', error);
+        console.error('PixelSetupWizard: Error saving pixel config:', error);
         throw error;
       }
+      
+      console.log('PixelSetupWizard: Successfully saved pixel config');
+      return pages;
     },
-    onSuccess: () => {
-      console.log('Pixel config saved successfully');
+    onSuccess: (pages) => {
+      console.log('PixelSetupWizard: Pixel config save mutation success, pages:', pages);
       queryClient.invalidateQueries({ queryKey: ['tracking-pixels', projectId] });
       toast({
         title: "Success",
         description: "Funnel pages saved successfully",
       });
+      
+      // Update local state immediately
+      setFunnelPages(pages);
+      if (pixelData) {
+        setPixelData({
+          ...pixelData,
+          config: {
+            ...pixelData.config,
+            funnelPages: pages
+          }
+        });
+      }
     },
     onError: (error) => {
-      console.error('Failed to save pixel config:', error);
+      console.error('PixelSetupWizard: Failed to save pixel config:', error);
       toast({
         title: "Error",
         description: "Failed to save funnel pages",
@@ -73,27 +89,29 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
 
   const handlePagesConfigured = async (pages: any[]) => {
     console.log('PixelSetupWizard: Funnel pages configured:', pages);
-    setFunnelPages(pages);
     
     if (pixelData?.id) {
       // Save the pages immediately when configured
-      await savePixelConfig.mutateAsync({
-        pixelId: pixelData.id,
-        pages: pages
+      try {
+        await savePixelConfig.mutateAsync({
+          pixelId: pixelData.id,
+          pages: pages
+        });
+        
+        console.log('PixelSetupWizard: Pages saved successfully, proceeding to step 3');
+        setCurrentStep(3);
+      } catch (error) {
+        console.error('PixelSetupWizard: Failed to save pages:', error);
+        // Don't proceed to next step if save failed
+      }
+    } else {
+      console.error('PixelSetupWizard: No pixel ID available to save config');
+      toast({
+        title: "Error",
+        description: "No pixel found to save configuration",
+        variant: "destructive",
       });
-      
-      // Update local pixel data
-      const updatedPixelData = {
-        ...pixelData,
-        config: {
-          ...(pixelData.config || {}),
-          funnelPages: pages
-        }
-      };
-      setPixelData(updatedPixelData);
     }
-    
-    setCurrentStep(3);
   };
 
   const handleConfigSaved = () => {
