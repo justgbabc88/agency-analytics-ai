@@ -1,9 +1,10 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Eye, Trash2, BarChart3, Copy, Globe, ShoppingCart, CheckCircle, Video, Calendar, FileText, Settings, ChevronDown, ChevronUp } from "lucide-react";
+import { Eye, Trash2, BarChart3, Copy, Globe, ShoppingCart, CheckCircle, Video, Calendar, FileText, Settings, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from "@/hooks/use-toast";
@@ -197,27 +198,121 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
       
       if (events.includes('form_submission')) {
         trackingCode += `
-    // Track form submissions
+    // Track ALL form submissions on the page
     document.addEventListener('submit', function(e) {
+      console.log('Form submission detected on ${page.name}');
       const form = e.target;
       const formData = new FormData(form);
       const data = {};
       for (let [key, value] of formData.entries()) {
-        if (!key.toLowerCase().includes('password')) {
+        if (!key.toLowerCase().includes('password') && !key.toLowerCase().includes('pass')) {
           data[key] = value;
         }
       }
+      
       track('form_submission', {
         eventName: '${page.name} - Form Submission',
-        formData: data
+        formData: data,
+        formAction: form.action || 'No action specified',
+        formMethod: form.method || 'GET'
       });
+    });
+    
+    // Also track form submissions using form element detection
+    setTimeout(function() {
+      const forms = document.querySelectorAll('form');
+      console.log('Found ' + forms.length + ' forms on ${page.name}');
+      forms.forEach(function(form, index) {
+        form.addEventListener('submit', function(e) {
+          console.log('Form ' + index + ' submitted on ${page.name}');
+          const formData = new FormData(form);
+          const data = {};
+          for (let [key, value] of formData.entries()) {
+            if (!key.toLowerCase().includes('password') && !key.toLowerCase().includes('pass')) {
+              data[key] = value;
+            }
+          }
+          
+          track('form_submission', {
+            eventName: '${page.name} - Form ' + index + ' Submission',
+            formData: data,
+            formIndex: index
+          });
+        });
+      });
+    }, 1000);`;
+      }
+
+      if (events.includes('webinar_registration')) {
+        trackingCode += `
+    // Track webinar registration confirmation
+    window.trackWebinarRegistration = function(webinarName, userEmail, userName) {
+      console.log('Tracking webinar registration:', webinarName, userEmail, userName);
+      track('webinar_registration', {
+        eventName: 'Webinar Registration Confirmed',
+        webinarName: webinarName || '${page.name} Webinar',
+        contactInfo: { 
+          email: userEmail, 
+          name: userName 
+        }
+      });
+    };
+    
+    // Auto-detect webinar registration if form contains webinar-related fields
+    document.addEventListener('submit', function(e) {
+      const form = e.target;
+      const formData = new FormData(form);
+      const hasEmail = Array.from(formData.keys()).some(key => 
+        key.toLowerCase().includes('email')
+      );
+      const hasWebinarIndicator = Array.from(formData.keys()).some(key => 
+        key.toLowerCase().includes('webinar') || 
+        key.toLowerCase().includes('registration') ||
+        key.toLowerCase().includes('signup')
+      ) || window.location.href.toLowerCase().includes('webinar') ||
+          document.title.toLowerCase().includes('webinar');
+      
+      if (hasEmail && hasWebinarIndicator) {
+        console.log('Auto-detected webinar registration on ${page.name}');
+        const email = Array.from(formData.entries()).find(([key]) => 
+          key.toLowerCase().includes('email')
+        )?.[1];
+        const name = Array.from(formData.entries()).find(([key]) => 
+          key.toLowerCase().includes('name') || key.toLowerCase().includes('first')
+        )?.[1];
+        
+        track('webinar_registration', {
+          eventName: '${page.name} - Webinar Registration',
+          contactInfo: { 
+            email: email, 
+            name: name 
+          }
+        });
+      }
     });`;
+      }
+
+      if (events.includes('call_booking')) {
+        trackingCode += `
+    // Track call booking confirmation
+    window.trackCallBooking = function(appointmentType, userEmail, userName) {
+      console.log('Tracking call booking:', appointmentType, userEmail, userName);
+      track('call_booking', {
+        eventName: 'Call Booking Confirmed',
+        appointmentType: appointmentType || '${page.name} Appointment',
+        contactInfo: { 
+          email: userEmail, 
+          name: userName 
+        }
+      });
+    };`;
       }
 
       if (events.includes('purchase')) {
         trackingCode += `
-    // Track confirmed purchases (call this after successful payment)
+    // Track confirmed purchases
     window.trackPurchase = function(amount, currency = 'USD', customerInfo = {}) {
+      console.log('Tracking purchase:', amount, currency, customerInfo);
       track('purchase', {
         eventName: 'Purchase Completed',
         revenue: { amount: parseFloat(amount), currency: currency },
@@ -226,44 +321,23 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
     };`;
       }
 
-      if (events.includes('webinar_registration')) {
-        trackingCode += `
-    // Track webinar registration (call this after successful registration)
-    window.trackWebinarRegistration = function(webinarName, userEmail, userName) {
-      track('webinar_registration', {
-        eventName: 'Webinar Registration Confirmed',
-        webinarName: webinarName,
-        contactInfo: { email: userEmail, name: userName }
-      });
-    };`;
-      }
-
-      if (events.includes('call_booking')) {
-        trackingCode += `
-    // Track call booking (call this after successful booking)
-    window.trackCallBooking = function(appointmentType, userEmail, userName) {
-      track('call_booking', {
-        eventName: 'Call Booking Confirmed',
-        appointmentType: appointmentType,
-        contactInfo: { email: userEmail, name: userName }
-      });
-    };`;
-      }
-
       return trackingCode;
     };
 
-    return `<!-- ${page.name} -->
+    return `<!-- ${page.name} Tracking Code -->
 <script>
 (function() {
   const PIXEL_ID = '${pixelId}';
   const API_URL = '${supabaseUrl}/functions/v1/track-event';
+  
+  console.log('Initializing tracking for ${page.name} with pixel:', PIXEL_ID);
   
   function getSessionId() {
     let sessionId = localStorage.getItem('tracking_session_id');
     if (!sessionId) {
       sessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
       localStorage.setItem('tracking_session_id', sessionId);
+      console.log('Created new session ID:', sessionId);
     }
     return sessionId;
   }
@@ -278,13 +352,21 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
       ...data
     };
 
-    console.log('Tracking event:', trackingData);
+    console.log('Tracking event on ${page.name}:', trackingData);
 
     fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(trackingData)
-    }).catch(err => console.warn('Tracking failed:', err));
+    }).then(response => {
+      if (response.ok) {
+        console.log('Successfully tracked ${page.name} event:', eventType);
+      } else {
+        console.error('Failed to track ${page.name} event:', response.status);
+      }
+    }).catch(err => {
+      console.warn('Tracking failed for ${page.name}:', err);
+    });
   }
 
   function init() {${page.events?.includes('page_view') ? `
