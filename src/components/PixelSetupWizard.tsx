@@ -22,6 +22,7 @@ interface PixelData {
     customEvents: { name: string; selector: string; eventType: string }[];
     dataLayerEnabled: boolean;
     sessionTimeout: number;
+    funnelPages?: any[];
   };
 }
 
@@ -44,10 +45,12 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
       customEvents: [],
       dataLayerEnabled: false,
       sessionTimeout: 30,
+      funnelPages: [],
     }
   });
   const [isPixelCreated, setIsPixelCreated] = useState(false);
   const [isConfigured, setIsConfigured] = useState(false);
+  const [funnelPages, setFunnelPages] = useState<any[]>([]);
 
   const steps = [
     { id: 1, title: 'Create Pixel', description: 'Basic pixel setup' },
@@ -76,7 +79,8 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
     nextStep();
   };
 
-  const handleConfigurationComplete = () => {
+  const handleConfigurationComplete = (pages: any[]) => {
+    setFunnelPages(pages);
     setIsConfigured(true);
     nextStep();
   };
@@ -128,10 +132,10 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
           
           {currentStep === 2 && (
             <ConfigureInstallStep
-              projectId={projectId}
               pixelData={pixelData}
-              updatePixelData={updatePixelData}
-              onComplete={handleConfigurationComplete}
+              funnelPages={funnelPages}
+              onBack={prevStep}
+              onNext={handleConfigurationComplete}
             />
           )}
           

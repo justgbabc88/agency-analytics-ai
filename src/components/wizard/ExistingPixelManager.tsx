@@ -15,9 +15,24 @@ interface ExistingPixelManagerProps {
   projectId: string;
 }
 
+interface PixelWithConfig {
+  id: string;
+  name: string;
+  pixel_id: string;
+  project_id: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  domains: string[] | null;
+  conversion_events: string[];
+  config: {
+    funnelPages?: any[];
+  } | null;
+}
+
 export const ExistingPixelManager = ({ projectId }: ExistingPixelManagerProps) => {
   const [selectedPixelId, setSelectedPixelId] = useState<string>('');
-  const [selectedPixel, setSelectedPixel] = useState<any>(null);
+  const [selectedPixel, setSelectedPixel] = useState<PixelWithConfig | null>(null);
   const [showCodes, setShowCodes] = useState(false);
   const [editingPages, setEditingPages] = useState(false);
   const queryClient = useQueryClient();
@@ -34,7 +49,7 @@ export const ExistingPixelManager = ({ projectId }: ExistingPixelManagerProps) =
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data || [];
+      return (data || []) as PixelWithConfig[];
     },
     enabled: !!projectId,
   });
@@ -68,8 +83,10 @@ export const ExistingPixelManager = ({ projectId }: ExistingPixelManagerProps) =
   };
 
   const handlePagesUpdate = async (pages: any[]) => {
+    if (!selectedPixel) return;
+
     const updatedConfig = {
-      ...selectedPixel.config,
+      ...(selectedPixel.config || {}),
       funnelPages: pages
     };
 
@@ -181,7 +198,7 @@ export const ExistingPixelManager = ({ projectId }: ExistingPixelManagerProps) =
         
         <FunnelPageMapper
           onPagesConfigured={handlePagesUpdate}
-          initialPages={selectedPixel.config?.funnelPages || []}
+          initialPages={selectedPixel?.config?.funnelPages || []}
         />
       </div>
     );

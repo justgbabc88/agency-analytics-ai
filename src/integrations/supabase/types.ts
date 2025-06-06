@@ -647,6 +647,7 @@ export type Database = {
       }
       tracking_pixels: {
         Row: {
+          config: Json | null
           conversion_events: string[] | null
           created_at: string
           domains: string[] | null
@@ -658,6 +659,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          config?: Json | null
           conversion_events?: string[] | null
           created_at?: string
           domains?: string[] | null
@@ -669,6 +671,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          config?: Json | null
           conversion_events?: string[] | null
           created_at?: string
           domains?: string[] | null

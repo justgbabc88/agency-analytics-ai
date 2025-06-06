@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +10,21 @@ import { useToast } from "@/hooks/use-toast";
 
 interface TrackingPixelManagerProps {
   projectId: string;
+}
+
+interface PixelWithConfig {
+  id: string;
+  name: string;
+  pixel_id: string;
+  project_id: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  domains: string[] | null;
+  conversion_events: string[];
+  config: {
+    funnelPages?: any[];
+  } | null;
 }
 
 export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) => {
@@ -27,7 +41,7 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data || [];
+      return (data || []) as PixelWithConfig[];
     },
     enabled: !!projectId,
   });
