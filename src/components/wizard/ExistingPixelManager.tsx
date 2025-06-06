@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -138,12 +139,27 @@ export const ExistingPixelManager = ({ projectId }: ExistingPixelManagerProps) =
       console.log('Successfully cleared all tracking data for project');
     },
     onSuccess: () => {
+      // Invalidate all relevant query keys to refresh the UI
       queryClient.invalidateQueries({ queryKey: ['tracking-pixels', projectId] });
       queryClient.invalidateQueries({ queryKey: ['recent-events', projectId] });
       queryClient.invalidateQueries({ queryKey: ['event-stats', projectId] });
-      // Add attribution-related query invalidations
+      
+      // Invalidate attribution dashboard queries with all possible combinations
       queryClient.invalidateQueries({ queryKey: ['event-stats'] });
       queryClient.invalidateQueries({ queryKey: ['tracking-pixels'] });
+      
+      // Also invalidate any attribution-specific queries that might exist
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey as string[];
+          return key.includes('event-stats') || 
+                 key.includes('attribution') || 
+                 key.includes('tracking-events') ||
+                 key.includes('tracking-sessions') ||
+                 key.includes('attribution-data');
+        }
+      });
+      
       toast({
         title: "Success",
         description: "All tracking data cleared successfully",
