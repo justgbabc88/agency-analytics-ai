@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -199,8 +200,8 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
           setPixelName(pixelName);
           setDomains(domains);
           onPixelCreated();
-        }} disabled={createPixel.isLoading}>
-          {createPixel.isLoading ? "Creating..." : "Create Pixel"}
+        }} disabled={createPixel.isPending}>
+          {createPixel.isPending ? "Creating..." : "Create Pixel"}
         </Button>
       </div>
     );
@@ -278,8 +279,8 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
                   // handlePagesConfigured();
                   setCurrentStep(3);
                 }
-              }} disabled={createPixel.isLoading}>
-                {currentStep === 1 ? (createPixel.isLoading ? "Creating..." : "Next: Configure Pages") : "Next: Get Tracking Code"}
+              }} disabled={createPixel.isPending}>
+                {currentStep === 1 ? (createPixel.isPending ? "Creating..." : "Next: Configure Pages") : "Next: Get Tracking Code"}
               </Button>
             )}
           </div>
