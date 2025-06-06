@@ -1,28 +1,23 @@
 
 import React from 'react';
 import { Button } from "@/components/ui/button";
-import { Activity, BarChart3, Settings, Target } from "lucide-react";
+import { Activity, BarChart3, Target, Settings, Home } from "lucide-react";
 import { useNavigate, useLocation } from 'react-router-dom';
 
 export const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const navItems = [
+  const mainNavItems = [
     {
       path: '/',
       label: 'Dashboard',
-      icon: BarChart3,
+      icon: Home,
     },
     {
       path: '/tracking',
       label: 'Tracking',
       icon: Target,
-    },
-    {
-      path: '/integrations',
-      label: 'Integrations',
-      icon: Settings,
     },
   ];
 
@@ -35,7 +30,8 @@ export const Navbar = () => {
         </div>
         
         <div className="flex items-center gap-4">
-          {navItems.map((item) => {
+          {/* Main Navigation */}
+          {mainNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
             
@@ -51,6 +47,16 @@ export const Navbar = () => {
               </Button>
             );
           })}
+          
+          {/* Integrations in top right */}
+          <Button
+            variant={location.pathname === '/integrations' ? "default" : "ghost"}
+            onClick={() => navigate('/integrations')}
+            className="flex items-center gap-2"
+          >
+            <Settings className="h-4 w-4" />
+            Integrations
+          </Button>
         </div>
       </div>
     </nav>

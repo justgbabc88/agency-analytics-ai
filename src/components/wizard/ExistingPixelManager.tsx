@@ -69,6 +69,22 @@ export const ExistingPixelManager = ({ projectId }: ExistingPixelManagerProps) =
     enabled: !!projectId,
   });
 
+  // Get project details to know the funnel type
+  const { data: project } = useQuery({
+    queryKey: ['project', projectId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('id', projectId)
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!projectId,
+  });
+
   // Update selected pixel when pixels data changes
   useEffect(() => {
     if (selectedPixelId && pixels) {
@@ -315,6 +331,7 @@ export const ExistingPixelManager = ({ projectId }: ExistingPixelManagerProps) =
         <FunnelPageMapper
           onPagesConfigured={handlePagesUpdate}
           initialPages={selectedPixel?.config?.funnelPages || []}
+          funnelType={project?.funnel_type}
         />
       </div>
     );

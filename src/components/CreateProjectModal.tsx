@@ -20,10 +20,16 @@ export const CreateProjectModal = ({ onProjectCreated }: CreateProjectModalProps
   const { createProject } = useProjects();
 
   const funnelTypes = [
-    { value: "low_ticket", label: "Low Ticket Funnel" },
-    { value: "high_ticket", label: "High Ticket Funnel" },
-    { value: "webinar", label: "Webinar Funnel" },
-    { value: "book_call", label: "Book A Call Funnel" },
+    { 
+      value: "webinar", 
+      label: "Webinar Funnel",
+      description: "Registration → Webinar → Sales"
+    },
+    { 
+      value: "book_call", 
+      label: "Book A Call Funnel",
+      description: "Landing Page → Booking → Sales Call"
+    },
   ];
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -84,7 +90,10 @@ export const CreateProjectModal = ({ onProjectCreated }: CreateProjectModalProps
               <SelectContent>
                 {funnelTypes.map((type) => (
                   <SelectItem key={type.value} value={type.value}>
-                    {type.label}
+                    <div>
+                      <div className="font-medium">{type.label}</div>
+                      <div className="text-xs text-gray-500">{type.description}</div>
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>

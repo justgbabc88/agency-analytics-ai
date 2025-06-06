@@ -1,158 +1,229 @@
-
 import React, { useState } from 'react';
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CreatePixelStep } from './wizard/CreatePixelStep';
-import { ConfigureInstallStep } from './wizard/ConfigureInstallStep';
-import { TestVerifyStep } from './wizard/TestVerifyStep';
-import { ExistingPixelManager } from './wizard/ExistingPixelManager';
-import { ArrowLeft, ArrowRight, Zap, Settings, Eye, Archive } from "lucide-react";
-import { useQueryClient, useMutation } from '@tanstack/react-query';
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Globe, Zap, CheckCircle } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from "@/hooks/use-toast";
-import { PixelData } from './wizard/types';
+import { SimplifiedInstallationGuide } from './wizard/SimplifiedInstallationGuide';
+import { FunnelPageMapper } from './wizard/FunnelPageMapper';
+import { Target } from "lucide-react";
 
 interface PixelSetupWizardProps {
   projectId: string;
 }
 
+interface PixelData {
+  name: string;
+  pixelId: string;
+  domains: string;
+}
+
 export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
   const [currentStep, setCurrentStep] = useState(1);
+  const [pixelName, setPixelName] = useState('');
+  const [domains, setDomains] = useState('');
   const [pixelData, setPixelData] = useState<PixelData | null>(null);
   const [funnelPages, setFunnelPages] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState('new');
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const steps = [
-    { id: 1, title: 'Create Pixel', icon: Zap },
-    { id: 2, title: 'Configure & Install', icon: Settings },
-    { id: 3, title: 'Test & Verify', icon: Eye },
-  ];
-
-  const savePixelConfig = useMutation({
-    mutationFn: async ({ pixelId, pages }: { pixelId: string; pages: any[] }) => {
-      console.log('PixelSetupWizard: Saving pixel config for pixel:', pixelId, 'with pages:', pages);
-      
-      const { error } = await supabase
+  // Check for existing pixels to enforce 1 pixel per project
+  const { data: existingPixels } = useQuery({
+    queryKey: ['tracking-pixels', projectId],
+    queryFn: async () => {
+      const { data, error } = await supabase
         .from('tracking_pixels')
-        .update({ 
-          config: { funnelPages: pages }
-        })
-        .eq('id', pixelId);
+        .select('*')
+        .eq('project_id', projectId)
+        .eq('is_active', true);
 
-      if (error) {
-        console.error('PixelSetupWizard: Error saving pixel config:', error);
-        throw error;
-      }
-      
-      console.log('PixelSetupWizard: Successfully saved pixel config');
-      return pages;
+      if (error) throw error;
+      return data || [];
     },
-    onSuccess: (pages) => {
-      console.log('PixelSetupWizard: Pixel config save mutation success, pages:', pages);
-      queryClient.invalidateQueries({ queryKey: ['tracking-pixels', projectId] });
+    enabled: !!projectId,
+  });
+
+  // Get project details to know the funnel type
+  const { data: project } = useQuery({
+    queryKey: ['project', projectId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('id', projectId)
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!projectId,
+  });
+
+  const createPixel = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase
+        .from('tracking_pixels')
+        .insert([{
+          name: pixelName,
+          pixel_id: 'pixel_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+          project_id: projectId,
+          is_active: true,
+          domains: domains.split(',').map(s => s.trim()),
+          conversion_events: [],
+          config: {
+            funnelPages: []
+          }
+        }])
+        .select('*')
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      console.log('Pixel created successfully:', data);
+      setPixelData({
+        name: data.name,
+        pixelId: data.pixel_id,
+        domains: data.domains?.join(', ') || 'All domains'
+      });
+      setCurrentStep(2);
       toast({
         title: "Success",
-        description: "Funnel pages saved successfully",
+        description: "Tracking pixel created successfully",
       });
-      
-      // Update local state immediately
-      setFunnelPages(pages);
-      if (pixelData) {
-        setPixelData({
-          ...pixelData,
-          config: {
-            ...pixelData.config,
-            funnelPages: pages
-          }
-        });
-      }
     },
     onError: (error) => {
-      console.error('PixelSetupWizard: Failed to save pixel config:', error);
+      console.error('Error creating pixel:', error);
       toast({
         title: "Error",
-        description: "Failed to save funnel pages",
+        description: "Failed to create tracking pixel",
         variant: "destructive",
       });
     },
   });
 
-  const handlePixelCreated = (data: PixelData) => {
-    console.log('PixelSetupWizard: Pixel created:', data);
-    setPixelData(data);
-    setCurrentStep(2);
+  const updatePixelConfig = useMutation({
+    mutationFn: async ({ pixelId, config }: { pixelId: string; config: any }) => {
+      const { error } = await supabase
+        .from('tracking_pixels')
+        .update({ config })
+        .eq('id', pixelId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tracking-pixels', projectId] });
+      toast({
+        title: "Success",
+        description: "Pixel configuration updated successfully",
+      });
+    },
+  });
+
+  const handlePixelCreated = async () => {
+    if (!pixelName.trim()) {
+      toast({
+        title: "Error",
+        description: "Pixel name is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    await createPixel.mutateAsync();
   };
 
   const handlePagesConfigured = async (pages: any[]) => {
-    console.log('PixelSetupWizard: Funnel pages configured:', pages);
-    
-    if (pixelData?.id) {
-      // Save the pages immediately when configured
-      try {
-        await savePixelConfig.mutateAsync({
-          pixelId: pixelData.id,
-          pages: pages
-        });
-        
-        console.log('PixelSetupWizard: Pages saved successfully, proceeding to step 3');
-        setCurrentStep(3);
-      } catch (error) {
-        console.error('PixelSetupWizard: Failed to save pages:', error);
-        // Don't proceed to next step if save failed
-      }
-    } else {
-      console.error('PixelSetupWizard: No pixel ID available to save config');
+    setFunnelPages(pages);
+
+    const pixelId = (existingPixels && existingPixels.length > 0) ? existingPixels[0].id : null;
+
+    if (!pixelId) {
+      console.error('Pixel ID not found');
       toast({
         title: "Error",
-        description: "No pixel found to save configuration",
+        description: "Pixel ID not found",
         variant: "destructive",
       });
+      return;
     }
+
+    const config = {
+      funnelPages: pages
+    };
+
+    await updatePixelConfig.mutateAsync({
+      pixelId: pixelId,
+      config: config
+    });
+
+    setCurrentStep(3);
   };
 
-  const handleConfigSaved = () => {
-    console.log('PixelSetupWizard: Configuration saved, invalidating queries');
-    queryClient.invalidateQueries({ queryKey: ['tracking-pixels', projectId] });
+  const handleBack = () => {
+    setCurrentStep(currentStep - 1);
   };
 
-  const nextStep = () => {
-    if (currentStep < 3) {
-      setCurrentStep(currentStep + 1);
-    }
-  };
+  const CreatePixelStep = ({ onPixelCreated, projectId }: { onPixelCreated: () => void, projectId: string }) => {
+    const [pixelName, setPixelName] = useState('');
+    const [domains, setDomains] = useState('');
 
-  const prevStep = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
-
-  const resetWizard = () => {
-    setCurrentStep(1);
-    setPixelData(null);
-    setFunnelPages([]);
-  };
-
-  if (activeTab === 'existing') {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setActiveTab('new')}
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Quick Setup
-          </Button>
-          <h2 className="text-xl font-semibold">Manage Existing Pixels</h2>
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="pixel-name">Pixel Name</Label>
+          <Input
+            id="pixel-name"
+            placeholder="e.g., My Awesome Project"
+            value={pixelName}
+            onChange={(e) => setPixelName(e.target.value)}
+          />
         </div>
-        <ExistingPixelManager projectId={projectId} />
+        <div className="space-y-2">
+          <Label htmlFor="domains">Domains (comma-separated)</Label>
+          <Input
+            id="domains"
+            placeholder="e.g., yourdomain.com, anotherdomain.net"
+            value={domains}
+            onChange={(e) => setDomains(e.target.value)}
+          />
+        </div>
+        <Button onClick={() => {
+          setPixelName(pixelName);
+          setDomains(domains);
+          onPixelCreated();
+        }} disabled={createPixel.isLoading}>
+          {createPixel.isLoading ? "Creating..." : "Create Pixel"}
+        </Button>
       </div>
+    );
+  };
+
+  // If project already has a pixel, show existing pixel manager instead
+  if (existingPixels && existingPixels.length > 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Pixel Already Exists</CardTitle>
+        </CardHeader>
+        <CardContent className="text-center py-8">
+          <Target className="h-16 w-16 mx-auto text-blue-600 mb-4" />
+          <h3 className="text-lg font-semibold mb-2">Project Pixel Active</h3>
+          <p className="text-gray-600 mb-4">
+            This project already has a tracking pixel configured. Each project can only have one pixel.
+          </p>
+          <p className="text-sm text-gray-500">
+            Use the "Manage Pixels" tab to edit your existing pixel configuration.
+          </p>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -160,114 +231,57 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Zap className="h-5 w-5 text-primary" />
-              Quick Pixel Setup
-            </CardTitle>
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList>
-                <TabsTrigger value="new">New Pixel</TabsTrigger>
-                <TabsTrigger value="existing">
-                  <Archive className="h-4 w-4 mr-2" />
-                  Manage Existing
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
+          <CardTitle className="flex items-center gap-2">
+            <Zap className="h-5 w-5" />
+            Quick Pixel Setup
+          </CardTitle>
+          <p className="text-gray-600">
+            Create and configure your tracking pixel in a few simple steps.
+          </p>
         </CardHeader>
         <CardContent>
-          {/* Progress Steps */}
-          <div className="flex items-center justify-between mb-8">
-            {steps.map((step, index) => {
-              const StepIcon = step.icon;
-              const isActive = currentStep === step.id;
-              const isCompleted = currentStep > step.id;
-              
-              return (
-                <div key={step.id} className="flex items-center">
-                  <div className={`
-                    flex items-center justify-center w-10 h-10 rounded-full border-2 transition-colors
-                    ${isActive ? 'border-primary bg-primary text-white' : 
-                      isCompleted ? 'border-green-500 bg-green-500 text-white' : 
-                      'border-gray-300 bg-white text-gray-400'}
-                  `}>
-                    <StepIcon className="h-5 w-5" />
-                  </div>
-                  <div className="ml-3">
-                    <p className={`text-sm font-medium ${isActive ? 'text-primary' : isCompleted ? 'text-green-600' : 'text-gray-500'}`}>
-                      Step {step.id}
-                    </p>
-                    <p className={`text-xs ${isActive ? 'text-primary' : isCompleted ? 'text-green-600' : 'text-gray-400'}`}>
-                      {step.title}
-                    </p>
-                  </div>
-                  {index < steps.length - 1 && (
-                    <div className={`flex-1 h-0.5 mx-4 ${isCompleted ? 'bg-green-500' : 'bg-gray-200'}`} />
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          {currentStep === 1 && (
+            <CreatePixelStep
+              onPixelCreated={handlePixelCreated}
+              projectId={projectId}
+            />
+          )}
 
-          {/* Step Content */}
-          <div className="min-h-[400px]">
-            {currentStep === 1 && (
-              <CreatePixelStep
-                projectId={projectId}
-                onPixelCreated={handlePixelCreated}
-              />
-            )}
-            
-            {currentStep === 2 && pixelData && (
-              <ConfigureInstallStep
-                projectId={projectId}
-                pixelData={pixelData}
+          {currentStep === 2 && pixelData && (
+            <div className="space-y-4">
+              <h3 className="font-semibold">Configure Funnel Pages</h3>
+              <FunnelPageMapper
                 onPagesConfigured={handlePagesConfigured}
+                funnelType={project?.funnel_type}
               />
-            )}
-            
-            {currentStep === 3 && pixelData && (
-              <TestVerifyStep
-                projectId={projectId}
-                pixelData={pixelData}
-                funnelPages={funnelPages}
-                onConfigSaved={handleConfigSaved}
-              />
-            )}
-          </div>
-
-          {/* Navigation */}
-          <div className="flex justify-between pt-6 border-t">
-            <Button
-              variant="outline"
-              onClick={prevStep}
-              disabled={currentStep === 1}
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Previous
-            </Button>
-            
-            <div className="flex gap-2">
-              {currentStep === 3 && (
-                <Button
-                  variant="outline"
-                  onClick={resetWizard}
-                >
-                  Create Another Pixel
-                </Button>
-              )}
-              
-              {currentStep < 3 && (
-                <Button
-                  onClick={nextStep}
-                  disabled={currentStep === 1 && !pixelData}
-                >
-                  Next
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
-              )}
             </div>
+          )}
+
+          {currentStep === 3 && pixelData && funnelPages.length > 0 && (
+            <SimplifiedInstallationGuide
+              pixelData={pixelData}
+              funnelPages={funnelPages}
+            />
+          )}
+
+          <div className="flex justify-between mt-6">
+            {currentStep > 1 && (
+              <Button variant="outline" onClick={handleBack}>
+                Back
+              </Button>
+            )}
+            {currentStep < 3 && (
+              <Button onClick={() => {
+                if (currentStep === 1) {
+                  handlePixelCreated();
+                } else if (currentStep === 2) {
+                  // handlePagesConfigured();
+                  setCurrentStep(3);
+                }
+              }} disabled={createPixel.isLoading}>
+                {currentStep === 1 ? (createPixel.isLoading ? "Creating..." : "Next: Configure Pages") : "Next: Get Tracking Code"}
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
