@@ -1,12 +1,12 @@
 
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TrackingPixelGenerator } from '@/components/TrackingPixelGenerator';
+import { PixelSetupWizard } from '@/components/PixelSetupWizard';
 import { TrackingPixelManager } from '@/components/TrackingPixelManager';
 import { AttributionDashboard } from '@/components/AttributionDashboard';
 import { ProjectSelector } from '@/components/ProjectSelector';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, Target, Code, BarChart3 } from "lucide-react";
+import { Activity, Target, Zap, BarChart3 } from "lucide-react";
 
 const Tracking = () => {
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
@@ -39,15 +39,11 @@ const Tracking = () => {
           </CardContent>
         </Card>
       ) : (
-        <Tabs defaultValue="overview" className="space-y-6">
+        <Tabs defaultValue="setup" className="space-y-6">
           <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="overview" className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Overview
-            </TabsTrigger>
-            <TabsTrigger value="pixel" className="flex items-center gap-2">
-              <Code className="h-4 w-4" />
-              Generate Pixel
+            <TabsTrigger value="setup" className="flex items-center gap-2">
+              <Zap className="h-4 w-4" />
+              Quick Setup
             </TabsTrigger>
             <TabsTrigger value="manage" className="flex items-center gap-2">
               <Activity className="h-4 w-4" />
@@ -57,14 +53,30 @@ const Tracking = () => {
               <Target className="h-4 w-4" />
               Attribution
             </TabsTrigger>
+            <TabsTrigger value="overview" className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Overview
+            </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="setup">
+            <PixelSetupWizard projectId={selectedProjectId} />
+          </TabsContent>
+
+          <TabsContent value="manage">
+            <TrackingPixelManager projectId={selectedProjectId} />
+          </TabsContent>
+
+          <TabsContent value="attribution">
+            <AttributionDashboard projectId={selectedProjectId} />
+          </TabsContent>
 
           <TabsContent value="overview">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Code className="h-5 w-5 text-blue-600" />
+                    <Zap className="h-5 w-5 text-blue-600" />
                     Tracking Pixel
                   </CardTitle>
                 </CardHeader>
@@ -121,18 +133,6 @@ const Tracking = () => {
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
-
-          <TabsContent value="pixel">
-            <TrackingPixelGenerator projectId={selectedProjectId} />
-          </TabsContent>
-
-          <TabsContent value="manage">
-            <TrackingPixelManager projectId={selectedProjectId} />
-          </TabsContent>
-
-          <TabsContent value="attribution">
-            <AttributionDashboard projectId={selectedProjectId} />
           </TabsContent>
         </Tabs>
       )}
