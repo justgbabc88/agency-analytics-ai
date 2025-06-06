@@ -89,6 +89,25 @@ const Tracking = () => {
     ).join(' ');
   };
 
+  const getPagePath = (pageUrl: string) => {
+    try {
+      if (!pageUrl || typeof pageUrl !== 'string') {
+        return 'Unknown page';
+      }
+      
+      // If it doesn't start with http, assume it's a relative path
+      if (!pageUrl.startsWith('http')) {
+        return pageUrl;
+      }
+      
+      const url = new URL(pageUrl);
+      return url.pathname;
+    } catch (error) {
+      console.warn('Invalid URL:', pageUrl, error);
+      return pageUrl || 'Unknown page';
+    }
+  };
+
   const handleRefreshEvents = () => {
     refetchEvents();
   };
@@ -233,7 +252,7 @@ const Tracking = () => {
                                 {event.event_name || formatEventType(event.event_type)}
                               </p>
                               <p className="text-sm text-muted-foreground">
-                                {new URL(event.page_url).pathname}
+                                {getPagePath(event.page_url)}
                               </p>
                             </div>
                           </div>
