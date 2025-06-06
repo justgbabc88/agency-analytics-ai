@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Copy, Globe, ShoppingCart, CheckCircle, FileText } from "lucide-react";
+import { Copy, Globe, ShoppingCart, CheckCircle, FileText, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface PixelData {
@@ -127,8 +127,8 @@ export const PageSpecificInstructions = ({ pixelData }: PageSpecificInstructions
       case 'Thank You':
         return `
     // Thank you page - track conversion
-    // Add this manually for each conversion:
-    // trackPurchase(orderAmount, 'USD', { email: 'customer@email.com' });
+    // IMPORTANT: You MUST manually call trackPurchase() with the actual order details
+    // Example: trackPurchase(orderAmount, 'USD', { email: 'customer@email.com' });
     
     setTimeout(() => {
       track('conversion_page_view', {
@@ -169,7 +169,7 @@ export const PageSpecificInstructions = ({ pixelData }: PageSpecificInstructions
       name: 'Thank You Page',
       icon: CheckCircle,
       description: 'Conversion confirmation page',
-      tracks: ['Conversion confirmation', 'Success page views']
+      tracks: ['Conversion confirmation', 'Success page views', 'Purchase tracking']
     },
     {
       id: 'general',
@@ -188,6 +188,30 @@ export const PageSpecificInstructions = ({ pixelData }: PageSpecificInstructions
           Copy the code for each page type and paste it in the &lt;head&gt; section of your HTML.
         </p>
       </div>
+
+      {/* Critical Purchase Tracking Alert */}
+      <Card className="border-orange-200 bg-orange-50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-orange-800">
+            <AlertTriangle className="h-5 w-5" />
+            Important: Purchase Tracking Setup
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-orange-800">
+            <strong>To track actual purchases and revenue, you MUST manually call the trackPurchase function on your thank you/confirmation page.</strong>
+          </p>
+          <div className="bg-white p-3 rounded border">
+            <p className="text-xs text-gray-600 mb-2">Add this code after a successful purchase:</p>
+            <code className="text-sm font-mono bg-gray-100 p-2 rounded block">
+              trackPurchase(99.99, 'USD', {'{'}email: 'customer@email.com', name: 'John Doe'{'}'});
+            </code>
+          </div>
+          <p className="text-xs text-orange-700">
+            Without this manual call, we can only track purchase intent (button clicks, form submissions) but not actual confirmed revenue.
+          </p>
+        </CardContent>
+      </Card>
 
       <Tabs defaultValue="landing" className="w-full">
         <TabsList className="grid w-full grid-cols-4">
@@ -241,14 +265,61 @@ export const PageSpecificInstructions = ({ pixelData }: PageSpecificInstructions
                 </div>
 
                 {pageType.id === 'thankyou' && (
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <h4 className="font-semibold text-blue-900 mb-2">Important:</h4>
-                    <p className="text-sm text-blue-800">
-                      On your thank you page, you need to manually call the purchase tracking function with the actual order details:
+                  <div className="space-y-4">
+                    <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
+                      <h4 className="font-semibold text-red-900 mb-2 flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4" />
+                        Critical: Manual Purchase Tracking Required
+                      </h4>
+                      <p className="text-sm text-red-800 mb-3">
+                        The script above only tracks that someone visited your thank you page. To track actual revenue and customer data, you <strong>MUST</strong> manually add the purchase tracking call.
+                      </p>
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-red-900">Add this line after a successful purchase:</p>
+                        <code className="block p-3 bg-white rounded text-sm border">
+                          trackPurchase(orderAmount, 'USD', {'{'}email: customerEmail, name: customerName{'}'});
+                        </code>
+                        <p className="text-xs text-red-700">
+                          Replace 'orderAmount', 'customerEmail', and 'customerName' with actual values from your order.
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+                      <h4 className="font-semibold text-blue-900 mb-2">Implementation Examples:</h4>
+                      <div className="space-y-3 text-sm">
+                        <div>
+                          <p className="font-medium text-blue-800">PHP Example:</p>
+                          <code className="block p-2 bg-white rounded text-xs mt-1">
+                            {`<script>
+  trackPurchase(<?php echo $order_total; ?>, 'USD', {
+    email: '<?php echo $customer_email; ?>',
+    name: '<?php echo $customer_name; ?>'
+  });
+</script>`}
+                          </code>
+                        </div>
+                        <div>
+                          <p className="font-medium text-blue-800">JavaScript Example:</p>
+                          <code className="block p-2 bg-white rounded text-xs mt-1">
+                            {`// After successful Stripe payment
+trackPurchase(paymentIntent.amount / 100, 'USD', {
+  email: customer.email,
+  name: customer.name
+});`}
+                          </code>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {pageType.id === 'checkout' && (
+                  <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+                    <h4 className="font-semibold text-yellow-900 mb-2">Note about Checkout Tracking:</h4>
+                    <p className="text-sm text-yellow-800">
+                      This page tracks checkout attempts (when forms are submitted), but not successful purchases. Actual purchase tracking happens on your thank you page using the trackPurchase() function.
                     </p>
-                    <code className="block mt-2 p-2 bg-white rounded text-xs">
-                      trackPurchase(99.99, 'USD', {'{'}email: 'customer@email.com', name: 'John Doe'{'}'});
-                    </code>
                   </div>
                 )}
               </CardContent>
