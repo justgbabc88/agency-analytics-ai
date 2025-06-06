@@ -1,14 +1,24 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Eye, Trash2, Copy, Globe, ShoppingCart, CheckCircle, Video, Calendar, FileText, Settings, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
+import { Eye, Trash2, Copy, Globe, ShoppingCart, CheckCircle, Video, Calendar, FileText, Settings, ChevronDown, ChevronUp, ExternalLink, AlertTriangle } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from "@/hooks/use-toast";
 import { FunnelPageMapper } from './wizard/FunnelPageMapper';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface TrackingPixelManagerProps {
   projectId: string;
@@ -137,6 +147,75 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
       toast({
         title: "Success",
         description: "Pixel status updated successfully",
+      });
+    },
+  });
+
+  const clearPixelData = useMutation({
+    mutationFn: async (pixelId: string) => {
+      console.log('Clearing data for pixel:', pixelId);
+      
+      // First get the pixel to get its pixel_id
+      const { data: pixel, error: pixelError } = await supabase
+        .from('tracking_pixels')
+        .select('pixel_id')
+        .eq('id', pixelId)
+        .single();
+
+      if (pixelError || !pixel) {
+        throw new Error('Pixel not found');
+      }
+
+      // Delete tracking events for this project
+      const { error: eventsError } = await supabase
+        .from('tracking_events')
+        .delete()
+        .eq('project_id', projectId);
+
+      if (eventsError) {
+        console.error('Error deleting tracking events:', eventsError);
+        throw eventsError;
+      }
+
+      // Delete tracking sessions for this project
+      const { error: sessionsError } = await supabase
+        .from('tracking_sessions')
+        .delete()
+        .eq('project_id', projectId);
+
+      if (sessionsError) {
+        console.error('Error deleting tracking sessions:', sessionsError);
+        throw sessionsError;
+      }
+
+      // Delete attribution data for this project
+      const { error: attributionError } = await supabase
+        .from('attribution_data')
+        .delete()
+        .eq('project_id', projectId);
+
+      if (attributionError) {
+        console.error('Error deleting attribution data:', attributionError);
+        throw attributionError;
+      }
+
+      console.log('Successfully cleared all tracking data for pixel');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tracking-pixels', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['recent-events', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['event-stats', projectId] });
+      toast({
+        title: "Success",
+        description: "All tracking data cleared successfully",
+      });
+    },
+    onError: (error) => {
+      console.error('Error clearing pixel data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to clear tracking data",
+        variant: "destructive",
       });
     },
   });
@@ -421,6 +500,36 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
                             {isExpanded ? 'Hide Codes' : 'Show Codes'}
                           </Button>
                         )}
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-orange-600 hover:text-orange-700"
+                            >
+                              <AlertTriangle className="h-4 w-4 mr-2" />
+                              Clear Data
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Clear Tracking Data</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will permanently delete all tracking events, sessions, and attribution data for this project. 
+                                This action cannot be undone. Are you sure you want to proceed?
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => clearPixelData.mutate(pixel.id)}
+                                className="bg-red-600 hover:bg-red-700"
+                              >
+                                Clear All Data
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                         <Button
                           size="sm"
                           variant="outline"
