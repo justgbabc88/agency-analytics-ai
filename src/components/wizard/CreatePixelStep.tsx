@@ -14,24 +14,28 @@ interface PixelData {
   name: string;
   pixelId: string;
   domains: string;
-  config: any;
+  config?: any;
 }
 
 interface CreatePixelStepProps {
   projectId: string;
-  pixelData: PixelData;
-  updatePixelData: (updates: Partial<PixelData>) => void;
-  onComplete: () => void;
+  onPixelCreated: (data: PixelData) => void;
 }
 
-export const CreatePixelStep = ({ projectId, pixelData, updatePixelData, onComplete }: CreatePixelStepProps) => {
+export const CreatePixelStep = ({ projectId, onPixelCreated }: CreatePixelStepProps) => {
+  const [pixelData, setPixelData] = useState<PixelData>({
+    name: '',
+    pixelId: '',
+    domains: '',
+    config: {}
+  });
   const [isCreating, setIsCreating] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const generatePixelId = () => {
     const id = `pixel_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    updatePixelData({ pixelId: id });
+    setPixelData(prev => ({ ...prev, pixelId: id }));
   };
 
   useEffect(() => {
@@ -49,7 +53,8 @@ export const CreatePixelStep = ({ projectId, pixelData, updatePixelData, onCompl
           name: pixelData.name,
           pixel_id: pixelData.pixelId,
           domains: pixelData.domains ? pixelData.domains.split(',').map(d => d.trim()) : null,
-          is_active: true
+          is_active: true,
+          config: { funnelPages: [] }
         })
         .select()
         .single();
@@ -58,13 +63,17 @@ export const CreatePixelStep = ({ projectId, pixelData, updatePixelData, onCompl
       return data;
     },
     onSuccess: (data) => {
-      updatePixelData({ id: data.id });
+      const updatedPixelData = {
+        ...pixelData,
+        id: data.id,
+        config: data.config || { funnelPages: [] }
+      };
       queryClient.invalidateQueries({ queryKey: ['tracking-pixels', projectId] });
       toast({
         title: "Success!",
         description: "Tracking pixel created successfully",
       });
-      onComplete();
+      onPixelCreated(updatedPixelData);
     },
     onError: (error) => {
       toast({
@@ -111,7 +120,7 @@ export const CreatePixelStep = ({ projectId, pixelData, updatePixelData, onCompl
             <Input
               id="pixelName"
               value={pixelData.name}
-              onChange={(e) => updatePixelData({ name: e.target.value })}
+              onChange={(e) => setPixelData(prev => ({ ...prev, name: e.target.value }))}
               placeholder="e.g., Main Website Pixel"
               className="mt-1"
             />
@@ -125,7 +134,7 @@ export const CreatePixelStep = ({ projectId, pixelData, updatePixelData, onCompl
             <Input
               id="domains"
               value={pixelData.domains}
-              onChange={(e) => updatePixelData({ domains: e.target.value })}
+              onChange={(e) => setPixelData(prev => ({ ...prev, domains: e.target.value }))}
               placeholder="e.g., yourdomain.com, subdomain.yourdomain.com"
               className="mt-1"
             />

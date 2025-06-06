@@ -6,19 +6,22 @@ import { SimplifiedInstallationGuide } from './SimplifiedInstallationGuide';
 import { FunnelPageMapper } from './FunnelPageMapper';
 import { ArrowLeft, ArrowRight } from "lucide-react";
 
-interface ConfigureInstallStepProps {
-  pixelData: {
-    name: string;
-    pixelId: string;
-    domains: string;
-  };
-  funnelPages: any[];
-  onBack: () => void;
-  onNext: (pages: any[]) => void;
+interface PixelData {
+  id?: string;
+  name: string;
+  pixelId: string;
+  domains: string;
+  config?: any;
 }
 
-export const ConfigureInstallStep = ({ pixelData, funnelPages, onBack, onNext }: ConfigureInstallStepProps) => {
-  const [currentPages, setCurrentPages] = useState<any[]>(funnelPages);
+interface ConfigureInstallStepProps {
+  projectId: string;
+  pixelData: PixelData;
+  onPagesConfigured: (pages: any[]) => void;
+}
+
+export const ConfigureInstallStep = ({ projectId, pixelData, onPagesConfigured }: ConfigureInstallStepProps) => {
+  const [currentPages, setCurrentPages] = useState<any[]>([]);
   const [showCodes, setShowCodes] = useState(false);
 
   const handlePagesConfigured = (pages: any[]) => {
@@ -27,16 +30,18 @@ export const ConfigureInstallStep = ({ pixelData, funnelPages, onBack, onNext }:
   };
 
   const handleContinue = () => {
-    onNext(currentPages);
+    onPagesConfigured(currentPages);
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <Button variant="outline" onClick={onBack}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Setup
-        </Button>
+        <div className="text-center space-y-2">
+          <h3 className="text-lg font-semibold">Configure & Install Your Pixel</h3>
+          <p className="text-muted-foreground">
+            Map your funnel pages and get installation codes.
+          </p>
+        </div>
         {showCodes && currentPages.length > 0 && (
           <Button onClick={handleContinue}>
             Continue to Verification
