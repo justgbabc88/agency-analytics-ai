@@ -1,13 +1,11 @@
-
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PixelSetupWizard } from '@/components/PixelSetupWizard';
 import { TrackingPixelManager } from '@/components/TrackingPixelManager';
 import { AttributionDashboard } from '@/components/AttributionDashboard';
-import { ExistingPixelManager } from '@/components/wizard/ExistingPixelManager';
 import { ProjectSelector } from '@/components/ProjectSelector';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, Target, Zap, BarChart3, Code } from "lucide-react";
+import { Activity, Target, Zap, BarChart3 } from "lucide-react";
 
 const Tracking = () => {
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
@@ -41,14 +39,10 @@ const Tracking = () => {
         </Card>
       ) : (
         <Tabs defaultValue="setup" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="setup" className="flex items-center gap-2">
               <Zap className="h-4 w-4" />
               Quick Setup
-            </TabsTrigger>
-            <TabsTrigger value="existing" className="flex items-center gap-2">
-              <Code className="h-4 w-4" />
-              Get Codes
             </TabsTrigger>
             <TabsTrigger value="manage" className="flex items-center gap-2">
               <Activity className="h-4 w-4" />
@@ -66,10 +60,6 @@ const Tracking = () => {
 
           <TabsContent value="setup">
             <PixelSetupWizard projectId={selectedProjectId} />
-          </TabsContent>
-
-          <TabsContent value="existing">
-            <ExistingPixelManager projectId={selectedProjectId} />
           </TabsContent>
 
           <TabsContent value="manage">

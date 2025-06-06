@@ -1,12 +1,14 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Trash2, BarChart3, Copy, Globe, ShoppingCart, CheckCircle, Video, Calendar, FileText } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Eye, Trash2, BarChart3, Copy, Globe, ShoppingCart, CheckCircle, Video, Calendar, FileText, Settings, ChevronDown, ChevronUp } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from "@/hooks/use-toast";
+import { FunnelPageMapper } from './wizard/FunnelPageMapper';
 
 interface TrackingPixelManagerProps {
   projectId: string;
@@ -28,6 +30,8 @@ interface PixelWithConfig {
 }
 
 export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) => {
+  const [expandedPixels, setExpandedPixels] = useState<Set<string>>(new Set());
+  const [editingPixels, setEditingPixels] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -73,6 +77,24 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
     enabled: !!projectId,
   });
 
+  const updatePixelConfig = useMutation({
+    mutationFn: async ({ pixelId, config }: { pixelId: string; config: any }) => {
+      const { error } = await supabase
+        .from('tracking_pixels')
+        .update({ config })
+        .eq('id', pixelId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tracking-pixels', projectId] });
+      toast({
+        title: "Success",
+        description: "Pixel configuration updated successfully",
+      });
+    },
+  });
+
   const deletePixel = useMutation({
     mutationFn: async (pixelId: string) => {
       const { error } = await supabase
@@ -115,6 +137,28 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
       });
     },
   });
+
+  const handlePagesUpdate = async (pixelId: string, pages: any[]) => {
+    const pixel = pixels?.find(p => p.id === pixelId);
+    if (!pixel) return;
+
+    const updatedConfig = {
+      ...(pixel.config || {}),
+      funnelPages: pages
+    };
+
+    await updatePixelConfig.mutateAsync({
+      pixelId: pixelId,
+      config: updatedConfig
+    });
+
+    // Close editing mode
+    setEditingPixels(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(pixelId);
+      return newSet;
+    });
+  };
 
   const generatePageScript = (page: any, pixelId: string) => {
     const supabaseUrl = "https://iqxvtfupjjxjkbajgcve.supabase.co";
@@ -223,6 +267,30 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
     }
   };
 
+  const togglePixelExpansion = (pixelId: string) => {
+    setExpandedPixels(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(pixelId)) {
+        newSet.delete(pixelId);
+      } else {
+        newSet.add(pixelId);
+      }
+      return newSet;
+    });
+  };
+
+  const togglePixelEditing = (pixelId: string) => {
+    setEditingPixels(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(pixelId)) {
+        newSet.delete(pixelId);
+      } else {
+        newSet.add(pixelId);
+      }
+      return newSet;
+    });
+  };
+
   if (isLoading) {
     return <div>Loading tracking pixels...</div>;
   }
@@ -273,7 +341,8 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
             <div className="space-y-6">
               {pixels?.map((pixel) => {
                 const funnelPages = pixel.config?.funnelPages || [];
-                console.log(`Pixel ${pixel.name} has ${funnelPages.length} funnel pages:`, funnelPages);
+                const isExpanded = expandedPixels.has(pixel.id);
+                const isEditing = editingPixels.has(pixel.id);
                 
                 return (
                   <div key={pixel.id} className="border rounded-lg p-4 space-y-4">
@@ -293,8 +362,29 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
                             Domains: {pixel.domains.join(', ')}
                           </p>
                         )}
+                        <p className="text-xs text-gray-500 mt-1">
+                          {funnelPages.length} funnel pages configured
+                        </p>
                       </div>
                       <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => togglePixelEditing(pixel.id)}
+                        >
+                          <Settings className="h-4 w-4 mr-2" />
+                          {isEditing ? 'Cancel' : 'Edit Pages'}
+                        </Button>
+                        {funnelPages.length > 0 && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => togglePixelExpansion(pixel.id)}
+                          >
+                            {isExpanded ? <ChevronUp className="h-4 w-4 mr-2" /> : <ChevronDown className="h-4 w-4 mr-2" />}
+                            {isExpanded ? 'Hide Codes' : 'Show Codes'}
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="outline"
@@ -317,54 +407,73 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
                       </div>
                     </div>
 
-                    {funnelPages.length > 0 ? (
-                      <div>
-                        <h4 className="font-medium mb-3">Page Tracking Codes ({funnelPages.length} pages)</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                    {isEditing && (
+                      <div className="border-t pt-4">
+                        <h4 className="font-medium mb-3">Edit Funnel Pages</h4>
+                        <FunnelPageMapper
+                          onPagesConfigured={(pages) => handlePagesUpdate(pixel.id, pages)}
+                          initialPages={funnelPages}
+                        />
+                      </div>
+                    )}
+
+                    {isExpanded && funnelPages.length > 0 && (
+                      <div className="border-t pt-4">
+                        <h4 className="font-medium mb-3">Tracking Codes</h4>
+                        <div className="space-y-4">
                           {funnelPages.map((page: any) => {
                             const PageIcon = getPageIcon(page.type);
                             const script = generatePageScript(page, pixel.pixel_id);
                             
                             return (
-                              <Card key={page.id} className="relative">
-                                <CardHeader className="pb-2">
+                              <Card key={page.id} className="p-4">
+                                <div className="flex items-center justify-between mb-3">
                                   <div className="flex items-center gap-2">
                                     <PageIcon className="h-4 w-4 text-primary" />
-                                    <CardTitle className="text-sm">{page.name}</CardTitle>
-                                  </div>
-                                </CardHeader>
-                                <CardContent className="pt-0 space-y-2">
-                                  <div className="flex flex-wrap gap-1">
-                                    {(page.events || []).slice(0, 2).map((event: string) => (
-                                      <Badge key={event} variant="secondary" className="text-xs">
-                                        {event.replace(/_/g, ' ')}
-                                      </Badge>
-                                    ))}
-                                    {(page.events || []).length > 2 && (
-                                      <Badge variant="outline" className="text-xs">
-                                        +{(page.events || []).length - 2} more
-                                      </Badge>
-                                    )}
+                                    <h5 className="font-medium">{page.name}</h5>
                                   </div>
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="w-full"
                                     onClick={() => copyToClipboard(script, page.name)}
                                   >
-                                    <Copy className="h-3 w-3 mr-1" />
+                                    <Copy className="h-4 w-4 mr-2" />
                                     Copy Code
                                   </Button>
-                                </CardContent>
+                                </div>
+                                <div className="space-y-2">
+                                  <div className="flex flex-wrap gap-1">
+                                    {(page.events || []).map((event: string) => (
+                                      <Badge key={event} variant="secondary" className="text-xs">
+                                        {event.replace(/_/g, ' ')}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                  <Textarea
+                                    value={script}
+                                    readOnly
+                                    className="font-mono text-xs h-32 bg-muted resize-none"
+                                  />
+                                </div>
                               </Card>
                             );
                           })}
                         </div>
                       </div>
-                    ) : (
+                    )}
+
+                    {funnelPages.length === 0 && !isEditing && (
                       <div className="text-center py-4 text-gray-500 bg-gray-50 rounded">
                         <p className="text-sm">No funnel pages configured yet.</p>
-                        <p className="text-xs">Use the Quick Setup to add pages and generate tracking codes.</p>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="mt-2"
+                          onClick={() => togglePixelEditing(pixel.id)}
+                        >
+                          <Settings className="h-4 w-4 mr-2" />
+                          Configure Pages
+                        </Button>
                       </div>
                     )}
                   </div>
