@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -42,6 +41,52 @@ interface EventRecord {
 export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) => {
   const [timeRange, setTimeRange] = useState('7d');
   const [selectedPixelId, setSelectedPixelId] = useState<string>('');
+
+  // Helper functions defined first to avoid hoisting issues
+  const getPageIcon = (type: string) => {
+    switch (type) {
+      case 'landing': return Globe;
+      case 'checkout': return ShoppingCart;
+      case 'thankyou': return CheckCircle;
+      case 'webinar': return Video;
+      case 'booking': return Calendar;
+      default: return FileText;
+    }
+  };
+
+  const getPageTypeColor = (type: string) => {
+    switch (type) {
+      case 'landing': return '#8884d8';
+      case 'checkout': return '#82ca9d';
+      case 'thankyou': return '#ffc658';
+      case 'webinar': return '#ff7300';
+      case 'booking': return '#00ff00';
+      default: return '#8884d8';
+    }
+  };
+
+  const getEventTypeColor = (eventType: string) => {
+    switch (eventType.toLowerCase()) {
+      case 'page_view': return '#8884d8';
+      case 'form_submission': return '#82ca9d';
+      case 'click': return '#ffc658';
+      case 'purchase': return '#ff7300';
+      case 'webinar_registration': return '#00ff00';
+      case 'call_booking': return '#ff0000';
+      default: return '#8884d8';
+    }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount);
+  };
+
+  const formatPercentage = (value: number) => {
+    return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
+  };
 
   // Get tracking pixels for this project
   const { data: pixels } = useQuery({
@@ -252,51 +297,6 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
       eventsTrend
     };
   }, [eventStats]);
-
-  const getPageIcon = (type: string) => {
-    switch (type) {
-      case 'landing': return Globe;
-      case 'checkout': return ShoppingCart;
-      case 'thankyou': return CheckCircle;
-      case 'webinar': return Video;
-      case 'booking': return Calendar;
-      default: return FileText;
-    }
-  };
-
-  const getPageTypeColor = (type: string) => {
-    switch (type) {
-      case 'landing': return '#8884d8';
-      case 'checkout': return '#82ca9d';
-      case 'thankyou': return '#ffc658';
-      case 'webinar': return '#ff7300';
-      case 'booking': return '#00ff00';
-      default: return '#8884d8';
-    }
-  };
-
-  const getEventTypeColor = (eventType: string) => {
-    switch (eventType.toLowerCase()) {
-      case 'page_view': return '#8884d8';
-      case 'form_submission': return '#82ca9d';
-      case 'click': return '#ffc658';
-      case 'purchase': return '#ff7300';
-      case 'webinar_registration': return '#00ff00';
-      case 'call_booking': return '#ff0000';
-      default: return '#8884d8';
-    }
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount);
-  };
-
-  const formatPercentage = (value: number) => {
-    return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
-  };
 
   if (isLoading) {
     return <div>Loading attribution data...</div>;
