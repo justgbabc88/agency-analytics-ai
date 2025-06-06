@@ -37,8 +37,8 @@ const WebsitePreview = ({ url, pageName }: { url: string; pageName: string }) =>
       // Ensure URL has protocol
       const cleanUrl = url.startsWith('http') ? url : `https://${url}`;
       
-      // Try website-screenshot.vercel.app first (more reliable)
-      return `https://website-screenshot.vercel.app/api?url=${encodeURIComponent(cleanUrl)}&width=1200&height=800&fullPage=false`;
+      // Try screenshotmachine.com API (more reliable)
+      return `https://api.screenshotmachine.com/?key=demo&url=${encodeURIComponent(cleanUrl)}&dimension=1200x800&device=desktop&format=png&cacheLimit=0`;
     } catch (error) {
       console.error('Error generating screenshot URL:', error);
       return null;
