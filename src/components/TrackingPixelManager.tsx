@@ -1,9 +1,10 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Eye, Trash2, BarChart3, Copy, Globe, ShoppingCart, CheckCircle, Video, Calendar, FileText, Settings, ChevronDown, ChevronUp, RefreshCw, ExternalLink } from "lucide-react";
+import { Eye, Trash2, Copy, Globe, ShoppingCart, CheckCircle, Video, Calendar, FileText, Settings, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from "@/hooks/use-toast";
@@ -25,89 +26,6 @@ interface PixelWithConfig {
   conversion_events: string[];
   config: any; // Database Json type - we'll safely access this
 }
-
-// Component for website preview screenshot
-const WebsitePreview = ({ url, pageName }: { url: string; pageName: string }) => {
-  const [imageError, setImageError] = useState(false);
-  const [imageLoading, setImageLoading] = useState(true);
-  
-  // Use Google's PageSpeed Insights API for screenshots (free and reliable)
-  const getScreenshotUrl = (url: string) => {
-    try {
-      // Ensure URL has protocol
-      const cleanUrl = url.startsWith('http') ? url : `https://${url}`;
-      
-      // Use Thumbnail.ws free tier (1000 free screenshots per month)
-      return `https://api.thumbnail.ws/api/89b67a5d6df844538b504b4b6c98648f6f42/thumbnail/get?url=${encodeURIComponent(cleanUrl)}&width=400`;
-    } catch (error) {
-      console.error('Error generating screenshot URL:', error);
-      return null;
-    }
-  };
-
-  const screenshotUrl = getScreenshotUrl(url);
-  
-  if (imageError || !screenshotUrl) {
-    return (
-      <div className="w-full h-32 bg-gray-100 rounded border flex items-center justify-center">
-        <div className="text-center">
-          <Globe className="h-8 w-8 mx-auto text-gray-400 mb-2" />
-          <p className="text-xs text-gray-500">Preview unavailable</p>
-          <a 
-            href={url.startsWith('http') ? url : `https://${url}`}
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="text-xs text-blue-600 hover:underline flex items-center justify-center mt-1"
-          >
-            Visit page <ExternalLink className="h-3 w-3 ml-1" />
-          </a>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="relative w-full h-32 bg-gray-100 rounded border overflow-hidden">
-      {imageLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white">
-          <div className="animate-pulse flex items-center">
-            <div className="w-6 h-6 bg-gray-300 rounded mr-2 animate-pulse"></div>
-            <span className="text-xs text-gray-500">Loading preview...</span>
-          </div>
-        </div>
-      )}
-      <img
-        src={screenshotUrl}
-        alt={`Preview of ${pageName}`}
-        className={`w-full h-full object-cover transition-opacity duration-300 ${imageLoading ? 'opacity-0' : 'opacity-100'}`}
-        onLoad={() => {
-          console.log('Screenshot loaded successfully for:', url);
-          setImageLoading(false);
-        }}
-        onError={(e) => {
-          console.error('Screenshot failed to load for:', url, e);
-          setImageError(true);
-          setImageLoading(false);
-        }}
-      />
-      {!imageLoading && !imageError && (
-        <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-10 transition-all duration-200 flex items-end">
-          <div className="w-full bg-gradient-to-t from-black/50 to-transparent p-2">
-            <a 
-              href={url.startsWith('http') ? url : `https://${url}`}
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-white text-xs hover:underline flex items-center"
-            >
-              {url.length > 40 ? `${url.substring(0, 40)}...` : url}
-              <ExternalLink className="h-3 w-3 ml-1" />
-            </a>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
 
 export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) => {
   const [expandedPixels, setExpandedPixels] = useState<Set<string>>(new Set());
@@ -153,59 +71,6 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
     },
     enabled: !!projectId,
     refetchInterval: 5000, // Refetch every 5 seconds to catch updates
-  });
-
-  const { data: pixelStats, refetch: refetchStats } = useQuery({
-    queryKey: ['pixel-stats', projectId],
-    queryFn: async () => {
-      console.log('Fetching pixel stats for project:', projectId);
-      const { data, error } = await supabase
-        .from('tracking_events')
-        .select('event_type, created_at, event_name')
-        .eq('project_id', projectId);
-
-      if (error) {
-        console.error('Error fetching pixel stats:', error);
-        throw error;
-      }
-
-      console.log('Fetched tracking events:', data);
-
-      const stats = data?.reduce((acc, event) => {
-        acc.totalEvents = (acc.totalEvents || 0) + 1;
-        acc.eventTypes = acc.eventTypes || {};
-        acc.eventTypes[event.event_type] = (acc.eventTypes[event.event_type] || 0) + 1;
-        return acc;
-      }, {} as any);
-
-      console.log('Computed stats:', stats);
-      return stats || { totalEvents: 0, eventTypes: {} };
-    },
-    enabled: !!projectId,
-    refetchInterval: 10000, // Refetch every 10 seconds
-  });
-
-  const { data: recentEvents, refetch: refetchEvents } = useQuery({
-    queryKey: ['recent-events', projectId],
-    queryFn: async () => {
-      console.log('Fetching recent events for project:', projectId);
-      const { data, error } = await supabase
-        .from('tracking_events')
-        .select('*')
-        .eq('project_id', projectId)
-        .order('created_at', { ascending: false })
-        .limit(20);
-
-      if (error) {
-        console.error('Error fetching recent events:', error);
-        throw error;
-      }
-
-      console.log('Fetched recent events:', data);
-      return data || [];
-    },
-    enabled: !!projectId,
-    refetchInterval: 5000, // Refetch every 5 seconds
   });
 
   const updatePixelConfig = useMutation({
@@ -461,25 +326,6 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
     }
   };
 
-  const getEventTypeColor = (eventType: string) => {
-    switch (eventType) {
-      case 'page_view': return 'bg-blue-100 text-blue-800';
-      case 'form_submission': return 'bg-green-100 text-green-800';
-      case 'click': return 'bg-purple-100 text-purple-800';
-      case 'purchase': return 'bg-yellow-100 text-yellow-800';
-      case 'webinar_registration': return 'bg-orange-100 text-orange-800';
-      case 'call_booking': return 'bg-indigo-100 text-indigo-800';
-      case 'custom_event': return 'bg-pink-100 text-pink-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const formatEventType = (eventType: string) => {
-    return eventType.split('_').map(word => 
-      word.charAt(0).toUpperCase() + word.slice(1)
-    ).join(' ');
-  };
-
   const togglePixelExpansion = (pixelId: string) => {
     setExpandedPixels(prev => {
       const newSet = new Set(prev);
@@ -504,96 +350,12 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
     });
   };
 
-  const handleRefreshEvents = () => {
-    console.log('TrackingPixelManager: Manually refreshing all data');
-    refetchEvents();
-    refetchStats();
-    refetchPixels(); // Also refresh pixels to get latest config
-    toast({
-      title: "Refreshed",
-      description: "All data has been updated",
-    });
-  };
-
   if (isLoading) {
     return <div>Loading tracking pixels...</div>;
   }
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              Tracking Overview
-            </CardTitle>
-            <Button onClick={handleRefreshEvents} variant="outline" size="sm">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh Data
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">
-                {pixels?.length || 0}
-              </div>
-              <div className="text-sm text-gray-600">Active Pixels</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">
-                {pixelStats?.totalEvents || 0}
-              </div>
-              <div className="text-sm text-gray-600">Total Events</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">
-                {Object.keys(pixelStats?.eventTypes || {}).length}
-              </div>
-              <div className="text-sm text-gray-600">Event Types</div>
-            </div>
-          </div>
-
-          {/* Event Types Breakdown */}
-          {pixelStats?.eventTypes && Object.keys(pixelStats.eventTypes).length > 0 && (
-            <div className="mt-4 space-y-2">
-              <h4 className="font-medium">Event Types Breakdown:</h4>
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(pixelStats.eventTypes).map(([eventType, count]: [string, any]) => (
-                  <Badge key={eventType} className={getEventTypeColor(eventType)}>
-                    {formatEventType(eventType)}: {count}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Recent Events */}
-          {recentEvents && recentEvents.length > 0 && (
-            <div className="mt-6">
-              <h4 className="font-medium mb-3">Recent Events (Last 20)</h4>
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {recentEvents.map((event, index) => (
-                  <div key={event.id} className="flex items-center justify-between p-2 border rounded text-sm">
-                    <div className="flex items-center space-x-2">
-                      <Badge className={getEventTypeColor(event.event_type)}>
-                        {formatEventType(event.event_type)}
-                      </Badge>
-                      <span>{event.event_name || formatEventType(event.event_type)}</span>
-                    </div>
-                    <span className="text-xs text-gray-500">
-                      {new Date(event.created_at).toLocaleString()}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
       <Card>
         <CardHeader>
           <CardTitle>Tracking Pixels</CardTitle>
@@ -681,7 +443,7 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
                       </div>
                     </div>
 
-                    {/* Display funnel pages with clickable links instead of previews */}
+                    {/* Display funnel pages with clickable links */}
                     {funnelPages.length > 0 && !isEditing && (
                       <div className="border-t pt-4">
                         <h4 className="font-medium mb-3">Connected Pages</h4>

@@ -5,8 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { TrendingUp, DollarSign, Users, MousePointer, Activity } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
+import { TrendingUp, DollarSign, Users, MousePointer, Activity, Globe, ShoppingCart, CheckCircle, Video, Calendar, FileText } from "lucide-react";
 
 interface AttributionDashboardProps {
   projectId: string;
@@ -53,10 +53,15 @@ interface AttributionRecord {
 }
 
 interface EventRecord {
+  id: string;
   event_type: string;
   event_name: string | null;
   page_url: string;
   created_at: string;
+  revenue_amount: number | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  contact_name: string | null;
 }
 
 export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) => {
@@ -122,9 +127,10 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
 
       const { data, error } = await supabase
         .from('tracking_events')
-        .select('event_type, event_name, page_url, created_at')
+        .select('*')
         .eq('project_id', projectId)
-        .gte('created_at', startDate.toISOString());
+        .gte('created_at', startDate.toISOString())
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       return (data || []) as EventRecord[];
@@ -136,24 +142,112 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
   const selectedPixel = pixels?.find(p => p.id === selectedPixelId);
   const configuredPages = selectedPixel?.config?.funnelPages || [];
 
-  // Process event stats by configured pages
-  const pageStats = configuredPages.map((page: any) => {
-    const pageEvents = eventStats?.filter(event => 
-      event.page_url?.includes(new URL(page.url).pathname) ||
-      event.event_name?.includes(page.name)
-    ) || [];
+  // Helper function to get page name from URL
+  const getPageNameFromUrl = (pageUrl: string): string => {
+    // First try to match with configured pages
+    const matchedPage = configuredPages.find((page: any) => {
+      try {
+        const configuredUrl = new URL(page.url.startsWith('http') ? page.url : `https://${page.url}`);
+        const eventUrl = new URL(pageUrl);
+        return configuredUrl.pathname === eventUrl.pathname || pageUrl.includes(configuredUrl.pathname);
+      } catch {
+        return pageUrl.includes(page.url) || page.url.includes(pageUrl);
+      }
+    });
 
-    const eventBreakdown = page.events.reduce((acc: Record<string, number>, eventType: string) => {
-      acc[eventType] = pageEvents.filter(e => e.event_type === eventType).length;
-      return acc;
-    }, {} as Record<string, number>);
+    if (matchedPage) {
+      return matchedPage.name;
+    }
 
-    return {
-      ...page,
-      totalEvents: pageEvents.length,
-      eventBreakdown
-    };
-  });
+    // Extract page name from URL path
+    try {
+      const url = new URL(pageUrl);
+      const pathname = url.pathname;
+      if (pathname === '/' || pathname === '') return 'Home Page';
+      
+      // Remove leading slash and convert to readable name
+      const pageName = pathname.substring(1)
+        .split('/')
+        .map(segment => segment.replace(/-/g, ' ').replace(/_/g, ' '))
+        .map(segment => segment.charAt(0).toUpperCase() + segment.slice(1))
+        .join(' / ');
+      
+      return pageName || 'Unknown Page';
+    } catch {
+      return pageUrl || 'Unknown Page';
+    }
+  };
+
+  // Helper function to get page type from URL or event
+  const getPageType = (pageUrl: string, eventType: string): string => {
+    const matchedPage = configuredPages.find((page: any) => {
+      try {
+        const configuredUrl = new URL(page.url.startsWith('http') ? page.url : `https://${page.url}`);
+        const eventUrl = new URL(pageUrl);
+        return configuredUrl.pathname === eventUrl.pathname || pageUrl.includes(configuredUrl.pathname);
+      } catch {
+        return pageUrl.includes(page.url) || page.url.includes(pageUrl);
+      }
+    });
+
+    if (matchedPage) {
+      return matchedPage.type;
+    }
+
+    // Infer type from URL patterns
+    const url = pageUrl.toLowerCase();
+    if (url.includes('checkout') || url.includes('payment')) return 'checkout';
+    if (url.includes('thank') || url.includes('success') || url.includes('confirmation')) return 'thankyou';
+    if (url.includes('webinar') || url.includes('training')) return 'webinar';
+    if (url.includes('book') || url.includes('schedule') || url.includes('calendar')) return 'booking';
+    if (eventType === 'purchase') return 'checkout';
+    if (eventType === 'webinar_registration') return 'webinar';
+    if (eventType === 'call_booking') return 'booking';
+    
+    return 'landing';
+  };
+
+  // Process event stats by pages with enhanced data
+  const pageStats = eventStats?.reduce((acc: any[], event) => {
+    const pageName = getPageNameFromUrl(event.page_url);
+    const pageType = getPageType(event.page_url, event.event_type);
+    
+    let existingPage = acc.find(p => p.pageName === pageName);
+    
+    if (!existingPage) {
+      existingPage = {
+        pageName,
+        pageType,
+        pageUrl: event.page_url,
+        totalEvents: 0,
+        totalRevenue: 0,
+        eventBreakdown: {},
+        uniqueVisitors: new Set(),
+        conversions: 0
+      };
+      acc.push(existingPage);
+    }
+    
+    existingPage.totalEvents += 1;
+    existingPage.eventBreakdown[event.event_type] = (existingPage.eventBreakdown[event.event_type] || 0) + 1;
+    
+    if (event.revenue_amount && event.revenue_amount > 0) {
+      existingPage.totalRevenue += parseFloat(event.revenue_amount.toString());
+      existingPage.conversions += 1;
+    }
+    
+    if (event.contact_email) {
+      existingPage.uniqueVisitors.add(event.contact_email);
+    }
+    
+    return acc;
+  }, []) || [];
+
+  // Convert Sets to counts for display
+  const processedPageStats = pageStats.map(page => ({
+    ...page,
+    uniqueVisitors: page.uniqueVisitors.size
+  }));
 
   // Process attribution data for charts
   const sourceData = attributionData?.reduce((acc: Record<string, any>, attr) => {
@@ -168,11 +262,65 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
 
   const sourceChartData = Object.values(sourceData || {});
 
+  // Event type breakdown data
+  const eventTypeData = eventStats?.reduce((acc: Record<string, number>, event) => {
+    acc[event.event_type] = (acc[event.event_type] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const eventTypeChartData = Object.entries(eventTypeData || {}).map(([type, count]) => ({
+    eventType: type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '),
+    count
+  }));
+
+  // Daily performance data
+  const dailyData = eventStats?.reduce((acc: Record<string, any>, event) => {
+    const date = new Date(event.created_at).toLocaleDateString();
+    if (!acc[date]) {
+      acc[date] = { date, events: 0, revenue: 0, conversions: 0 };
+    }
+    acc[date].events += 1;
+    if (event.revenue_amount && event.revenue_amount > 0) {
+      acc[date].revenue += parseFloat(event.revenue_amount.toString());
+      acc[date].conversions += 1;
+    }
+    return acc;
+  }, {} as Record<string, any>);
+
+  const dailyChartData = Object.values(dailyData || {}).sort((a: any, b: any) => 
+    new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
+
   // Calculate key metrics
-  const totalRevenue = attributionData?.reduce((sum, attr) => sum + parseFloat(attr.attributed_revenue?.toString() || '0'), 0) || 0;
-  const totalConversions = attributionData?.length || 0;
+  const totalRevenue = eventStats?.reduce((sum, event) => sum + parseFloat(event.revenue_amount?.toString() || '0'), 0) || 0;
+  const totalConversions = eventStats?.filter(event => event.revenue_amount && event.revenue_amount > 0).length || 0;
   const totalEvents = eventStats?.length || 0;
   const conversionRate = totalEvents > 0 ? ((totalConversions / totalEvents) * 100).toFixed(2) : '0';
+  const avgOrderValue = totalConversions > 0 ? (totalRevenue / totalConversions).toFixed(2) : '0';
+
+  const getPageIcon = (type: string) => {
+    switch (type) {
+      case 'landing': return Globe;
+      case 'checkout': return ShoppingCart;
+      case 'thankyou': return CheckCircle;
+      case 'webinar': return Video;
+      case 'booking': return Calendar;
+      default: return FileText;
+    }
+  };
+
+  const getEventTypeColor = (eventType: string) => {
+    switch (eventType.toLowerCase().replace(' ', '_')) {
+      case 'page_view': return 'bg-blue-100 text-blue-800';
+      case 'form_submission': return 'bg-green-100 text-green-800';
+      case 'click': return 'bg-purple-100 text-purple-800';
+      case 'purchase': return 'bg-yellow-100 text-yellow-800';
+      case 'webinar_registration': return 'bg-orange-100 text-orange-800';
+      case 'call_booking': return 'bg-indigo-100 text-indigo-800';
+      case 'custom_event': return 'bg-pink-100 text-pink-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
 
   const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#00ff00', '#ff0000', '#0000ff'];
 
@@ -223,7 +371,7 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
       ) : (
         <>
           {/* Key Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center gap-2">
@@ -271,44 +419,139 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
                 </div>
               </CardContent>
             </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5 text-indigo-600" />
+                  <div>
+                    <p className="text-sm text-gray-600">Avg Order Value</p>
+                    <p className="text-2xl font-bold">${avgOrderValue}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Page Performance */}
-          {configuredPages.length > 0 && (
+          {processedPageStats.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle>Page Performance</CardTitle>
+                <CardTitle>Page Performance by Name & Type</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {pageStats.map((page: any) => (
-                    <div key={page.id} className="border rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-medium">{page.name}</h4>
-                        <Badge variant="outline">{page.totalEvents} events</Badge>
-                      </div>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        {page.events.map((eventType: string) => (
-                          <div key={eventType} className="text-center">
-                            <div className="font-medium text-lg">
-                              {page.eventBreakdown[eventType] || 0}
-                            </div>
-                            <div className="text-gray-600 capitalize">
-                              {eventType.replace('_', ' ')}
+                  {processedPageStats.map((page: any, index: number) => {
+                    const PageIcon = getPageIcon(page.pageType);
+                    return (
+                      <div key={index} className="border rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <PageIcon className="h-5 w-5 text-primary" />
+                            <div>
+                              <h4 className="font-medium">{page.pageName}</h4>
+                              <p className="text-sm text-gray-600">{page.pageUrl}</p>
                             </div>
                           </div>
-                        ))}
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">{page.pageType}</Badge>
+                            <Badge variant="secondary">{page.totalEvents} events</Badge>
+                            {page.totalRevenue > 0 && (
+                              <Badge className="bg-green-100 text-green-800">
+                                ${page.totalRevenue.toFixed(2)}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                          <div className="text-center">
+                            <div className="font-medium text-lg">{page.totalEvents}</div>
+                            <div className="text-gray-600">Total Events</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="font-medium text-lg">{page.uniqueVisitors}</div>
+                            <div className="text-gray-600">Unique Visitors</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="font-medium text-lg">{page.conversions}</div>
+                            <div className="text-gray-600">Conversions</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="font-medium text-lg">
+                              {page.totalEvents > 0 ? ((page.conversions / page.totalEvents) * 100).toFixed(1) : '0'}%
+                            </div>
+                            <div className="text-gray-600">Conversion Rate</div>
+                          </div>
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {Object.entries(page.eventBreakdown).map(([eventType, count]: [string, any]) => (
+                            <Badge key={eventType} className={getEventTypeColor(eventType)}>
+                              {eventType.replace(/_/g, ' ')}: {count}
+                            </Badge>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>
           )}
 
           {/* Charts */}
-          {sourceChartData.length > 0 && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Daily Performance */}
+            {dailyChartData.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Daily Performance</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={dailyChartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="date" />
+                      <YAxis />
+                      <Tooltip />
+                      <Line type="monotone" dataKey="events" stroke="#8884d8" name="Events" />
+                      <Line type="monotone" dataKey="conversions" stroke="#82ca9d" name="Conversions" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Event Types Breakdown */}
+            {eventTypeChartData.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Event Types Breakdown</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={eventTypeChartData}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="count"
+                        label={({ eventType, count }) => `${eventType}: ${count}`}
+                      >
+                        {eventTypeChartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Revenue by Source */}
+            {sourceChartData.length > 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle>Revenue by Source</CardTitle>
@@ -325,7 +568,10 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
                   </ResponsiveContainer>
                 </CardContent>
               </Card>
+            )}
 
+            {/* Conversions by Source */}
+            {sourceChartData.length > 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle>Conversions by Source</CardTitle>
@@ -351,46 +597,57 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
                   </ResponsiveContainer>
                 </CardContent>
               </Card>
-            </div>
-          )}
+            )}
+          </div>
 
-          {/* Recent Attributions */}
+          {/* Recent Events with Page Names */}
           <Card>
             <CardHeader>
-              <CardTitle>Recent Attributions</CardTitle>
+              <CardTitle>Recent Events with Page Details</CardTitle>
             </CardHeader>
             <CardContent>
-              {attributionData?.length === 0 ? (
+              {eventStats?.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
-                  No attribution data available yet. Install the tracking pixel and start driving traffic!
+                  No events available yet. Install the tracking pixel and start driving traffic!
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {attributionData?.slice(0, 10).map((attr) => (
-                    <div key={attr.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline">
-                            {attr.utm_source || 'Direct'}
-                          </Badge>
-                          {attr.utm_campaign && (
-                            <Badge variant="secondary">
-                              {attr.utm_campaign}
-                            </Badge>
+                  {eventStats?.slice(0, 20).map((event) => {
+                    const pageName = getPageNameFromUrl(event.page_url);
+                    const pageType = getPageType(event.page_url, event.event_type);
+                    const PageIcon = getPageIcon(pageType);
+                    
+                    return (
+                      <div key={event.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <PageIcon className="h-5 w-5 text-primary" />
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <Badge className={getEventTypeColor(event.event_type)}>
+                                {event.event_type.replace(/_/g, ' ')}
+                              </Badge>
+                              <Badge variant="outline">{pageType}</Badge>
+                            </div>
+                            <p className="font-medium">{pageName}</p>
+                            <p className="text-sm text-gray-600">{event.event_name}</p>
+                            {event.contact_email && (
+                              <p className="text-xs text-gray-500">{event.contact_email}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-gray-500">
+                            {new Date(event.created_at).toLocaleString()}
+                          </p>
+                          {event.revenue_amount && event.revenue_amount > 0 && (
+                            <p className="text-sm font-medium text-green-600">
+                              ${parseFloat(event.revenue_amount.toString()).toFixed(2)}
+                            </p>
                           )}
                         </div>
-                        <p className="text-sm text-gray-600 mt-1">
-                          {attr.contact_email || 'Anonymous'} • {new Date(attr.conversion_date).toLocaleDateString()}
-                        </p>
                       </div>
-                      <div className="text-right">
-                        <p className="font-semibold text-green-600">
-                          ${parseFloat(attr.attributed_revenue?.toString() || '0').toFixed(2)}
-                        </p>
-                        <p className="text-xs text-gray-500">{attr.attribution_model}</p>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
