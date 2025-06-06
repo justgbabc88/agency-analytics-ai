@@ -26,6 +26,7 @@ export const TestVerifyStep = ({ projectId, pixelData }: TestVerifyStepProps) =>
   const { data: recentEvents, isLoading, refetch } = useQuery({
     queryKey: ['recent-events', pixelData.pixelId],
     queryFn: async () => {
+      console.log('TestVerifyStep: Fetching events for project:', projectId);
       const { data, error } = await supabase
         .from('tracking_events')
         .select('*')
@@ -33,22 +34,32 @@ export const TestVerifyStep = ({ projectId, pixelData }: TestVerifyStepProps) =>
         .order('created_at', { ascending: false })
         .limit(10);
 
-      if (error) throw error;
+      if (error) {
+        console.error('TestVerifyStep: Error fetching events:', error);
+        throw error;
+      }
+      console.log('TestVerifyStep: Fetched events:', data);
       return data || [];
     },
-    refetchInterval: 5000, // Refresh every 5 seconds
+    refetchInterval: 5000,
   });
 
   const { data: eventStats } = useQuery({
     queryKey: ['event-stats', pixelData.pixelId],
     queryFn: async () => {
+      console.log('TestVerifyStep: Fetching event stats for project:', projectId);
       const { data, error } = await supabase
         .from('tracking_events')
         .select('event_type, created_at')
         .eq('project_id', projectId)
         .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 
-      if (error) throw error;
+      if (error) {
+        console.error('TestVerifyStep: Error fetching event stats:', error);
+        throw error;
+      }
+
+      console.log('TestVerifyStep: Fetched event stats data:', data);
 
       const stats = data?.reduce((acc, event) => {
         acc.total = (acc.total || 0) + 1;
@@ -57,6 +68,7 @@ export const TestVerifyStep = ({ projectId, pixelData }: TestVerifyStepProps) =>
         return acc;
       }, {} as any);
 
+      console.log('TestVerifyStep: Computed event stats:', stats);
       return stats || { total: 0, types: {} };
     },
     refetchInterval: 10000,
@@ -74,6 +86,9 @@ export const TestVerifyStep = ({ projectId, pixelData }: TestVerifyStepProps) =>
       case 'form_submission': return 'bg-green-100 text-green-800';
       case 'click': return 'bg-purple-100 text-purple-800';
       case 'purchase': return 'bg-yellow-100 text-yellow-800';
+      case 'webinar_registration': return 'bg-orange-100 text-orange-800';
+      case 'call_booking': return 'bg-indigo-100 text-indigo-800';
+      case 'custom_event': return 'bg-pink-100 text-pink-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -143,6 +158,24 @@ export const TestVerifyStep = ({ projectId, pixelData }: TestVerifyStepProps) =>
           </CardContent>
         </Card>
       </div>
+
+      {/* Event Types Breakdown */}
+      {eventStats?.types && Object.keys(eventStats.types).length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Event Types (Last 24h)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(eventStats.types).map(([eventType, count]: [string, any]) => (
+                <Badge key={eventType} className={getEventTypeColor(eventType)}>
+                  {formatEventType(eventType)}: {count}
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Live Event Feed */}
       <Card>
@@ -227,6 +260,8 @@ export const TestVerifyStep = ({ projectId, pixelData }: TestVerifyStepProps) =>
                 <li>• Check that your website domain is correctly configured</li>
                 <li>• Verify there are no JavaScript errors in the browser console</li>
                 <li>• Try visiting your website and performing trackable actions</li>
+                <li>• For form submissions, make sure you're actually submitting forms</li>
+                <li>• For purchases, make sure you're calling trackPurchase() function</li>
                 <li>• Wait a few minutes as events may take time to appear</li>
               </ul>
             </div>
