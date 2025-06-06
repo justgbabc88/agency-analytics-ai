@@ -198,56 +198,104 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
       
       if (events.includes('form_submission')) {
         trackingCode += `
-    // Track ALL form submissions on the page
-    document.addEventListener('submit', function(e) {
-      console.log('Form submission detected on ${page.name}');
-      const form = e.target;
-      const formData = new FormData(form);
-      const data = {};
-      for (let [key, value] of formData.entries()) {
-        if (!key.toLowerCase().includes('password') && !key.toLowerCase().includes('pass')) {
-          data[key] = value;
-        }
+    // Track ALL form submissions with comprehensive detection
+    function setupFormTracking() {
+      console.log('Setting up form tracking for ${page.name}');
+      
+      // Method 1: Event delegation for dynamic forms
+      document.addEventListener('submit', function(e) {
+        console.log('Form submission detected via event delegation:', e.target);
+        handleFormSubmission(e.target, 'Event Delegation');
+      }, true);
+      
+      // Method 2: Direct form detection
+      function attachToExistingForms() {
+        const forms = document.querySelectorAll('form');
+        console.log('Found ' + forms.length + ' forms on ${page.name}');
+        
+        forms.forEach(function(form, index) {
+          if (!form.hasAttribute('data-tracking-attached')) {
+            form.setAttribute('data-tracking-attached', 'true');
+            
+            form.addEventListener('submit', function(e) {
+              console.log('Form ' + index + ' submitted directly:', form);
+              handleFormSubmission(form, 'Direct Attachment');
+            });
+          }
+        });
       }
       
-      track('form_submission', {
-        eventName: '${page.name} - Form Submission',
-        formData: data,
-        formAction: form.action || 'No action specified',
-        formMethod: form.method || 'GET'
+      // Method 3: Input field change detection (for AJAX forms)
+      document.addEventListener('input', function(e) {
+        if (e.target.type === 'submit' || e.target.type === 'button') {
+          console.log('Submit input detected:', e.target);
+        }
       });
-    });
-    
-    // Also track form submissions using form element detection
-    setTimeout(function() {
-      const forms = document.querySelectorAll('form');
-      console.log('Found ' + forms.length + ' forms on ${page.name}');
-      forms.forEach(function(form, index) {
-        form.addEventListener('submit', function(e) {
-          console.log('Form ' + index + ' submitted on ${page.name}');
-          const formData = new FormData(form);
-          const data = {};
-          for (let [key, value] of formData.entries()) {
-            if (!key.toLowerCase().includes('password') && !key.toLowerCase().includes('pass')) {
-              data[key] = value;
+      
+      // Method 4: Button click detection for submit buttons
+      document.addEventListener('click', function(e) {
+        const target = e.target;
+        if (target.type === 'submit' || 
+            target.classList.contains('submit') ||
+            target.classList.contains('btn-submit') ||
+            target.innerText.toLowerCase().includes('submit') ||
+            target.innerText.toLowerCase().includes('register') ||
+            target.innerText.toLowerCase().includes('sign up')) {
+          
+          console.log('Submit button clicked:', target);
+          
+          // Find the parent form
+          const form = target.closest('form');
+          if (form) {
+            setTimeout(() => {
+              handleFormSubmission(form, 'Button Click');
+            }, 100);
+          }
+        }
+      });
+      
+      function handleFormSubmission(form, method) {
+        console.log('Processing form submission via ' + method + ':', form);
+        
+        const formData = new FormData(form);
+        const data = {};
+        let hasEmailField = false;
+        
+        for (let [key, value] of formData.entries()) {
+          if (!key.toLowerCase().includes('password') && !key.toLowerCase().includes('pass')) {
+            data[key] = value;
+            if (key.toLowerCase().includes('email')) {
+              hasEmailField = true;
             }
           }
-          
-          track('form_submission', {
-            eventName: '${page.name} - Form ' + index + ' Submission',
-            formData: data,
-            formIndex: index
-          });
+        }
+        
+        console.log('Form data collected:', data);
+        
+        track('form_submission', {
+          eventName: '${page.name} - Form Submission (' + method + ')',
+          formData: data,
+          formAction: form.action || 'No action specified',
+          formMethod: form.method || 'GET',
+          hasEmail: hasEmailField
         });
-      });
-    }, 1000);`;
+      }
+      
+      // Run attachment initially
+      attachToExistingForms();
+      
+      // Re-run every 2 seconds to catch dynamically added forms
+      setInterval(attachToExistingForms, 2000);
+    }
+    
+    setupFormTracking();`;
       }
 
       if (events.includes('webinar_registration')) {
         trackingCode += `
-    // Track webinar registration confirmation
+    // Enhanced webinar registration tracking
     window.trackWebinarRegistration = function(webinarName, userEmail, userName) {
-      console.log('Tracking webinar registration:', webinarName, userEmail, userName);
+      console.log('Manual webinar registration tracking called:', webinarName, userEmail, userName);
       track('webinar_registration', {
         eventName: 'Webinar Registration Confirmed',
         webinarName: webinarName || '${page.name} Webinar',
@@ -258,22 +306,94 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
       });
     };
     
-    // Auto-detect webinar registration if form contains webinar-related fields
+    // Auto-detect webinar registration patterns
+    function detectWebinarRegistration() {
+      console.log('Setting up webinar registration detection for ${page.name}');
+      
+      document.addEventListener('submit', function(e) {
+        const form = e.target;
+        const formData = new FormData(form);
+        const url = window.location.href.toLowerCase();
+        const title = document.title.toLowerCase();
+        
+        const hasEmail = Array.from(formData.keys()).some(key => 
+          key.toLowerCase().includes('email')
+        );
+        
+        const isWebinarContext = 
+          url.includes('webinar') || 
+          title.includes('webinar') ||
+          url.includes('training') ||
+          title.includes('training') ||
+          Array.from(formData.keys()).some(key => 
+            key.toLowerCase().includes('webinar') || 
+            key.toLowerCase().includes('training')
+          );
+        
+        if (hasEmail && isWebinarContext) {
+          console.log('Auto-detected webinar registration on ${page.name}');
+          
+          const email = Array.from(formData.entries()).find(([key]) => 
+            key.toLowerCase().includes('email')
+          )?.[1];
+          const name = Array.from(formData.entries()).find(([key]) => 
+            key.toLowerCase().includes('name') || key.toLowerCase().includes('first')
+          )?.[1];
+          
+          track('webinar_registration', {
+            eventName: '${page.name} - Auto-detected Webinar Registration',
+            contactInfo: { 
+              email: email, 
+              name: name 
+            }
+          });
+        }
+      });
+    }
+    
+    detectWebinarRegistration();`;
+      }
+
+      if (events.includes('call_booking')) {
+        trackingCode += `
+    // Call booking tracking
+    window.trackCallBooking = function(appointmentType, userEmail, userName) {
+      console.log('Call booking tracking called:', appointmentType, userEmail, userName);
+      track('call_booking', {
+        eventName: 'Call Booking Confirmed',
+        appointmentType: appointmentType || '${page.name} Appointment',
+        contactInfo: { 
+          email: userEmail, 
+          name: userName 
+        }
+      });
+    };
+    
+    // Auto-detect booking patterns
     document.addEventListener('submit', function(e) {
       const form = e.target;
       const formData = new FormData(form);
+      const url = window.location.href.toLowerCase();
+      
       const hasEmail = Array.from(formData.keys()).some(key => 
         key.toLowerCase().includes('email')
       );
-      const hasWebinarIndicator = Array.from(formData.keys()).some(key => 
-        key.toLowerCase().includes('webinar') || 
-        key.toLowerCase().includes('registration') ||
-        key.toLowerCase().includes('signup')
-      ) || window.location.href.toLowerCase().includes('webinar') ||
-          document.title.toLowerCase().includes('webinar');
       
-      if (hasEmail && hasWebinarIndicator) {
-        console.log('Auto-detected webinar registration on ${page.name}');
+      const isBookingContext = 
+        url.includes('booking') || 
+        url.includes('appointment') ||
+        url.includes('call') ||
+        url.includes('schedule') ||
+        Array.from(formData.keys()).some(key => 
+          key.toLowerCase().includes('booking') || 
+          key.toLowerCase().includes('appointment') ||
+          key.toLowerCase().includes('call') ||
+          key.toLowerCase().includes('schedule')
+        );
+      
+      if (hasEmail && isBookingContext) {
+        console.log('Auto-detected call booking on ${page.name}');
+        
         const email = Array.from(formData.entries()).find(([key]) => 
           key.toLowerCase().includes('email')
         )?.[1];
@@ -281,8 +401,8 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
           key.toLowerCase().includes('name') || key.toLowerCase().includes('first')
         )?.[1];
         
-        track('webinar_registration', {
-          eventName: '${page.name} - Webinar Registration',
+        track('call_booking', {
+          eventName: '${page.name} - Auto-detected Call Booking',
           contactInfo: { 
             email: email, 
             name: name 
@@ -292,33 +412,19 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
     });`;
       }
 
-      if (events.includes('call_booking')) {
-        trackingCode += `
-    // Track call booking confirmation
-    window.trackCallBooking = function(appointmentType, userEmail, userName) {
-      console.log('Tracking call booking:', appointmentType, userEmail, userName);
-      track('call_booking', {
-        eventName: 'Call Booking Confirmed',
-        appointmentType: appointmentType || '${page.name} Appointment',
-        contactInfo: { 
-          email: userEmail, 
-          name: userName 
-        }
-      });
-    };`;
-      }
-
       if (events.includes('purchase')) {
         trackingCode += `
-    // Track confirmed purchases
+    // Purchase tracking - REQUIRES MANUAL IMPLEMENTATION
     window.trackPurchase = function(amount, currency = 'USD', customerInfo = {}) {
-      console.log('Tracking purchase:', amount, currency, customerInfo);
+      console.log('Purchase tracking called:', amount, currency, customerInfo);
       track('purchase', {
         eventName: 'Purchase Completed',
         revenue: { amount: parseFloat(amount), currency: currency },
         contactInfo: customerInfo
       });
-    };`;
+    };
+    
+    console.log('Purchase tracking function available. Call trackPurchase(amount, currency, customerInfo) after successful payment.');`;
       }
 
       return trackingCode;
@@ -330,7 +436,7 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
   const PIXEL_ID = '${pixelId}';
   const API_URL = '${supabaseUrl}/functions/v1/track-event';
   
-  console.log('Initializing tracking for ${page.name} with pixel:', PIXEL_ID);
+  console.log('Initializing comprehensive tracking for ${page.name} with pixel:', PIXEL_ID);
   
   function getSessionId() {
     let sessionId = localStorage.getItem('tracking_session_id');
@@ -349,6 +455,7 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
       eventType: eventType,
       pageUrl: window.location.href,
       referrerUrl: document.referrer,
+      timestamp: new Date().toISOString(),
       ...data
     };
 
@@ -361,26 +468,44 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
     }).then(response => {
       if (response.ok) {
         console.log('Successfully tracked ${page.name} event:', eventType);
+        return response.json();
       } else {
-        console.error('Failed to track ${page.name} event:', response.status);
+        console.error('Failed to track ${page.name} event:', response.status, response.statusText);
+        return response.text().then(text => {
+          console.error('Error details:', text);
+        });
       }
     }).catch(err => {
-      console.warn('Tracking failed for ${page.name}:', err);
+      console.error('Tracking failed for ${page.name}:', err);
     });
   }
 
-  function init() {${page.events?.includes('page_view') ? `
+  function init() {
+    console.log('Initializing tracking for ${page.name}');
+    ${page.events?.includes('page_view') ? `
+    // Track page view immediately
     track('page_view', { eventName: '${page.name} - Page View' });` : ''}
+    
     ${getTrackingEvents(page.events || [])}
+    
+    console.log('${page.name} tracking initialization complete');
   }
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
+    console.log('Waiting for DOM to load for ${page.name}');
   } else {
     init();
   }
 
+  // Make tracking function globally available
   window.trackEvent = track;
+  
+  // Debug function to test tracking
+  window.testTracking = function() {
+    console.log('Testing tracking for ${page.name}');
+    track('test_event', { eventName: '${page.name} - Manual Test' });
+  };
 })();
 </script>`;
   };
