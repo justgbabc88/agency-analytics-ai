@@ -681,7 +681,7 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
                       </div>
                     </div>
 
-                    {/* Display funnel pages with preview screenshots */}
+                    {/* Display funnel pages with clickable links instead of previews */}
                     {funnelPages.length > 0 && !isEditing && (
                       <div className="border-t pt-4">
                         <h4 className="font-medium mb-3">Connected Pages</h4>
@@ -702,8 +702,19 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
                                     </Badge>
                                   </div>
                                   
-                                  {/* Website Preview Screenshot */}
-                                  <WebsitePreview url={page.url} pageName={page.name} />
+                                  {/* Clickable URL Link */}
+                                  <div className="p-3 bg-gray-50 rounded border">
+                                    <a 
+                                      href={page.url.startsWith('http') ? page.url : `https://${page.url}`}
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="text-blue-600 hover:text-blue-800 hover:underline flex items-center text-sm break-all"
+                                    >
+                                      <Globe className="h-4 w-4 mr-2 flex-shrink-0" />
+                                      {page.url.length > 50 ? `${page.url.substring(0, 50)}...` : page.url}
+                                      <ExternalLink className="h-3 w-3 ml-1 flex-shrink-0" />
+                                    </a>
+                                  </div>
                                   
                                   <div className="space-y-2">
                                     <div className="flex flex-wrap gap-1">
