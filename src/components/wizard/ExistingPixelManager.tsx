@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -52,7 +53,7 @@ export const ExistingPixelManager = ({ projectId }: ExistingPixelManagerProps) =
   const { data: pixels, isLoading } = useQuery({
     queryKey: ['tracking-pixels', projectId],
     queryFn: async () => {
-      console.log('Fetching pixels for project:', projectId);
+      console.log('ExistingPixelManager: Fetching pixels for project:', projectId);
       const { data, error } = await supabase
         .from('tracking_pixels')
         .select('*')
@@ -61,10 +62,10 @@ export const ExistingPixelManager = ({ projectId }: ExistingPixelManagerProps) =
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching pixels:', error);
+        console.error('ExistingPixelManager: Error fetching pixels:', error);
         throw error;
       }
-      console.log('Fetched pixels:', data);
+      console.log('ExistingPixelManager: Fetched pixels:', data);
       return (data || []) as PixelWithConfig[];
     },
     enabled: !!projectId,
@@ -75,7 +76,7 @@ export const ExistingPixelManager = ({ projectId }: ExistingPixelManagerProps) =
     if (selectedPixelId && pixels) {
       const updatedPixel = pixels.find(p => p.id === selectedPixelId);
       if (updatedPixel) {
-        console.log('Updating selected pixel with fresh data:', updatedPixel);
+        console.log('ExistingPixelManager: Updating selected pixel with fresh data:', updatedPixel);
         setSelectedPixel(updatedPixel);
       }
     }
@@ -101,77 +102,80 @@ export const ExistingPixelManager = ({ projectId }: ExistingPixelManagerProps) =
 
   const clearPixelData = useMutation({
     mutationFn: async (pixelId: string) => {
-      console.log('Clearing data for pixel:', pixelId);
+      console.log('ExistingPixelManager: Clearing data for pixel:', pixelId, 'project:', projectId);
       
       // Delete tracking events for this project
-      const { error: eventsError } = await supabase
+      const { error: eventsError, count: eventsCount } = await supabase
         .from('tracking_events')
-        .delete()
+        .delete({ count: 'exact' })
         .eq('project_id', projectId);
 
       if (eventsError) {
-        console.error('Error deleting tracking events:', eventsError);
+        console.error('ExistingPixelManager: Error deleting tracking events:', eventsError);
         throw eventsError;
       }
+      console.log('ExistingPixelManager: Deleted', eventsCount, 'tracking events');
 
       // Delete tracking sessions for this project
-      const { error: sessionsError } = await supabase
+      const { error: sessionsError, count: sessionsCount } = await supabase
         .from('tracking_sessions')
-        .delete()
+        .delete({ count: 'exact' })
         .eq('project_id', projectId);
 
       if (sessionsError) {
-        console.error('Error deleting tracking sessions:', sessionsError);
+        console.error('ExistingPixelManager: Error deleting tracking sessions:', sessionsError);
         throw sessionsError;
       }
+      console.log('ExistingPixelManager: Deleted', sessionsCount, 'tracking sessions');
 
       // Delete attribution data for this project
-      const { error: attributionError } = await supabase
+      const { error: attributionError, count: attributionCount } = await supabase
         .from('attribution_data')
-        .delete()
+        .delete({ count: 'exact' })
         .eq('project_id', projectId);
 
       if (attributionError) {
-        console.error('Error deleting attribution data:', attributionError);
+        console.error('ExistingPixelManager: Error deleting attribution data:', attributionError);
         throw attributionError;
       }
+      console.log('ExistingPixelManager: Deleted', attributionCount, 'attribution records');
 
-      console.log('Successfully cleared all tracking data for project');
+      console.log('ExistingPixelManager: Successfully cleared all tracking data for project');
     },
     onSuccess: () => {
+      console.log('ExistingPixelManager: Starting comprehensive cache clear...');
+      
       // Clear ALL query cache to ensure complete refresh
       queryClient.clear();
       
-      // Force immediate refetch of all relevant queries
-      queryClient.invalidateQueries({ queryKey: ['tracking-pixels', projectId] });
-      queryClient.invalidateQueries({ queryKey: ['recent-events', projectId] });
-      queryClient.invalidateQueries({ queryKey: ['event-stats', projectId] });
-      
-      // Invalidate any possible AttributionDashboard query combinations
-      queryClient.invalidateQueries({ 
-        predicate: (query) => {
-          const key = query.queryKey as string[];
-          return key.includes(projectId) || 
-                 key.includes('event-stats') ||
-                 key.includes('attribution') ||
-                 key.includes('tracking-events') ||
-                 key.includes('tracking-sessions') ||
-                 key.includes('attribution-data');
-        }
-      });
-      
-      // Force a complete re-render by clearing the entire cache
+      // Wait a moment then force refetch of critical queries
       setTimeout(() => {
+        console.log('ExistingPixelManager: Refetching all critical queries...');
+        
+        // Refetch pixels
         queryClient.refetchQueries({ queryKey: ['tracking-pixels', projectId] });
-      }, 100);
+        
+        // Refetch events
+        queryClient.refetchQueries({ queryKey: ['recent-events', projectId] });
+        
+        // Force refetch of any event-stats queries (which is what Attribution Dashboard uses)
+        queryClient.refetchQueries({ 
+          predicate: (query) => {
+            const key = query.queryKey as string[];
+            return key[0] === 'event-stats' && key.includes(projectId);
+          }
+        });
+        
+        console.log('ExistingPixelManager: Cache clear and refetch complete');
+      }, 500);
       
       toast({
         title: "Success",
-        description: "All tracking data cleared successfully",
+        description: "All tracking data cleared successfully. Attribution dashboard will update momentarily.",
       });
     },
     onError: (error) => {
-      console.error('Error clearing pixel data:', error);
+      console.error('ExistingPixelManager: Error clearing pixel data:', error);
       toast({
         title: "Error",
         description: "Failed to clear tracking data",
@@ -181,10 +185,10 @@ export const ExistingPixelManager = ({ projectId }: ExistingPixelManagerProps) =
   });
 
   const handlePixelSelect = (pixelId: string) => {
-    console.log('Selecting pixel:', pixelId);
+    console.log('ExistingPixelManager: Selecting pixel:', pixelId);
     const pixel = pixels?.find(p => p.id === pixelId);
     if (pixel) {
-      console.log('Selected pixel:', pixel);
+      console.log('ExistingPixelManager: Selected pixel:', pixel);
       setSelectedPixelId(pixelId);
       setSelectedPixel(pixel);
       setShowCodes(false);
@@ -302,7 +306,7 @@ export const ExistingPixelManager = ({ projectId }: ExistingPixelManagerProps) =
     };
 
     const funnelPages = selectedPixel.config?.funnelPages || [];
-    console.log('Showing codes for funnel pages:', funnelPages);
+    console.log('ExistingPixelManager: Showing codes for funnel pages:', funnelPages);
 
     return (
       <div className="space-y-4">
@@ -440,3 +444,4 @@ export const ExistingPixelManager = ({ projectId }: ExistingPixelManagerProps) =
     </div>
   );
 };
+

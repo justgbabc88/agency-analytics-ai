@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -154,7 +153,7 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
 
   const clearPixelData = useMutation({
     mutationFn: async (pixelId: string) => {
-      console.log('Clearing data for pixel:', pixelId);
+      console.log('TrackingPixelManager: Clearing data for pixel:', pixelId, 'project:', projectId);
       
       // First get the pixel to get its pixel_id
       const { data: pixel, error: pixelError } = await supabase
@@ -167,75 +166,80 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
         throw new Error('Pixel not found');
       }
 
+      console.log('TrackingPixelManager: Found pixel with ID:', pixel.pixel_id);
+
       // Delete tracking events for this project
-      const { error: eventsError } = await supabase
+      const { error: eventsError, count: eventsCount } = await supabase
         .from('tracking_events')
-        .delete()
+        .delete({ count: 'exact' })
         .eq('project_id', projectId);
 
       if (eventsError) {
-        console.error('Error deleting tracking events:', eventsError);
+        console.error('TrackingPixelManager: Error deleting tracking events:', eventsError);
         throw eventsError;
       }
+      console.log('TrackingPixelManager: Deleted', eventsCount, 'tracking events');
 
       // Delete tracking sessions for this project
-      const { error: sessionsError } = await supabase
+      const { error: sessionsError, count: sessionsCount } = await supabase
         .from('tracking_sessions')
-        .delete()
+        .delete({ count: 'exact' })
         .eq('project_id', projectId);
 
       if (sessionsError) {
-        console.error('Error deleting tracking sessions:', sessionsError);
+        console.error('TrackingPixelManager: Error deleting tracking sessions:', sessionsError);
         throw sessionsError;
       }
+      console.log('TrackingPixelManager: Deleted', sessionsCount, 'tracking sessions');
 
       // Delete attribution data for this project
-      const { error: attributionError } = await supabase
+      const { error: attributionError, count: attributionCount } = await supabase
         .from('attribution_data')
-        .delete()
+        .delete({ count: 'exact' })
         .eq('project_id', projectId);
 
       if (attributionError) {
-        console.error('Error deleting attribution data:', attributionError);
+        console.error('TrackingPixelManager: Error deleting attribution data:', attributionError);
         throw attributionError;
       }
+      console.log('TrackingPixelManager: Deleted', attributionCount, 'attribution records');
 
-      console.log('Successfully cleared all tracking data for pixel');
+      console.log('TrackingPixelManager: Successfully cleared all tracking data for project');
     },
     onSuccess: () => {
+      console.log('TrackingPixelManager: Starting comprehensive cache clear...');
+      
       // Clear ALL query cache to ensure complete refresh
       queryClient.clear();
       
-      // Force immediate refetch of all relevant queries
-      queryClient.invalidateQueries({ queryKey: ['tracking-pixels', projectId] });
-      queryClient.invalidateQueries({ queryKey: ['recent-events', projectId] });
-      queryClient.invalidateQueries({ queryKey: ['event-stats', projectId] });
-      
-      // Invalidate any possible AttributionDashboard query combinations
-      queryClient.invalidateQueries({ 
-        predicate: (query) => {
-          const key = query.queryKey as string[];
-          return key.includes(projectId) || 
-                 key.includes('event-stats') ||
-                 key.includes('attribution') ||
-                 key.includes('tracking-events') ||
-                 key.includes('tracking-sessions') ||
-                 key.includes('attribution-data');
-        }
-      });
-      
-      // Force a complete re-render by clearing the entire cache
+      // Wait a moment then force refetch of critical queries
       setTimeout(() => {
+        console.log('TrackingPixelManager: Refetching all critical queries...');
+        
+        // Refetch pixels
         queryClient.refetchQueries({ queryKey: ['tracking-pixels', projectId] });
-      }, 100);
+        
+        // Refetch events
+        queryClient.refetchQueries({ queryKey: ['recent-events', projectId] });
+        
+        // Force refetch of any event-stats queries (which is what Attribution Dashboard uses)
+        queryClient.refetchQueries({ 
+          predicate: (query) => {
+            const key = query.queryKey as string[];
+            return key[0] === 'event-stats' && key.includes(projectId);
+          }
+        });
+        
+        console.log('TrackingPixelManager: Cache clear and refetch complete');
+      }, 500);
       
       toast({
         title: "Success",
-        description: "All tracking data cleared successfully",
+        description: "All tracking data cleared successfully. Attribution dashboard will update momentarily.",
       });
     },
     onError: (error) => {
-      console.error('Error clearing pixel data:', error);
+      console.error('TrackingPixelManager: Error clearing pixel data:', error);
       toast({
         title: "Error",
         description: "Failed to clear tracking data",

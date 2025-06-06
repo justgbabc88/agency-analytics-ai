@@ -1,12 +1,14 @@
 
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
-import { TrendingUp, Users, MousePointer, Activity, Globe, ShoppingCart, CheckCircle, Video, Calendar, FileText, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { TrendingUp, Users, MousePointer, Activity, Globe, ShoppingCart, CheckCircle, Video, Calendar, FileText, ArrowUpRight, ArrowDownRight, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface AttributionDashboardProps {
   projectId: string;
@@ -42,6 +44,7 @@ interface EventRecord {
 export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) => {
   const [timeRange, setTimeRange] = useState('7d');
   const [selectedPixelId, setSelectedPixelId] = useState<string>('');
+  const queryClient = useQueryClient();
 
   // Helper functions
   const getPageIcon = (type: string) => {
@@ -71,17 +74,40 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
     return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
   };
 
+  const handleRefresh = () => {
+    console.log('Manually refreshing Attribution Dashboard data...');
+    
+    // Clear all cached data
+    queryClient.clear();
+    
+    // Invalidate specific queries
+    queryClient.invalidateQueries({ queryKey: ['tracking-pixels', projectId] });
+    queryClient.invalidateQueries({ queryKey: ['event-stats', projectId, selectedPixelId, timeRange] });
+    queryClient.invalidateQueries({ queryKey: ['recent-events', projectId] });
+    
+    // Force refetch
+    queryClient.refetchQueries({ queryKey: ['tracking-pixels', projectId] });
+    if (selectedPixelId) {
+      queryClient.refetchQueries({ queryKey: ['event-stats', projectId, selectedPixelId, timeRange] });
+    }
+  };
+
   // Get tracking pixels for this project
   const { data: pixels } = useQuery({
     queryKey: ['tracking-pixels', projectId],
     queryFn: async () => {
+      console.log('AttributionDashboard: Fetching pixels for project:', projectId);
       const { data, error } = await supabase
         .from('tracking_pixels')
         .select('*')
         .eq('project_id', projectId)
         .eq('is_active', true);
 
-      if (error) throw error;
+      if (error) {
+        console.error('AttributionDashboard: Error fetching pixels:', error);
+        throw error;
+      }
+      console.log('AttributionDashboard: Fetched pixels:', data);
       return (data || []) as PixelData[];
     },
     enabled: !!projectId,
@@ -91,11 +117,21 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
   const { data: eventStats, isLoading } = useQuery({
     queryKey: ['event-stats', projectId, selectedPixelId, timeRange],
     queryFn: async () => {
-      if (!selectedPixelId) return [];
+      if (!selectedPixelId) {
+        console.log('AttributionDashboard: No pixel selected, returning empty array');
+        return [];
+      }
       
       const daysAgo = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - daysAgo);
+
+      console.log('AttributionDashboard: Fetching event stats for:', {
+        projectId,
+        selectedPixelId,
+        timeRange,
+        startDate: startDate.toISOString()
+      });
 
       const { data, error } = await supabase
         .from('tracking_events')
@@ -104,8 +140,13 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
         .gte('created_at', startDate.toISOString())
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      console.log('Raw event data:', data);
+      if (error) {
+        console.error('AttributionDashboard: Error fetching event stats:', error);
+        throw error;
+      }
+
+      console.log('AttributionDashboard: Raw event data:', data);
+      console.log('AttributionDashboard: Event count:', data?.length || 0);
       return (data || []) as EventRecord[];
     },
     enabled: !!projectId && !!selectedPixelId,
@@ -140,7 +181,7 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
   // Process page analytics
   const pageAnalytics = React.useMemo(() => {
     if (!eventStats || !configuredPages.length) {
-      console.log('No event stats or configured pages:', { 
+      console.log('AttributionDashboard: No event stats or configured pages:', { 
         hasEventStats: !!eventStats, 
         eventStatsLength: eventStats?.length,
         configuredPagesLength: configuredPages.length 
@@ -148,7 +189,7 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
       return null;
     }
 
-    console.log('Processing page analytics:', { 
+    console.log('AttributionDashboard: Processing page analytics:', { 
       eventStatsCount: eventStats.length, 
       configuredPagesCount: configuredPages.length,
       configuredPages: configuredPages.map(p => ({ name: p.name, url: p.url }))
@@ -211,7 +252,7 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
       };
     });
 
-    console.log('Final page metrics:', pageMetrics);
+    console.log('AttributionDashboard: Final page metrics:', pageMetrics);
     return { pageMetrics };
   }, [eventStats, configuredPages]);
 
@@ -317,6 +358,10 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
               <SelectItem value="90d">Last 90 days</SelectItem>
             </SelectContent>
           </Select>
+          <Button onClick={handleRefresh} variant="outline" size="sm">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
         </div>
       </div>
 
@@ -407,7 +452,7 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
           )}
 
           {/* Page Performance Metrics */}
-          {pageAnalytics && pageAnalytics.pageMetrics.length > 0 && (
+          {pageAnalytics && pageAnalytics.pageMetrics.length > 0 ? (
             <Card>
               <CardHeader>
                 <CardTitle>Page Performance Metrics (Event-Based Tracking)</CardTitle>
@@ -452,6 +497,16 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
                     );
                   })}
                 </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="p-8 text-center">
+                <Activity className="h-16 w-16 mx-auto text-gray-400 mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No Data Available</h3>
+                <p className="text-gray-600">
+                  No tracking events found for the selected time period.
+                </p>
               </CardContent>
             </Card>
           )}
@@ -553,3 +608,4 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
     </div>
   );
 };
+
