@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -143,35 +141,59 @@ export const ExistingPixelManager = ({ projectId }: ExistingPixelManagerProps) =
       console.log('ExistingPixelManager: Successfully cleared all tracking data for project');
     },
     onSuccess: () => {
-      console.log('ExistingPixelManager: Starting comprehensive cache clear...');
+      console.log('ExistingPixelManager: Starting nuclear cache clearing...');
       
-      // Clear ALL query cache to ensure complete refresh
+      // Signal to AttributionDashboard that data was cleared
+      localStorage.setItem('attribution_data_cleared', Date.now().toString());
+      
+      // Nuclear cache clearing approach
       queryClient.clear();
+      queryClient.removeQueries();
+      queryClient.cancelQueries();
       
-      // Wait a moment then force refetch of critical queries
+      // Multiple rounds of aggressive cache clearing
       setTimeout(() => {
-        console.log('ExistingPixelManager: Refetching all critical queries...');
+        console.log('ExistingPixelManager: Round 1 - Nuclear cache clear...');
+        queryClient.clear();
         
-        // Refetch pixels
-        queryClient.refetchQueries({ queryKey: ['tracking-pixels', projectId] });
-        
-        // Refetch events
-        queryClient.refetchQueries({ queryKey: ['recent-events', projectId] });
-        
-        // Force refetch of any event-stats queries (which is what Attribution Dashboard uses)
-        queryClient.refetchQueries({ 
-          predicate: (query) => {
-            const key = query.queryKey as string[];
-            return key[0] === 'event-stats' && key.includes(projectId);
-          }
-        });
-        
-        console.log('ExistingPixelManager: Cache clear and refetch complete');
-      }, 500);
+        setTimeout(() => {
+          console.log('ExistingPixelManager: Round 2 - Force invalidate everything...');
+          queryClient.invalidateQueries();
+          
+          setTimeout(() => {
+            console.log('ExistingPixelManager: Round 3 - Final nuclear refetch...');
+            
+            // Force refetch all critical queries
+            queryClient.refetchQueries({ queryKey: ['tracking-pixels', projectId] });
+            queryClient.refetchQueries({ queryKey: ['recent-events', projectId] });
+            
+            // Nuclear approach - invalidate everything that could possibly contain project data
+            queryClient.invalidateQueries({ 
+              predicate: (query) => {
+                const key = query.queryKey as string[];
+                return key && key.some(k => 
+                  typeof k === 'string' && (
+                    k.includes('event') || 
+                    k.includes('tracking') || 
+                    k.includes('attribution') ||
+                    k.includes('stats') ||
+                    k === projectId
+                  )
+                );
+              }
+            });
+            
+            // Clear the localStorage signal
+            localStorage.removeItem('attribution_data_cleared');
+            
+            console.log('ExistingPixelManager: Nuclear cache clear operation complete');
+          }, 400);
+        }, 400);
+      }, 400);
       
       toast({
         title: "Success",
-        description: "All tracking data cleared successfully. Attribution dashboard will update momentarily.",
+        description: "All tracking data cleared successfully. Please manually refresh the Attribution Dashboard to see the changes.",
       });
     },
     onError: (error) => {
@@ -444,4 +466,3 @@ export const ExistingPixelManager = ({ projectId }: ExistingPixelManagerProps) =
     </div>
   );
 };
-

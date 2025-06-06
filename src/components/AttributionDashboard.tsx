@@ -1,6 +1,5 @@
 
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -44,6 +43,7 @@ interface EventRecord {
 export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) => {
   const [timeRange, setTimeRange] = useState('7d');
   const [selectedPixelId, setSelectedPixelId] = useState<string>('');
+  const [forceRefreshKey, setForceRefreshKey] = useState(0);
   const queryClient = useQueryClient();
 
   // Helper functions
@@ -74,18 +74,36 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
     return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
   };
 
+  // Listen for global data clear events
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'attribution_data_cleared') {
+        console.log('Attribution Dashboard: Detected data clear event, forcing refresh...');
+        setForceRefreshKey(prev => prev + 1);
+        // Clear all cached data
+        queryClient.clear();
+        // Immediately refetch
+        setTimeout(() => {
+          queryClient.refetchQueries({ queryKey: ['tracking-pixels', projectId] });
+          if (selectedPixelId) {
+            queryClient.refetchQueries({ queryKey: ['event-stats', projectId, selectedPixelId, timeRange] });
+          }
+        }, 100);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [projectId, selectedPixelId, timeRange, queryClient]);
+
   const handleRefresh = () => {
-    console.log('Manually refreshing Attribution Dashboard data...');
+    console.log('Attribution Dashboard: Manual refresh triggered');
+    setForceRefreshKey(prev => prev + 1);
     
     // Clear all cached data
     queryClient.clear();
     
-    // Invalidate specific queries
-    queryClient.invalidateQueries({ queryKey: ['tracking-pixels', projectId] });
-    queryClient.invalidateQueries({ queryKey: ['event-stats', projectId, selectedPixelId, timeRange] });
-    queryClient.invalidateQueries({ queryKey: ['recent-events', projectId] });
-    
-    // Force refetch
+    // Force immediate refetch
     queryClient.refetchQueries({ queryKey: ['tracking-pixels', projectId] });
     if (selectedPixelId) {
       queryClient.refetchQueries({ queryKey: ['event-stats', projectId, selectedPixelId, timeRange] });
@@ -94,7 +112,7 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
 
   // Get tracking pixels for this project
   const { data: pixels } = useQuery({
-    queryKey: ['tracking-pixels', projectId],
+    queryKey: ['tracking-pixels', projectId, forceRefreshKey],
     queryFn: async () => {
       console.log('AttributionDashboard: Fetching pixels for project:', projectId);
       const { data, error } = await supabase
@@ -115,7 +133,7 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
 
   // Get event stats by page and event type
   const { data: eventStats, isLoading } = useQuery({
-    queryKey: ['event-stats', projectId, selectedPixelId, timeRange],
+    queryKey: ['event-stats', projectId, selectedPixelId, timeRange, forceRefreshKey],
     queryFn: async () => {
       if (!selectedPixelId) {
         console.log('AttributionDashboard: No pixel selected, returning empty array');
@@ -130,7 +148,8 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
         projectId,
         selectedPixelId,
         timeRange,
-        startDate: startDate.toISOString()
+        startDate: startDate.toISOString(),
+        forceRefreshKey
       });
 
       const { data, error } = await supabase
@@ -178,8 +197,8 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
     return false;
   };
 
-  // Process page analytics
-  const pageAnalytics = React.useMemo(() => {
+  // Process page analytics - Remove memoization to ensure fresh calculation
+  const pageAnalytics = (() => {
     if (!eventStats || !configuredPages.length) {
       console.log('AttributionDashboard: No event stats or configured pages:', { 
         hasEventStats: !!eventStats, 
@@ -192,7 +211,8 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
     console.log('AttributionDashboard: Processing page analytics:', { 
       eventStatsCount: eventStats.length, 
       configuredPagesCount: configuredPages.length,
-      configuredPages: configuredPages.map(p => ({ name: p.name, url: p.url }))
+      configuredPages: configuredPages.map(p => ({ name: p.name, url: p.url })),
+      forceRefreshKey
     });
 
     // Group events by page based on event names
@@ -254,10 +274,10 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
 
     console.log('AttributionDashboard: Final page metrics:', pageMetrics);
     return { pageMetrics };
-  }, [eventStats, configuredPages]);
+  })();
 
-  // Process daily trends
-  const dailyTrends = React.useMemo(() => {
+  // Process daily trends - Remove memoization
+  const dailyTrends = (() => {
     if (!eventStats) return [];
 
     const dailyData = eventStats.reduce((acc: Record<string, any>, event) => {
@@ -279,10 +299,10 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
       uniqueVisitors: day.uniqueVisitors.size,
       conversionRate: day.events > 0 ? (day.conversions / day.events) * 100 : 0
     })).sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [eventStats]);
+  })();
 
-  // Process event type breakdown
-  const eventTypeBreakdown = React.useMemo(() => {
+  // Process event type breakdown - Remove memoization
+  const eventTypeBreakdown = (() => {
     if (!eventStats) return [];
 
     const eventTypeData = eventStats.reduce((acc: Record<string, number>, event) => {
@@ -295,10 +315,10 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
       count,
       fill: getEventTypeColor(type)
     }));
-  }, [eventStats]);
+  })();
 
-  // Calculate key metrics
-  const keyMetrics = React.useMemo(() => {
+  // Calculate key metrics - Remove memoization
+  const keyMetrics = (() => {
     if (!eventStats) return null;
 
     const totalConversions = eventStats.filter(event => event.event_type !== 'page_view').length;
@@ -325,7 +345,7 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
       conversionRate,
       eventsTrend
     };
-  }, [eventStats]);
+  })();
 
   if (isLoading) {
     return <div>Loading attribution data...</div>;
@@ -608,4 +628,3 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
     </div>
   );
 };
-

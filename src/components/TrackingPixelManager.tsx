@@ -207,35 +207,62 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
       console.log('TrackingPixelManager: Successfully cleared all tracking data for project');
     },
     onSuccess: () => {
-      console.log('TrackingPixelManager: Starting comprehensive cache clear...');
+      console.log('TrackingPixelManager: Starting ultra-aggressive cache clear...');
       
-      // Clear ALL query cache to ensure complete refresh
+      // Signal to AttributionDashboard that data was cleared
+      localStorage.setItem('attribution_data_cleared', Date.now().toString());
+      
+      // Clear ALL query cache completely
       queryClient.clear();
       
-      // Wait a moment then force refetch of critical queries
+      // Remove all cached data from memory
+      queryClient.removeQueries();
+      
+      // Force immediate garbage collection of queries
+      queryClient.cancelQueries();
+      
+      // Wait and perform multiple rounds of cache clearing
       setTimeout(() => {
-        console.log('TrackingPixelManager: Refetching all critical queries...');
+        console.log('TrackingPixelManager: Round 1 - Force clearing all caches...');
+        queryClient.clear();
         
-        // Refetch pixels
-        queryClient.refetchQueries({ queryKey: ['tracking-pixels', projectId] });
-        
-        // Refetch events
-        queryClient.refetchQueries({ queryKey: ['recent-events', projectId] });
-        
-        // Force refetch of any event-stats queries (which is what Attribution Dashboard uses)
-        queryClient.refetchQueries({ 
-          predicate: (query) => {
-            const key = query.queryKey as string[];
-            return key[0] === 'event-stats' && key.includes(projectId);
-          }
-        });
-        
-        console.log('TrackingPixelManager: Cache clear and refetch complete');
-      }, 500);
+        setTimeout(() => {
+          console.log('TrackingPixelManager: Round 2 - Invalidating all queries...');
+          queryClient.invalidateQueries();
+          
+          setTimeout(() => {
+            console.log('TrackingPixelManager: Round 3 - Final refetch...');
+            
+            // Force refetch pixels
+            queryClient.refetchQueries({ queryKey: ['tracking-pixels', projectId] });
+            
+            // Force refetch events with different query variations
+            queryClient.refetchQueries({ queryKey: ['recent-events', projectId] });
+            
+            // Aggressively invalidate all event-related queries
+            queryClient.invalidateQueries({ 
+              predicate: (query) => {
+                const key = query.queryKey as string[];
+                return key && (
+                  key.includes('event-stats') || 
+                  key.includes('tracking-events') ||
+                  key.includes('attribution') ||
+                  key.includes(projectId)
+                );
+              }
+            });
+            
+            // Clear the localStorage signal
+            localStorage.removeItem('attribution_data_cleared');
+            
+            console.log('TrackingPixelManager: Ultra-aggressive cache clear complete');
+          }, 300);
+        }, 300);
+      }, 300);
       
       toast({
         title: "Success",
-        description: "All tracking data cleared successfully. Attribution dashboard will update momentarily.",
+        description: "All tracking data cleared successfully. Please refresh the Attribution tab to see the changes.",
       });
     },
     onError: (error) => {
