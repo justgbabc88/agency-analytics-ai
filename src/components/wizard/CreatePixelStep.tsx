@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,14 +7,7 @@ import { Plus, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-
-interface PixelData {
-  id?: string;
-  name: string;
-  pixelId: string;
-  domains: string;
-  config?: any;
-}
+import { PixelData } from './types';
 
 interface CreatePixelStepProps {
   projectId: string;

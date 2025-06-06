@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,17 +9,10 @@ import { TestVerifyStep } from './wizard/TestVerifyStep';
 import { ExistingPixelManager } from './wizard/ExistingPixelManager';
 import { ArrowLeft, ArrowRight, Zap, Settings, Eye, Archive } from "lucide-react";
 import { useQueryClient } from '@tanstack/react-query';
+import { PixelData } from './wizard/types';
 
 interface PixelSetupWizardProps {
   projectId: string;
-}
-
-interface PixelData {
-  id?: string;
-  name: string;
-  pixelId: string;
-  domains: string;
-  config?: any;
 }
 
 export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {

@@ -1,18 +1,10 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SimplifiedInstallationGuide } from './SimplifiedInstallationGuide';
 import { FunnelPageMapper } from './FunnelPageMapper';
 import { ArrowLeft, ArrowRight } from "lucide-react";
-
-interface PixelData {
-  id?: string;
-  name: string;
-  pixelId: string;
-  domains: string;
-  config?: any;
-}
+import { PixelData } from './types';
 
 interface ConfigureInstallStepProps {
   projectId: string;
