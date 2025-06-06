@@ -5,8 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
-import { TrendingUp, DollarSign, Users, MousePointer, Activity, Globe, ShoppingCart, CheckCircle, Video, Calendar, FileText } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, FunnelChart, Funnel, LabelList } from 'recharts';
+import { TrendingUp, DollarSign, Users, MousePointer, Activity, Globe, ShoppingCart, CheckCircle, Video, Calendar, FileText, TrendingDown, ArrowUpRight, ArrowDownRight } from "lucide-react";
 
 interface AttributionDashboardProps {
   projectId: string;
@@ -24,31 +24,6 @@ interface PixelData {
   conversion_events: string[];
   config?: {
     funnelPages?: any[];
-  };
-}
-
-interface AttributionRecord {
-  id: string;
-  project_id: string;
-  pixel_id: string;
-  session_id: string;
-  contact_email: string | null;
-  contact_phone: string | null;
-  utm_source: string | null;
-  utm_medium: string | null;
-  utm_campaign: string | null;
-  attributed_revenue: number;
-  attribution_model: string;
-  conversion_date: string;
-  created_at: string;
-  updated_at: string;
-  event_id: string | null;
-  tracking_sessions: {
-    utm_source: string | null;
-    utm_campaign: string | null;
-    utm_medium: string | null;
-    device_type: string | null;
-    browser: string | null;
   };
 }
 
@@ -84,39 +59,8 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
     enabled: !!projectId,
   });
 
-  // Get attribution data for selected pixel
-  const { data: attributionData, isLoading } = useQuery({
-    queryKey: ['attribution-data', projectId, selectedPixelId, timeRange],
-    queryFn: async () => {
-      if (!selectedPixelId) return [];
-      
-      const daysAgo = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - daysAgo);
-
-      const { data, error } = await supabase
-        .from('attribution_data')
-        .select(`
-          *,
-          tracking_sessions!inner(
-            utm_source,
-            utm_campaign,
-            utm_medium,
-            device_type,
-            browser
-          )
-        `)
-        .eq('project_id', projectId)
-        .gte('created_at', startDate.toISOString());
-
-      if (error) throw error;
-      return (data || []) as AttributionRecord[];
-    },
-    enabled: !!projectId && !!selectedPixelId,
-  });
-
   // Get event stats by page and event type
-  const { data: eventStats } = useQuery({
+  const { data: eventStats, isLoading } = useQuery({
     queryKey: ['event-stats', projectId, selectedPixelId, timeRange],
     queryFn: async () => {
       if (!selectedPixelId) return [];
@@ -142,8 +86,8 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
   const selectedPixel = pixels?.find(p => p.id === selectedPixelId);
   const configuredPages = selectedPixel?.config?.funnelPages || [];
 
-  // Helper function to get page name from URL
-  const getPageNameFromUrl = (pageUrl: string): string => {
+  // Helper function to get page name and details from URL
+  const getPageDetails = (pageUrl: string): { name: string; type: string; order: number } => {
     // First try to match with configured pages
     const matchedPage = configuredPages.find((page: any) => {
       try {
@@ -156,147 +100,158 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
     });
 
     if (matchedPage) {
-      return matchedPage.name;
+      return {
+        name: matchedPage.name,
+        type: matchedPage.type,
+        order: configuredPages.findIndex((p: any) => p.id === matchedPage.id)
+      };
     }
 
-    // Extract page name from URL path
+    // Fallback: Extract page name from URL
     try {
       const url = new URL(pageUrl);
       const pathname = url.pathname;
-      if (pathname === '/' || pathname === '') return 'Home Page';
+      if (pathname === '/' || pathname === '') return { name: 'Home Page', type: 'landing', order: 0 };
       
-      // Remove leading slash and convert to readable name
       const pageName = pathname.substring(1)
         .split('/')
         .map(segment => segment.replace(/-/g, ' ').replace(/_/g, ' '))
         .map(segment => segment.charAt(0).toUpperCase() + segment.slice(1))
         .join(' / ');
       
-      return pageName || 'Unknown Page';
+      // Infer type from URL patterns
+      let type = 'landing';
+      if (pathname.includes('checkout') || pathname.includes('payment')) type = 'checkout';
+      else if (pathname.includes('thank') || pathname.includes('success')) type = 'thankyou';
+      else if (pathname.includes('webinar') || pathname.includes('training')) type = 'webinar';
+      else if (pathname.includes('book') || pathname.includes('schedule')) type = 'booking';
+      
+      return { name: pageName || 'Unknown Page', type, order: 999 };
     } catch {
-      return pageUrl || 'Unknown Page';
+      return { name: pageUrl || 'Unknown Page', type: 'landing', order: 999 };
     }
   };
 
-  // Helper function to get page type from URL or event
-  const getPageType = (pageUrl: string, eventType: string): string => {
-    const matchedPage = configuredPages.find((page: any) => {
-      try {
-        const configuredUrl = new URL(page.url.startsWith('http') ? page.url : `https://${page.url}`);
-        const eventUrl = new URL(pageUrl);
-        return configuredUrl.pathname === eventUrl.pathname || pageUrl.includes(configuredUrl.pathname);
-      } catch {
-        return pageUrl.includes(page.url) || page.url.includes(pageUrl);
-      }
+  // Process funnel analytics
+  const funnelAnalytics = React.useMemo(() => {
+    if (!eventStats || !configuredPages.length) return null;
+
+    // Group events by page and calculate metrics
+    const pageMetrics = configuredPages.map((page: any, index: number) => {
+      const pageEvents = eventStats.filter(event => {
+        const { name } = getPageDetails(event.page_url);
+        return name === page.name;
+      });
+
+      const totalEvents = pageEvents.length;
+      const uniqueVisitors = new Set(pageEvents.map(e => e.contact_email || e.page_url)).size;
+      const conversions = pageEvents.filter(e => e.revenue_amount && e.revenue_amount > 0).length;
+      const revenue = pageEvents.reduce((sum, e) => sum + (parseFloat(e.revenue_amount?.toString() || '0')), 0);
+
+      return {
+        name: page.name,
+        type: page.type,
+        order: index,
+        totalEvents,
+        uniqueVisitors,
+        conversions,
+        revenue,
+        conversionRate: totalEvents > 0 ? (conversions / totalEvents) * 100 : 0,
+        revenuePerVisitor: uniqueVisitors > 0 ? revenue / uniqueVisitors : 0
+      };
     });
 
-    if (matchedPage) {
-      return matchedPage.type;
-    }
-
-    // Infer type from URL patterns
-    const url = pageUrl.toLowerCase();
-    if (url.includes('checkout') || url.includes('payment')) return 'checkout';
-    if (url.includes('thank') || url.includes('success') || url.includes('confirmation')) return 'thankyou';
-    if (url.includes('webinar') || url.includes('training')) return 'webinar';
-    if (url.includes('book') || url.includes('schedule') || url.includes('calendar')) return 'booking';
-    if (eventType === 'purchase') return 'checkout';
-    if (eventType === 'webinar_registration') return 'webinar';
-    if (eventType === 'call_booking') return 'booking';
-    
-    return 'landing';
-  };
-
-  // Process event stats by pages with enhanced data
-  const pageStats = eventStats?.reduce((acc: any[], event) => {
-    const pageName = getPageNameFromUrl(event.page_url);
-    const pageType = getPageType(event.page_url, event.event_type);
-    
-    let existingPage = acc.find(p => p.pageName === pageName);
-    
-    if (!existingPage) {
-      existingPage = {
-        pageName,
-        pageType,
-        pageUrl: event.page_url,
-        totalEvents: 0,
-        totalRevenue: 0,
-        eventBreakdown: {},
-        uniqueVisitors: new Set(),
-        conversions: 0
+    // Calculate funnel conversion rates
+    const funnelData = pageMetrics.map((page, index) => {
+      const dropOffRate = index > 0 ? 
+        ((pageMetrics[index - 1].uniqueVisitors - page.uniqueVisitors) / pageMetrics[index - 1].uniqueVisitors) * 100 : 0;
+      
+      return {
+        ...page,
+        dropOffRate,
+        fill: getPageTypeColor(page.type)
       };
-      acc.push(existingPage);
-    }
-    
-    existingPage.totalEvents += 1;
-    existingPage.eventBreakdown[event.event_type] = (existingPage.eventBreakdown[event.event_type] || 0) + 1;
-    
-    if (event.revenue_amount && event.revenue_amount > 0) {
-      existingPage.totalRevenue += parseFloat(event.revenue_amount.toString());
-      existingPage.conversions += 1;
-    }
-    
-    if (event.contact_email) {
-      existingPage.uniqueVisitors.add(event.contact_email);
-    }
-    
-    return acc;
-  }, []) || [];
+    });
 
-  // Convert Sets to counts for display
-  const processedPageStats = pageStats.map(page => ({
-    ...page,
-    uniqueVisitors: page.uniqueVisitors.size
-  }));
+    return { pageMetrics, funnelData };
+  }, [eventStats, configuredPages]);
 
-  // Process attribution data for charts
-  const sourceData = attributionData?.reduce((acc: Record<string, any>, attr) => {
-    const source = attr.utm_source || 'Direct';
-    if (!acc[source]) {
-      acc[source] = { source, revenue: 0, conversions: 0 };
-    }
-    acc[source].revenue += parseFloat(attr.attributed_revenue?.toString() || '0');
-    acc[source].conversions += 1;
-    return acc;
-  }, {} as Record<string, any>);
+  // Process daily trends
+  const dailyTrends = React.useMemo(() => {
+    if (!eventStats) return [];
 
-  const sourceChartData = Object.values(sourceData || {});
+    const dailyData = eventStats.reduce((acc: Record<string, any>, event) => {
+      const date = new Date(event.created_at).toLocaleDateString();
+      if (!acc[date]) {
+        acc[date] = { date, events: 0, revenue: 0, conversions: 0, uniqueVisitors: new Set() };
+      }
+      acc[date].events += 1;
+      if (event.revenue_amount && event.revenue_amount > 0) {
+        acc[date].revenue += parseFloat(event.revenue_amount.toString());
+        acc[date].conversions += 1;
+      }
+      if (event.contact_email) {
+        acc[date].uniqueVisitors.add(event.contact_email);
+      }
+      return acc;
+    }, {} as Record<string, any>);
 
-  // Event type breakdown data
-  const eventTypeData = eventStats?.reduce((acc: Record<string, number>, event) => {
-    acc[event.event_type] = (acc[event.event_type] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+    return Object.values(dailyData).map((day: any) => ({
+      ...day,
+      uniqueVisitors: day.uniqueVisitors.size,
+      conversionRate: day.events > 0 ? (day.conversions / day.events) * 100 : 0
+    })).sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [eventStats]);
 
-  const eventTypeChartData = Object.entries(eventTypeData || {}).map(([type, count]) => ({
-    eventType: type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '),
-    count
-  }));
+  // Process event type breakdown
+  const eventTypeBreakdown = React.useMemo(() => {
+    if (!eventStats) return [];
 
-  // Daily performance data
-  const dailyData = eventStats?.reduce((acc: Record<string, any>, event) => {
-    const date = new Date(event.created_at).toLocaleDateString();
-    if (!acc[date]) {
-      acc[date] = { date, events: 0, revenue: 0, conversions: 0 };
-    }
-    acc[date].events += 1;
-    if (event.revenue_amount && event.revenue_amount > 0) {
-      acc[date].revenue += parseFloat(event.revenue_amount.toString());
-      acc[date].conversions += 1;
-    }
-    return acc;
-  }, {} as Record<string, any>);
+    const eventTypeData = eventStats.reduce((acc: Record<string, number>, event) => {
+      acc[event.event_type] = (acc[event.event_type] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
 
-  const dailyChartData = Object.values(dailyData || {}).sort((a: any, b: any) => 
-    new Date(a.date).getTime() - new Date(b.date).getTime()
-  );
+    return Object.entries(eventTypeData).map(([type, count]) => ({
+      eventType: type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '),
+      count,
+      fill: getEventTypeColor(type)
+    }));
+  }, [eventStats]);
 
   // Calculate key metrics
-  const totalRevenue = eventStats?.reduce((sum, event) => sum + parseFloat(event.revenue_amount?.toString() || '0'), 0) || 0;
-  const totalConversions = eventStats?.filter(event => event.revenue_amount && event.revenue_amount > 0).length || 0;
-  const totalEvents = eventStats?.length || 0;
-  const conversionRate = totalEvents > 0 ? ((totalConversions / totalEvents) * 100).toFixed(2) : '0';
-  const avgOrderValue = totalConversions > 0 ? (totalRevenue / totalConversions).toFixed(2) : '0';
+  const keyMetrics = React.useMemo(() => {
+    if (!eventStats) return null;
+
+    const totalRevenue = eventStats.reduce((sum, event) => sum + parseFloat(event.revenue_amount?.toString() || '0'), 0);
+    const totalConversions = eventStats.filter(event => event.revenue_amount && event.revenue_amount > 0).length;
+    const totalEvents = eventStats.length;
+    const uniqueVisitors = new Set(eventStats.map(e => e.contact_email || e.page_url)).size;
+    const conversionRate = totalEvents > 0 ? ((totalConversions / totalEvents) * 100) : 0;
+    const avgOrderValue = totalConversions > 0 ? (totalRevenue / totalConversions) : 0;
+
+    // Calculate trends (compare with previous period)
+    const midPoint = Math.floor(eventStats.length / 2);
+    const recentEvents = eventStats.slice(0, midPoint);
+    const olderEvents = eventStats.slice(midPoint);
+
+    const recentRevenue = recentEvents.reduce((sum, event) => sum + parseFloat(event.revenue_amount?.toString() || '0'), 0);
+    const olderRevenue = olderEvents.reduce((sum, event) => sum + parseFloat(event.revenue_amount?.toString() || '0'), 0);
+    
+    const revenueTrend = olderRevenue > 0 ? ((recentRevenue - olderRevenue) / olderRevenue) * 100 : 0;
+    const eventsTrend = olderEvents.length > 0 ? ((recentEvents.length - olderEvents.length) / olderEvents.length) * 100 : 0;
+
+    return {
+      totalRevenue,
+      totalConversions,
+      totalEvents,
+      uniqueVisitors,
+      conversionRate,
+      avgOrderValue,
+      revenueTrend,
+      eventsTrend
+    };
+  }, [eventStats]);
 
   const getPageIcon = (type: string) => {
     switch (type) {
@@ -309,20 +264,39 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
     }
   };
 
-  const getEventTypeColor = (eventType: string) => {
-    switch (eventType.toLowerCase().replace(' ', '_')) {
-      case 'page_view': return 'bg-blue-100 text-blue-800';
-      case 'form_submission': return 'bg-green-100 text-green-800';
-      case 'click': return 'bg-purple-100 text-purple-800';
-      case 'purchase': return 'bg-yellow-100 text-yellow-800';
-      case 'webinar_registration': return 'bg-orange-100 text-orange-800';
-      case 'call_booking': return 'bg-indigo-100 text-indigo-800';
-      case 'custom_event': return 'bg-pink-100 text-pink-800';
-      default: return 'bg-gray-100 text-gray-800';
+  const getPageTypeColor = (type: string) => {
+    switch (type) {
+      case 'landing': return '#8884d8';
+      case 'checkout': return '#82ca9d';
+      case 'thankyou': return '#ffc658';
+      case 'webinar': return '#ff7300';
+      case 'booking': return '#00ff00';
+      default: return '#8884d8';
     }
   };
 
-  const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#00ff00', '#ff0000', '#0000ff'];
+  const getEventTypeColor = (eventType: string) => {
+    switch (eventType.toLowerCase()) {
+      case 'page_view': return '#8884d8';
+      case 'form_submission': return '#82ca9d';
+      case 'click': return '#ffc658';
+      case 'purchase': return '#ff7300';
+      case 'webinar_registration': return '#00ff00';
+      case 'call_booking': return '#ff0000';
+      default: return '#8884d8';
+    }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount);
+  };
+
+  const formatPercentage = (value: number) => {
+    return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
+  };
 
   if (isLoading) {
     return <div>Loading attribution data...</div>;
@@ -331,7 +305,7 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Attribution Dashboard</h2>
+        <h2 className="text-2xl font-bold">Attribution Analytics</h2>
         <div className="flex gap-4">
           <Select value={selectedPixelId} onValueChange={setSelectedPixelId}>
             <SelectTrigger className="w-64">
@@ -364,157 +338,218 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
             <Activity className="h-16 w-16 mx-auto text-gray-400 mb-4" />
             <h3 className="text-lg font-semibold mb-2">Select a Tracking Pixel</h3>
             <p className="text-gray-600">
-              Choose a tracking pixel to view its attribution data and performance metrics.
+              Choose a tracking pixel to view its attribution analytics and funnel performance.
+            </p>
+          </CardContent>
+        </Card>
+      ) : !configuredPages.length ? (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <FileText className="h-16 w-16 mx-auto text-gray-400 mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No Funnel Pages Configured</h3>
+            <p className="text-gray-600">
+              Configure funnel pages for this pixel to see detailed attribution analytics.
             </p>
           </CardContent>
         </Card>
       ) : (
         <>
-          {/* Key Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center gap-2">
-                  <DollarSign className="h-5 w-5 text-green-600" />
-                  <div>
-                    <p className="text-sm text-gray-600">Total Revenue</p>
-                    <p className="text-2xl font-bold">${totalRevenue.toFixed(2)}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-blue-600" />
-                  <div>
-                    <p className="text-sm text-gray-600">Conversions</p>
-                    <p className="text-2xl font-bold">{totalConversions}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center gap-2">
-                  <MousePointer className="h-5 w-5 text-purple-600" />
-                  <div>
-                    <p className="text-sm text-gray-600">Total Events</p>
-                    <p className="text-2xl font-bold">{totalEvents}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-orange-600" />
-                  <div>
-                    <p className="text-sm text-gray-600">Conversion Rate</p>
-                    <p className="text-2xl font-bold">{conversionRate}%</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center gap-2">
-                  <DollarSign className="h-5 w-5 text-indigo-600" />
-                  <div>
-                    <p className="text-sm text-gray-600">Avg Order Value</p>
-                    <p className="text-2xl font-bold">${avgOrderValue}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Page Performance */}
-          {processedPageStats.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Page Performance by Name & Type</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {processedPageStats.map((page: any, index: number) => {
-                    const PageIcon = getPageIcon(page.pageType);
-                    return (
-                      <div key={index} className="border rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-3">
-                            <PageIcon className="h-5 w-5 text-primary" />
-                            <div>
-                              <h4 className="font-medium">{page.pageName}</h4>
-                              <p className="text-sm text-gray-600">{page.pageUrl}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline">{page.pageType}</Badge>
-                            <Badge variant="secondary">{page.totalEvents} events</Badge>
-                            {page.totalRevenue > 0 && (
-                              <Badge className="bg-green-100 text-green-800">
-                                ${page.totalRevenue.toFixed(2)}
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                          <div className="text-center">
-                            <div className="font-medium text-lg">{page.totalEvents}</div>
-                            <div className="text-gray-600">Total Events</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="font-medium text-lg">{page.uniqueVisitors}</div>
-                            <div className="text-gray-600">Unique Visitors</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="font-medium text-lg">{page.conversions}</div>
-                            <div className="text-gray-600">Conversions</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="font-medium text-lg">
-                              {page.totalEvents > 0 ? ((page.conversions / page.totalEvents) * 100).toFixed(1) : '0'}%
-                            </div>
-                            <div className="text-gray-600">Conversion Rate</div>
-                          </div>
-                        </div>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {Object.entries(page.eventBreakdown).map(([eventType, count]: [string, any]) => (
-                            <Badge key={eventType} className={getEventTypeColor(eventType)}>
-                              {eventType.replace(/_/g, ' ')}: {count}
-                            </Badge>
-                          ))}
-                        </div>
+          {/* Key Metrics with Trends */}
+          {keyMetrics && (
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="h-5 w-5 text-green-600" />
+                      <div>
+                        <p className="text-sm text-gray-600">Total Revenue</p>
+                        <p className="text-2xl font-bold">{formatCurrency(keyMetrics.totalRevenue)}</p>
                       </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {keyMetrics.revenueTrend >= 0 ? 
+                        <ArrowUpRight className="h-4 w-4 text-green-600" /> : 
+                        <ArrowDownRight className="h-4 w-4 text-red-600" />
+                      }
+                      <span className={`text-sm font-medium ${keyMetrics.revenueTrend >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {formatPercentage(keyMetrics.revenueTrend)}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5 text-blue-600" />
+                    <div>
+                      <p className="text-sm text-gray-600">Conversions</p>
+                      <p className="text-2xl font-bold">{keyMetrics.totalConversions}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <MousePointer className="h-5 w-5 text-purple-600" />
+                      <div>
+                        <p className="text-sm text-gray-600">Total Events</p>
+                        <p className="text-2xl font-bold">{keyMetrics.totalEvents}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {keyMetrics.eventsTrend >= 0 ? 
+                        <ArrowUpRight className="h-4 w-4 text-green-600" /> : 
+                        <ArrowDownRight className="h-4 w-4 text-red-600" />
+                      }
+                      <span className={`text-sm font-medium ${keyMetrics.eventsTrend >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {formatPercentage(keyMetrics.eventsTrend)}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-orange-600" />
+                    <div>
+                      <p className="text-sm text-gray-600">Unique Visitors</p>
+                      <p className="text-2xl font-bold">{keyMetrics.uniqueVisitors}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-2">
+                    <Activity className="h-5 w-5 text-indigo-600" />
+                    <div>
+                      <p className="text-sm text-gray-600">Conversion Rate</p>
+                      <p className="text-2xl font-bold">{keyMetrics.conversionRate.toFixed(1)}%</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="h-5 w-5 text-emerald-600" />
+                    <div>
+                      <p className="text-sm text-gray-600">Avg Order Value</p>
+                      <p className="text-2xl font-bold">{formatCurrency(keyMetrics.avgOrderValue)}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Funnel Visualization */}
+          {funnelAnalytics && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Funnel Performance</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={400}>
+                    <FunnelChart>
+                      <Funnel
+                        dataKey="uniqueVisitors"
+                        data={funnelAnalytics.funnelData}
+                        isAnimationActive
+                      >
+                        <LabelList position="center" fill="#fff" stroke="none" />
+                      </Funnel>
+                      <Tooltip formatter={(value) => [`${value} visitors`, 'Unique Visitors']} />
+                    </FunnelChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Page Performance Metrics</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {funnelAnalytics.pageMetrics.map((page: any, index: number) => {
+                      const PageIcon = getPageIcon(page.type);
+                      return (
+                        <div key={index} className="border rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <PageIcon className="h-5 w-5 text-primary" />
+                              <div>
+                                <h4 className="font-medium">{page.name}</h4>
+                                <Badge variant="outline">{page.type}</Badge>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-lg font-bold">{page.conversionRate.toFixed(1)}%</div>
+                              <div className="text-sm text-gray-600">Conv. Rate</div>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-4 gap-4 text-sm">
+                            <div className="text-center">
+                              <div className="font-medium">{page.totalEvents}</div>
+                              <div className="text-gray-600">Events</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="font-medium">{page.uniqueVisitors}</div>
+                              <div className="text-gray-600">Visitors</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="font-medium">{page.conversions}</div>
+                              <div className="text-gray-600">Conversions</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="font-medium">{formatCurrency(page.revenue)}</div>
+                              <div className="text-gray-600">Revenue</div>
+                            </div>
+                          </div>
+                          {page.dropOffRate > 0 && (
+                            <div className="mt-2 flex items-center gap-1 text-sm text-red-600">
+                              <TrendingDown className="h-4 w-4" />
+                              {page.dropOffRate.toFixed(1)}% drop-off from previous step
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           )}
 
           {/* Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Daily Performance */}
-            {dailyChartData.length > 0 && (
+            {/* Daily Performance Trend */}
+            {dailyTrends.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Daily Performance</CardTitle>
+                  <CardTitle>Daily Performance Trends</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={dailyChartData}>
+                    <LineChart data={dailyTrends}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="date" />
                       <YAxis />
                       <Tooltip />
                       <Line type="monotone" dataKey="events" stroke="#8884d8" name="Events" />
                       <Line type="monotone" dataKey="conversions" stroke="#82ca9d" name="Conversions" />
+                      <Line type="monotone" dataKey="uniqueVisitors" stroke="#ffc658" name="Unique Visitors" />
                     </LineChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -522,25 +557,24 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
             )}
 
             {/* Event Types Breakdown */}
-            {eventTypeChartData.length > 0 && (
+            {eventTypeBreakdown.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Event Types Breakdown</CardTitle>
+                  <CardTitle>Event Types Distribution</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={300}>
                     <PieChart>
                       <Pie
-                        data={eventTypeChartData}
+                        data={eventTypeBreakdown}
                         cx="50%"
                         cy="50%"
                         outerRadius={80}
-                        fill="#8884d8"
                         dataKey="count"
                         label={({ eventType, count }) => `${eventType}: ${count}`}
                       >
-                        {eventTypeChartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        {eventTypeBreakdown.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
                         ))}
                       </Pie>
                       <Tooltip />
@@ -550,19 +584,19 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
               </Card>
             )}
 
-            {/* Revenue by Source */}
-            {sourceChartData.length > 0 && (
+            {/* Revenue by Page */}
+            {funnelAnalytics && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Revenue by Source</CardTitle>
+                  <CardTitle>Revenue by Funnel Page</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={sourceChartData}>
+                    <BarChart data={funnelAnalytics.pageMetrics}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="source" />
+                      <XAxis dataKey="name" />
                       <YAxis />
-                      <Tooltip formatter={(value) => [`$${value}`, 'Revenue']} />
+                      <Tooltip formatter={(value) => [formatCurrency(Number(value)), 'Revenue']} />
                       <Bar dataKey="revenue" fill="#8884d8" />
                     </BarChart>
                   </ResponsiveContainer>
@@ -570,88 +604,26 @@ export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) =
               </Card>
             )}
 
-            {/* Conversions by Source */}
-            {sourceChartData.length > 0 && (
+            {/* Conversion Rates by Page */}
+            {funnelAnalytics && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Conversions by Source</CardTitle>
+                  <CardTitle>Conversion Rates by Page</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={sourceChartData}
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="conversions"
-                        label={({ source, conversions }) => `${source}: ${conversions}`}
-                      >
-                        {sourceChartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
+                    <BarChart data={funnelAnalytics.pageMetrics}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip formatter={(value) => [`${Number(value).toFixed(2)}%`, 'Conversion Rate']} />
+                      <Bar dataKey="conversionRate" fill="#82ca9d" />
+                    </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
               </Card>
             )}
           </div>
-
-          {/* Recent Events with Page Names */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Events with Page Details</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {eventStats?.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  No events available yet. Install the tracking pixel and start driving traffic!
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {eventStats?.slice(0, 20).map((event) => {
-                    const pageName = getPageNameFromUrl(event.page_url);
-                    const pageType = getPageType(event.page_url, event.event_type);
-                    const PageIcon = getPageIcon(pageType);
-                    
-                    return (
-                      <div key={event.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <PageIcon className="h-5 w-5 text-primary" />
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <Badge className={getEventTypeColor(event.event_type)}>
-                                {event.event_type.replace(/_/g, ' ')}
-                              </Badge>
-                              <Badge variant="outline">{pageType}</Badge>
-                            </div>
-                            <p className="font-medium">{pageName}</p>
-                            <p className="text-sm text-gray-600">{event.event_name}</p>
-                            {event.contact_email && (
-                              <p className="text-xs text-gray-500">{event.contact_email}</p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm text-gray-500">
-                            {new Date(event.created_at).toLocaleString()}
-                          </p>
-                          {event.revenue_amount && event.revenue_amount > 0 && (
-                            <p className="text-sm font-medium text-green-600">
-                              ${parseFloat(event.revenue_amount.toString()).toFixed(2)}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
         </>
       )}
     </div>
