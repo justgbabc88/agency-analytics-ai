@@ -138,17 +138,9 @@ export const ExistingPixelManager = ({ projectId }: ExistingPixelManagerProps) =
       console.log('Successfully cleared all tracking data for project');
     },
     onSuccess: () => {
-      // Invalidate all relevant queries to refresh the UI
       queryClient.invalidateQueries({ queryKey: ['tracking-pixels', projectId] });
       queryClient.invalidateQueries({ queryKey: ['recent-events', projectId] });
       queryClient.invalidateQueries({ queryKey: ['event-stats', projectId] });
-      queryClient.invalidateQueries({ queryKey: ['attribution-data', projectId] });
-      
-      // Also invalidate any pixel-specific queries
-      pixels?.forEach(pixel => {
-        queryClient.invalidateQueries({ queryKey: ['event-stats', projectId, pixel.id] });
-      });
-
       toast({
         title: "Success",
         description: "All tracking data cleared successfully",
