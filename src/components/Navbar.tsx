@@ -17,7 +17,10 @@ import { useAuth } from '@/hooks/useAuth';
 export const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, signOut } = useAuth();
+  const { user, loading, signOut } = useAuth();
+
+  // Add some debugging
+  console.log('Navbar render - user:', user, 'loading:', loading);
 
   const mainNavItems = [
     {
@@ -74,8 +77,10 @@ export const Navbar = () => {
             );
           })}
 
-          {/* User Profile Dropdown */}
-          {user && (
+          {/* User Profile Dropdown - Show loading state or user dropdown */}
+          {loading ? (
+            <div className="h-8 w-8 rounded-full bg-gray-200 animate-pulse"></div>
+          ) : user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
@@ -110,6 +115,10 @@ export const Navbar = () => {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+          ) : (
+            <Button variant="outline" onClick={() => navigate('/auth')}>
+              Sign In
+            </Button>
           )}
         </div>
       </div>
