@@ -1,5 +1,4 @@
 
-
 import { useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { LowTicketFunnel } from "@/components/LowTicketFunnel";
@@ -9,6 +8,7 @@ import { AlertSystem } from "@/components/AlertSystem";
 import { PredictiveAnalytics } from "@/components/PredictiveAnalytics";
 import { AIChatPanel } from "@/components/AIChatPanel";
 import { FacebookMetrics } from "@/components/FacebookMetrics";
+import { GoogleSheetsMetrics } from "@/components/GoogleSheetsMetrics";
 import { PixelSetupWizard } from '@/components/PixelSetupWizard';
 import { TrackingPixelManager } from '@/components/TrackingPixelManager';
 import { AttributionDashboard } from '@/components/AttributionDashboard';
@@ -44,15 +44,17 @@ const Index = () => {
 
   // Tracking events queries (moved from Tracking page)
   const { data: recentEvents, isLoading: eventsLoading, refetch: refetchEvents } = useQuery({
-    queryKey: ['recent-events', selectedProjectId],
+    queryKey: ['recent-events', selectedProjectId, dateRange],
     queryFn: async () => {
       if (!selectedProjectId) return [];
       
-      console.log('Fetching recent events for project:', selectedProjectId);
+      console.log('Fetching recent events for project:', selectedProjectId, 'date range:', dateRange);
       const { data, error } = await supabase
         .from('tracking_events')
         .select('*')
         .eq('project_id', selectedProjectId)
+        .gte('created_at', dateRange.from.toISOString())
+        .lte('created_at', dateRange.to.toISOString())
         .order('created_at', { ascending: false })
         .limit(50);
 
@@ -69,16 +71,17 @@ const Index = () => {
   });
 
   const { data: eventStats } = useQuery({
-    queryKey: ['event-stats', selectedProjectId],
+    queryKey: ['event-stats', selectedProjectId, dateRange],
     queryFn: async () => {
       if (!selectedProjectId) return { total: 0, types: {} };
       
-      console.log('Fetching event stats for project:', selectedProjectId);
+      console.log('Fetching event stats for project:', selectedProjectId, 'date range:', dateRange);
       const { data, error } = await supabase
         .from('tracking_events')
         .select('event_type, created_at')
         .eq('project_id', selectedProjectId)
-        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+        .gte('created_at', dateRange.from.toISOString())
+        .lte('created_at', dateRange.to.toISOString());
 
       if (error) {
         console.error('Error fetching event stats:', error);
@@ -161,7 +164,7 @@ const Index = () => {
 
     switch (selectedProject.funnel_type) {
       case "book_call":
-        return <BookCallFunnel projectId={selectedProjectId} />;
+        return <BookCallFunnel projectId={selectedProjectId} dateRange={dateRange} />;
       case "high_ticket":
       case "webinar":
         return (
@@ -225,6 +228,8 @@ const Index = () => {
 
           <TabsContent value="funnel" className="space-y-6">
             {renderFunnelContent()}
+            {/* Add Google Sheets metrics to funnel tab */}
+            <GoogleSheetsMetrics dateRange={dateRange} />
           </TabsContent>
 
           <TabsContent value="facebook" className="space-y-6">
@@ -272,7 +277,7 @@ const Index = () => {
                 </TabsContent>
 
                 <TabsContent value="attribution">
-                  <AttributionDashboard projectId={selectedProjectId} />
+                  <AttributionDashboard projectId={selectedProjectId} dateRange={dateRange} />
                 </TabsContent>
 
                 <TabsContent value="events">
@@ -282,7 +287,7 @@ const Index = () => {
                       <div className="flex items-center justify-between mb-6">
                         <h3 className="text-lg font-semibold flex items-center gap-2">
                           <BarChart3 className="h-5 w-5" />
-                          Event Statistics (Last 24h)
+                          Event Statistics ({dateRange.from.toLocaleDateString()} - {dateRange.to.toLocaleDateString()})
                         </h3>
                         <Button onClick={handleRefreshEvents} variant="outline" size="sm">
                           <RefreshCw className="h-4 w-4 mr-2" />
@@ -389,19 +394,19 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="predictions" className="space-y-6">
-            <PredictiveAnalytics />
+            <PredictiveAnalytics dateRange={dateRange} />
           </TabsContent>
 
           <TabsContent value="assistant" className="space-y-6">
-            <AIChatPanel />
+            <AIChatPanel dateRange={dateRange} />
           </TabsContent>
 
           <TabsContent value="alerts" className="space-y-6">
-            <AlertSystem />
+            <AlertSystem dateRange={dateRange} />
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-6">
-            <ProjectIntegrationsPanel projectId={selectedProjectId} />
+            <ProjectIntegrationsPanel projectId={selectedProjectId} dateRange={dateRange} />
           </TabsContent>
         </Tabs>
       </div>
@@ -410,4 +415,3 @@ const Index = () => {
 };
 
 export default Index;
-
