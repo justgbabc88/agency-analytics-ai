@@ -164,7 +164,7 @@ const Index = () => {
 
     switch (selectedProject.funnel_type) {
       case "book_call":
-        return <BookCallFunnel projectId={selectedProjectId} dateRange={dateRange} />;
+        return <BookCallFunnel projectId={selectedProjectId} />;
       case "high_ticket":
       case "webinar":
         return (
@@ -394,19 +394,19 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="predictions" className="space-y-6">
-            <PredictiveAnalytics dateRange={dateRange} />
+            <PredictiveAnalytics />
           </TabsContent>
 
           <TabsContent value="assistant" className="space-y-6">
-            <AIChatPanel dateRange={dateRange} />
+            <AIChatPanel />
           </TabsContent>
 
           <TabsContent value="alerts" className="space-y-6">
-            <AlertSystem dateRange={dateRange} />
+            <AlertSystem />
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-6">
-            <ProjectIntegrationsPanel projectId={selectedProjectId} dateRange={dateRange} />
+            <ProjectIntegrationsPanel projectId={selectedProjectId} />
           </TabsContent>
         </Tabs>
       </div>
