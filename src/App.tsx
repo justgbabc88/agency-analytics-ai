@@ -21,6 +21,9 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "./components/AppSidebar";
 import { Navbar } from "./components/Navbar";
 import FacebookAds from "./pages/FacebookAds";
+import Predictions from "./pages/Predictions";
+import AIAssistant from "./pages/AIAssistant";
+import Alerts from "./pages/Alerts";
 
 const queryClient = new QueryClient()
 
@@ -39,9 +42,9 @@ function App() {
                   <Routes>
                     <Route path="/" element={<Index />} />
                     <Route path="/facebook-ads" element={<FacebookAds />} />
-                    <Route path="/predictions" element={<Index />} />
-                    <Route path="/ai-assistant" element={<Index />} />
-                    <Route path="/alerts" element={<Index />} />
+                    <Route path="/predictions" element={<Predictions />} />
+                    <Route path="/ai-assistant" element={<AIAssistant />} />
+                    <Route path="/alerts" element={<Alerts />} />
                     <Route path="/integrations" element={<Integrations />} />
                     <Route path="/tracking" element={<Tracking />} />
                     <Route path="/google-oauth-callback" element={<GoogleOAuthCallback />} />
