@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +10,7 @@ import { Button } from "@/components/ui/button";
 
 interface AttributionDashboardProps {
   projectId: string;
+  dateRange: { from: Date; to: Date; };
 }
 
 interface PixelData {
@@ -40,7 +40,7 @@ interface EventRecord {
   contact_name: string | null;
 }
 
-export const AttributionDashboard = ({ projectId }: AttributionDashboardProps) => {
+export const AttributionDashboard = ({ projectId, dateRange }: AttributionDashboardProps) => {
   const [timeRange, setTimeRange] = useState('7d');
   const [selectedPixelId, setSelectedPixelId] = useState<string>('');
   const [forceRefreshKey, setForceRefreshKey] = useState(0);
