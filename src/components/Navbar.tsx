@@ -1,8 +1,8 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from "@/components/ui/button";
-import { Activity, Settings, User, LogOut, Bell } from "lucide-react";
-import { useNavigate } from 'react-router-dom';
+import { Activity, BarChart3, Target, Settings, Home, User, LogOut } from "lucide-react";
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,15 +13,27 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from '@/hooks/useAuth';
-import { ProjectSelector } from './ProjectSelector';
-import { CreateProjectModal } from './CreateProjectModal';
 
 export const Navbar = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, loading, signOut } = useAuth();
-  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
 
+  // Add some debugging
   console.log('Navbar render - user:', user, 'loading:', loading);
+
+  const mainNavItems = [
+    {
+      path: '/',
+      label: 'Dashboard',
+      icon: Home,
+    },
+    {
+      path: '/tracking',
+      label: 'Tracking',
+      icon: Target,
+    },
+  ];
 
   const handleSignOut = async () => {
     try {
@@ -36,104 +48,75 @@ export const Navbar = () => {
     return email.split('@')[0].substring(0, 2).toUpperCase();
   };
 
-  const handleProjectCreated = (projectId: string) => {
-    setSelectedProjectId(projectId);
-  };
-
   return (
-    <nav className="bg-gray-900 border-b border-gray-800 px-6 py-3 h-16">
-      <div className="flex items-center justify-between h-full">
-        {/* Left side - Logo and Project Selector */}
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2">
-            <Activity className="h-6 w-6 text-green-500" />
-            <span className="text-lg font-semibold text-white">Agency Analytics</span>
-          </div>
-          
-          {/* Project Selector */}
-          <div className="flex items-center gap-3">
-            <div className="w-64">
-              <ProjectSelector
-                selectedProjectId={selectedProjectId}
-                onProjectChange={setSelectedProjectId}
-                className="bg-gray-800 border-gray-700 text-white"
-              />
-            </div>
-            <CreateProjectModal onProjectCreated={handleProjectCreated} />
-          </div>
+    <nav className="bg-white border-b border-gray-200 px-6 py-4">
+      <div className="flex items-center justify-between">
+        {/* Logo on the left */}
+        <div className="flex items-center gap-2">
+          <Activity className="h-8 w-8 text-blue-600" />
+          <span className="text-xl font-bold text-gray-900">Agency Analytics</span>
         </div>
         
-        {/* Right side - Actions and Profile */}
+        {/* Right side - Navigation and Profile */}
         <div className="flex items-center gap-4">
-          {/* Tracking Percentage */}
-          <div className="flex items-center gap-2 bg-gray-800 px-3 py-1 rounded">
-            <span className="text-sm text-gray-300">Tracking percentage</span>
-            <span className="text-sm font-semibold text-green-500">91%</span>
-          </div>
-          
-          {/* Settings */}
-          <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white p-2">
-            <Settings className="h-4 w-4" />
-          </Button>
-          
-          {/* Notifications */}
-          <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white p-2 relative">
-            <Bell className="h-4 w-4" />
-            <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-              2
-            </span>
-          </Button>
+          {/* Navigation items */}
+          {mainNavItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = location.pathname === item.path;
+            
+            return (
+              <Button
+                key={item.path}
+                variant={isActive ? "default" : "ghost"}
+                onClick={() => navigate(item.path)}
+                className="flex items-center gap-2"
+              >
+                <Icon className="h-4 w-4" />
+                {item.label}
+              </Button>
+            );
+          })}
 
-          {/* User Profile Dropdown */}
+          {/* User Profile Dropdown - Show loading state or user dropdown */}
           {loading ? (
-            <div className="h-8 w-8 rounded-full bg-gray-700 animate-pulse"></div>
+            <div className="h-8 w-8 rounded-full bg-gray-200 animate-pulse"></div>
           ) : user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full p-0">
+                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                   <Avatar className="h-8 w-8">
                     <AvatarImage src={user.user_metadata?.avatar_url} alt={user.email} />
-                    <AvatarFallback className="bg-blue-600 text-white text-xs">
-                      {getUserInitials(user.email || 'User')}
-                    </AvatarFallback>
+                    <AvatarFallback>{getUserInitials(user.email || 'User')}</AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56 bg-gray-800 border-gray-700" align="end" forceMount>
+              <DropdownMenuContent className="w-56" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none text-white">
-                      {user.user_metadata?.full_name || 'User'}
-                    </p>
-                    <p className="text-xs leading-none text-gray-400">
+                    <p className="text-sm font-medium leading-none">{user.user_metadata?.full_name || 'User'}</p>
+                    <p className="text-xs leading-none text-muted-foreground">
                       {user.email}
                     </p>
                   </div>
                 </DropdownMenuLabel>
-                <DropdownMenuSeparator className="bg-gray-700" />
-                <DropdownMenuItem 
-                  onClick={() => navigate('/settings')}
-                  className="text-gray-300 hover:text-white hover:bg-gray-700"
-                >
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate('/integrations')}>
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Integrations</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/settings')}>
                   <User className="mr-2 h-4 w-4" />
                   <span>Profile Settings</span>
                 </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-gray-700" />
-                <DropdownMenuItem 
-                  onClick={handleSignOut}
-                  className="text-gray-300 hover:text-white hover:bg-gray-700"
-                >
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut}>
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Log out</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Button 
-              variant="outline" 
-              onClick={() => navigate('/auth')}
-              className="border-gray-600 text-gray-300 hover:text-white hover:bg-gray-800"
-            >
+            <Button variant="outline" onClick={() => navigate('/auth')}>
               Sign In
             </Button>
           )}
