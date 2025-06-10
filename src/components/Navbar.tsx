@@ -16,8 +16,13 @@ import { useAuth } from '@/hooks/useAuth';
 import { ProjectSelector } from '@/components/ProjectSelector';
 import { CreateProjectModal } from '@/components/CreateProjectModal';
 import { useProjects } from '@/hooks/useProjects';
+import { AdvancedDateRangePicker } from '@/components/AdvancedDateRangePicker';
 
-export const Navbar = () => {
+interface NavbarProps {
+  onDateChange?: (from: Date, to: Date) => void;
+}
+
+export const Navbar = ({ onDateChange }: NavbarProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, loading, signOut } = useAuth();
@@ -51,6 +56,12 @@ export const Navbar = () => {
     setSelectedProjectId(projectId);
   };
 
+  const handleDateChange = (from: Date, to: Date) => {
+    if (onDateChange) {
+      onDateChange(from, to);
+    }
+  };
+
   return (
     <nav className="bg-white border-b border-gray-200 px-6 py-4">
       <div className="flex items-center justify-between">
@@ -60,7 +71,7 @@ export const Navbar = () => {
           <span className="text-xl font-bold text-gray-900">Agency Analytics</span>
         </div>
         
-        {/* Right side - Navigation and Profile */}
+        {/* Right side - Navigation, Project Selector, Date Filter, and Profile */}
         <div className="flex items-center gap-4">
           {/* Navigation items */}
           {mainNavItems.map((item) => {
@@ -88,6 +99,14 @@ export const Navbar = () => {
               className="w-[200px]"
             />
             <CreateProjectModal onProjectCreated={handleProjectCreated} />
+          </div>
+
+          {/* Date Filter */}
+          <div className="flex-shrink-0">
+            <AdvancedDateRangePicker 
+              onDateChange={handleDateChange}
+              className="w-full sm:w-auto"
+            />
           </div>
 
           {/* User Profile Dropdown - Show loading state or user dropdown */}

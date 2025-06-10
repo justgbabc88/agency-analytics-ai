@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Navbar } from "@/components/Navbar";
-import { AdvancedDateRangePicker } from "@/components/AdvancedDateRangePicker";
 import { LowTicketFunnel } from "@/components/LowTicketFunnel";
 import { BookCallFunnel } from "@/components/BookCallFunnel";
 import { ProjectIntegrationsPanel } from "@/components/ProjectIntegrationsPanel";
@@ -184,60 +183,42 @@ const Index = () => {
 
   return (
     <div className="bg-gray-50">
-      <Navbar />
+      <Navbar onDateChange={handleDateChange} />
       
       <div className="p-6">
         <Tabs defaultValue="dashboard" className="space-y-6">
-          {/* Header with title, navigation tabs, and date picker in the same row */}
+          {/* Navigation tabs */}
           <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 flex-1">
-                <div>
-                  <h2 className="text-xl font-semibold text-gray-900">AI Marketing Dashboard</h2>
-                  <p className="text-gray-600">Monitor and optimize your marketing funnels with real-time data</p>
-                </div>
-                
-                {/* Navigation tabs */}
-                <TabsList className="grid grid-cols-3 lg:grid-cols-7 w-full lg:w-auto">
-                  <TabsTrigger value="dashboard" className="flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4" />
-                    <span className="hidden sm:inline">Dashboard</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="facebook" className="flex items-center gap-2">
-                    <Facebook className="h-4 w-4" />
-                    <span className="hidden sm:inline">Facebook</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="tracking" className="flex items-center gap-2">
-                    <Target className="h-4 w-4" />
-                    <span className="hidden sm:inline">Tracking</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="predictions" className="flex items-center gap-2">
-                    <Activity className="h-4 w-4" />
-                    <span className="hidden sm:inline">Predictions</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="assistant" className="flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4" />
-                    <span className="hidden sm:inline">Assistant</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="alerts" className="flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4" />
-                    <span className="hidden sm:inline">Alerts</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="settings" className="flex items-center gap-2">
-                    <Settings className="h-4 w-4" />
-                    <span className="hidden sm:inline">Settings</span>
-                  </TabsTrigger>
-                </TabsList>
-              </div>
-              
-              {/* Date picker */}
-              <div className="flex-shrink-0">
-                <AdvancedDateRangePicker 
-                  onDateChange={handleDateChange}
-                  className="w-full sm:w-auto"
-                />
-              </div>
-            </div>
+            <TabsList className="grid grid-cols-3 lg:grid-cols-7 w-full lg:w-auto">
+              <TabsTrigger value="dashboard" className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4" />
+                <span className="hidden sm:inline">Dashboard</span>
+              </TabsTrigger>
+              <TabsTrigger value="facebook" className="flex items-center gap-2">
+                <Facebook className="h-4 w-4" />
+                <span className="hidden sm:inline">Facebook</span>
+              </TabsTrigger>
+              <TabsTrigger value="tracking" className="flex items-center gap-2">
+                <Target className="h-4 w-4" />
+                <span className="hidden sm:inline">Tracking</span>
+              </TabsTrigger>
+              <TabsTrigger value="predictions" className="flex items-center gap-2">
+                <Activity className="h-4 w-4" />
+                <span className="hidden sm:inline">Predictions</span>
+              </TabsTrigger>
+              <TabsTrigger value="assistant" className="flex items-center gap-2">
+                <MessageSquare className="h-4 w-4" />
+                <span className="hidden sm:inline">Assistant</span>
+              </TabsTrigger>
+              <TabsTrigger value="alerts" className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
+                <span className="hidden sm:inline">Alerts</span>
+              </TabsTrigger>
+              <TabsTrigger value="settings" className="flex items-center gap-2">
+                <Settings className="h-4 w-4" />
+                <span className="hidden sm:inline">Settings</span>
+              </TabsTrigger>
+            </TabsList>
           </div>
 
           <TabsContent value="dashboard" className="space-y-6">
@@ -427,3 +408,5 @@ const Index = () => {
 };
 
 export default Index;
+
+</edits_to_apply>
