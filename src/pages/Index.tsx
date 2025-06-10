@@ -1,4 +1,5 @@
 
+
 import { useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { LowTicketFunnel } from "@/components/LowTicketFunnel";
@@ -190,32 +191,32 @@ const Index = () => {
         <Tabs defaultValue="funnel" className="space-y-6">
           {/* Navigation tabs */}
           <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <TabsList className="grid w-full grid-cols-7 gap-1">
-              <TabsTrigger value="funnel" className="flex items-center gap-2 px-2 py-2">
+            <TabsList className="grid w-full grid-cols-7 h-12">
+              <TabsTrigger value="funnel" className="flex items-center justify-center gap-2 h-10">
                 <BarChart3 className="h-4 w-4" />
                 <span className="hidden sm:inline">Funnel</span>
               </TabsTrigger>
-              <TabsTrigger value="facebook" className="flex items-center gap-2 px-2 py-2">
+              <TabsTrigger value="facebook" className="flex items-center justify-center gap-2 h-10">
                 <Facebook className="h-4 w-4" />
                 <span className="hidden sm:inline">Facebook</span>
               </TabsTrigger>
-              <TabsTrigger value="tracking" className="flex items-center gap-2 px-2 py-2">
+              <TabsTrigger value="tracking" className="flex items-center justify-center gap-2 h-10">
                 <Target className="h-4 w-4" />
                 <span className="hidden sm:inline">Tracking</span>
               </TabsTrigger>
-              <TabsTrigger value="predictions" className="flex items-center gap-2 px-2 py-2">
+              <TabsTrigger value="predictions" className="flex items-center justify-center gap-2 h-10">
                 <Activity className="h-4 w-4" />
                 <span className="hidden sm:inline">Predictions</span>
               </TabsTrigger>
-              <TabsTrigger value="assistant" className="flex items-center gap-2 px-2 py-2">
+              <TabsTrigger value="assistant" className="flex items-center justify-center gap-2 h-10">
                 <MessageSquare className="h-4 w-4" />
                 <span className="hidden sm:inline">Assistant</span>
               </TabsTrigger>
-              <TabsTrigger value="alerts" className="flex items-center gap-2 px-2 py-2">
+              <TabsTrigger value="alerts" className="flex items-center justify-center gap-2 h-10">
                 <TrendingUp className="h-4 w-4" />
                 <span className="hidden sm:inline">Alerts</span>
               </TabsTrigger>
-              <TabsTrigger value="settings" className="flex items-center gap-2 px-2 py-2">
+              <TabsTrigger value="settings" className="flex items-center justify-center gap-2 h-10">
                 <Settings className="h-4 w-4" />
                 <span className="hidden sm:inline">Settings</span>
               </TabsTrigger>
@@ -409,3 +410,4 @@ const Index = () => {
 };
 
 export default Index;
+
