@@ -1,11 +1,12 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAgency } from './useAgency';
+import { useState, useEffect } from 'react';
 
 export const useProjects = () => {
   const { agency } = useAgency();
   const queryClient = useQueryClient();
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
 
   const { data: projects, isLoading } = useQuery({
     queryKey: ['projects', agency?.id],
@@ -37,6 +38,13 @@ export const useProjects = () => {
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
+
+  // Auto-select first project if none selected and projects are available
+  useEffect(() => {
+    if (projects && projects.length > 0 && !selectedProjectId) {
+      setSelectedProjectId(projects[0].id);
+    }
+  }, [projects, selectedProjectId]);
 
   const createProject = useMutation({
     mutationFn: async (projectData: { name: string; funnel_type: string }) => {
@@ -201,5 +209,7 @@ export const useProjects = () => {
     isLoading,
     createProject,
     deleteProject,
+    selectedProjectId,
+    setSelectedProjectId,
   };
 };
