@@ -8,57 +8,61 @@ import { AIInsights } from "@/components/AIInsights";
 import { ExportPanel } from "@/components/ExportPanel";
 
 const Index = () => {
+  // Mock data for the charts and components
+  const mockChartData = [
+    { date: '2024-01-01', conversionRate: 3.2, revenue: 15000 },
+    { date: '2024-01-02', conversionRate: 3.8, revenue: 18000 },
+    { date: '2024-01-03', conversionRate: 3.5, revenue: 16500 },
+    { date: '2024-01-04', conversionRate: 4.1, revenue: 20000 },
+    { date: '2024-01-05', conversionRate: 3.9, revenue: 19000 }
+  ];
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-            <p className="text-gray-600 mt-1">Welcome to your analytics dashboard</p>
-          </div>
-          <ExportPanel />
-        </div>
-
         {/* Metrics Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <MetricCard 
             title="Total Revenue" 
             value="$24,500" 
-            change={12.5} 
-            trend="up" 
+            previousValue="$21,800"
+            format="currency"
           />
           <MetricCard 
             title="Conversion Rate" 
-            value="3.8%" 
-            change={-2.1} 
-            trend="down" 
+            value="3.8" 
+            previousValue="3.9"
+            format="percentage"
           />
           <MetricCard 
             title="Average Order Value" 
             value="$125.50" 
-            change={8.2} 
-            trend="up" 
+            previousValue="$115.80"
+            format="currency"
           />
           <MetricCard 
             title="Return on Ad Spend" 
-            value="4.2x" 
-            change={15.7} 
-            trend="up" 
+            value="4.2" 
+            previousValue="3.6"
+            format="number"
           />
         </div>
 
         {/* Charts and Analytics */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <ConversionChart />
+          <ConversionChart 
+            data={mockChartData}
+            title="Performance Overview"
+            metrics={['conversionRate', 'revenue']}
+          />
           <PredictiveAnalytics />
         </div>
 
         {/* Attribution Dashboard */}
-        <AttributionDashboard />
+        <AttributionDashboard projectId="default-project" />
 
         {/* AI Insights */}
-        <AIInsights />
+        <AIInsights insights="Based on current performance data, your conversion rate is trending upward with a 12.5% increase. Consider optimizing your top-performing campaigns for better ROI." />
       </div>
     </div>
   );
