@@ -1,4 +1,3 @@
-
 import { useCalendlyData } from "@/hooks/useCalendlyData";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { AdvancedDateRangePicker } from "./AdvancedDateRangePicker";
@@ -33,6 +32,12 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   const dateRangeKey = useMemo(() => {
     return `${dateRange.from.getTime()}-${dateRange.to.getTime()}`;
   }, [dateRange]);
+
+  // Create a stable date range object for hooks
+  const stableDateRange = useMemo(() => ({
+    from: dateRange.from,
+    to: dateRange.to
+  }), [dateRangeKey]);
 
   // Fetch tracking pixel for this project
   const { data: trackingPixel, isLoading: pixelLoading } = useQuery({
@@ -96,10 +101,10 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
     console.log('Date range key:', dateRangeKey);
     console.log('Events available:', calendlyEvents.length);
     
-    const data = generateCallDataFromEvents(calendlyEvents, dateRange);
+    const data = generateCallDataFromEvents(calendlyEvents, stableDateRange);
     console.log('Generated chart data:', data);
     return data;
-  }, [calendlyEvents, dateRangeKey]);
+  }, [calendlyEvents, dateRangeKey, stableDateRange]);
   
   const {
     callStats,
@@ -108,7 +113,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
     showUpRate,
     previousCallsTaken,
     previousShowUpRate,
-  } = useCallStatsCalculations(calendlyEvents, dateRange);
+  } = useCallStatsCalculations(calendlyEvents, stableDateRange);
   
   useEffect(() => {
     console.log('🔄 BookCallFunnel dateRange changed:', {
