@@ -1,14 +1,12 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { ProjectSelector } from '@/components/ProjectSelector';
-import { IntegrationsPanel } from '@/components/IntegrationsPanel';
+import { ProjectIntegrationsPanel } from '@/components/ProjectIntegrationsPanel';
 
 const Integrations = () => {
   const navigate = useNavigate();
-  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -31,18 +29,8 @@ const Integrations = () => {
           </p>
         </div>
 
-        {/* Project Selection */}
-        <div className="mb-6">
-          <div className="max-w-md mx-auto">
-            <ProjectSelector
-              selectedProjectId={selectedProjectId}
-              onProjectChange={setSelectedProjectId}
-            />
-          </div>
-        </div>
-
-        {/* Integrations Panel */}
-        <IntegrationsPanel projectId={selectedProjectId} />
+        {/* Integrations Panel - will use the selected project from navbar */}
+        <ProjectIntegrationsPanel />
       </div>
     </div>
   );

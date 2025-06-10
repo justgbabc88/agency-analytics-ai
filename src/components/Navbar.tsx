@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Activity, Settings, User, LogOut, Bell } from "lucide-react";
 import { useNavigate } from 'react-router-dom';
@@ -13,10 +13,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from '@/hooks/useAuth';
+import { ProjectSelector } from './ProjectSelector';
+import { CreateProjectModal } from './CreateProjectModal';
 
 export const Navbar = () => {
   const navigate = useNavigate();
   const { user, loading, signOut } = useAuth();
+  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
 
   console.log('Navbar render - user:', user, 'loading:', loading);
 
@@ -33,14 +36,30 @@ export const Navbar = () => {
     return email.split('@')[0].substring(0, 2).toUpperCase();
   };
 
+  const handleProjectCreated = (projectId: string) => {
+    setSelectedProjectId(projectId);
+  };
+
   return (
     <nav className="bg-gray-900 border-b border-gray-800 px-6 py-3 h-16">
       <div className="flex items-center justify-between h-full">
-        {/* Left side - Logo */}
-        <div className="flex items-center gap-4">
+        {/* Left side - Logo and Project Selector */}
+        <div className="flex items-center gap-6">
           <div className="flex items-center gap-2">
             <Activity className="h-6 w-6 text-green-500" />
             <span className="text-lg font-semibold text-white">Agency Analytics</span>
+          </div>
+          
+          {/* Project Selector */}
+          <div className="flex items-center gap-3">
+            <div className="w-64">
+              <ProjectSelector
+                selectedProjectId={selectedProjectId}
+                onProjectChange={setSelectedProjectId}
+                className="bg-gray-800 border-gray-700 text-white"
+              />
+            </div>
+            <CreateProjectModal onProjectCreated={handleProjectCreated} />
           </div>
         </div>
         
