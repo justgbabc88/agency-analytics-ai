@@ -1,5 +1,7 @@
 
+
 import { useState } from "react";
+import { Navbar } from "@/components/Navbar";
 import { LowTicketFunnel } from "@/components/LowTicketFunnel";
 import { BookCallFunnel } from "@/components/BookCallFunnel";
 import { ProjectIntegrationsPanel } from "@/components/ProjectIntegrationsPanel";
@@ -182,7 +184,9 @@ const Index = () => {
   };
 
   return (
-    <div className="bg-gray-50">      
+    <div className="bg-gray-50">
+      <Navbar onDateChange={handleDateChange} />
+      
       <div className="p-6">
         <Tabs defaultValue="dashboard" className="space-y-6">
           {/* Navigation tabs */}
@@ -406,3 +410,4 @@ const Index = () => {
 };
 
 export default Index;
+
