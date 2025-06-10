@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -47,7 +48,7 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
   });
 
   // Get project details to know the funnel type
-  const { data: project } = useQuery({
+  const { data: project, isLoading: projectLoading } = useQuery({
     queryKey: ['project', projectId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -190,6 +191,17 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
     );
   }
 
+  // Show loading state while project is loading
+  if (projectLoading) {
+    return (
+      <Card>
+        <CardContent className="text-center py-8">
+          <p className="text-gray-600">Loading project details...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <Card>
@@ -233,7 +245,7 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
             </div>
           )}
 
-          {currentStep === 2 && project && (
+          {currentStep === 2 && project && !projectLoading && (
             <div className="space-y-4">
               <div className="text-center space-y-2">
                 <h3 className="text-lg font-semibold">Configure Funnel Pages</h3>
@@ -243,7 +255,7 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
               </div>
               <FunnelPageMapper
                 onPagesConfigured={handlePagesConfigured}
-                funnelType={project?.funnel_type}
+                funnelType={project.funnel_type}
                 initialPages={[]}
               />
             </div>
