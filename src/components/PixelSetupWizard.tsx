@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,6 +27,7 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
   const [pixelData, setPixelData] = useState<PixelData | null>(null);
   const [funnelPages, setFunnelPages] = useState<any[]>([]);
   const [createdPixelId, setCreatedPixelId] = useState<string>('');
+  const [isInSetupFlow, setIsInSetupFlow] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -92,6 +92,7 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
         domains: data.domains?.join(', ') || 'All domains'
       });
       setCreatedPixelId(data.id);
+      setIsInSetupFlow(true); // Mark that we're in setup flow
       setCurrentStep(2); // Move to page configuration step
       queryClient.invalidateQueries({ queryKey: ['tracking-pixels', projectId] });
       toast({
@@ -170,8 +171,8 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
     setCurrentStep(currentStep - 1);
   };
 
-  // If project already has a pixel, show existing pixel manager instead
-  if (existingPixels && existingPixels.length > 0) {
+  // If project already has a pixel AND we're not in setup flow, show existing pixel manager
+  if (existingPixels && existingPixels.length > 0 && !isInSetupFlow) {
     return (
       <Card>
         <CardHeader>
