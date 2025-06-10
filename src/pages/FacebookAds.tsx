@@ -10,6 +10,10 @@ const FacebookAds = () => {
     to: new Date(),
   });
 
+  const handleDateChange = (from: Date, to: Date) => {
+    setDateRange({ from, to });
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -20,8 +24,7 @@ const FacebookAds = () => {
             <p className="text-gray-600 mt-1">Monitor your Facebook advertising performance</p>
           </div>
           <DateRangePicker
-            dateRange={dateRange}
-            onDateRangeChange={setDateRange}
+            onDateChange={handleDateChange}
           />
         </div>
 
