@@ -86,11 +86,8 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   console.log('Tracking pixel:', trackingPixel);
   console.log('Tracking events:', trackingEvents?.length || 0);
   
-  const dateRangeKey = useMemo(() => {
-    const fromISO = dateRange.from.toISOString();
-    const toISO = dateRange.to.toISOString();
-    return `${fromISO}-${toISO}`;
-  }, [dateRange.from, dateRange.to]);
+  // Create a stable date range key
+  const dateRangeKey = `${dateRange.from.getTime()}-${dateRange.to.getTime()}`;
   
   const chartData = useMemo(() => {
     console.log('🔄 Recalculating chart data due to dependency change');
