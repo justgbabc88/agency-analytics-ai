@@ -189,7 +189,7 @@ const Index = () => {
         <Tabs defaultValue="funnel" className="space-y-6">
           {/* Navigation tabs */}
           <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <TabsList className="grid grid-cols-3 lg:grid-cols-6 w-full lg:w-auto">
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
               <TabsTrigger value="funnel" className="flex items-center gap-2">
                 <BarChart3 className="h-4 w-4" />
                 <span className="hidden sm:inline">Funnel</span>
@@ -408,3 +408,5 @@ const Index = () => {
 };
 
 export default Index;
+
+</edits_to_apply>
