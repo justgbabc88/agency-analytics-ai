@@ -1,5 +1,3 @@
-
-
 import { useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { LowTicketFunnel } from "@/components/LowTicketFunnel";
@@ -188,13 +186,13 @@ const Index = () => {
       <Navbar onDateChange={handleDateChange} />
       
       <div className="p-6">
-        <Tabs defaultValue="dashboard" className="space-y-6">
+        <Tabs defaultValue="funnel" className="space-y-6">
           {/* Navigation tabs */}
           <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <TabsList className="grid grid-cols-3 lg:grid-cols-7 w-full lg:w-auto">
-              <TabsTrigger value="dashboard" className="flex items-center gap-2">
+            <TabsList className="grid grid-cols-3 lg:grid-cols-6 w-full lg:w-auto">
+              <TabsTrigger value="funnel" className="flex items-center gap-2">
                 <BarChart3 className="h-4 w-4" />
-                <span className="hidden sm:inline">Dashboard</span>
+                <span className="hidden sm:inline">Funnel</span>
               </TabsTrigger>
               <TabsTrigger value="facebook" className="flex items-center gap-2">
                 <Facebook className="h-4 w-4" />
@@ -223,7 +221,7 @@ const Index = () => {
             </TabsList>
           </div>
 
-          <TabsContent value="dashboard" className="space-y-6">
+          <TabsContent value="funnel" className="space-y-6">
             {renderFunnelContent()}
           </TabsContent>
 
@@ -410,4 +408,3 @@ const Index = () => {
 };
 
 export default Index;
-

@@ -1,8 +1,8 @@
 
 import React from 'react';
 import { Button } from "@/components/ui/button";
-import { Activity, Settings, Home, User, LogOut } from "lucide-react";
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Activity, Settings, User, LogOut } from "lucide-react";
+import { useNavigate } from 'react-router-dom';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,20 +24,10 @@ interface NavbarProps {
 
 export const Navbar = ({ onDateChange }: NavbarProps) => {
   const navigate = useNavigate();
-  const location = useLocation();
   const { user, loading, signOut } = useAuth();
   const { selectedProjectId, setSelectedProjectId } = useProjects();
 
-  // Add some debugging
   console.log('Navbar render - user:', user, 'loading:', loading);
-
-  const mainNavItems = [
-    {
-      path: '/',
-      label: 'Dashboard',
-      icon: Home,
-    },
-  ];
 
   const handleSignOut = async () => {
     try {
@@ -65,32 +55,14 @@ export const Navbar = ({ onDateChange }: NavbarProps) => {
   return (
     <nav className="bg-white border-b border-gray-200 px-6 py-4">
       <div className="flex items-center justify-between">
-        {/* Logo on the left */}
+        {/* Logo */}
         <div className="flex items-center gap-2">
           <Activity className="h-8 w-8 text-blue-600" />
           <span className="text-xl font-bold text-gray-900">Agency Analytics</span>
         </div>
         
-        {/* Right side - Navigation, Project Selector, Date Filter, and Profile */}
+        {/* Right side - Project Selector, Date Filter, and Profile */}
         <div className="flex items-center gap-4">
-          {/* Navigation items */}
-          {mainNavItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = location.pathname === item.path;
-            
-            return (
-              <Button
-                key={item.path}
-                variant={isActive ? "default" : "ghost"}
-                onClick={() => navigate(item.path)}
-                className="flex items-center gap-2"
-              >
-                <Icon className="h-4 w-4" />
-                {item.label}
-              </Button>
-            );
-          })}
-
           {/* Project Selector and Create Project */}
           <div className="flex items-center gap-2">
             <ProjectSelector 
@@ -109,7 +81,7 @@ export const Navbar = ({ onDateChange }: NavbarProps) => {
             />
           </div>
 
-          {/* User Profile Dropdown - Show loading state or user dropdown */}
+          {/* User Profile Dropdown */}
           {loading ? (
             <div className="h-8 w-8 rounded-full bg-gray-200 animate-pulse"></div>
           ) : user ? (
