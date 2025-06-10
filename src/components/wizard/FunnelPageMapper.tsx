@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -96,6 +97,9 @@ export const FunnelPageMapper = ({
 
   const availableEvents = getEventsForFunnelType(funnelType);
 
+  // Check if all existing pages have URLs filled in
+  const canAddNewPage = pages.every(page => page.url.trim() !== '');
+
   return (
     <Card>
       <CardHeader>
@@ -179,7 +183,13 @@ export const FunnelPageMapper = ({
                     value={page.url}
                     onChange={(e) => updatePage(page.id, { url: e.target.value })}
                     placeholder="https://yourdomain.com/page"
+                    className={!page.url.trim() ? "border-orange-300 focus:border-orange-500" : ""}
                   />
+                  {!page.url.trim() && (
+                    <p className="text-sm text-orange-600">
+                      URL is required before adding another page
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -210,23 +220,52 @@ export const FunnelPageMapper = ({
         </div>
 
         {/* Prominent Add Page Section */}
-        <div className="border-2 border-dashed border-blue-200 rounded-lg p-6 text-center bg-blue-50/50">
+        <div className={`border-2 border-dashed rounded-lg p-6 text-center ${
+          canAddNewPage 
+            ? "border-blue-200 bg-blue-50/50" 
+            : "border-gray-200 bg-gray-50/50"
+        }`}>
           <div className="space-y-3">
             <div className="flex justify-center">
-              <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
-                <Plus className="h-6 w-6 text-blue-600" />
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                canAddNewPage 
+                  ? "bg-blue-100" 
+                  : "bg-gray-100"
+              }`}>
+                <Plus className={`h-6 w-6 ${
+                  canAddNewPage 
+                    ? "text-blue-600" 
+                    : "text-gray-400"
+                }`} />
               </div>
             </div>
             <div>
-              <h4 className="font-medium text-blue-900">Add Another Page</h4>
-              <p className="text-sm text-blue-700 mt-1">
-                Track your complete funnel by adding all your pages (landing, thank you, checkout, etc.)
+              <h4 className={`font-medium ${
+                canAddNewPage 
+                  ? "text-blue-900" 
+                  : "text-gray-600"
+              }`}>
+                Add Another Page
+              </h4>
+              <p className={`text-sm mt-1 ${
+                canAddNewPage 
+                  ? "text-blue-700" 
+                  : "text-gray-500"
+              }`}>
+                {canAddNewPage 
+                  ? "Track your complete funnel by adding all your pages (landing, thank you, checkout, etc.)"
+                  : "Please add URLs to all existing pages before adding another page"
+                }
               </p>
             </div>
             <Button
               type="button"
               onClick={addPage}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              disabled={!canAddNewPage}
+              className={canAddNewPage 
+                ? "bg-blue-600 hover:bg-blue-700 text-white" 
+                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+              }
               size="lg"
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -244,3 +283,4 @@ export const FunnelPageMapper = ({
     </Card>
   );
 };
+
