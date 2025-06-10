@@ -32,7 +32,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   // Create a stable date range key
   const dateRangeKey = useMemo(() => {
     return `${dateRange.from.getTime()}-${dateRange.to.getTime()}`;
-  }, [dateRange.from.getTime(), dateRange.to.getTime()]);
+  }, [dateRange]);
 
   // Fetch tracking pixel for this project
   const { data: trackingPixel, isLoading: pixelLoading } = useQuery({
