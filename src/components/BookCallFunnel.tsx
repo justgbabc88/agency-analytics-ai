@@ -1,4 +1,3 @@
-
 import { useCalendlyData } from "@/hooks/useCalendlyData";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { AdvancedDateRangePicker } from "./AdvancedDateRangePicker";
@@ -57,7 +56,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
 
   // Fetch tracking events for pixel pages
   const { data: trackingEvents } = useQuery({
-    queryKey: ['tracking-events', trackingPixel?.pixel_id, dateRangeKey],
+    queryKey: ['tracking-events', trackingPixel?.pixel_id, dateRange.from.toISOString(), dateRange.to.toISOString()],
     queryFn: async () => {
       if (!trackingPixel?.pixel_id) return [];
       
