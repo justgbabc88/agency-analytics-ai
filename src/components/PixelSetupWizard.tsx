@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -234,7 +233,7 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
             </div>
           )}
 
-          {currentStep === 2 && (
+          {currentStep === 2 && project && (
             <div className="space-y-4">
               <div className="text-center space-y-2">
                 <h3 className="text-lg font-semibold">Configure Funnel Pages</h3>
@@ -245,6 +244,7 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
               <FunnelPageMapper
                 onPagesConfigured={handlePagesConfigured}
                 funnelType={project?.funnel_type}
+                initialPages={[]}
               />
             </div>
           )}
