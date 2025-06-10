@@ -27,6 +27,7 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
   const [domains, setDomains] = useState('');
   const [pixelData, setPixelData] = useState<PixelData | null>(null);
   const [funnelPages, setFunnelPages] = useState<any[]>([]);
+  const [createdPixelId, setCreatedPixelId] = useState<string>('');
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -90,11 +91,12 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
         pixelId: data.pixel_id,
         domains: data.domains?.join(', ') || 'All domains'
       });
-      setCurrentStep(2);
+      setCreatedPixelId(data.id);
+      setCurrentStep(2); // Move to page configuration step
       queryClient.invalidateQueries({ queryKey: ['tracking-pixels', projectId] });
       toast({
         title: "Success",
-        description: "Tracking pixel created successfully",
+        description: "Tracking pixel created successfully. Now configure your funnel pages.",
       });
     },
     onError: (error) => {
@@ -125,7 +127,7 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
     },
   });
 
-  const handleCreatePixelAndConfigure = async () => {
+  const handleCreatePixel = async () => {
     if (!pixelName.trim()) {
       toast({
         title: "Error",
@@ -139,12 +141,11 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
   };
 
   const handlePagesConfigured = async (pages: any[]) => {
+    console.log('Pages configured:', pages);
     setFunnelPages(pages);
 
-    const pixelId = (existingPixels && existingPixels.length > 0) ? existingPixels[0].id : null;
-
-    if (!pixelId) {
-      console.error('Pixel ID not found');
+    if (!createdPixelId) {
+      console.error('Created pixel ID not found');
       toast({
         title: "Error",
         description: "Pixel ID not found",
@@ -158,11 +159,11 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
     };
 
     await updatePixelConfig.mutateAsync({
-      pixelId: pixelId,
+      pixelId: createdPixelId,
       config: config
     });
 
-    setCurrentStep(3);
+    setCurrentStep(3); // Move to installation guide step
   };
 
   const handleBack = () => {
@@ -224,7 +225,7 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
                 />
               </div>
               <Button 
-                onClick={handleCreatePixelAndConfigure} 
+                onClick={handleCreatePixel} 
                 disabled={createPixel.isPending || !pixelName.trim()}
                 className="w-full"
               >
@@ -233,9 +234,14 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
             </div>
           )}
 
-          {currentStep === 2 && pixelData && (
+          {currentStep === 2 && (
             <div className="space-y-4">
-              <h3 className="font-semibold">Configure Funnel Pages</h3>
+              <div className="text-center space-y-2">
+                <h3 className="text-lg font-semibold">Configure Funnel Pages</h3>
+                <p className="text-muted-foreground">
+                  Set up the pages in your funnel to generate optimized tracking codes for each step.
+                </p>
+              </div>
               <FunnelPageMapper
                 onPagesConfigured={handlePagesConfigured}
                 funnelType={project?.funnel_type}
