@@ -56,9 +56,9 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {sidebarItems.map((item) => {
-                const isActive = location.pathname === item.path || 
-                  (item.path === '/' && location.pathname === '/') ||
-                  (item.path !== '/' && location.pathname.startsWith(item.path));
+                const isActive = location.pathname === item.url || 
+                  (item.url === '/' && location.pathname === '/') ||
+                  (item.url !== '/' && location.pathname.startsWith(item.url));
                 
                 return (
                   <SidebarMenuItem key={item.title}>
