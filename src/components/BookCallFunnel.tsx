@@ -29,6 +29,11 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
     };
   });
 
+  // Create a stable date range key
+  const dateRangeKey = useMemo(() => {
+    return `${dateRange.from.getTime()}-${dateRange.to.getTime()}`;
+  }, [dateRange.from.getTime(), dateRange.to.getTime()]);
+
   // Fetch tracking pixel for this project
   const { data: trackingPixel, isLoading: pixelLoading } = useQuery({
     queryKey: ['tracking-pixel', projectId],
@@ -54,7 +59,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
 
   // Fetch tracking events for pixel pages
   const { data: trackingEvents } = useQuery({
-    queryKey: ['tracking-events', trackingPixel?.pixel_id, dateRange.from, dateRange.to],
+    queryKey: ['tracking-events', trackingPixel?.pixel_id, dateRangeKey],
     queryFn: async () => {
       if (!trackingPixel?.pixel_id) return [];
       
@@ -85,9 +90,6 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   console.log('All Calendly events:', calendlyEvents.length);
   console.log('Tracking pixel:', trackingPixel);
   console.log('Tracking events:', trackingEvents?.length || 0);
-  
-  // Create a stable date range key
-  const dateRangeKey = `${dateRange.from.getTime()}-${dateRange.to.getTime()}`;
   
   const chartData = useMemo(() => {
     console.log('🔄 Recalculating chart data due to dependency change');
