@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -92,8 +93,8 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
         domains: data.domains?.join(', ') || 'All domains'
       });
       setCreatedPixelId(data.id);
-      setIsInSetupFlow(true); // Mark that we're in setup flow
-      setCurrentStep(2); // Move to page configuration step
+      setIsInSetupFlow(true);
+      setCurrentStep(2);
       queryClient.invalidateQueries({ queryKey: ['tracking-pixels', projectId] });
       toast({
         title: "Success",
@@ -143,6 +144,16 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
 
   const handlePagesConfigured = async (pages: any[]) => {
     console.log('Pages configured:', pages);
+    
+    if (pages.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please configure at least one page before proceeding",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setFunnelPages(pages);
 
     if (!createdPixelId) {
@@ -164,10 +175,17 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
       config: config
     });
 
-    setCurrentStep(3); // Move to installation guide step
+    setCurrentStep(3);
   };
 
   const handleBack = () => {
+    if (currentStep === 2) {
+      // If going back from page config, reset the setup flow
+      setIsInSetupFlow(false);
+      setPixelData(null);
+      setCreatedPixelId('');
+      setFunnelPages([]);
+    }
     setCurrentStep(currentStep - 1);
   };
 
@@ -246,13 +264,18 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
             </div>
           )}
 
-          {currentStep === 2 && project && !projectLoading && (
+          {currentStep === 2 && project && pixelData && (
             <div className="space-y-4">
               <div className="text-center space-y-2">
                 <h3 className="text-lg font-semibold">Configure Funnel Pages</h3>
                 <p className="text-muted-foreground">
                   Set up the pages in your funnel to generate optimized tracking codes for each step.
                 </p>
+                <div className="bg-blue-50 p-3 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    Pixel "{pixelData.name}" created successfully. Now configure your pages below.
+                  </p>
+                </div>
               </div>
               <FunnelPageMapper
                 onPagesConfigured={handlePagesConfigured}
