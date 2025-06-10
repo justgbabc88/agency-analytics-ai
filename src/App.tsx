@@ -20,6 +20,7 @@ import CalendlyOAuthCallback from "@/pages/CalendlyOAuthCallback";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "./components/AppSidebar";
 import { Navbar } from "./components/Navbar";
+import FacebookAds from "./pages/FacebookAds";
 
 const queryClient = new QueryClient()
 
@@ -37,7 +38,7 @@ function App() {
                 <main className="flex-1 p-0">
                   <Routes>
                     <Route path="/" element={<Index />} />
-                    <Route path="/facebook-ads" element={<Index />} />
+                    <Route path="/facebook-ads" element={<FacebookAds />} />
                     <Route path="/predictions" element={<Index />} />
                     <Route path="/ai-assistant" element={<Index />} />
                     <Route path="/alerts" element={<Index />} />
