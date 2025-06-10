@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Globe, Trash2 } from "lucide-react";
+import { Globe, Trash2, Plus } from "lucide-react";
 
 interface FunnelPage {
   id: string;
@@ -104,7 +104,7 @@ export const FunnelPageMapper = ({
           Configure Funnel Pages
         </CardTitle>
         <p className="text-sm text-gray-600">
-          Add your funnel pages and select which events to track on each page.
+          Add your funnel pages and select which events to track on each page. Add multiple pages to track your complete funnel flow.
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -114,15 +114,17 @@ export const FunnelPageMapper = ({
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h4 className="font-medium">Page {index + 1}</h4>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => removePage(page.id)}
-                    className="text-red-600 hover:text-red-700"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {pages.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => removePage(page.id)}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -200,16 +202,35 @@ export const FunnelPageMapper = ({
           ))}
         </div>
 
-        <div className="flex justify-between">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={addPage}
-          >
-            Add Page
-          </Button>
-          <Button onClick={handleSave}>
-            Save Configuration
+        {/* Prominent Add Page Section */}
+        <div className="border-2 border-dashed border-blue-200 rounded-lg p-6 text-center bg-blue-50/50">
+          <div className="space-y-3">
+            <div className="flex justify-center">
+              <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                <Plus className="h-6 w-6 text-blue-600" />
+              </div>
+            </div>
+            <div>
+              <h4 className="font-medium text-blue-900">Add Another Page</h4>
+              <p className="text-sm text-blue-700 mt-1">
+                Track your complete funnel by adding all your pages (landing, thank you, checkout, etc.)
+              </p>
+            </div>
+            <Button
+              type="button"
+              onClick={addPage}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              size="lg"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Another Page
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex justify-end pt-4 border-t">
+          <Button onClick={handleSave} size="lg" className="min-w-[150px]">
+            Save Configuration ({pages.length} page{pages.length !== 1 ? 's' : ''})
           </Button>
         </div>
       </CardContent>
