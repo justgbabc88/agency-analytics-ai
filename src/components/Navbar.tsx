@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from "@/components/ui/button";
-import { Activity, BarChart3, Target, Settings, Home, User, LogOut } from "lucide-react";
+import { Activity, Settings, Home, User, LogOut } from "lucide-react";
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   DropdownMenu,
@@ -13,11 +13,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from '@/hooks/useAuth';
+import { ProjectSelector } from '@/components/ProjectSelector';
+import { CreateProjectModal } from '@/components/CreateProjectModal';
+import { useProjects } from '@/hooks/useProjects';
 
 export const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, loading, signOut } = useAuth();
+  const { selectedProjectId, setSelectedProjectId } = useProjects();
 
   // Add some debugging
   console.log('Navbar render - user:', user, 'loading:', loading);
@@ -27,11 +31,6 @@ export const Navbar = () => {
       path: '/',
       label: 'Dashboard',
       icon: Home,
-    },
-    {
-      path: '/tracking',
-      label: 'Tracking',
-      icon: Target,
     },
   ];
 
@@ -46,6 +45,10 @@ export const Navbar = () => {
 
   const getUserInitials = (email: string) => {
     return email.split('@')[0].substring(0, 2).toUpperCase();
+  };
+
+  const handleProjectCreated = (projectId: string) => {
+    setSelectedProjectId(projectId);
   };
 
   return (
@@ -76,6 +79,16 @@ export const Navbar = () => {
               </Button>
             );
           })}
+
+          {/* Project Selector and Create Project */}
+          <div className="flex items-center gap-2">
+            <ProjectSelector 
+              selectedProjectId={selectedProjectId}
+              onProjectChange={setSelectedProjectId}
+              className="w-[200px]"
+            />
+            <CreateProjectModal onProjectCreated={handleProjectCreated} />
+          </div>
 
           {/* User Profile Dropdown - Show loading state or user dropdown */}
           {loading ? (
