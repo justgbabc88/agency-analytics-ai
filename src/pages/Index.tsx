@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { LowTicketFunnel } from "@/components/LowTicketFunnel";
@@ -189,32 +190,32 @@ const Index = () => {
         <Tabs defaultValue="funnel" className="space-y-6">
           {/* Navigation tabs */}
           <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
-              <TabsTrigger value="funnel" className="flex items-center gap-2">
+            <TabsList className="grid w-full grid-cols-7 gap-1">
+              <TabsTrigger value="funnel" className="flex items-center gap-2 px-2 py-2">
                 <BarChart3 className="h-4 w-4" />
                 <span className="hidden sm:inline">Funnel</span>
               </TabsTrigger>
-              <TabsTrigger value="facebook" className="flex items-center gap-2">
+              <TabsTrigger value="facebook" className="flex items-center gap-2 px-2 py-2">
                 <Facebook className="h-4 w-4" />
                 <span className="hidden sm:inline">Facebook</span>
               </TabsTrigger>
-              <TabsTrigger value="tracking" className="flex items-center gap-2">
+              <TabsTrigger value="tracking" className="flex items-center gap-2 px-2 py-2">
                 <Target className="h-4 w-4" />
                 <span className="hidden sm:inline">Tracking</span>
               </TabsTrigger>
-              <TabsTrigger value="predictions" className="flex items-center gap-2">
+              <TabsTrigger value="predictions" className="flex items-center gap-2 px-2 py-2">
                 <Activity className="h-4 w-4" />
                 <span className="hidden sm:inline">Predictions</span>
               </TabsTrigger>
-              <TabsTrigger value="assistant" className="flex items-center gap-2">
+              <TabsTrigger value="assistant" className="flex items-center gap-2 px-2 py-2">
                 <MessageSquare className="h-4 w-4" />
                 <span className="hidden sm:inline">Assistant</span>
               </TabsTrigger>
-              <TabsTrigger value="alerts" className="flex items-center gap-2">
+              <TabsTrigger value="alerts" className="flex items-center gap-2 px-2 py-2">
                 <TrendingUp className="h-4 w-4" />
                 <span className="hidden sm:inline">Alerts</span>
               </TabsTrigger>
-              <TabsTrigger value="settings" className="flex items-center gap-2">
+              <TabsTrigger value="settings" className="flex items-center gap-2 px-2 py-2">
                 <Settings className="h-4 w-4" />
                 <span className="hidden sm:inline">Settings</span>
               </TabsTrigger>
