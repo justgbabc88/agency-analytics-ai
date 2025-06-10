@@ -1,3 +1,4 @@
+
 import { useCalendlyData } from "@/hooks/useCalendlyData";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { AdvancedDateRangePicker } from "./AdvancedDateRangePicker";
@@ -28,11 +29,6 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
     };
   });
 
-  // Create simple string keys for memoization to avoid deep type inference
-  const fromDateKey = dateRange.from.toISOString();
-  const toDateKey = dateRange.to.toISOString();
-  const dateRangeKey = `${fromDateKey}-${toDateKey}`;
-
   // Fetch tracking pixel for this project
   const { data: trackingPixel, isLoading: pixelLoading } = useQuery({
     queryKey: ['tracking-pixel', projectId],
@@ -56,9 +52,9 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
     enabled: !!projectId,
   });
 
-  // Fetch tracking events for pixel pages - using simple string variables
+  // Fetch tracking events for pixel pages
   const { data: trackingEvents } = useQuery({
-    queryKey: ['tracking-events', trackingPixel?.pixel_id, fromDateKey, toDateKey],
+    queryKey: ['tracking-events', trackingPixel?.pixel_id, dateRange.from.getTime(), dateRange.to.getTime()],
     queryFn: async () => {
       if (!trackingPixel?.pixel_id) return [];
       
@@ -67,8 +63,8 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
         .select('*')
         .eq('pixel_id', trackingPixel.pixel_id)
         .eq('event_type', 'page_view')
-        .gte('created_at', fromDateKey)
-        .lte('created_at', toDateKey)
+        .gte('created_at', dateRange.from.toISOString())
+        .lte('created_at', dateRange.to.toISOString())
         .order('created_at', { ascending: true });
 
       if (error) {
@@ -92,13 +88,12 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   
   const chartData = useMemo(() => {
     console.log('🔄 Recalculating chart data due to dependency change');
-    console.log('Date range key:', dateRangeKey);
     console.log('Events available:', calendlyEvents.length);
     
     const data = generateCallDataFromEvents(calendlyEvents, dateRange);
     console.log('Generated chart data:', data);
     return data;
-  }, [calendlyEvents, dateRangeKey]);
+  }, [calendlyEvents, dateRange.from.getTime(), dateRange.to.getTime()]);
   
   const {
     callStats,
@@ -152,10 +147,9 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   console.log('\n=== FINAL COMPONENT STATE ===');
   console.log('Chart data length:', chartData.length);
   console.log('Total bookings for metrics:', callStats.totalBookings);
-  console.log('Date range key:', dateRangeKey);
   console.log('Total page views (from pixel):', totalPageViews);
 
-  const chartKey = `${dateRangeKey}-${callStats.totalBookings}`;
+  const chartKey = `${dateRange.from.getTime()}-${dateRange.to.getTime()}-${callStats.totalBookings}`;
 
   if (!projectId) {
     return (
