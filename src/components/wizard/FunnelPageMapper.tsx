@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -81,9 +82,8 @@ export const FunnelPageMapper = ({
       case 'book_call':
         return [
           { value: 'page_view', label: 'Page View' },
-          { value: 'call_booking', label: 'Call Booking' },
-          { value: 'call_completed', label: 'Call Completed' },
-          { value: 'purchase', label: 'Purchase' },
+          { value: 'form_submitted', label: 'Form Submitted' },
+          { value: 'call_booked', label: 'Call Booked' },
         ];
       default:
         return [
@@ -152,6 +152,13 @@ export const FunnelPageMapper = ({
                             <SelectItem value="webinar">Webinar Page</SelectItem>
                             <SelectItem value="thankyou">Thank You Page</SelectItem>
                             <SelectItem value="checkout">Checkout Page</SelectItem>
+                          </>
+                        ) : funnelType === 'book_call' ? (
+                          <>
+                            <SelectItem value="landing">Landing Page</SelectItem>
+                            <SelectItem value="booking">Booking Page</SelectItem>
+                            <SelectItem value="thankyou">Thank You Page</SelectItem>
+                            <SelectItem value="misc">Misc. Page</SelectItem>
                           </>
                         ) : (
                           <>
