@@ -17,6 +17,9 @@ import { Toaster } from "@/components/ui/toaster"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { GoogleOAuthCallback } from './components/GoogleOAuthCallback';
 import CalendlyOAuthCallback from "@/pages/CalendlyOAuthCallback";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import { AppSidebar } from "./components/AppSidebar";
+import { Navbar } from "./components/Navbar";
 
 const queryClient = new QueryClient()
 
@@ -26,13 +29,23 @@ function App() {
       <TooltipProvider>
         <Toaster />
         <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/integrations" element={<Integrations />} />
-            <Route path="/tracking" element={<Tracking />} />
-            <Route path="/google-oauth-callback" element={<GoogleOAuthCallback />} />
-            <Route path="/calendly-callback" element={<CalendlyOAuthCallback />} />
-          </Routes>
+          <SidebarProvider>
+            <div className="min-h-screen flex w-full">
+              <AppSidebar />
+              <div className="flex-1 flex flex-col">
+                <Navbar />
+                <main className="flex-1">
+                  <Routes>
+                    <Route path="/" element={<Index />} />
+                    <Route path="/integrations" element={<Integrations />} />
+                    <Route path="/tracking" element={<Tracking />} />
+                    <Route path="/google-oauth-callback" element={<GoogleOAuthCallback />} />
+                    <Route path="/calendly-callback" element={<CalendlyOAuthCallback />} />
+                  </Routes>
+                </main>
+              </div>
+            </div>
+          </SidebarProvider>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>

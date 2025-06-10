@@ -1,8 +1,8 @@
 
 import React from 'react';
 import { Button } from "@/components/ui/button";
-import { Activity, BarChart3, Target, Settings, Home, User, LogOut } from "lucide-react";
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Activity, Settings, User, LogOut } from "lucide-react";
+import { useNavigate } from 'react-router-dom';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,27 +13,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from '@/hooks/useAuth';
+import { SidebarTrigger } from "@/components/ui/sidebar";
 
 export const Navbar = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const { user, loading, signOut } = useAuth();
 
   // Add some debugging
   console.log('Navbar render - user:', user, 'loading:', loading);
-
-  const mainNavItems = [
-    {
-      path: '/',
-      label: 'Dashboard',
-      icon: Home,
-    },
-    {
-      path: '/tracking',
-      label: 'Tracking',
-      icon: Target,
-    },
-  ];
 
   const handleSignOut = async () => {
     try {
@@ -51,32 +38,17 @@ export const Navbar = () => {
   return (
     <nav className="bg-white border-b border-gray-200 px-6 py-4">
       <div className="flex items-center justify-between">
-        {/* Logo on the left */}
-        <div className="flex items-center gap-2">
-          <Activity className="h-8 w-8 text-blue-600" />
-          <span className="text-xl font-bold text-gray-900">Agency Analytics</span>
+        {/* Left side - Sidebar trigger and Logo */}
+        <div className="flex items-center gap-4">
+          <SidebarTrigger />
+          <div className="flex items-center gap-2">
+            <Activity className="h-8 w-8 text-blue-600" />
+            <span className="text-xl font-bold text-gray-900">Agency Analytics</span>
+          </div>
         </div>
         
-        {/* Right side - Navigation and Profile */}
+        {/* Right side - Profile */}
         <div className="flex items-center gap-4">
-          {/* Navigation items */}
-          {mainNavItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = location.pathname === item.path;
-            
-            return (
-              <Button
-                key={item.path}
-                variant={isActive ? "default" : "ghost"}
-                onClick={() => navigate(item.path)}
-                className="flex items-center gap-2"
-              >
-                <Icon className="h-4 w-4" />
-                {item.label}
-              </Button>
-            );
-          })}
-
           {/* User Profile Dropdown - Show loading state or user dropdown */}
           {loading ? (
             <div className="h-8 w-8 rounded-full bg-gray-200 animate-pulse"></div>
@@ -100,10 +72,6 @@ export const Navbar = () => {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => navigate('/integrations')}>
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>Integrations</span>
-                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate('/settings')}>
                   <User className="mr-2 h-4 w-4" />
                   <span>Profile Settings</span>
