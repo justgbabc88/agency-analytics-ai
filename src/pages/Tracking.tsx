@@ -1,9 +1,9 @@
-
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PixelSetupWizard } from '@/components/PixelSetupWizard';
 import { TrackingPixelManager } from '@/components/TrackingPixelManager';
 import { AttributionDashboard } from '@/components/AttributionDashboard';
+import { AdvancedDateRangePicker } from '@/components/AdvancedDateRangePicker';
 import { ProjectSelector } from '@/components/ProjectSelector';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Activity, Target, Zap, BarChart3, RefreshCw } from "lucide-react";
@@ -11,9 +11,19 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { subDays, startOfDay, endOfDay } from 'date-fns';
 
 const Tracking = () => {
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+  const [dateRange, setDateRange] = useState({
+    from: startOfDay(subDays(new Date(), 30)),
+    to: endOfDay(new Date())
+  });
+
+  const handleDateChange = (from: Date, to: Date) => {
+    console.log('📅 Tracking page - Date range changed:', { from, to });
+    setDateRange({ from, to });
+  };
 
   const { data: recentEvents, isLoading: eventsLoading, refetch: refetchEvents } = useQuery({
     queryKey: ['recent-events', selectedProjectId],
@@ -121,11 +131,14 @@ const Tracking = () => {
             Track, attribute, and optimize your marketing campaigns with precision.
           </p>
         </div>
-        <div className="w-80">
-          <ProjectSelector
-            selectedProjectId={selectedProjectId}
-            onProjectChange={setSelectedProjectId}
-          />
+        <div className="flex items-center gap-4">
+          <AdvancedDateRangePicker onDateChange={handleDateChange} />
+          <div className="w-80">
+            <ProjectSelector
+              selectedProjectId={selectedProjectId}
+              onProjectChange={setSelectedProjectId}
+            />
+          </div>
         </div>
       </div>
 
@@ -169,7 +182,7 @@ const Tracking = () => {
           </TabsContent>
 
           <TabsContent value="attribution">
-            <AttributionDashboard projectId={selectedProjectId} />
+            <AttributionDashboard projectId={selectedProjectId} dateRange={dateRange} />
           </TabsContent>
 
           <TabsContent value="events">
@@ -292,3 +305,5 @@ const Tracking = () => {
 };
 
 export default Tracking;
+
+}
