@@ -1,4 +1,5 @@
 
+
 import { useCalendlyData } from "@/hooks/useCalendlyData";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { AdvancedDateRangePicker } from "./AdvancedDateRangePicker";
@@ -29,6 +30,12 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
     };
   });
 
+  // Extract time values to simple variables to avoid TypeScript issues
+  const fromTime = dateRange.from.getTime();
+  const toTime = dateRange.to.getTime();
+  const fromIso = dateRange.from.toISOString();
+  const toIso = dateRange.to.toISOString();
+
   // Fetch tracking pixel for this project
   const { data: trackingPixel, isLoading: pixelLoading } = useQuery({
     queryKey: ['tracking-pixel', projectId],
@@ -54,7 +61,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
 
   // Fetch tracking events for pixel pages
   const { data: trackingEvents } = useQuery({
-    queryKey: ['tracking-events', trackingPixel?.pixel_id, dateRange.from.getTime(), dateRange.to.getTime()],
+    queryKey: ['tracking-events', trackingPixel?.pixel_id, fromTime, toTime],
     queryFn: async () => {
       if (!trackingPixel?.pixel_id) return [];
       
@@ -63,8 +70,8 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
         .select('*')
         .eq('pixel_id', trackingPixel.pixel_id)
         .eq('event_type', 'page_view')
-        .gte('created_at', dateRange.from.toISOString())
-        .lte('created_at', dateRange.to.toISOString())
+        .gte('created_at', fromIso)
+        .lte('created_at', toIso)
         .order('created_at', { ascending: true });
 
       if (error) {
@@ -93,7 +100,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
     const data = generateCallDataFromEvents(calendlyEvents, dateRange);
     console.log('Generated chart data:', data);
     return data;
-  }, [calendlyEvents, dateRange.from.getTime(), dateRange.to.getTime()]);
+  }, [calendlyEvents, fromTime, toTime]);
   
   const {
     callStats,
@@ -149,7 +156,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   console.log('Total bookings for metrics:', callStats.totalBookings);
   console.log('Total page views (from pixel):', totalPageViews);
 
-  const chartKey = `${dateRange.from.getTime()}-${dateRange.to.getTime()}-${callStats.totalBookings}`;
+  const chartKey = `${fromTime}-${toTime}-${callStats.totalBookings}`;
 
   if (!projectId) {
     return (
@@ -234,3 +241,4 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
 };
 
 export default BookCallFunnel;
+
