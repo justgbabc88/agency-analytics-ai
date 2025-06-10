@@ -86,11 +86,11 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
   };
 
   return (
-    <div className={cn("space-y-2", className)}>
-      <div className="flex items-center gap-2">
+    <div className={cn("grid gap-2", className)}>
+      <div className="flex gap-2">
         <Select value={selectedPreset} onValueChange={handlePresetChange}>
-          <SelectTrigger className="w-[140px] h-9 text-sm bg-white border-gray-300">
-            <SelectValue placeholder="Select range" />
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Select date range" />
           </SelectTrigger>
           <SelectContent>
             {datePresets.map((preset) => (
@@ -107,7 +107,7 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
               <Button
                 variant="outline"
                 className={cn(
-                  "h-9 px-3 justify-start text-left font-normal text-sm bg-white border-gray-300",
+                  "w-[280px] justify-start text-left font-normal",
                   !dateRange && "text-muted-foreground"
                 )}
               >
@@ -115,17 +115,18 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
                 {dateRange?.from ? (
                   dateRange.to ? (
                     <>
-                      {format(dateRange.from, "MMM dd")} - {format(dateRange.to, "MMM dd")}
+                      {format(dateRange.from, "LLL dd, y")} -{" "}
+                      {format(dateRange.to, "LLL dd, y")}
                     </>
                   ) : (
-                    format(dateRange.from, "MMM dd, yyyy")
+                    format(dateRange.from, "LLL dd, y")
                   )
                 ) : (
-                  <span>Pick dates</span>
+                  <span>Pick a date range</span>
                 )}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
+            <PopoverContent className="w-auto p-0" align="start">
               <Calendar
                 initialFocus
                 mode="range"
@@ -144,8 +145,8 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
       </div>
       
       {!isCustom && (
-        <div className="text-xs text-gray-500 text-center">
-          {format(dateRange.from, "MMM dd")} - {format(dateRange.to, "MMM dd, yyyy")}
+        <div className="text-sm text-gray-600">
+          {format(dateRange.from, "MMM dd, yyyy")} - {format(dateRange.to, "MMM dd, yyyy")}
         </div>
       )}
     </div>

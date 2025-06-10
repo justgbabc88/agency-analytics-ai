@@ -62,22 +62,22 @@ export const Navbar = ({ onDateChange }: NavbarProps) => {
         </div>
         
         {/* Right side - Project Selector, Date Filter, and Profile */}
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4">
           {/* Project Selector and Create Project */}
-          <div className="flex items-center gap-3 px-4 py-2 bg-gray-50 rounded-lg border border-gray-200">
+          <div className="flex items-center gap-2">
             <ProjectSelector 
               selectedProjectId={selectedProjectId}
               onProjectChange={setSelectedProjectId}
-              className="w-[180px] bg-white"
+              className="w-[200px]"
             />
             <CreateProjectModal onProjectCreated={handleProjectCreated} />
           </div>
 
-          {/* Date Filter - Enhanced styling */}
-          <div className="px-4 py-2 bg-gray-50 rounded-lg border border-gray-200">
+          {/* Date Filter */}
+          <div className="flex-shrink-0">
             <AdvancedDateRangePicker 
               onDateChange={handleDateChange}
-              className="w-full"
+              className="w-full sm:w-auto"
             />
           </div>
 
