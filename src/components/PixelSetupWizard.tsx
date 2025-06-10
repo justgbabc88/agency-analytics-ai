@@ -4,16 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Globe, Zap, CheckCircle } from "lucide-react";
+import { Target, Zap } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from "@/hooks/use-toast";
 import { SimplifiedInstallationGuide } from './wizard/SimplifiedInstallationGuide';
 import { FunnelPageMapper } from './wizard/FunnelPageMapper';
-import { Target } from "lucide-react";
 
 interface PixelSetupWizardProps {
   projectId: string;
@@ -75,7 +71,7 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
           pixel_id: 'pixel_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
           project_id: projectId,
           is_active: true,
-          domains: domains.split(',').map(s => s.trim()),
+          domains: domains.split(',').map(s => s.trim()).filter(s => s.length > 0),
           conversion_events: [],
           config: {
             funnelPages: []
@@ -95,6 +91,7 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
         domains: data.domains?.join(', ') || 'All domains'
       });
       setCurrentStep(2);
+      queryClient.invalidateQueries({ queryKey: ['tracking-pixels', projectId] });
       toast({
         title: "Success",
         description: "Tracking pixel created successfully",
@@ -128,7 +125,7 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
     },
   });
 
-  const handlePixelCreated = async () => {
+  const handleCreatePixelAndConfigure = async () => {
     if (!pixelName.trim()) {
       toast({
         title: "Error",
@@ -172,41 +169,6 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
     setCurrentStep(currentStep - 1);
   };
 
-  const CreatePixelStep = ({ onPixelCreated, projectId }: { onPixelCreated: () => void, projectId: string }) => {
-    const [pixelName, setPixelName] = useState('');
-    const [domains, setDomains] = useState('');
-
-    return (
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="pixel-name">Pixel Name</Label>
-          <Input
-            id="pixel-name"
-            placeholder="e.g., My Awesome Project"
-            value={pixelName}
-            onChange={(e) => setPixelName(e.target.value)}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="domains">Domains (comma-separated)</Label>
-          <Input
-            id="domains"
-            placeholder="e.g., yourdomain.com, anotherdomain.net"
-            value={domains}
-            onChange={(e) => setDomains(e.target.value)}
-          />
-        </div>
-        <Button onClick={() => {
-          setPixelName(pixelName);
-          setDomains(domains);
-          onPixelCreated();
-        }} disabled={createPixel.isPending}>
-          {createPixel.isPending ? "Creating..." : "Create Pixel"}
-        </Button>
-      </div>
-    );
-  };
-
   // If project already has a pixel, show existing pixel manager instead
   if (existingPixels && existingPixels.length > 0) {
     return (
@@ -242,10 +204,33 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
         </CardHeader>
         <CardContent>
           {currentStep === 1 && (
-            <CreatePixelStep
-              onPixelCreated={handlePixelCreated}
-              projectId={projectId}
-            />
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="pixel-name">Pixel Name</Label>
+                <Input
+                  id="pixel-name"
+                  placeholder="e.g., My Awesome Project"
+                  value={pixelName}
+                  onChange={(e) => setPixelName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="domains">Domains (comma-separated, optional)</Label>
+                <Input
+                  id="domains"
+                  placeholder="e.g., yourdomain.com, anotherdomain.net"
+                  value={domains}
+                  onChange={(e) => setDomains(e.target.value)}
+                />
+              </div>
+              <Button 
+                onClick={handleCreatePixelAndConfigure} 
+                disabled={createPixel.isPending || !pixelName.trim()}
+                className="w-full"
+              >
+                {createPixel.isPending ? "Creating..." : "Create Pixel & Configure Pages"}
+              </Button>
+            </div>
           )}
 
           {currentStep === 2 && pixelData && (
@@ -265,25 +250,13 @@ export const PixelSetupWizard = ({ projectId }: PixelSetupWizardProps) => {
             />
           )}
 
-          <div className="flex justify-between mt-6">
-            {currentStep > 1 && (
+          {currentStep > 1 && (
+            <div className="flex justify-between mt-6">
               <Button variant="outline" onClick={handleBack}>
                 Back
               </Button>
-            )}
-            {currentStep < 3 && (
-              <Button onClick={() => {
-                if (currentStep === 1) {
-                  handlePixelCreated();
-                } else if (currentStep === 2) {
-                  // handlePagesConfigured();
-                  setCurrentStep(3);
-                }
-              }} disabled={createPixel.isPending}>
-                {currentStep === 1 ? (createPixel.isPending ? "Creating..." : "Next: Configure Pages") : "Next: Get Tracking Code"}
-              </Button>
-            )}
-          </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
