@@ -28,8 +28,10 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
     };
   });
 
-  // Create a simple string key for memoization
-  const dateRangeKey = `${dateRange.from.getTime()}-${dateRange.to.getTime()}`;
+  // Create simple string keys for memoization to avoid deep type inference
+  const fromDateKey = dateRange.from.toISOString();
+  const toDateKey = dateRange.to.toISOString();
+  const dateRangeKey = `${fromDateKey}-${toDateKey}`;
 
   // Fetch tracking pixel for this project
   const { data: trackingPixel, isLoading: pixelLoading } = useQuery({
@@ -54,9 +56,9 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
     enabled: !!projectId,
   });
 
-  // Fetch tracking events for pixel pages
+  // Fetch tracking events for pixel pages - using simple string variables
   const { data: trackingEvents } = useQuery({
-    queryKey: ['tracking-events', trackingPixel?.pixel_id, dateRange.from.toISOString(), dateRange.to.toISOString()],
+    queryKey: ['tracking-events', trackingPixel?.pixel_id, fromDateKey, toDateKey],
     queryFn: async () => {
       if (!trackingPixel?.pixel_id) return [];
       
@@ -65,8 +67,8 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
         .select('*')
         .eq('pixel_id', trackingPixel.pixel_id)
         .eq('event_type', 'page_view')
-        .gte('created_at', dateRange.from.toISOString())
-        .lte('created_at', dateRange.to.toISOString())
+        .gte('created_at', fromDateKey)
+        .lte('created_at', toDateKey)
         .order('created_at', { ascending: true });
 
       if (error) {
@@ -236,3 +238,5 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
     </div>
   );
 };
+
+export default BookCallFunnel;
