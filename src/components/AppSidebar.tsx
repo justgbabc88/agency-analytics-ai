@@ -50,7 +50,7 @@ export function AppSidebar() {
   const location = useLocation();
 
   return (
-    <Sidebar className="border-r border-gray-800 w-16">
+    <Sidebar className="border-r border-gray-800" style={{ width: '64px', minWidth: '64px', maxWidth: '64px' }} collapsible="none">
       <SidebarContent className="bg-gray-900">
         <SidebarGroup>
           <SidebarGroupContent>

@@ -32,11 +32,15 @@ function App() {
           <SidebarProvider>
             <div className="min-h-screen flex w-full">
               <AppSidebar />
-              <div className="flex-1 flex flex-col">
+              <div className="flex-1 flex flex-col min-w-0">
                 <Navbar />
-                <main className="flex-1">
+                <main className="flex-1 p-0">
                   <Routes>
                     <Route path="/" element={<Index />} />
+                    <Route path="/facebook-ads" element={<Index />} />
+                    <Route path="/predictions" element={<Index />} />
+                    <Route path="/ai-assistant" element={<Index />} />
+                    <Route path="/alerts" element={<Index />} />
                     <Route path="/integrations" element={<Integrations />} />
                     <Route path="/tracking" element={<Tracking />} />
                     <Route path="/google-oauth-callback" element={<GoogleOAuthCallback />} />

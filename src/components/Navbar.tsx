@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from '@/hooks/useAuth';
-import { SidebarTrigger } from "@/components/ui/sidebar";
 
 export const Navbar = () => {
   const navigate = useNavigate();
@@ -37,9 +36,8 @@ export const Navbar = () => {
   return (
     <nav className="bg-gray-900 border-b border-gray-800 px-6 py-3 h-16">
       <div className="flex items-center justify-between h-full">
-        {/* Left side - Sidebar trigger and Logo */}
+        {/* Left side - Logo */}
         <div className="flex items-center gap-4">
-          <SidebarTrigger className="text-gray-400 hover:text-white" />
           <div className="flex items-center gap-2">
             <Activity className="h-6 w-6 text-green-500" />
             <span className="text-lg font-semibold text-white">Agency Analytics</span>
