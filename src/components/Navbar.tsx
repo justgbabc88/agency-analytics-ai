@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from "@/components/ui/button";
-import { Activity, Settings, User, LogOut } from "lucide-react";
+import { Activity, Settings, User, LogOut, Plus, Bell } from "lucide-react";
 import { useNavigate } from 'react-router-dom';
 import {
   DropdownMenu,
@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from '@/hooks/useAuth';
-import { SidebarTrigger } from "@/components/ui/sidebar";
 
 export const Navbar = () => {
   const navigate = useNavigate();
@@ -36,55 +35,102 @@ export const Navbar = () => {
   };
 
   return (
-    <nav className="bg-white border-b border-gray-200 px-6 py-4">
+    <nav className="bg-gray-900 border-b border-gray-800 px-6 py-3">
       <div className="flex items-center justify-between">
-        {/* Left side - Sidebar trigger and Logo */}
-        <div className="flex items-center gap-4">
-          <SidebarTrigger />
+        {/* Left side - Logo and Create Report */}
+        <div className="flex items-center gap-6">
           <div className="flex items-center gap-2">
-            <Activity className="h-8 w-8 text-blue-600" />
-            <span className="text-xl font-bold text-gray-900">Agency Analytics</span>
+            <Activity className="h-6 w-6 text-green-500" />
+            <span className="text-lg font-semibold text-white">Agency Analytics</span>
           </div>
+          
+          <Button 
+            className="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-2 h-8"
+            onClick={() => navigate('/create-report')}
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            Create report
+          </Button>
         </div>
         
-        {/* Right side - Profile */}
+        {/* Center - Navigation Tabs */}
+        <div className="flex items-center gap-8">
+          <button className="text-gray-300 hover:text-white text-sm font-medium">
+            Your Reports
+          </button>
+        </div>
+        
+        {/* Right side - Actions and Profile */}
         <div className="flex items-center gap-4">
-          {/* User Profile Dropdown - Show loading state or user dropdown */}
+          {/* Tracking Percentage */}
+          <div className="flex items-center gap-2 bg-gray-800 px-3 py-1 rounded">
+            <span className="text-sm text-gray-300">Tracking percentage</span>
+            <span className="text-sm font-semibold text-green-500">91%</span>
+          </div>
+          
+          {/* Settings */}
+          <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white p-2">
+            <Settings className="h-4 w-4" />
+          </Button>
+          
+          {/* Notifications */}
+          <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white p-2 relative">
+            <Bell className="h-4 w-4" />
+            <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+              2
+            </span>
+          </Button>
+
+          {/* User Profile Dropdown */}
           {loading ? (
-            <div className="h-8 w-8 rounded-full bg-gray-200 animate-pulse"></div>
+            <div className="h-8 w-8 rounded-full bg-gray-700 animate-pulse"></div>
           ) : user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                <Button variant="ghost" className="relative h-8 w-8 rounded-full p-0">
                   <Avatar className="h-8 w-8">
                     <AvatarImage src={user.user_metadata?.avatar_url} alt={user.email} />
-                    <AvatarFallback>{getUserInitials(user.email || 'User')}</AvatarFallback>
+                    <AvatarFallback className="bg-blue-600 text-white text-xs">
+                      {getUserInitials(user.email || 'User')}
+                    </AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end" forceMount>
+              <DropdownMenuContent className="w-56 bg-gray-800 border-gray-700" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{user.user_metadata?.full_name || 'User'}</p>
-                    <p className="text-xs leading-none text-muted-foreground">
+                    <p className="text-sm font-medium leading-none text-white">
+                      {user.user_metadata?.full_name || 'User'}
+                    </p>
+                    <p className="text-xs leading-none text-gray-400">
                       {user.email}
                     </p>
                   </div>
                 </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => navigate('/settings')}>
+                <DropdownMenuSeparator className="bg-gray-700" />
+                <DropdownMenuItem 
+                  onClick={() => navigate('/settings')}
+                  className="text-gray-300 hover:text-white hover:bg-gray-700"
+                >
                   <User className="mr-2 h-4 w-4" />
                   <span>Profile Settings</span>
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut}>
+                <DropdownMenuSeparator className="bg-gray-700" />
+                <DropdownMenuItem 
+                  onClick={handleSignOut}
+                  className="text-gray-300 hover:text-white hover:bg-gray-700"
+                >
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Log out</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Button variant="outline" onClick={() => navigate('/auth')}>
+            <Button 
+              variant="outline" 
+              onClick={() => navigate('/auth')}
+              className="border-gray-600 text-gray-300 hover:text-white hover:bg-gray-800"
+            >
               Sign In
             </Button>
           )}
