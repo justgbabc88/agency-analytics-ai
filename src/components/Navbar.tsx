@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from "@/components/ui/button";
-import { Activity, Settings, User, LogOut, Plus, Bell } from "lucide-react";
+import { Activity, Settings, User, LogOut, Bell } from "lucide-react";
 import { useNavigate } from 'react-router-dom';
 import {
   DropdownMenu,
@@ -13,12 +13,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from '@/hooks/useAuth';
+import { SidebarTrigger } from "@/components/ui/sidebar";
 
 export const Navbar = () => {
   const navigate = useNavigate();
   const { user, loading, signOut } = useAuth();
 
-  // Add some debugging
   console.log('Navbar render - user:', user, 'loading:', loading);
 
   const handleSignOut = async () => {
@@ -35,29 +35,15 @@ export const Navbar = () => {
   };
 
   return (
-    <nav className="bg-gray-900 border-b border-gray-800 px-6 py-3">
-      <div className="flex items-center justify-between">
-        {/* Left side - Logo and Create Report */}
-        <div className="flex items-center gap-6">
+    <nav className="bg-gray-900 border-b border-gray-800 px-6 py-3 h-16">
+      <div className="flex items-center justify-between h-full">
+        {/* Left side - Sidebar trigger and Logo */}
+        <div className="flex items-center gap-4">
+          <SidebarTrigger className="text-gray-400 hover:text-white" />
           <div className="flex items-center gap-2">
             <Activity className="h-6 w-6 text-green-500" />
             <span className="text-lg font-semibold text-white">Agency Analytics</span>
           </div>
-          
-          <Button 
-            className="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-2 h-8"
-            onClick={() => navigate('/create-report')}
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            Create report
-          </Button>
-        </div>
-        
-        {/* Center - Navigation Tabs */}
-        <div className="flex items-center gap-8">
-          <button className="text-gray-300 hover:text-white text-sm font-medium">
-            Your Reports
-          </button>
         </div>
         
         {/* Right side - Actions and Profile */}

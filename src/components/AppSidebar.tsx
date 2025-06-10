@@ -50,7 +50,7 @@ export function AppSidebar() {
   const location = useLocation();
 
   return (
-    <Sidebar className="border-r border-gray-800">
+    <Sidebar className="border-r border-gray-800 w-16">
       <SidebarContent className="bg-gray-900">
         <SidebarGroup>
           <SidebarGroupContent>
@@ -67,16 +67,16 @@ export function AppSidebar() {
                       isActive={isActive}
                       onClick={() => navigate(item.url)}
                       className="group relative"
+                      tooltip={item.title}
                     >
                       <button className={`
-                        flex flex-col items-center justify-center gap-1 w-full p-3 rounded-lg transition-all duration-200
+                        flex items-center justify-center w-12 h-12 rounded-lg transition-all duration-200 mx-auto
                         ${isActive 
                           ? 'bg-blue-600 text-white' 
                           : 'text-gray-400 hover:text-white hover:bg-gray-800'
                         }
                       `}>
                         <item.icon className="h-5 w-5" />
-                        <span className="text-xs font-medium">{item.title}</span>
                       </button>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
