@@ -36,7 +36,7 @@ const Integrations = () => {
           <div className="max-w-md mx-auto">
             <ProjectSelector
               selectedProjectId={selectedProjectId}
-              onProjectSelect={setSelectedProjectId}
+              onProjectChange={setSelectedProjectId}
             />
           </div>
         </div>
