@@ -1,5 +1,5 @@
 
-import { parseISO, isValid, startOfDay, endOfDay, isToday, format } from "date-fns";
+import { parseISO, isValid, startOfDay, endOfDay, isToday, format, isWithinInterval } from "date-fns";
 
 // Standardized date filtering function to ensure consistency with timezone handling
 export const isEventInDateRange = (eventCreatedAt: string, startDate: Date, endDate: Date): boolean => {
@@ -29,13 +29,25 @@ export const isEventCreatedToday = (eventCreatedAt: string): boolean => {
     const createdDate = parseISO(eventCreatedAt);
     if (!isValid(createdDate)) return false;
     
-    // Use date-fns isToday which handles timezone properly
-    const isCreatedToday = isToday(createdDate);
+    // Get today's date range in local timezone
+    const today = new Date();
+    const todayStart = startOfDay(today);
+    const todayEnd = endOfDay(today);
+    
+    // Check if the UTC timestamp falls within today's local timezone range
+    const isCreatedToday = isWithinInterval(createdDate, {
+      start: todayStart,
+      end: todayEnd
+    });
     
     console.log('Checking if event is from today:', {
       eventCreatedAt,
       eventDate: format(createdDate, 'yyyy-MM-dd HH:mm:ss'),
-      today: format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
+      eventDateUTC: createdDate.toISOString(),
+      todayStart: format(todayStart, 'yyyy-MM-dd HH:mm:ss'),
+      todayEnd: format(todayEnd, 'yyyy-MM-dd HH:mm:ss'),
+      todayStartUTC: todayStart.toISOString(),
+      todayEndUTC: todayEnd.toISOString(),
       isCreatedToday
     });
     
@@ -54,16 +66,24 @@ export const isEventCreatedOnDate = (eventCreatedAt: string, targetDate: Date): 
     const createdDate = parseISO(eventCreatedAt);
     if (!isValid(createdDate)) return false;
     
-    // Compare dates in local timezone
-    const eventDateStr = format(createdDate, 'yyyy-MM-dd');
-    const targetDateStr = format(targetDate, 'yyyy-MM-dd');
+    // Get the target date range in local timezone
+    const targetStart = startOfDay(targetDate);
+    const targetEnd = endOfDay(targetDate);
     
-    const isOnDate = eventDateStr === targetDateStr;
+    // Check if the UTC timestamp falls within the target date's local timezone range
+    const isOnDate = isWithinInterval(createdDate, {
+      start: targetStart,
+      end: targetEnd
+    });
     
-    console.log(`Checking if event created on ${targetDateStr}:`, {
+    console.log(`Checking if event created on ${format(targetDate, 'yyyy-MM-dd')}:`, {
       eventCreatedAt,
-      eventDateStr,
-      targetDateStr,
+      eventDate: format(createdDate, 'yyyy-MM-dd HH:mm:ss'),
+      eventDateUTC: createdDate.toISOString(),
+      targetStart: format(targetStart, 'yyyy-MM-dd HH:mm:ss'),
+      targetEnd: format(targetEnd, 'yyyy-MM-dd HH:mm:ss'),
+      targetStartUTC: targetStart.toISOString(),
+      targetEndUTC: targetEnd.toISOString(),
       isOnDate
     });
     
