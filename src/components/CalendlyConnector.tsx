@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -165,20 +164,49 @@ export const CalendlyConnector = ({
     setLoading(true);
 
     try {
+      // First check if we have a valid integration record
+      const { data: integration, error: integrationError } = await supabase
+        .from('project_integrations')
+        .select('*')
+        .eq('project_id', projectId)
+        .eq('platform', 'calendly')
+        .eq('is_connected', true)
+        .maybeSingle();
+
+      if (integrationError) {
+        console.error('Integration check error:', integrationError);
+        onConnectionChange(false);
+        return;
+      }
+
+      if (!integration) {
+        console.log('No connected integration found in database');
+        onConnectionChange(false);
+        return;
+      }
+
+      // If we have an integration record, try to fetch event types to verify the connection is still valid
       const { data, error } = await supabase.functions.invoke('calendly-oauth', {
         body: { action: 'get_event_types', projectId }
       });
 
       if (error) {
-        console.error('Connection check error:', error);
+        console.error('Event types check error:', error);
         
-        if (error.message?.includes('No Calendly integration found') || 
-            error.message?.includes('not connected')) {
+        // Only mark as disconnected if it's an auth error, not a network error
+        if (error.message?.includes('authorization') || error.message?.includes('expired') || error.message?.includes('not connected')) {
+          console.log('Marking integration as disconnected due to auth error');
           onConnectionChange(false);
-          return;
+        } else {
+          // For other errors, keep the connection status as is but show a warning
+          console.warn('Connection check failed but keeping status:', error.message);
+          toast({
+            title: "Connection Warning",
+            description: "Could not verify Calendly connection. Refresh to retry.",
+            variant: "default",
+          });
         }
-        
-        throw new Error(error.message || 'Failed to check connection');
+        return;
       }
 
       // Success!
@@ -186,23 +214,21 @@ export const CalendlyConnector = ({
       onConnectionChange(true);
       
       if (!connecting) {
-        toast({
-          title: "Connected",
-          description: `Found ${data.event_types?.length || 0} event types in your Calendly account`,
-        });
+        console.log('Connection verified successfully');
       }
 
       await loadEventMappings();
       
     } catch (error) {
       console.error('Failed to check connection status:', error);
-      onConnectionChange(false);
+      // Don't automatically disconnect on network errors
+      console.log('Keeping current connection status due to network error');
       
       if (!connecting) {
         toast({
           title: "Connection Check Failed",
-          description: error.message || "Failed to verify Calendly connection",
-          variant: "destructive",
+          description: "Network error while checking connection. Refresh to retry.",
+          variant: "default",
         });
       }
     } finally {
@@ -395,7 +421,7 @@ export const CalendlyConnector = ({
     if (isConnected && projectId) {
       checkConnectionStatus();
     }
-  }, [projectId]);
+  }, [projectId, isConnected]);
 
   if (!projectId) {
     return (

@@ -1,8 +1,8 @@
 
 import { format } from "date-fns";
-import { isEventInDateRange } from "./dateFiltering";
+import { isEventInDateRange, isEventCreatedToday } from "./dateFiltering";
 
-// Generate chart data based on real Calendly events with date filtering using created_at
+// Generate chart data based on real Calendly events with improved date filtering
 export const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Date; to: Date }) => {
   const dates = [];
   const { from: startDate, to: endDate } = dateRange;
@@ -14,6 +14,16 @@ export const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { f
   console.log('Total days in range:', daysDiff);
   console.log('Total Calendly events available:', calendlyEvents.length);
   
+  // Log today's events specifically
+  const todaysEvents = calendlyEvents.filter(event => isEventCreatedToday(event.created_at));
+  console.log('Events created today:', todaysEvents.length);
+  console.log('Today\'s events sample:', todaysEvents.slice(0, 3).map(e => ({
+    id: e.calendly_event_id,
+    created_at: e.created_at,
+    scheduled_at: e.scheduled_at,
+    status: e.status
+  })));
+  
   const totalDays = daysDiff === 0 ? 1 : daysDiff + 1;
   
   for (let i = 0; i < totalDays; i++) {
@@ -23,11 +33,19 @@ export const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { f
     
     console.log(`\n--- Processing ${currentDateStr} ---`);
     
+    // Filter events created on this specific day
     const eventsCreatedThisDay = calendlyEvents.filter(event => 
       isEventInDateRange(event.created_at, currentDate, currentDate)
     );
     
     console.log(`Events created on ${currentDateStr}: ${eventsCreatedThisDay.length}`);
+    if (eventsCreatedThisDay.length > 0) {
+      console.log('Sample events for this day:', eventsCreatedThisDay.slice(0, 2).map(e => ({
+        created_at: e.created_at,
+        scheduled_at: e.scheduled_at,
+        status: e.status
+      })));
+    }
     
     const callsBooked = eventsCreatedThisDay.length;
     const cancelled = eventsCreatedThisDay.filter(event => 
