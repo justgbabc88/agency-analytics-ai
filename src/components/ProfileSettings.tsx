@@ -57,7 +57,6 @@ export const ProfileSettings = () => {
     try {
       setLoading(true);
       
-      // Try to get existing profile
       const { data: existingProfile, error: fetchError } = await supabase
         .from('profiles')
         .select('*')
@@ -72,7 +71,7 @@ export const ProfileSettings = () => {
         setProfile(existingProfile);
       } else {
         // Create a new profile with default values
-        const newProfile: Partial<UserProfile> = {
+        const newProfile = {
           id: user.id,
           first_name: user.user_metadata?.first_name || '',
           last_name: user.user_metadata?.last_name || '',

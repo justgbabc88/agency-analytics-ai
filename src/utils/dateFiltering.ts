@@ -1,5 +1,6 @@
-import { parseISO, isValid, startOfDay, endOfDay, isToday, format, isWithinInterval } from "date-fns";
-import { formatInTimeZone, toZonedTime } from "date-fns-tz";
+
+import { parseISO, isValid, startOfDay, endOfDay, format, isWithinInterval } from "date-fns";
+import { toZonedTime, formatInTimeZone } from "date-fns-tz";
 
 // Standardized date filtering function to ensure consistency with timezone handling
 export const isEventInDateRange = (eventCreatedAt: string, startDate: Date, endDate: Date): boolean => {
@@ -32,13 +33,13 @@ export const isEventCreatedToday = (eventCreatedAt: string, userTimezone?: strin
     // Use user's timezone or fall back to browser timezone
     const timezone = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
     
-    // Get today's date range in the user's timezone
+    // Get today's date in the user's timezone
     const now = new Date();
     const todayInUserTz = toZonedTime(now, timezone);
     const todayStart = startOfDay(todayInUserTz);
     const todayEnd = endOfDay(todayInUserTz);
     
-    // Convert the event date to the user's timezone
+    // Convert the event date to the user's timezone for comparison
     const eventInUserTz = toZonedTime(createdDate, timezone);
     
     // Check if the event falls within today's range in the user's timezone
@@ -81,7 +82,7 @@ export const isEventCreatedOnDate = (eventCreatedAt: string, targetDate: Date, u
     const targetStart = startOfDay(targetInUserTz);
     const targetEnd = endOfDay(targetInUserTz);
     
-    // Convert the event date to the user's timezone
+    // Convert the event date to the user's timezone for comparison
     const eventInUserTz = toZonedTime(createdDate, timezone);
     
     // Check if the event falls within the target date's range in the user's timezone
