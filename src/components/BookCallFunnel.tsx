@@ -1,4 +1,3 @@
-
 import { useCalendlyData } from "@/hooks/useCalendlyData";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
@@ -28,35 +27,40 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   
   const userTimezone = getUserTimezone();
   
-  console.log('BookCallFunnel render - Project ID:', projectId);
-  console.log('User timezone:', userTimezone);
-  console.log('Profile timezone:', profile?.timezone);
-  console.log('Current date range:', {
+  console.log('🔄 BookCallFunnel render - Project ID:', projectId);
+  console.log('🔄 User timezone from profile:', userTimezone);
+  console.log('🔄 Profile timezone setting:', profile?.timezone);
+  console.log('🔄 Current date range:', {
     from: format(dateRange.from, 'yyyy-MM-dd HH:mm:ss'),
     to: format(dateRange.to, 'yyyy-MM-dd HH:mm:ss')
   });
-  console.log('All Calendly events:', calendlyEvents.length);
+  console.log('🔄 All Calendly events available:', calendlyEvents.length);
   
-  // Include both timezone and profile changes in the dependency key
+  // Create a more specific dependency key that includes both timezone sources
   const dateRangeKey = useMemo(() => {
     const fromISO = dateRange.from.toISOString();
     const toISO = dateRange.to.toISOString();
-    const timezoneKey = userTimezone || 'UTC';
-    const profileTimezoneKey = profile?.timezone || 'UTC';
-    return `${fromISO}-${toISO}-${timezoneKey}-${profileTimezoneKey}`;
-  }, [dateRange.from, dateRange.to, userTimezone, profile?.timezone]);
+    const profileTimezone = profile?.timezone || 'UTC';
+    const effectiveTimezone = userTimezone || 'UTC';
+    return `${fromISO}-${toISO}-${profileTimezone}-${effectiveTimezone}-${calendlyEvents.length}`;
+  }, [dateRange.from, dateRange.to, userTimezone, profile?.timezone, calendlyEvents.length]);
   
   const chartData = useMemo(() => {
     console.log('🔄 Recalculating chart data due to dependency change');
-    console.log('Date range key:', dateRangeKey);
-    console.log('Events available:', calendlyEvents.length);
-    console.log('Using timezone:', userTimezone);
-    console.log('Profile loaded:', !!profile);
+    console.log('🔄 Date range key:', dateRangeKey);
+    console.log('🔄 Events available:', calendlyEvents.length);
+    console.log('🔄 Using timezone:', userTimezone);
+    console.log('🔄 Profile loaded:', !!profile);
+    
+    if (calendlyEvents.length === 0) {
+      console.log('⚠️ No events available for chart generation');
+      return [];
+    }
     
     const data = generateCallDataFromEvents(calendlyEvents, dateRange, userTimezone);
-    console.log('Generated chart data:', data);
+    console.log('🎯 Generated chart data:', data);
     return data;
-  }, [calendlyEvents, dateRangeKey]);
+  }, [calendlyEvents, dateRangeKey, userTimezone]);
   
   const {
     callStats,
@@ -73,9 +77,10 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
       to: format(dateRange.to, 'yyyy-MM-dd HH:mm:ss'),
       totalEvents: calendlyEvents.length,
       userTimezone,
-      profileTimezone: profile?.timezone
+      profileTimezone: profile?.timezone,
+      dateRangeKey
     });
-  }, [dateRange, calendlyEvents.length, userTimezone, profile?.timezone]);
+  }, [dateRange, calendlyEvents.length, userTimezone, profile?.timezone, dateRangeKey]);
 
   const recentBookings = getRecentBookings(7);
   const monthlyComparison = getMonthlyComparison();
@@ -106,6 +111,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   console.log('Total bookings for metrics:', callStats.totalBookings);
   console.log('Date range key:', dateRangeKey);
   console.log('User timezone being used:', userTimezone);
+  console.log('Today\'s events should be visible with timezone:', userTimezone);
 
   const chartKey = `${dateRangeKey}-${callStats.totalBookings}`;
 
