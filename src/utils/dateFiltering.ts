@@ -1,5 +1,5 @@
 
-import { parseISO, isValid, startOfDay, endOfDay } from "date-fns";
+import { parseISO, isValid, startOfDay, endOfDay, isToday, format } from "date-fns";
 
 // Standardized date filtering function to ensure consistency with timezone handling
 export const isEventInDateRange = (eventCreatedAt: string, startDate: Date, endDate: Date): boolean => {
@@ -29,25 +29,47 @@ export const isEventCreatedToday = (eventCreatedAt: string): boolean => {
     const createdDate = parseISO(eventCreatedAt);
     if (!isValid(createdDate)) return false;
     
-    const today = new Date();
-    const todayStart = startOfDay(today);
-    const todayEnd = endOfDay(today);
-    
-    const eventTime = createdDate.getTime();
-    const rangeStart = todayStart.getTime();
-    const rangeEnd = todayEnd.getTime();
+    // Use date-fns isToday which handles timezone properly
+    const isCreatedToday = isToday(createdDate);
     
     console.log('Checking if event is from today:', {
       eventCreatedAt,
-      eventTime: new Date(eventTime).toISOString(),
-      todayStart: todayStart.toISOString(),
-      todayEnd: todayEnd.toISOString(),
-      isInRange: eventTime >= rangeStart && eventTime <= rangeEnd
+      eventDate: format(createdDate, 'yyyy-MM-dd HH:mm:ss'),
+      today: format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
+      isCreatedToday
     });
     
-    return eventTime >= rangeStart && eventTime <= rangeEnd;
+    return isCreatedToday;
   } catch (error) {
     console.warn('Error parsing event date for today check:', eventCreatedAt, error);
+    return false;
+  }
+};
+
+// Helper function to check if an event was created on a specific date (local timezone)
+export const isEventCreatedOnDate = (eventCreatedAt: string, targetDate: Date): boolean => {
+  if (!eventCreatedAt) return false;
+  
+  try {
+    const createdDate = parseISO(eventCreatedAt);
+    if (!isValid(createdDate)) return false;
+    
+    // Compare dates in local timezone
+    const eventDateStr = format(createdDate, 'yyyy-MM-dd');
+    const targetDateStr = format(targetDate, 'yyyy-MM-dd');
+    
+    const isOnDate = eventDateStr === targetDateStr;
+    
+    console.log(`Checking if event created on ${targetDateStr}:`, {
+      eventCreatedAt,
+      eventDateStr,
+      targetDateStr,
+      isOnDate
+    });
+    
+    return isOnDate;
+  } catch (error) {
+    console.warn('Error checking event date:', eventCreatedAt, error);
     return false;
   }
 };
