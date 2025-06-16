@@ -2,8 +2,8 @@
 import { format } from "date-fns";
 import { isEventCreatedOnDate, isEventCreatedToday } from "./dateFiltering";
 
-// Generate chart data based on real Calendly events with improved date filtering
-export const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Date; to: Date }) => {
+// Generate chart data based on real Calendly events with improved date filtering and timezone support
+export const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Date; to: Date }, userTimezone?: string) => {
   const dates = [];
   const { from: startDate, to: endDate } = dateRange;
   
@@ -11,12 +11,13 @@ export const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { f
   
   console.log('=== CHART DATA GENERATION DEBUG ===');
   console.log('Date range:', format(startDate, 'yyyy-MM-dd'), 'to', format(endDate, 'yyyy-MM-dd'));
+  console.log('User timezone:', userTimezone || 'browser default');
   console.log('Total days in range:', daysDiff);
   console.log('Total Calendly events available:', calendlyEvents.length);
   
   // Log today's events specifically with improved detection
-  const todaysEvents = calendlyEvents.filter(event => isEventCreatedToday(event.created_at));
-  console.log('Events created today (improved detection):', todaysEvents.length);
+  const todaysEvents = calendlyEvents.filter(event => isEventCreatedToday(event.created_at, userTimezone));
+  console.log('Events created today (with timezone support):', todaysEvents.length);
   console.log('Today\'s events sample:', todaysEvents.slice(0, 3).map(e => ({
     id: e.calendly_event_id,
     created_at: e.created_at,
@@ -33,9 +34,9 @@ export const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { f
     
     console.log(`\n--- Processing ${currentDateStr} ---`);
     
-    // Use improved date filtering for this specific day
+    // Use improved date filtering for this specific day with timezone support
     const eventsCreatedThisDay = calendlyEvents.filter(event => 
-      isEventCreatedOnDate(event.created_at, currentDate)
+      isEventCreatedOnDate(event.created_at, currentDate, userTimezone)
     );
     
     console.log(`Events created on ${currentDateStr}: ${eventsCreatedThisDay.length}`);

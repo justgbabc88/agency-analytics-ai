@@ -1,5 +1,5 @@
-
 import { useCalendlyData } from "@/hooks/useCalendlyData";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { AdvancedDateRangePicker } from "./AdvancedDateRangePicker";
 import { LandingPageMetrics } from "./LandingPageMetrics";
@@ -15,6 +15,7 @@ interface BookCallFunnelProps {
 
 export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   const { calendlyEvents, getRecentBookings, getMonthlyComparison } = useCalendlyData(projectId);
+  const { getUserTimezone } = useUserProfile();
   
   const [dateRange, setDateRange] = useState(() => {
     const today = new Date();
@@ -24,7 +25,10 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
     };
   });
   
+  const userTimezone = getUserTimezone();
+  
   console.log('BookCallFunnel render - Project ID:', projectId);
+  console.log('User timezone:', userTimezone);
   console.log('Current date range:', {
     from: format(dateRange.from, 'yyyy-MM-dd HH:mm:ss'),
     to: format(dateRange.to, 'yyyy-MM-dd HH:mm:ss')
@@ -34,15 +38,16 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   const dateRangeKey = useMemo(() => {
     const fromISO = dateRange.from.toISOString();
     const toISO = dateRange.to.toISOString();
-    return `${fromISO}-${toISO}`;
-  }, [dateRange.from, dateRange.to]);
+    return `${fromISO}-${toISO}-${userTimezone}`;
+  }, [dateRange.from, dateRange.to, userTimezone]);
   
   const chartData = useMemo(() => {
     console.log('🔄 Recalculating chart data due to dependency change');
     console.log('Date range key:', dateRangeKey);
     console.log('Events available:', calendlyEvents.length);
+    console.log('Using timezone:', userTimezone);
     
-    const data = generateCallDataFromEvents(calendlyEvents, dateRange);
+    const data = generateCallDataFromEvents(calendlyEvents, dateRange, userTimezone);
     console.log('Generated chart data:', data);
     return data;
   }, [calendlyEvents, dateRangeKey]);
@@ -92,6 +97,7 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   console.log('Chart data length:', chartData.length);
   console.log('Total bookings for metrics:', callStats.totalBookings);
   console.log('Date range key:', dateRangeKey);
+  console.log('User timezone being used:', userTimezone);
 
   const chartKey = `${dateRangeKey}-${callStats.totalBookings}`;
 
