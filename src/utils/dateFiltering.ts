@@ -2,20 +2,50 @@
 import { parseISO, isValid, startOfDay, endOfDay, format, isWithinInterval } from "date-fns";
 import { toZonedTime, formatInTimeZone } from "date-fns-tz";
 
-// Standardized date filtering function to ensure consistency with timezone handling
-export const isEventInDateRange = (eventCreatedAt: string, startDate: Date, endDate: Date): boolean => {
+// Enhanced date filtering function with proper timezone handling
+export const isEventInDateRange = (eventCreatedAt: string, startDate: Date, endDate: Date, userTimezone?: string): boolean => {
   if (!eventCreatedAt) return false;
   
   try {
     const createdDate = parseISO(eventCreatedAt);
     if (!isValid(createdDate)) return false;
     
-    // Use UTC for consistent timezone handling
-    const eventTime = createdDate.getTime();
-    const rangeStart = startOfDay(startDate).getTime();
-    const rangeEnd = endOfDay(endDate).getTime();
+    // Use user's timezone or fall back to browser timezone
+    const timezone = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
     
-    return eventTime >= rangeStart && eventTime <= rangeEnd;
+    console.log('🔍 Checking date range with timezone:', {
+      eventCreatedAt,
+      timezone,
+      startDate: format(startDate, 'yyyy-MM-dd'),
+      endDate: format(endDate, 'yyyy-MM-dd')
+    });
+    
+    // Convert the event creation date to the user's timezone
+    const eventInUserTz = toZonedTime(createdDate, timezone);
+    
+    // Convert date range boundaries to user's timezone
+    const startInUserTz = toZonedTime(startDate, timezone);
+    const endInUserTz = toZonedTime(endDate, timezone);
+    
+    // Get day boundaries in the user's timezone
+    const rangeStart = startOfDay(startInUserTz);
+    const rangeEnd = endOfDay(endInUserTz);
+    
+    // Check if the event falls within the date range in the user's timezone
+    const isInRange = isWithinInterval(eventInUserTz, {
+      start: rangeStart,
+      end: rangeEnd
+    });
+    
+    console.log('🔍 Date range check result:', {
+      eventUTC: createdDate.toISOString(),
+      eventInUserTz: formatInTimeZone(createdDate, timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
+      rangeStart: formatInTimeZone(rangeStart, timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
+      rangeEnd: formatInTimeZone(rangeEnd, timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
+      isInRange
+    });
+    
+    return isInRange;
   } catch (error) {
     console.warn('Error parsing event date:', eventCreatedAt, error);
     return false;
@@ -110,17 +140,18 @@ export const isEventCreatedOnDate = (eventCreatedAt: string, targetDate: Date, u
   }
 };
 
-// Helper function to filter events by date range consistently
-export const filterEventsByDateRange = (events: any[], dateRange: { from: Date; to: Date }) => {
-  console.log('\n=== FILTERING EVENTS FOR METRICS ===');
+// Helper function to filter events by date range consistently with timezone support
+export const filterEventsByDateRange = (events: any[], dateRange: { from: Date; to: Date }, userTimezone?: string) => {
+  console.log('\n=== FILTERING EVENTS FOR METRICS WITH TIMEZONE ===');
   console.log('Date range:', {
     from: dateRange.from.toISOString(),
     to: dateRange.to.toISOString()
   });
+  console.log('User timezone:', userTimezone);
   console.log('Total events to filter:', events.length);
   
   const filtered = events.filter(event => 
-    isEventInDateRange(event.created_at, dateRange.from, dateRange.to)
+    isEventInDateRange(event.created_at, dateRange.from, dateRange.to, userTimezone)
   );
   
   console.log('Filtered events count:', filtered.length);
