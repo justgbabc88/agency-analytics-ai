@@ -1,3 +1,4 @@
+
 import { useCalendlyData } from "@/hooks/useCalendlyData";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
@@ -15,7 +16,7 @@ interface BookCallFunnelProps {
 
 export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   const { calendlyEvents, getRecentBookings, getMonthlyComparison } = useCalendlyData(projectId);
-  const { getUserTimezone } = useUserProfile();
+  const { getUserTimezone, profile } = useUserProfile();
   
   const [dateRange, setDateRange] = useState(() => {
     const today = new Date();
@@ -29,23 +30,28 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   
   console.log('BookCallFunnel render - Project ID:', projectId);
   console.log('User timezone:', userTimezone);
+  console.log('Profile timezone:', profile?.timezone);
   console.log('Current date range:', {
     from: format(dateRange.from, 'yyyy-MM-dd HH:mm:ss'),
     to: format(dateRange.to, 'yyyy-MM-dd HH:mm:ss')
   });
   console.log('All Calendly events:', calendlyEvents.length);
   
+  // Include both timezone and profile changes in the dependency key
   const dateRangeKey = useMemo(() => {
     const fromISO = dateRange.from.toISOString();
     const toISO = dateRange.to.toISOString();
-    return `${fromISO}-${toISO}-${userTimezone}`;
-  }, [dateRange.from, dateRange.to, userTimezone]);
+    const timezoneKey = userTimezone || 'UTC';
+    const profileTimezoneKey = profile?.timezone || 'UTC';
+    return `${fromISO}-${toISO}-${timezoneKey}-${profileTimezoneKey}`;
+  }, [dateRange.from, dateRange.to, userTimezone, profile?.timezone]);
   
   const chartData = useMemo(() => {
     console.log('🔄 Recalculating chart data due to dependency change');
     console.log('Date range key:', dateRangeKey);
     console.log('Events available:', calendlyEvents.length);
     console.log('Using timezone:', userTimezone);
+    console.log('Profile loaded:', !!profile);
     
     const data = generateCallDataFromEvents(calendlyEvents, dateRange, userTimezone);
     console.log('Generated chart data:', data);
@@ -59,15 +65,17 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
     showUpRate,
     previousCallsTaken,
     previousShowUpRate,
-  } = useCallStatsCalculations(calendlyEvents, dateRange);
+  } = useCallStatsCalculations(calendlyEvents, dateRange, userTimezone);
   
   useEffect(() => {
-    console.log('🔄 BookCallFunnel dateRange changed:', {
+    console.log('🔄 BookCallFunnel dependencies changed:', {
       from: format(dateRange.from, 'yyyy-MM-dd HH:mm:ss'),
       to: format(dateRange.to, 'yyyy-MM-dd HH:mm:ss'),
-      totalEvents: calendlyEvents.length
+      totalEvents: calendlyEvents.length,
+      userTimezone,
+      profileTimezone: profile?.timezone
     });
-  }, [dateRange, calendlyEvents.length]);
+  }, [dateRange, calendlyEvents.length, userTimezone, profile?.timezone]);
 
   const recentBookings = getRecentBookings(7);
   const monthlyComparison = getMonthlyComparison();

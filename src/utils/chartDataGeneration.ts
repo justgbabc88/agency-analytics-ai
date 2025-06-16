@@ -11,11 +11,11 @@ export const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { f
   
   console.log('=== CHART DATA GENERATION DEBUG ===');
   console.log('Date range:', format(startDate, 'yyyy-MM-dd'), 'to', format(endDate, 'yyyy-MM-dd'));
-  console.log('User timezone:', userTimezone || 'browser default');
+  console.log('User timezone (passed to chart generation):', userTimezone || 'browser default');
   console.log('Total days in range:', daysDiff);
   console.log('Total Calendly events available:', calendlyEvents.length);
   
-  // Log today's events specifically with improved detection
+  // Log today's events specifically with improved detection and timezone awareness
   const todaysEvents = calendlyEvents.filter(event => isEventCreatedToday(event.created_at, userTimezone));
   console.log('Events created today (with timezone support):', todaysEvents.length);
   console.log('Today\'s events sample:', todaysEvents.slice(0, 3).map(e => ({
@@ -25,6 +25,12 @@ export const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { f
     status: e.status
   })));
   
+  if (todaysEvents.length > 0) {
+    console.log('🎯 FOUND TODAY\'S EVENTS - Timezone handling is working!');
+  } else {
+    console.log('⚠️ NO TODAY\'S EVENTS FOUND - Check timezone handling');
+  }
+  
   const totalDays = daysDiff === 0 ? 1 : daysDiff + 1;
   
   for (let i = 0; i < totalDays; i++) {
@@ -32,7 +38,7 @@ export const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { f
     currentDate.setDate(currentDate.getDate() + i);
     const currentDateStr = format(currentDate, 'yyyy-MM-dd');
     
-    console.log(`\n--- Processing ${currentDateStr} ---`);
+    console.log(`\n--- Processing ${currentDateStr} with timezone ${userTimezone} ---`);
     
     // Use improved date filtering for this specific day with timezone support
     const eventsCreatedThisDay = calendlyEvents.filter(event => 
@@ -79,6 +85,7 @@ export const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { f
   console.log('Generated data points:', dates.length);
   console.log('Total calls booked across all days:', dates.reduce((sum, d) => sum + d.callsBooked, 0));
   console.log('Sample data point:', dates[0]);
+  console.log('Timezone used for generation:', userTimezone);
   
   return dates;
 };

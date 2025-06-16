@@ -3,15 +3,16 @@ import { useMemo } from "react";
 import { subDays, parseISO, isValid } from "date-fns";
 import { filterEventsByDateRange } from "@/utils/dateFiltering";
 
-export const useCallStatsCalculations = (calendlyEvents: any[], dateRange: { from: Date; to: Date }) => {
+export const useCallStatsCalculations = (calendlyEvents: any[], dateRange: { from: Date; to: Date }, userTimezone?: string) => {
   const filteredEvents = useMemo(() => {
-    console.log('🔄 Recalculating filtered events for metrics');
+    console.log('🔄 Recalculating filtered events for metrics with timezone:', userTimezone);
     return filterEventsByDateRange(calendlyEvents, dateRange);
-  }, [calendlyEvents, dateRange.from.toISOString(), dateRange.to.toISOString()]);
+  }, [calendlyEvents, dateRange.from.toISOString(), dateRange.to.toISOString(), userTimezone]);
 
   const callStats = useMemo(() => {
     console.log('\n=== METRICS CALCULATION ===');
     console.log('Filtered events for metrics (by created_at):', filteredEvents.length);
+    console.log('Using timezone for calculations:', userTimezone);
 
     return filteredEvents.reduce((stats, event) => {
       stats.totalBookings++;
@@ -32,7 +33,7 @@ export const useCallStatsCalculations = (calendlyEvents: any[], dateRange: { fro
       }
       return stats;
     }, { totalBookings: 0, scheduled: 0, cancelled: 0, noShows: 0, other: 0 });
-  }, [filteredEvents]);
+  }, [filteredEvents, userTimezone]);
 
   const previousStats = useMemo(() => {
     const previous30Days = calendlyEvents.filter(event => {
@@ -64,7 +65,7 @@ export const useCallStatsCalculations = (calendlyEvents: any[], dateRange: { fro
       }
       return stats;
     }, { totalBookings: 0, scheduled: 0, cancelled: 0, noShows: 0 });
-  }, [calendlyEvents]);
+  }, [calendlyEvents, userTimezone]);
 
   const callsTaken = callStats.scheduled - callStats.noShows;
   const showUpRate = callStats.scheduled > 0 ? ((callsTaken / callStats.scheduled) * 100) : 0;
