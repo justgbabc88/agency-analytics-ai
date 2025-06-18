@@ -51,6 +51,15 @@ interface CalendlyWebhookEvent {
   };
 }
 
+// Helper function to convert hex string to Uint8Array
+function hexStringToUint8Array(hex: string): Uint8Array {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
+  }
+  return bytes;
+}
+
 // Helper function to verify webhook signature
 async function verifyWebhookSignature(rawBody: string, signatureHeader: string, secret: string): Promise<boolean> {
   try {
@@ -71,20 +80,22 @@ async function verifyWebhookSignature(rawBody: string, signatureHeader: string, 
       encoder.encode(secret),
       { name: 'HMAC', hash: 'SHA-256' },
       false,
-      ['sign']
+      ['verify']
     );
 
-    // Generate HMAC signature of the raw body
-    const signatureArrayBuffer = await crypto.subtle.sign('HMAC', key, encoder.encode(rawBody));
-    const expectedSignature = Array.from(new Uint8Array(signatureArrayBuffer))
-      .map(byte => byte.toString(16).padStart(2, '0'))
-      .join('');
+    // Convert hex signature to bytes
+    const expectedSigBytes = hexStringToUint8Array(signature);
+    
+    console.log('🔐 Verifying signature with crypto.subtle.verify...');
 
-    console.log('🔐 Expected signature:', expectedSignature);
-    console.log('🔐 Received signature:', signature);
+    // Verify the signature
+    const isValid = await crypto.subtle.verify(
+      'HMAC',
+      key,
+      expectedSigBytes,
+      encoder.encode(rawBody)
+    );
 
-    // Compare signatures using constant-time comparison
-    const isValid = expectedSignature === signature;
     console.log('🔐 Signature verification result:', isValid);
     
     return isValid;
