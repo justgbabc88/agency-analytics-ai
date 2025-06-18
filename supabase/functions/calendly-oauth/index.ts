@@ -32,6 +32,58 @@ serve(async (req) => {
 
     console.log('Using redirect URI:', redirectUri);
 
+    if (action === 'check_webhooks') {
+      console.log('=== CHECK WEBHOOKS ===');
+      console.log('Project ID:', projectId);
+      
+      // Get access token for this project
+      const { data: tokenData, error: tokenError } = await getAccessToken(supabase, projectId);
+      
+      if (tokenError || !tokenData?.access_token) {
+        console.error('No access token available:', tokenError);
+        throw new Error('Calendly not connected or token expired');
+      }
+
+      console.log('Token found, checking webhooks...');
+      
+      // Get existing webhook subscriptions
+      const webhooksUrl = `https://api.calendly.com/webhook_subscriptions?organization=${encodeURIComponent(tokenData.user_uri.replace('/users/', '/organizations/'))}`;
+      console.log('Webhooks API URL:', webhooksUrl);
+
+      const webhooksResponse = await fetch(webhooksUrl, {
+        headers: {
+          'Authorization': `Bearer ${tokenData.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!webhooksResponse.ok) {
+        const errorText = await webhooksResponse.text();
+        console.error('Webhooks API error:', webhooksResponse.status, errorText);
+        throw new Error(`Webhooks API error: ${webhooksResponse.status}`);
+      }
+
+      const webhooksData = await webhooksResponse.json();
+      const webhooks = webhooksData.collection || [];
+      
+      console.log(`Found ${webhooks.length} webhook subscriptions`);
+      
+      // Check for our webhook
+      const expectedUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/calendly-webhook`;
+      const ourWebhook = webhooks.find(webhook => webhook.callback_url === expectedUrl);
+      
+      return new Response(JSON.stringify({ 
+        success: true,
+        webhooks: webhooks,
+        ourWebhook: ourWebhook,
+        isConfigured: !!ourWebhook,
+        expectedUrl: expectedUrl
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     if (action === 'get_events_by_date') {
       console.log('=== GET EVENTS BY DATE ===');
       console.log('Project ID:', projectId);
@@ -353,6 +405,32 @@ serve(async (req) => {
 
         if (tokenError || !tokenData) {
           throw new Error('Access token not found');
+        }
+
+        // First, check if webhook already exists
+        const webhooksUrl = `https://api.calendly.com/webhook_subscriptions?organization=${encodeURIComponent(tokenData.data.user_uri.replace('/users/', '/organizations/'))}`;
+        const existingWebhooksResponse = await fetch(webhooksUrl, {
+          headers: {
+            'Authorization': `Bearer ${tokenData.data.access_token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (existingWebhooksResponse.ok) {
+          const existingWebhooksData = await existingWebhooksResponse.json();
+          const expectedUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/calendly-webhook`;
+          const existingWebhook = existingWebhooksData.collection?.find(w => w.callback_url === expectedUrl);
+          
+          if (existingWebhook) {
+            console.log('Webhook already exists:', existingWebhook.uri);
+            return new Response(JSON.stringify({ 
+              success: true, 
+              webhook_id: existingWebhook.uri,
+              message: 'Webhook already configured'
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
         }
 
         // Create webhook subscription

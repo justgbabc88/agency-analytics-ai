@@ -105,53 +105,70 @@ serve(async (req) => {
         console.log(`  - ${mapping.event_type_name}: ${mapping.calendly_event_type_id}`);
       });
 
-      // Extended sync window - look back 48 hours to catch recent events
+      // More aggressive sync window - look back 72 hours and forward 24 hours to catch all recent activity
       const now = new Date();
-      const fortyEightHoursAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+      const seventyTwoHoursAgo = new Date(now.getTime() - 72 * 60 * 60 * 1000);
+      const twentyFourHoursFromNow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
       
-      // For debugging, let's also try the last 7 days
-      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      const syncFromDate = debugMode ? sevenDaysAgo : fortyEightHoursAgo;
-
       console.log('📅 Sync date range:');
-      console.log(`  From: ${syncFromDate.toISOString()}`);
-      console.log(`  To: ${now.toISOString()}`);
-      console.log(`  Hours back: ${Math.round((now.getTime() - syncFromDate.getTime()) / (1000 * 60 * 60))}`);
+      console.log(`  From: ${seventyTwoHoursAgo.toISOString()}`);
+      console.log(`  To: ${twentyFourHoursFromNow.toISOString()}`);
+      console.log(`  Hours back: ${Math.round((now.getTime() - seventyTwoHoursAgo.getTime()) / (1000 * 60 * 60))}`);
 
-      // Fetch events from Calendly API with extended time range
-      const calendlyUrl = `https://api.calendly.com/scheduled_events?user=${encodeURIComponent(tokenData.user_uri)}&min_start_time=${syncFromDate.toISOString()}&max_start_time=${now.toISOString()}&count=100&sort=start_time:desc`;
-      console.log('🌐 Calendly API URL:', calendlyUrl);
+      // First, get events by creation date (when they were booked)
+      const createdEventsUrl = `https://api.calendly.com/scheduled_events?user=${encodeURIComponent(tokenData.user_uri)}&min_start_time=${seventyTwoHoursAgo.toISOString()}&max_start_time=${twentyFourHoursFromNow.toISOString()}&count=100&sort=created_at:desc`;
+      console.log('🌐 Calendly API URL (by creation):', createdEventsUrl);
 
-      const calendlyResponse = await fetch(calendlyUrl, {
+      const createdResponse = await fetch(createdEventsUrl, {
         headers: {
           'Authorization': `Bearer ${tokenData.access_token}`,
           'Content-Type': 'application/json'
         }
       });
 
-      if (!calendlyResponse.ok) {
-        const errorText = await calendlyResponse.text();
-        console.error('❌ Calendly API error:', calendlyResponse.status, errorText);
-        debugInfo.push({
-          projectId,
-          error: 'Calendly API error',
-          status: calendlyResponse.status,
-          details: errorText
-        });
+      if (!createdResponse.ok) {
+        const errorText = await createdResponse.text();
+        console.error('❌ Calendly API error:', createdResponse.status, errorText);
         continue;
       }
 
-      const calendlyData = await calendlyResponse.json();
-      const calendlyEvents = calendlyData.collection || [];
+      const createdData = await createdResponse.json();
+      let allEvents = createdData.collection || [];
 
-      console.log(`📊 Calendly API Response Summary:`);
-      console.log(`  Total events found: ${calendlyEvents.length}`);
-      console.log(`  Pagination info:`, calendlyData.pagination || 'No pagination');
+      // Also get events by scheduled date for today specifically
+      const today = new Date();
+      const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+
+      const todayEventsUrl = `https://api.calendly.com/scheduled_events?user=${encodeURIComponent(tokenData.user_uri)}&min_start_time=${startOfToday.toISOString()}&max_start_time=${endOfToday.toISOString()}&count=100&sort=start_time:asc`;
+      console.log('🌐 Today\'s events API URL:', todayEventsUrl);
+
+      const todayResponse = await fetch(todayEventsUrl, {
+        headers: {
+          'Authorization': `Bearer ${tokenData.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (todayResponse.ok) {
+        const todayData = await todayResponse.json();
+        const todayEvents = todayData.collection || [];
+        
+        // Merge events, avoiding duplicates
+        const eventIds = new Set(allEvents.map(e => e.uri));
+        for (const event of todayEvents) {
+          if (!eventIds.has(event.uri)) {
+            allEvents.push(event);
+          }
+        }
+      }
+
+      console.log(`📊 Total Calendly events found: ${allEvents.length}`);
 
       // Log details of each event found
-      if (calendlyEvents.length > 0) {
+      if (allEvents.length > 0) {
         console.log('\n📝 All events from Calendly API:');
-        calendlyEvents.forEach((event, index) => {
+        allEvents.forEach((event, index) => {
           const startTime = new Date(event.start_time);
           const createdTime = new Date(event.created_at);
           console.log(`  ${index + 1}. Event: ${event.uri}`);
@@ -166,7 +183,7 @@ serve(async (req) => {
       const trackedEventTypeIds = mappings.map(m => m.calendly_event_type_id);
       console.log('\n🎯 Tracked event type IDs:', trackedEventTypeIds);
 
-      const relevantEvents = calendlyEvents.filter(event => {
+      const relevantEvents = allEvents.filter(event => {
         const isTracked = trackedEventTypeIds.includes(event.event_type);
         if (!isTracked) {
           console.log(`⏭️ Skipping untracked event type: ${event.event_type}`);
@@ -176,12 +193,12 @@ serve(async (req) => {
 
       console.log(`✅ ${relevantEvents.length} events match tracked event types`);
 
-      // Get existing events from our database for comparison
+      // Get existing events from our database for comparison - expanded window
       const { data: existingEvents, error: existingError } = await supabase
         .from('calendly_events')
         .select('calendly_event_id, created_at, scheduled_at')
         .eq('project_id', projectId)
-        .gte('created_at', syncFromDate.toISOString());
+        .gte('created_at', seventyTwoHoursAgo.toISOString());
 
       if (existingError) {
         console.error('❌ Error fetching existing events:', existingError);
@@ -192,8 +209,10 @@ serve(async (req) => {
       if (existingEvents?.length > 0) {
         existingEvents.forEach((event, index) => {
           const createdTime = new Date(event.created_at);
+          const scheduledTime = new Date(event.scheduled_at);
           console.log(`  ${index + 1}. DB Event: ${event.calendly_event_id}`);
           console.log(`     Created: ${createdTime.toISOString()} (${createdTime.toLocaleString('en-US', { timeZone: 'America/Denver' })} MST)`);
+          console.log(`     Scheduled: ${scheduledTime.toISOString()} (${scheduledTime.toLocaleString('en-US', { timeZone: 'America/Denver' })} MST)`);
         });
       }
 
@@ -204,6 +223,10 @@ serve(async (req) => {
         const isMissing = !existingEventIds.has(event.uri);
         if (isMissing) {
           console.log(`🔍 Found missing event: ${event.uri}`);
+          const startTime = new Date(event.start_time);
+          const createdTime = new Date(event.created_at);
+          console.log(`    📅 Scheduled: ${startTime.toLocaleString('en-US', { timeZone: 'America/Denver' })} MST`);
+          console.log(`    📝 Created: ${createdTime.toLocaleString('en-US', { timeZone: 'America/Denver' })} MST`);
         }
         return isMissing;
       });
@@ -223,32 +246,30 @@ serve(async (req) => {
           
           console.log(`\n📝 Processing event: ${event.uri}`);
           
-          // Try to extract invitee information from the event
+          // Try to get invitee information from the event
           let inviteeName = null;
           let inviteeEmail = null;
           
-          // Fetch event details if we have invitee info
-          if (event.event_memberships && event.event_memberships.length > 0) {
-            try {
-              const detailResponse = await fetch(event.uri, {
-                headers: {
-                  'Authorization': `Bearer ${tokenData.access_token}`,
-                  'Content-Type': 'application/json'
-                }
-              });
-              
-              if (detailResponse.ok) {
-                const eventDetail = await detailResponse.json();
-                if (eventDetail.resource?.event_memberships?.[0]) {
-                  const membership = eventDetail.resource.event_memberships[0];
-                  inviteeName = membership.user?.name;
-                  inviteeEmail = membership.user?.email;
-                  console.log(`  👤 Invitee: ${inviteeName} (${inviteeEmail})`);
-                }
+          try {
+            const inviteesUrl = `${event.uri}/invitees`;
+            const inviteesResponse = await fetch(inviteesUrl, {
+              headers: {
+                'Authorization': `Bearer ${tokenData.access_token}`,
+                'Content-Type': 'application/json'
               }
-            } catch (error) {
-              console.warn('⚠️ Could not fetch event details:', error);
+            });
+            
+            if (inviteesResponse.ok) {
+              const inviteesData = await inviteesResponse.json();
+              if (inviteesData.collection && inviteesData.collection.length > 0) {
+                const invitee = inviteesData.collection[0];
+                inviteeName = invitee.name;
+                inviteeEmail = invitee.email;
+                console.log(`  👤 Invitee: ${inviteeName} (${inviteeEmail})`);
+              }
             }
+          } catch (error) {
+            console.warn('⚠️ Could not fetch invitee details:', error);
           }
           
           const eventData = {
