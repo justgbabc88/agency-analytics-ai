@@ -52,7 +52,7 @@ interface CalendlyWebhookEvent {
 }
 
 // Helper function to convert hex string to Uint8Array
-function hexStringToUint8Array(hex: string): Uint8Array {
+function hexToUint8Array(hex: string): Uint8Array {
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < hex.length; i += 2) {
     bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
@@ -139,16 +139,13 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // 1. Capture raw body BEFORE any parsing
+    // 1. Capture raw body FIRST - this must be the very first read of the stream
     const rawBody = await req.text();
     console.log('📝 Raw webhook body length:', rawBody.length);
     
-    // 2. Log the full raw body for debugging
-    console.log("🔥 RAW Calendly Body:", rawBody);
-    
     // 2. Extract the v1 signature value from the 'calendly-webhook-signature' header
     const signatureHeader = req.headers.get('calendly-webhook-signature');
-    const signature = signatureHeader?.split(',').find(p => p.startsWith('v1='))?.replace('v1=', '');
+    const v1Signature = signatureHeader?.split(',').find(p => p.startsWith('v1='))?.replace('v1=', '');
     const webhookSecret = Deno.env.get('CALENDLY_WEBHOOK_SIGNING_KEY');
     
     if (!signatureHeader || !webhookSecret) {
@@ -159,7 +156,7 @@ serve(async (req) => {
       });
     }
 
-    if (!signature) {
+    if (!v1Signature) {
       console.error('❌ No v1 signature found in header:', signatureHeader);
       return new Response('Invalid signature format', { 
         status: 400, 
@@ -168,13 +165,9 @@ serve(async (req) => {
     }
 
     console.log('🔍 Signature header format:', signatureHeader);
-    console.log('🔍 Extracted signature from header:', signature);
+    console.log('🔍 Extracted v1 signature:', v1Signature);
 
-    // 3. TEMPORARILY BYPASS SIGNATURE VERIFICATION FOR DEBUGGING
-    console.log('🚨 BYPASSING SIGNATURE VERIFICATION FOR DEBUGGING');
-    
-    /*
-    // 4. Verify the signature using HMAC SHA-256
+    // 3. Verify the signature using HMAC SHA-256
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(
       'raw',
@@ -183,7 +176,7 @@ serve(async (req) => {
       false,
       ['verify']
     );
-    const expectedSigBytes = hexStringToUint8Array(signature);
+    const expectedSigBytes = hexToUint8Array(v1Signature);
     
     console.log('🔐 Verifying signature with crypto.subtle.verify...');
 
@@ -196,7 +189,7 @@ serve(async (req) => {
 
     console.log('🔐 Signature verification result:', isValid);
 
-    // 5. If the signature is invalid, log an error and return a 401
+    // 4. If the signature is invalid, log an error and return a 401
     if (!isValid) {
       console.error('❌ Invalid webhook signature');
       return new Response('Invalid signature', { 
@@ -204,11 +197,10 @@ serve(async (req) => {
         headers: corsHeaders 
       });
     }
-    */
 
-    console.log('✅ Webhook signature verification BYPASSED for debugging');
+    console.log('✅ Webhook signature verified successfully');
 
-    // 6. Only after validation passes, parse the body
+    // 5. Only after validation passes, parse the body
     const webhookData: CalendlyWebhookEvent = JSON.parse(rawBody);
     
     console.log('📞 Processed Calendly webhook:', {
