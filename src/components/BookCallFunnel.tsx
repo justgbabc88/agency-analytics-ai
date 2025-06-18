@@ -1,4 +1,3 @@
-
 import { useCalendlyData } from "@/hooks/useCalendlyData";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
@@ -9,14 +8,17 @@ import { SalesConversionMetrics } from "./SalesConversionMetrics";
 import { useState, useEffect, useMemo } from "react";
 import { generateCallDataFromEvents } from "@/utils/chartDataGeneration";
 import { useCallStatsCalculations } from "@/hooks/useCallStatsCalculations";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface BookCallFunnelProps {
   projectId: string;
 }
 
 export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
-  const { calendlyEvents, getRecentBookings, getMonthlyComparison } = useCalendlyData(projectId);
+  const { calendlyEvents, getRecentBookings, getMonthlyComparison, refetch } = useCalendlyData(projectId);
   const { getUserTimezone, profile } = useUserProfile();
+  const { toast } = useToast();
   
   const [dateRange, setDateRange] = useState(() => {
     const today = new Date();
@@ -36,6 +38,104 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
     to: format(dateRange.to, 'yyyy-MM-dd HH:mm:ss')
   });
   console.log('🔄 All Calendly events available:', calendlyEvents.length);
+
+  // Real-time listener for new Calendly events
+  useEffect(() => {
+    if (!projectId) return;
+
+    console.log('🎧 Setting up real-time listener for Calendly events...');
+    
+    const channel = supabase
+      .channel('calendly-events-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'calendly_events',
+          filter: `project_id=eq.${projectId}`
+        },
+        (payload) => {
+          console.log('🆕 New Calendly event received:', payload);
+          
+          // Show toast notification for new bookings
+          if (payload.new) {
+            toast({
+              title: "New Booking! 🎉",
+              description: `${payload.new.event_type_name} scheduled for ${format(new Date(payload.new.scheduled_at), 'MMM d, h:mm a')}`,
+            });
+          }
+          
+          // Refresh data to show the new event
+          refetch();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'calendly_events',
+          filter: `project_id=eq.${projectId}`
+        },
+        (payload) => {
+          console.log('📝 Calendly event updated:', payload);
+          
+          // Show notification for status changes
+          if (payload.new && payload.old) {
+            const oldStatus = payload.old.status;
+            const newStatus = payload.new.status;
+            
+            if (oldStatus !== newStatus) {
+              let message = '';
+              if (newStatus === 'cancelled') {
+                message = `Booking cancelled: ${payload.new.event_type_name}`;
+              } else if (newStatus === 'completed') {
+                message = `Call completed: ${payload.new.event_type_name}`;
+              } else if (newStatus === 'no_show') {
+                message = `No-show recorded: ${payload.new.event_type_name}`;
+              }
+              
+              if (message) {
+                toast({
+                  title: "Booking Status Updated",
+                  description: message,
+                });
+              }
+            }
+          }
+          
+          // Refresh data to show the updated event
+          refetch();
+        }
+      )
+      .subscribe();
+
+    // Trigger initial gap sync when component loads
+    const triggerGapSync = async () => {
+      try {
+        console.log('🔄 Triggering initial gap sync...');
+        await supabase.functions.invoke('calendly-sync-gaps', {
+          body: { 
+            triggerReason: 'component_load',
+            projectId 
+          }
+        });
+        
+        // Refresh data after gap sync
+        setTimeout(() => refetch(), 2000);
+      } catch (error) {
+        console.error('Gap sync trigger failed:', error);
+      }
+    };
+
+    triggerGapSync();
+
+    return () => {
+      console.log('🎧 Cleaning up real-time listener...');
+      supabase.removeChannel(channel);
+    };
+  }, [projectId, refetch, toast]);
 
   // DEBUG: Log the most recent events to help identify the missing booking
   useEffect(() => {

@@ -83,8 +83,9 @@ export const CalendlyConnector = ({
           console.log('Received success message from popup');
           window.removeEventListener('message', messageHandler);
           
-          // Give a moment for database operations to complete
-          setTimeout(() => {
+          // Setup webhooks after successful connection
+          setTimeout(async () => {
+            await setupWebhooks();
             checkConnectionStatus();
           }, 1500);
         }
@@ -124,6 +125,39 @@ export const CalendlyConnector = ({
         description: error.message || "Failed to initiate Calendly connection",
         variant: "destructive",
       });
+    }
+  };
+
+  const setupWebhooks = async () => {
+    if (!projectId) return;
+
+    try {
+      console.log('Setting up Calendly webhooks...');
+      
+      const { data, error } = await supabase.functions.invoke('calendly-oauth', {
+        body: { 
+          action: 'setup_webhooks', 
+          projectId,
+          webhookUrl: `${window.location.origin}/functions/v1/calendly-webhook`
+        }
+      });
+
+      if (error) {
+        console.error('Webhook setup error:', error);
+        toast({
+          title: "Webhook Setup Warning",
+          description: "Connected successfully but webhooks couldn't be configured. Real-time updates may not work.",
+          variant: "default",
+        });
+      } else {
+        console.log('Webhooks configured successfully');
+        toast({
+          title: "Real-time Updates Enabled",
+          description: "Webhooks configured! You'll get instant notifications for new bookings.",
+        });
+      }
+    } catch (error) {
+      console.error('Webhook setup failed:', error);
     }
   };
 
@@ -269,9 +303,10 @@ export const CalendlyConnector = ({
       console.log('Auto-syncing last 30 days including today with proper creation timestamps...');
       console.log('Date range:', thirtyDaysAgo.toISOString(), 'to', today.toISOString());
       
-      const { data, error } = await supabase.functions.invoke('calendly-oauth', {
+      // Use the new gap sync function
+      const { data, error } = await supabase.functions.invoke('calendly-sync-gaps', {
         body: { 
-          action: 'sync_historical_events', 
+          triggerReason: 'auto_sync',
           projectId,
           dateRange: {
             startDate: thirtyDaysAgo.toISOString(),
@@ -287,15 +322,15 @@ export const CalendlyConnector = ({
 
       console.log('Auto sync result:', data);
 
-      if (data.synced_events > 0) {
+      if (data.eventsSynced > 0) {
         toast({
-          title: "Historical Events Re-synced",
-          description: `Successfully re-imported ${data.synced_events} events with correct creation timestamps from the last 30 days`,
+          title: "Historical Events Synced",
+          description: `Successfully imported ${data.eventsSynced} events with real-time updates enabled`,
         });
       } else {
         toast({
           title: "Sync Complete",
-          description: data.message || "No events found in the selected date range",
+          description: "All events are up to date. Real-time monitoring is now active.",
         });
       }
 
@@ -317,44 +352,32 @@ export const CalendlyConnector = ({
     setSyncing(true);
     
     try {
-      const sixtyDaysAgo = new Date();
-      sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+      console.log('Triggering manual gap sync...');
       
-      // Make sure we include today's date properly
-      const today = new Date();
-      today.setHours(23, 59, 59, 999); // End of today
-
-      console.log('Manually re-syncing last 60 days including today with proper creation timestamps...');
-      console.log('Date range:', sixtyDaysAgo.toISOString(), 'to', today.toISOString());
-      
-      const { data, error } = await supabase.functions.invoke('calendly-oauth', {
+      const { data, error } = await supabase.functions.invoke('calendly-sync-gaps', {
         body: { 
-          action: 'sync_historical_events', 
-          projectId,
-          dateRange: {
-            startDate: sixtyDaysAgo.toISOString(),
-            endDate: today.toISOString()
-          }
+          triggerReason: 'manual_sync',
+          projectId
         }
       });
 
       if (error) {
         console.error('Manual sync error:', error);
-        throw new Error(error.message || 'Failed to sync historical events');
+        throw new Error(error.message || 'Failed to sync events');
       }
 
       console.log('Manual sync result:', data);
 
       toast({
-        title: "Events Re-synced Successfully",
-        description: `Re-imported ${data.synced_events} events with correct creation timestamps including today`,
+        title: "Events Synced Successfully",
+        description: `Found and synced ${data.eventsSynced} events. ${data.gapsFound} gaps detected and filled.`,
       });
 
     } catch (error) {
       console.error('Manual sync error:', error);
       toast({
         title: "Sync Failed", 
-        description: error.message || "Failed to sync historical events",
+        description: error.message || "Failed to sync events",
         variant: "destructive"
       });
     } finally {
