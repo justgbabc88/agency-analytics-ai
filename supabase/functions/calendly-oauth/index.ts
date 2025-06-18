@@ -156,36 +156,70 @@ serve(async (req) => {
       const webhooksData = await webhooksResponse.json();
       const existingWebhooks = webhooksData.collection || [];
 
-      // Find webhooks with our target URL
-      const duplicateWebhooks = existingWebhooks.filter(webhook => webhook.url === targetWebhookUrl);
+      // Find ALL webhooks with our target URL (duplicates + working ones)
+      const matchingWebhooks = existingWebhooks.filter(webhook => webhook.url === targetWebhookUrl);
       
-      console.log(`🔍 Found ${duplicateWebhooks.length} duplicate webhooks for URL: ${targetWebhookUrl}`);
+      console.log(`🔍 Found ${matchingWebhooks.length} webhooks for URL: ${targetWebhookUrl}`);
 
       let cleanedCount = 0;
-      for (const webhook of duplicateWebhooks) {
-        try {
-          const deleteResponse = await fetch(`https://api.calendly.com/webhook_subscriptions/${webhook.uri}`, {
-            method: 'DELETE',
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-            }
-          });
+      let keptWebhook = null;
 
-          if (deleteResponse.ok) {
-            console.log(`✅ Deleted webhook: ${webhook.uri}`);
-            cleanedCount++;
-          } else {
-            console.warn(`⚠️ Failed to delete webhook: ${webhook.uri}`);
+      // Keep the first working webhook and delete the rest
+      for (const [index, webhook] of matchingWebhooks.entries()) {
+        if (index === 0) {
+          // Keep the first one
+          keptWebhook = webhook;
+          console.log(`✅ Keeping webhook: ${webhook.uri}`);
+        } else {
+          // Delete duplicates
+          try {
+            const deleteResponse = await fetch(`https://api.calendly.com/webhook_subscriptions/${webhook.uri}`, {
+              method: 'DELETE',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+              }
+            });
+
+            if (deleteResponse.ok) {
+              console.log(`✅ Deleted duplicate webhook: ${webhook.uri}`);
+              cleanedCount++;
+            } else {
+              console.warn(`⚠️ Failed to delete webhook: ${webhook.uri}`);
+            }
+          } catch (error) {
+            console.warn(`⚠️ Error deleting webhook ${webhook.uri}:`, error);
           }
-        } catch (error) {
-          console.warn(`⚠️ Error deleting webhook ${webhook.uri}:`, error);
         }
+      }
+
+      // Update our stored data with the kept webhook info
+      if (keptWebhook) {
+        const updatedData = {
+          ...integrationData.data,
+          webhook_id: keptWebhook.uri,
+          signing_key: keptWebhook.signing_key,
+          webhook_status: 'registered',
+          webhook_message: 'Webhook discovered and registered during cleanup',
+          webhook_url: targetWebhookUrl
+        };
+
+        await supabase
+          .from('project_integration_data')
+          .update({
+            data: updatedData,
+            updated_at: new Date().toISOString()
+          })
+          .eq('project_id', projectId)
+          .eq('platform', 'calendly');
+
+        console.log('✅ Updated stored webhook data after cleanup');
       }
 
       return new Response(JSON.stringify({ 
         success: true,
         cleaned_count: cleanedCount,
-        found_count: duplicateWebhooks.length
+        found_count: matchingWebhooks.length,
+        webhook_registered: !!keptWebhook
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -238,8 +272,8 @@ serve(async (req) => {
       const currentOrganization = userData.resource.current_organization;
       console.log('📋 Current organization:', currentOrganization);
 
-      // Enhanced webhook registration with cleanup
-      console.log('🔗 Setting up webhooks with cleanup...');
+      // Enhanced webhook registration with discovery
+      console.log('🔗 Setting up webhooks with discovery...');
       const webhookUrl = `https://iqxvtfupjjxjkbajgcve.supabase.co/functions/v1/calendly-webhook`;
       
       // First, list existing webhooks with proper parameters
@@ -269,7 +303,7 @@ serve(async (req) => {
           console.log('♻️ Found existing webhook, reusing it:', existingWebhook.uri);
           webhookData = { resource: existingWebhook };
           webhookStatus = 'registered';
-          webhookMessage = 'Reused existing webhook';
+          webhookMessage = 'Discovered and reused existing webhook';
         } else {
           // No existing webhook, create new one
           const webhookResponse = await fetch('https://api.calendly.com/webhook_subscriptions', {
@@ -294,14 +328,46 @@ serve(async (req) => {
           } else {
             const errorText = await webhookResponse.text();
             console.warn('⚠️ Webhook registration failed:', errorText);
-            webhookStatus = 'failed';
-            webhookMessage = `Failed to create webhook: ${errorText}`;
+            
+            // If creation failed due to existing webhook, try to discover it again
+            if (errorText.includes('already exists')) {
+              console.log('🔍 Webhook exists but not found in list, attempting discovery...');
+              // Try listing again in case of timing issue
+              const retryListResponse = await fetch(existingWebhooksUrl.toString(), {
+                headers: {
+                  'Authorization': `Bearer ${tokenData.access_token}`,
+                  'Content-Type': 'application/json'
+                }
+              });
+              
+              if (retryListResponse.ok) {
+                const retryListData = await retryListResponse.json();
+                const retryWebhooks = retryListData.collection || [];
+                const foundWebhook = retryWebhooks.find(webhook => webhook.url === webhookUrl);
+                
+                if (foundWebhook) {
+                  console.log('🎯 Found webhook on retry:', foundWebhook.uri);
+                  webhookData = { resource: foundWebhook };
+                  webhookStatus = 'registered';
+                  webhookMessage = 'Discovered existing webhook after creation attempt';
+                } else {
+                  webhookStatus = 'polling';
+                  webhookMessage = 'Webhook exists but could not be discovered - using polling mode';
+                }
+              } else {
+                webhookStatus = 'polling';
+                webhookMessage = 'Webhook creation failed, falling back to polling mode';
+              }
+            } else {
+              webhookStatus = 'polling';
+              webhookMessage = `Webhook creation failed: ${errorText}`;
+            }
           }
         }
       } else {
         console.warn('⚠️ Failed to list existing webhooks, proceeding with creation attempt');
-        webhookStatus = 'failed';
-        webhookMessage = 'Failed to list existing webhooks';
+        webhookStatus = 'polling';
+        webhookMessage = 'Failed to discover existing webhooks - using polling mode';
       }
 
       // Store integration data with enhanced webhook info
