@@ -1,9 +1,8 @@
-
 import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Bug, Database, Calendar, Webhook, Clock, AlertTriangle } from "lucide-react";
+import { Bug, Database, Calendar, Webhook, Clock, AlertTriangle, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useCalendlyData } from "@/hooks/useCalendlyData";
@@ -14,9 +13,108 @@ interface CalendlyDebugPanelProps {
 
 export const CalendlyDebugPanel = ({ projectId }: CalendlyDebugPanelProps) => {
   const [debugging, setDebugging] = useState(false);
+  const [liveDebugging, setLiveDebugging] = useState(false);
   const [debugResults, setDebugResults] = useState<any>(null);
   const { calendlyEvents, refetch } = useCalendlyData(projectId);
   const { toast } = useToast();
+
+  const runLiveEventCheck = async () => {
+    if (!projectId) return;
+
+    setLiveDebugging(true);
+    
+    try {
+      console.log('🔍 Running live event check for today...');
+      
+      // Get today's date range in MST
+      const now = new Date();
+      const todayStart = new Date(now);
+      todayStart.setHours(0, 0, 0, 0);
+      
+      const todayEnd = new Date(now);
+      todayEnd.setHours(23, 59, 59, 999);
+      
+      console.log(`🔍 Checking for events from ${todayStart.toISOString()} to ${todayEnd.toISOString()}`);
+      
+      // Check Calendly API directly for today's events
+      const { data: apiResult, error: apiError } = await supabase.functions.invoke('calendly-oauth', {
+        body: { 
+          action: 'get_events_by_date',
+          projectId,
+          startDate: todayStart.toISOString(),
+          endDate: todayEnd.toISOString()
+        }
+      });
+
+      if (apiError) {
+        throw new Error(apiError.message);
+      }
+
+      // Check database for today's events
+      const { data: dbEvents } = await supabase
+        .from('calendly_events')
+        .select('*')
+        .eq('project_id', projectId)
+        .gte('created_at', todayStart.toISOString())
+        .lte('created_at', todayEnd.toISOString())
+        .order('created_at', { ascending: false });
+
+      // Check for events scheduled today
+      const { data: scheduledToday } = await supabase
+        .from('calendly_events')
+        .select('*')
+        .eq('project_id', projectId)
+        .gte('scheduled_at', todayStart.toISOString())
+        .lte('scheduled_at', todayEnd.toISOString())
+        .order('scheduled_at', { ascending: false });
+
+      const results = {
+        timestamp: new Date().toISOString(),
+        todayRange: {
+          start: todayStart.toISOString(),
+          end: todayEnd.toISOString(),
+          startMST: todayStart.toLocaleString('en-US', { timeZone: 'America/Denver' }),
+          endMST: todayEnd.toLocaleString('en-US', { timeZone: 'America/Denver' })
+        },
+        apiEvents: apiResult?.events || [],
+        dbEventsCreatedToday: dbEvents || [],
+        dbEventsScheduledToday: scheduledToday || [],
+        apiEventCount: apiResult?.events?.length || 0,
+        dbCreatedTodayCount: dbEvents?.length || 0,
+        dbScheduledTodayCount: scheduledToday?.length || 0,
+        missingEvents: []
+      };
+
+      // Find events that are in API but not in database
+      if (apiResult?.events) {
+        results.missingEvents = apiResult.events.filter((apiEvent: any) => {
+          const existsInDb = dbEvents?.some(dbEvent => dbEvent.calendly_event_id === apiEvent.uri);
+          return !existsInDb;
+        });
+      }
+
+      setDebugResults(results);
+      console.log('🔍 Live debug results:', results);
+
+      const foundToday = results.apiEventCount;
+      const missingCount = results.missingEvents.length;
+
+      toast({
+        title: "Live Event Check Complete",
+        description: `Found ${foundToday} API events today. ${missingCount} missing from database.`,
+      });
+
+    } catch (error) {
+      console.error('Live debug failed:', error);
+      toast({
+        title: "Live Debug Failed",
+        description: error.message || "Failed to run live event check",
+        variant: "destructive",
+      });
+    } finally {
+      setLiveDebugging(false);
+    }
+  };
 
   const runComprehensiveDebug = async () => {
     if (!projectId) return;
@@ -137,37 +235,125 @@ export const CalendlyDebugPanel = ({ projectId }: CalendlyDebugPanelProps) => {
       <CardContent className="space-y-4">
         <div className="flex items-center justify-between">
           <p className="text-sm text-gray-600">
-            Run comprehensive analysis to identify why recent events aren't showing up.
+            Debug missing events and identify sync issues.
           </p>
-          <Button 
-            onClick={runComprehensiveDebug}
-            disabled={debugging}
-            variant="outline"
-            size="sm"
-          >
-            <Bug className={`h-4 w-4 mr-2 ${debugging ? 'animate-spin' : ''}`} />
-            {debugging ? 'Analyzing...' : 'Run Debug'}
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              onClick={runLiveEventCheck}
+              disabled={liveDebugging}
+              variant="outline"
+              size="sm"
+              className="bg-green-50 hover:bg-green-100 border-green-200"
+            >
+              <Clock className={`h-4 w-4 mr-2 ${liveDebugging ? 'animate-spin' : ''}`} />
+              {liveDebugging ? 'Checking...' : 'Live Check Today'}
+            </Button>
+            <Button 
+              onClick={runComprehensiveDebug}
+              disabled={debugging}
+              variant="outline"
+              size="sm"
+            >
+              <Bug className={`h-4 w-4 mr-2 ${debugging ? 'animate-spin' : ''}`} />
+              {debugging ? 'Analyzing...' : 'Full Debug'}
+            </Button>
+          </div>
         </div>
 
-        {debugging && (
+        {(debugging || liveDebugging) && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="flex items-center gap-2 text-blue-700 mb-2">
-              <Bug className="h-4 w-4 animate-spin" />
-              <span className="font-medium">Running Comprehensive Debug Analysis</span>
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              <span className="font-medium">
+                {liveDebugging ? 'Checking Today\'s Events' : 'Running Comprehensive Debug Analysis'}
+              </span>
             </div>
             <div className="text-sm text-blue-600 space-y-1">
-              <p>• Checking integration status</p>
-              <p>• Verifying event type mappings</p>
-              <p>• Analyzing recent database events</p>
-              <p>• Testing API access</p>
-              <p>• Running enhanced sync with detailed logging</p>
+              {liveDebugging ? (
+                <>
+                  <p>• Fetching today's events from Calendly API</p>
+                  <p>• Comparing with database records</p>
+                  <p>• Identifying missing events (like your 1:35 PM booking)</p>
+                </>
+              ) : (
+                <>
+                  <p>• Checking integration status</p>
+                  <p>• Verifying event type mappings</p>
+                  <p>• Analyzing recent database events</p>
+                  <p>• Testing API access</p>
+                  <p>• Running enhanced sync with detailed logging</p>
+                </>
+              )}
             </div>
           </div>
         )}
 
         {debugResults && (
           <div className="space-y-4">
+            {/* Live Check Results */}
+            {debugResults.todayRange && (
+              <Card className="border-green-200 bg-green-50">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Today's Event Check ({debugResults.todayRange.startMST.split(',')[0]})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-green-700">{debugResults.apiEventCount}</div>
+                      <div className="text-sm text-green-600">API Events Found</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-blue-700">{debugResults.dbCreatedTodayCount}</div>
+                      <div className="text-sm text-blue-600">DB Events Created Today</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-purple-700">{debugResults.dbScheduledTodayCount}</div>
+                      <div className="text-sm text-purple-600">DB Events Scheduled Today</div>
+                    </div>
+                  </div>
+
+                  {debugResults.missingEvents && debugResults.missingEvents.length > 0 && (
+                    <div className="border-t pt-4">
+                      <h4 className="font-medium text-red-700 mb-2">
+                        Missing Events Found ({debugResults.missingEvents.length}):
+                      </h4>
+                      <div className="space-y-2">
+                        {debugResults.missingEvents.map((event: any, index: number) => (
+                          <div key={index} className="text-sm bg-red-50 p-2 rounded">
+                            <p><strong>Event:</strong> {event.event_type_name || 'Unknown'}</p>
+                            <p><strong>Scheduled:</strong> {formatDate(event.start_time)}</p>
+                            <p><strong>Created:</strong> {formatDate(event.created_at)}</p>
+                            <p className="text-xs text-gray-600"><strong>ID:</strong> {event.uri}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {debugResults.apiEvents && debugResults.apiEvents.length > 0 && (
+                    <div className="border-t pt-4">
+                      <h4 className="font-medium text-green-700 mb-2">
+                        API Events Found Today ({debugResults.apiEvents.length}):
+                      </h4>
+                      <div className="space-y-2 max-h-40 overflow-y-auto">
+                        {debugResults.apiEvents.map((event: any, index: number) => (
+                          <div key={index} className="text-sm bg-green-100 p-2 rounded">
+                            <p><strong>Event:</strong> {event.event_type_name || 'Unknown'}</p>
+                            <p><strong>Scheduled:</strong> {formatDate(event.start_time)}</p>
+                            <p><strong>Status:</strong> {event.status}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Existing comprehensive debug results */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Integration Status */}
               <Card>
@@ -320,6 +506,9 @@ export const CalendlyDebugPanel = ({ projectId }: CalendlyDebugPanelProps) => {
                   )}
                   {!debugResults.apiTest?.success && (
                     <p className="text-red-600">• Fix API access issues</p>
+                  )}
+                  {debugResults.missingEvents && debugResults.missingEvents.length > 0 && (
+                    <p className="text-red-600">• {debugResults.missingEvents.length} events found in API but missing from database - manual sync needed</p>
                   )}
                   {debugResults.recentDbEvents.length === 0 && debugResults.mappings.length > 0 && (
                     <p className="text-orange-600">• Check if events are being created in Calendly during the test period</p>

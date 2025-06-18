@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -22,14 +21,75 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { action, projectId, code, webhookUrl } = await req.json();
+    const { action, projectId, ...params } = await req.json();
+    
+    console.log('=== CALENDLY OAUTH REQUEST ===');
+    console.log('Method:', req.method);
     console.log('Action:', action, 'ProjectId:', projectId);
 
-    // Get the origin from the request to determine the correct redirect URI
-    const origin = req.headers.get('origin') || req.headers.get('referer')?.split('/')[0] + '//' + req.headers.get('referer')?.split('/')[2];
-    const redirectUri = `${origin}/calendly-callback`;
-    
-    console.log('Using redirect URI:', redirectUri);
+    if (action === 'get_events_by_date') {
+      console.log('=== GET EVENTS BY DATE ===');
+      console.log('Project ID:', projectId);
+      console.log('Date range:', params.startDate, 'to', params.endDate);
+      
+      // Get access token for this project
+      const { data: tokenData, error: tokenError } = await getAccessToken(supabase, projectId);
+      
+      if (tokenError || !tokenData?.access_token) {
+        console.error('No access token available:', tokenError);
+        throw new Error('Calendly not connected or token expired');
+      }
+
+      console.log('Token found, fetching events for date range...');
+      
+      // Fetch events from Calendly API for the specified date range
+      const calendlyUrl = `https://api.calendly.com/scheduled_events?user=${encodeURIComponent(tokenData.user_uri)}&min_start_time=${params.startDate}&max_start_time=${params.endDate}&count=100&sort=start_time:desc`;
+      console.log('Calendly API URL:', calendlyUrl);
+
+      const calendlyResponse = await fetch(calendlyUrl, {
+        headers: {
+          'Authorization': `Bearer ${tokenData.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!calendlyResponse.ok) {
+        const errorText = await calendlyResponse.text();
+        console.error('Calendly API error:', calendlyResponse.status, errorText);
+        throw new Error(`Calendly API error: ${calendlyResponse.status}`);
+      }
+
+      const calendlyData = await calendlyResponse.json();
+      const events = calendlyData.collection || [];
+      
+      console.log(`Found ${events.length} events in date range`);
+      
+      // Enhanced event details
+      const enhancedEvents = events.map((event: any) => ({
+        uri: event.uri,
+        event_type: event.event_type,
+        start_time: event.start_time,
+        end_time: event.end_time,
+        status: event.status,
+        created_at: event.created_at,
+        updated_at: event.updated_at,
+        event_type_name: 'Unknown', // Will be filled from mappings if available
+        invitees_counter: event.invitees_counter
+      }));
+
+      return new Response(JSON.stringify({ 
+        success: true,
+        events: enhancedEvents,
+        total: events.length,
+        dateRange: {
+          start: params.startDate,
+          end: params.endDate
+        }
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     switch (action) {
       case 'get_auth_url': {
@@ -361,7 +421,7 @@ serve(async (req) => {
     }
 
   } catch (error) {
-    console.error('OAuth error:', error);
+    console.error('OAuth request error:', error);
     return new Response(JSON.stringify({ 
       error: error.message || 'Internal server error' 
     }), {
@@ -370,3 +430,21 @@ serve(async (req) => {
     });
   }
 });
+
+// Helper function to get access token
+async function getAccessToken(supabase: any, projectId: string) {
+  const { data: tokenData, error: tokenError } = await supabase
+    .from('project_integration_data')
+    .select('data')
+    .eq('project_id', projectId)
+    .eq('platform', 'calendly')
+    .order('synced_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (tokenError || !tokenData) {
+    throw new Error('Access token not found');
+  }
+
+  return tokenData;
+}
