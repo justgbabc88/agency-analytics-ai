@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -520,7 +520,7 @@ export const CalendlyConnector = ({
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <Checkbox
                   checked={debugMode}
-                  onCheckedChange={setDebugMode}
+                  onCheckedChange={(checked) => setDebugMode(checked === true)}
                 />
                 Enable enhanced debugging (logs 7 days of events)
               </label>
@@ -553,7 +553,7 @@ export const CalendlyConnector = ({
                           <Checkbox
                             checked={isEventMapped(eventType.uri)}
                             onCheckedChange={(checked) => 
-                              toggleEventMapping(eventType, checked as boolean)
+                              toggleEventMapping(eventType, checked === true)
                             }
                           />
                           <div>
