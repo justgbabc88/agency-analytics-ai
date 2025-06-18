@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -21,11 +22,14 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { action, projectId, ...params } = await req.json();
+    const { action, projectId, code, ...params } = await req.json();
     
     console.log('=== CALENDLY OAUTH REQUEST ===');
     console.log('Method:', req.method);
     console.log('Action:', action, 'ProjectId:', projectId);
+
+    // Define redirect URI
+    const redirectUri = `${Deno.env.get('SUPABASE_URL')}/functions/v1/calendly-oauth`;
 
     if (action === 'get_events_by_date') {
       console.log('=== GET EVENTS BY DATE ===');
