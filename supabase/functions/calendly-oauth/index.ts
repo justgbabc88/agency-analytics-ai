@@ -50,6 +50,128 @@ serve(async (req) => {
       });
     }
 
+    if (action === 'list_webhooks') {
+      if (!projectId) {
+        throw new Error('Project ID is required');
+      }
+
+      // Get stored access token
+      const { data: integrationData, error } = await supabase
+        .from('project_integration_data')
+        .select('data')
+        .eq('project_id', projectId)
+        .eq('platform', 'calendly')
+        .order('synced_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error || !integrationData) {
+        throw new Error('No Calendly integration found');
+      }
+
+      const accessToken = integrationData.data.access_token;
+      if (!accessToken) {
+        throw new Error('No access token found');
+      }
+
+      // List existing webhooks
+      const webhooksResponse = await fetch('https://api.calendly.com/webhook_subscriptions', {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!webhooksResponse.ok) {
+        const errorText = await webhooksResponse.text();
+        throw new Error(`Failed to list webhooks: ${errorText}`);
+      }
+
+      const webhooksData = await webhooksResponse.json();
+      
+      return new Response(JSON.stringify({
+        webhooks: webhooksData.collection || []
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (action === 'cleanup_webhooks') {
+      if (!projectId) {
+        throw new Error('Project ID is required');
+      }
+
+      // Get stored access token
+      const { data: integrationData, error } = await supabase
+        .from('project_integration_data')
+        .select('data')
+        .eq('project_id', projectId)
+        .eq('platform', 'calendly')
+        .order('synced_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error || !integrationData) {
+        throw new Error('No Calendly integration found');
+      }
+
+      const accessToken = integrationData.data.access_token;
+      if (!accessToken) {
+        throw new Error('No access token found');
+      }
+
+      const targetWebhookUrl = `https://iqxvtfupjjxjkbajgcve.supabase.co/functions/v1/calendly-webhook`;
+
+      // List existing webhooks first
+      const webhooksResponse = await fetch('https://api.calendly.com/webhook_subscriptions', {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!webhooksResponse.ok) {
+        throw new Error('Failed to list existing webhooks');
+      }
+
+      const webhooksData = await webhooksResponse.json();
+      const existingWebhooks = webhooksData.collection || [];
+
+      // Find webhooks with our target URL
+      const duplicateWebhooks = existingWebhooks.filter(webhook => webhook.url === targetWebhookUrl);
+      
+      console.log(`🔍 Found ${duplicateWebhooks.length} duplicate webhooks for URL: ${targetWebhookUrl}`);
+
+      let cleanedCount = 0;
+      for (const webhook of duplicateWebhooks) {
+        try {
+          const deleteResponse = await fetch(`https://api.calendly.com/webhook_subscriptions/${webhook.uri}`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+            }
+          });
+
+          if (deleteResponse.ok) {
+            console.log(`✅ Deleted webhook: ${webhook.uri}`);
+            cleanedCount++;
+          } else {
+            console.warn(`⚠️ Failed to delete webhook: ${webhook.uri}`);
+          }
+        } catch (error) {
+          console.warn(`⚠️ Error deleting webhook ${webhook.uri}:`, error);
+        }
+      }
+
+      return new Response(JSON.stringify({ 
+        success: true,
+        cleaned_count: cleanedCount,
+        found_count: duplicateWebhooks.length
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     if (action === 'handle_callback') {
       if (!code || !projectId) {
         throw new Error('Missing code or project ID');
@@ -97,33 +219,69 @@ serve(async (req) => {
       const currentOrganization = userData.resource.current_organization;
       console.log('📋 Current organization:', currentOrganization);
 
-      // Register webhook
-      console.log('🔗 Registering webhook...');
-      const webhookResponse = await fetch('https://api.calendly.com/webhook_subscriptions', {
-        method: 'POST',
+      // Enhanced webhook registration with cleanup
+      console.log('🔗 Setting up webhooks with cleanup...');
+      const webhookUrl = `https://iqxvtfupjjxjkbajgcve.supabase.co/functions/v1/calendly-webhook`;
+      
+      // First, list existing webhooks
+      const existingWebhooksResponse = await fetch('https://api.calendly.com/webhook_subscriptions', {
         headers: {
           'Authorization': `Bearer ${tokenData.access_token}`,
           'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          url: `https://iqxvtfupjjxjkbajgcve.supabase.co/functions/v1/calendly-webhook`,
-          events: ['invitee.created', 'invitee.canceled'],
-          organization: currentOrganization,
-          scope: 'organization'
-        })
+        }
       });
 
       let webhookData = null;
-      if (webhookResponse.ok) {
-        webhookData = await webhookResponse.json();
-        console.log('✅ Webhook registered successfully:', webhookData.resource.uri);
+      let webhookStatus = 'failed';
+      let webhookMessage = 'Unknown error';
+
+      if (existingWebhooksResponse.ok) {
+        const existingWebhooksData = await existingWebhooksResponse.json();
+        const existingWebhooks = existingWebhooksData.collection || [];
+        
+        // Check if webhook already exists
+        const existingWebhook = existingWebhooks.find(webhook => webhook.url === webhookUrl);
+        
+        if (existingWebhook) {
+          console.log('♻️ Found existing webhook, reusing it:', existingWebhook.uri);
+          webhookData = { resource: existingWebhook };
+          webhookStatus = 'registered';
+          webhookMessage = 'Reused existing webhook';
+        } else {
+          // No existing webhook, create new one
+          const webhookResponse = await fetch('https://api.calendly.com/webhook_subscriptions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${tokenData.access_token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              url: webhookUrl,
+              events: ['invitee.created', 'invitee.canceled'],
+              organization: currentOrganization,
+              scope: 'organization'
+            })
+          });
+
+          if (webhookResponse.ok) {
+            webhookData = await webhookResponse.json();
+            webhookStatus = 'registered';
+            webhookMessage = 'Successfully created new webhook';
+            console.log('✅ Webhook registered successfully:', webhookData.resource.uri);
+          } else {
+            const errorText = await webhookResponse.text();
+            console.warn('⚠️ Webhook registration failed:', errorText);
+            webhookStatus = 'failed';
+            webhookMessage = `Failed to create webhook: ${errorText}`;
+          }
+        }
       } else {
-        const errorText = await webhookResponse.text();
-        console.warn('⚠️ Webhook registration failed:', errorText);
-        // Continue without webhook - we'll fall back to polling
+        console.warn('⚠️ Failed to list existing webhooks, proceeding with creation attempt');
+        webhookStatus = 'failed';
+        webhookMessage = 'Failed to list existing webhooks';
       }
 
-      // Store integration data
+      // Store integration data with enhanced webhook info
       const integrationData = {
         access_token: tokenData.access_token,
         refresh_token: tokenData.refresh_token,
@@ -131,7 +289,10 @@ serve(async (req) => {
         organization: currentOrganization,
         webhook_id: webhookData?.resource?.uri,
         signing_key: webhookData?.resource?.signing_key,
-        user_uri: userData.resource.uri
+        user_uri: userData.resource.uri,
+        webhook_status: webhookStatus,
+        webhook_message: webhookMessage,
+        webhook_url: webhookUrl
       };
 
       // Check if integration already exists
@@ -197,7 +358,9 @@ serve(async (req) => {
 
       return new Response(JSON.stringify({ 
         success: true,
-        webhook_registered: !!webhookData 
+        webhook_registered: webhookStatus === 'registered',
+        webhook_status: webhookStatus,
+        webhook_message: webhookMessage
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -229,49 +392,98 @@ serve(async (req) => {
         throw new Error('Missing access token or organization');
       }
 
-      // Register webhook if not already done
-      if (!integrationData.data.webhook_id) {
-        const webhookResponse = await fetch('https://api.calendly.com/webhook_subscriptions', {
-          method: 'POST',
+      // Enhanced webhook setup with discovery and cleanup
+      let webhookStatus = 'failed';
+      let webhookMessage = 'Unknown error';
+      let webhookData = null;
+
+      // First check if webhook already exists
+      if (!integrationData.data.webhook_id || integrationData.data.webhook_status !== 'registered') {
+        // List existing webhooks first
+        const existingWebhooksResponse = await fetch('https://api.calendly.com/webhook_subscriptions', {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            url: webhookUrl,
-            events: ['invitee.created', 'invitee.canceled'],
-            organization: organization,
-            scope: 'organization'
-          })
+          }
         });
 
-        if (!webhookResponse.ok) {
-          const errorText = await webhookResponse.text();
-          throw new Error(`Webhook registration failed: ${errorText}`);
+        if (existingWebhooksResponse.ok) {
+          const existingWebhooksData = await existingWebhooksResponse.json();
+          const existingWebhooks = existingWebhooksData.collection || [];
+          
+          // Look for existing webhook with our URL
+          const existingWebhook = existingWebhooks.find(webhook => webhook.url === webhookUrl);
+          
+          if (existingWebhook) {
+            console.log('♻️ Found existing webhook, reusing it:', existingWebhook.uri);
+            webhookData = { resource: existingWebhook };
+            webhookStatus = 'registered';
+            webhookMessage = 'Reused existing webhook';
+          } else {
+            // Create new webhook
+            const webhookResponse = await fetch('https://api.calendly.com/webhook_subscriptions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                url: webhookUrl,
+                events: ['invitee.created', 'invitee.canceled'],
+                organization: organization,
+                scope: 'organization'
+              })
+            });
+
+            if (webhookResponse.ok) {
+              webhookData = await webhookResponse.json();
+              webhookStatus = 'registered';
+              webhookMessage = 'Successfully created new webhook';
+              console.log('✅ Webhook registered successfully');
+            } else {
+              const errorText = await webhookResponse.text();
+              webhookStatus = 'failed';
+              webhookMessage = `Failed to create webhook: ${errorText}`;
+              console.error('❌ Webhook registration failed:', errorText);
+            }
+          }
+        } else {
+          webhookStatus = 'failed';
+          webhookMessage = 'Failed to list existing webhooks';
         }
 
-        const webhookData = await webhookResponse.json();
-        
         // Update stored data with webhook info
-        const updatedData = {
-          ...integrationData.data,
-          webhook_id: webhookData.resource.uri,
-          signing_key: webhookData.resource.signing_key
-        };
+        if (webhookData) {
+          const updatedData = {
+            ...integrationData.data,
+            webhook_id: webhookData.resource.uri,
+            signing_key: webhookData.resource.signing_key,
+            webhook_status: webhookStatus,
+            webhook_message: webhookMessage,
+            webhook_url: webhookUrl
+          };
 
-        await supabase
-          .from('project_integration_data')
-          .update({
-            data: updatedData,
-            updated_at: new Date().toISOString()
-          })
-          .eq('project_id', projectId)
-          .eq('platform', 'calendly');
+          await supabase
+            .from('project_integration_data')
+            .update({
+              data: updatedData,
+              updated_at: new Date().toISOString()
+            })
+            .eq('project_id', projectId)
+            .eq('platform', 'calendly');
 
-        console.log('✅ Webhook registered and data updated');
+          console.log('✅ Webhook data updated in database');
+        }
+      } else {
+        webhookStatus = 'registered';
+        webhookMessage = 'Webhook already configured';
       }
 
-      return new Response(JSON.stringify({ success: true }), {
+      return new Response(JSON.stringify({ 
+        success: true,
+        webhook_status: webhookStatus,
+        webhook_message: webhookMessage
+      }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
