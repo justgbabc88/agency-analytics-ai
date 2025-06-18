@@ -141,6 +141,10 @@ serve(async (req) => {
 
     // 1. Capture raw body FIRST - this must be the very first read of the stream
     const rawBody = await req.text();
+    
+    // 2. Immediately log the raw body for debugging
+    console.log("🔥 RAW Calendly Body:", rawBody);
+    
     console.log('📝 Raw webhook body length:', rawBody.length);
     
     // 2. Extract the v1 signature value from the 'calendly-webhook-signature' header
