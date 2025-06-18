@@ -27,6 +27,16 @@ interface EventMapping {
   is_active: boolean;
 }
 
+interface CalendlyIntegrationData {
+  access_token?: string;
+  refresh_token?: string;
+  expires_at?: string;
+  organization?: string;
+  webhook_id?: string;
+  signing_key?: string;
+  user_uri?: string;
+}
+
 export const CalendlyConnector = ({ 
   projectId, 
   isConnected, 
@@ -169,12 +179,15 @@ export const CalendlyConnector = ({
         .limit(1)
         .maybeSingle();
 
-      if (integrationData?.data?.webhook_id) {
-        setWebhookStatus('registered');
-        console.log('✅ Webhook is registered:', integrationData.data.webhook_id);
-      } else {
-        setWebhookStatus('failed');
-        console.log('⚠️ No webhook registered');
+      if (integrationData?.data) {
+        const data = integrationData.data as CalendlyIntegrationData;
+        if (data.webhook_id) {
+          setWebhookStatus('registered');
+          console.log('✅ Webhook is registered:', data.webhook_id);
+        } else {
+          setWebhookStatus('failed');
+          console.log('⚠️ No webhook registered');
+        }
       }
 
       // Try to fetch event types to verify the connection is still valid

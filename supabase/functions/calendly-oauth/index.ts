@@ -33,7 +33,9 @@ serve(async (req) => {
       }
 
       const clientId = Deno.env.get('CALENDLY_CLIENT_ID');
-      const redirectUri = `${new URL(req.url).origin}/calendly-oauth-callback`;
+      
+      // Use the full Supabase project URL for the callback
+      const redirectUri = `https://iqxvtfupjjxjkbajgcve.supabase.co/functions/v1/calendly-oauth-callback`;
       
       const authUrl = new URL('https://auth.calendly.com/oauth/authorize');
       authUrl.searchParams.set('client_id', clientId);
@@ -52,6 +54,9 @@ serve(async (req) => {
         throw new Error('Missing code or project ID');
       }
 
+      // Use the same redirect URI for token exchange
+      const redirectUri = `https://iqxvtfupjjxjkbajgcve.supabase.co/functions/v1/calendly-oauth-callback`;
+
       // Exchange authorization code for access token
       const tokenResponse = await fetch('https://auth.calendly.com/oauth/token', {
         method: 'POST',
@@ -63,7 +68,7 @@ serve(async (req) => {
           code: code,
           client_id: Deno.env.get('CALENDLY_CLIENT_ID'),
           client_secret: Deno.env.get('CALENDLY_CLIENT_SECRET'),
-          redirect_uri: `${new URL(req.url).origin}/calendly-oauth-callback`,
+          redirect_uri: redirectUri,
         }),
       });
 
