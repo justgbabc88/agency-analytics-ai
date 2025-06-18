@@ -27,9 +27,8 @@ serve(async (req) => {
     console.log('Method:', req.method);
     console.log('Action:', action, 'ProjectId:', projectId);
 
-    // Define redirect URI - use the current domain with the callback route
-    const baseUrl = req.headers.get('origin') || 'https://lovable.dev';
-    const redirectUri = `${baseUrl}/calendly-callback`;
+    // Define redirect URI - use the correct Lovable app domain
+    const redirectUri = 'https://agency-analytics-ai.lovable.app/calendly-callback';
 
     console.log('Using redirect URI:', redirectUri);
 
