@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ExternalLink, RefreshCw, Calendar, CheckCircle, AlertCircle } from "lucide-react";
+import { ExternalLink, RefreshCw, Calendar, CheckCircle, AlertCircle, Bug, Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -37,6 +37,8 @@ export const CalendlyConnector = ({
   const [loading, setLoading] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [debugging, setDebugging] = useState(false);
+  const [debugMode, setDebugMode] = useState(false);
   const { toast } = useToast();
 
   const handleConnect = async () => {
@@ -287,62 +289,43 @@ export const CalendlyConnector = ({
     }
   };
 
-  const autoSyncHistoricalEvents = async () => {
+  const debugSync = async () => {
     if (!projectId) return;
 
-    setSyncing(true);
+    setDebugging(true);
     
     try {
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      console.log('🐛 Starting debug sync with enhanced logging...');
       
-      // Make sure we include today's date properly
-      const today = new Date();
-      today.setHours(23, 59, 59, 999); // End of today
-
-      console.log('Auto-syncing last 30 days including today with proper creation timestamps...');
-      console.log('Date range:', thirtyDaysAgo.toISOString(), 'to', today.toISOString());
-      
-      // Use the new gap sync function
       const { data, error } = await supabase.functions.invoke('calendly-sync-gaps', {
         body: { 
-          triggerReason: 'auto_sync',
+          triggerReason: 'debug_sync',
           projectId,
-          dateRange: {
-            startDate: thirtyDaysAgo.toISOString(),
-            endDate: today.toISOString()
-          }
+          debugMode: true
         }
       });
 
       if (error) {
-        console.error('Auto sync error:', error);
-        throw new Error(error.message || 'Failed to sync historical events');
+        console.error('Debug sync error:', error);
+        throw new Error(error.message || 'Failed to run debug sync');
       }
 
-      console.log('Auto sync result:', data);
+      console.log('🐛 Debug sync result:', data);
 
-      if (data.eventsSynced > 0) {
-        toast({
-          title: "Historical Events Synced",
-          description: `Successfully imported ${data.eventsSynced} events with real-time updates enabled`,
-        });
-      } else {
-        toast({
-          title: "Sync Complete",
-          description: "All events are up to date. Real-time monitoring is now active.",
-        });
-      }
+      toast({
+        title: "Debug Sync Complete",
+        description: `Found ${data.gapsFound} gaps, synced ${data.eventsSynced} events. Check console for detailed logs.`,
+      });
 
     } catch (error) {
-      console.error('Auto historical sync error:', error);
+      console.error('Debug sync failed:', error);
       toast({
-        title: "Sync Failed", 
-        description: error.message || "Failed to sync historical events",
+        title: "Debug Sync Failed", 
+        description: error.message || "Failed to run debug sync",
         variant: "destructive"
       });
     } finally {
-      setSyncing(false);
+      setDebugging(false);
     }
   };
 
@@ -352,12 +335,13 @@ export const CalendlyConnector = ({
     setSyncing(true);
     
     try {
-      console.log('Triggering manual gap sync...');
+      console.log('Triggering enhanced manual gap sync...');
       
       const { data, error } = await supabase.functions.invoke('calendly-sync-gaps', {
         body: { 
-          triggerReason: 'manual_sync',
-          projectId
+          triggerReason: 'manual_sync_enhanced',
+          projectId,
+          debugMode: debugMode
         }
       });
 
@@ -405,7 +389,7 @@ export const CalendlyConnector = ({
         // Auto-sync historical events when first event type is added
         const currentMappings = eventMappings.filter(m => m.is_active);
         if (currentMappings.length === 0) {
-          setTimeout(() => autoSyncHistoricalEvents(), 1000);
+          setTimeout(() => manualResyncEvents(), 1000);
         }
       } else {
         // Remove mapping
@@ -509,6 +493,16 @@ export const CalendlyConnector = ({
                 <Button 
                   variant="outline" 
                   size="sm" 
+                  onClick={debugSync}
+                  disabled={debugging}
+                  className="bg-orange-50 hover:bg-orange-100 border-orange-200"
+                >
+                  <Bug className={`h-4 w-4 mr-1 ${debugging ? 'animate-spin' : ''}`} />
+                  Debug Sync
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
                   onClick={manualResyncEvents}
                   disabled={syncing}
                 >
@@ -521,12 +515,28 @@ export const CalendlyConnector = ({
               </div>
             </div>
 
-            {syncing && (
+            <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+              <Settings className="h-4 w-4 text-gray-500" />
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <Checkbox
+                  checked={debugMode}
+                  onCheckedChange={setDebugMode}
+                />
+                Enable enhanced debugging (logs 7 days of events)
+              </label>
+            </div>
+
+            {(syncing || debugging) && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                 <div className="flex items-center gap-2 text-blue-700">
                   <RefreshCw className="h-4 w-4 animate-spin" />
-                  <span className="text-sm">Re-syncing events with correct creation timestamps...</span>
+                  <span className="text-sm">
+                    {debugging ? 'Running debug sync with enhanced logging...' : 'Re-syncing events...'}
+                  </span>
                 </div>
+                <p className="text-xs text-blue-600 mt-1">
+                  {debugging ? 'Check browser console for detailed debug information.' : 'This may take a moment...'}
+                </p>
               </div>
             )}
 
@@ -551,6 +561,9 @@ export const CalendlyConnector = ({
                             <p className="text-sm text-gray-500">
                               {eventType.duration} minutes • {eventType.kind}
                             </p>
+                            <p className="text-xs text-gray-400 font-mono">
+                              {eventType.uri}
+                            </p>
                           </div>
                         </div>
                         {isEventMapped(eventType.uri) && (
@@ -568,7 +581,7 @@ export const CalendlyConnector = ({
                       {eventMappings.filter(m => m.is_active).length} event type(s) are being tracked
                     </p>
                     <p className="text-xs text-green-600 mt-1">
-                      Events are synced with proper creation timestamps. Use "Re-sync Events" if you need to refresh the data.
+                      Events are synced automatically. Use "Debug Sync" to troubleshoot missing events.
                     </p>
                   </div>
                 )}
