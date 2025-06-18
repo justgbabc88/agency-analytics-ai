@@ -1,7 +1,7 @@
 
 import { format } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
-import { isEventCreatedOnDate, isEventCreatedToday } from "./dateFiltering";
+import { isEventCreatedOnDate, isEventCreatedToday, isEventScheduledOnDate, isEventScheduledToday } from "./dateFiltering";
 
 // Generate chart data based on real Calendly events with improved date filtering and timezone support
 export const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Date; to: Date }, userTimezone?: string) => {
@@ -20,24 +20,41 @@ export const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { f
   console.log('Total Calendly events available:', calendlyEvents.length);
   
   // Log today's events specifically with improved detection and timezone awareness
-  const todaysEvents = calendlyEvents.filter(event => isEventCreatedToday(event.created_at, timezone));
-  console.log('🎯 Events created today (with timezone support):', todaysEvents.length);
+  const todaysScheduledEvents = calendlyEvents.filter(event => isEventScheduledToday(event.scheduled_at, timezone));
+  const todaysCreatedEvents = calendlyEvents.filter(event => isEventCreatedToday(event.created_at, timezone));
   
-  if (todaysEvents.length > 0) {
-    console.log('🎯 TODAY\'S EVENTS FOUND:', todaysEvents.map(e => ({
+  console.log('🎯 Events SCHEDULED today (with timezone support):', todaysScheduledEvents.length);
+  console.log('🎯 Events CREATED today (with timezone support):', todaysCreatedEvents.length);
+  
+  if (todaysScheduledEvents.length > 0) {
+    console.log('🎯 TODAY\'S SCHEDULED EVENTS FOUND:', todaysScheduledEvents.map(e => ({
+      id: e.calendly_event_id,
+      created_at: e.created_at,
+      scheduled_at: e.scheduled_at,
+      scheduled_in_timezone: formatInTimeZone(new Date(e.scheduled_at), timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
+      status: e.status
+    })));
+  }
+  
+  if (todaysCreatedEvents.length > 0) {
+    console.log('🎯 TODAY\'S CREATED EVENTS FOUND:', todaysCreatedEvents.map(e => ({
       id: e.calendly_event_id,
       created_at: e.created_at,
       created_in_timezone: formatInTimeZone(new Date(e.created_at), timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
       scheduled_at: e.scheduled_at,
       status: e.status
     })));
-  } else {
+  }
+  
+  if (todaysScheduledEvents.length === 0 && todaysCreatedEvents.length === 0) {
     console.log('⚠️ NO TODAY\'S EVENTS FOUND - Debugging timezone conversion');
     console.log('Sample events for debugging:', calendlyEvents.slice(0, 3).map(e => ({
       id: e.calendly_event_id,
       created_at: e.created_at,
       created_in_timezone: e.created_at ? formatInTimeZone(new Date(e.created_at), timezone, 'yyyy-MM-dd HH:mm:ss zzz') : 'Invalid date',
-      scheduled_at: e.scheduled_at
+      scheduled_at: e.scheduled_at,
+      scheduled_in_timezone: e.scheduled_at ? formatInTimeZone(new Date(e.scheduled_at), timezone, 'yyyy-MM-dd HH:mm:ss zzz') : 'Invalid date',
+      status: e.status
     })));
   }
   
@@ -51,13 +68,21 @@ export const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { f
     console.log(`\n--- Processing ${currentDateStr} with timezone ${timezone} ---`);
     
     // Use improved date filtering for this specific day with timezone support
+    // For chart purposes, we'll use created_at to show when bookings were made
     const eventsCreatedThisDay = calendlyEvents.filter(event => 
       isEventCreatedOnDate(event.created_at, currentDate, timezone)
     );
     
+    // Also check for events scheduled on this day to show completed calls
+    const eventsScheduledThisDay = calendlyEvents.filter(event => 
+      isEventScheduledOnDate(event.scheduled_at, currentDate, timezone)
+    );
+    
     console.log(`Events created on ${currentDateStr}: ${eventsCreatedThisDay.length}`);
+    console.log(`Events scheduled on ${currentDateStr}: ${eventsScheduledThisDay.length}`);
+    
     if (eventsCreatedThisDay.length > 0) {
-      console.log('Sample events for this day:', eventsCreatedThisDay.slice(0, 2).map(e => ({
+      console.log('Sample events created this day:', eventsCreatedThisDay.slice(0, 2).map(e => ({
         created_at: e.created_at,
         created_in_timezone: formatInTimeZone(new Date(e.created_at), timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
         scheduled_at: e.scheduled_at,
@@ -65,6 +90,16 @@ export const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { f
       })));
     }
     
+    if (eventsScheduledThisDay.length > 0) {
+      console.log('Sample events scheduled this day:', eventsScheduledThisDay.slice(0, 2).map(e => ({
+        scheduled_at: e.scheduled_at,
+        scheduled_in_timezone: formatInTimeZone(new Date(e.scheduled_at), timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
+        created_at: e.created_at,
+        status: e.status
+      })));
+    }
+    
+    // Use created events for booking metrics (when people booked)
     const callsBooked = eventsCreatedThisDay.length;
     const cancelled = eventsCreatedThisDay.filter(event => 
       event.status === 'canceled' || event.status === 'cancelled'
@@ -73,8 +108,15 @@ export const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { f
     const scheduled = eventsCreatedThisDay.filter(event => 
       event.status === 'active' || event.status === 'scheduled'
     ).length;
-    const callsTaken = Math.max(0, scheduled - noShows);
-    const showUpRate = scheduled > 0 ? ((callsTaken / scheduled) * 100) : 0;
+    
+    // For calls taken, we should look at scheduled events to see what actually happened
+    const scheduledCallsThisDay = eventsScheduledThisDay.filter(event => 
+      event.status === 'active' || event.status === 'scheduled'
+    ).length;
+    const noShowsThisDay = eventsScheduledThisDay.filter(event => event.status === 'no_show').length;
+    const callsTaken = Math.max(0, scheduledCallsThisDay - noShowsThisDay);
+    
+    const showUpRate = scheduledCallsThisDay > 0 ? ((callsTaken / scheduledCallsThisDay) * 100) : 0;
     
     const pageViews = Math.floor(Math.random() * 300) + 150;
     
@@ -95,6 +137,7 @@ export const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { f
   console.log('\n=== FINAL CHART DATA SUMMARY ===');
   console.log('Generated data points:', dates.length);
   console.log('Total calls booked across all days:', dates.reduce((sum, d) => sum + d.callsBooked, 0));
+  console.log('Total calls taken across all days:', dates.reduce((sum, d) => sum + d.callsTaken, 0));
   console.log('Sample data point:', dates[0]);
   console.log('Timezone used for generation:', timezone);
   

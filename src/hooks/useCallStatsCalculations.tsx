@@ -1,7 +1,7 @@
 
 import { useMemo } from "react";
 import { subDays, parseISO, isValid } from "date-fns";
-import { filterEventsByDateRange } from "@/utils/dateFiltering";
+import { filterEventsByDateRange, filterEventsByScheduledDateRange } from "@/utils/dateFiltering";
 
 export const useCallStatsCalculations = (calendlyEvents: any[], dateRange: { from: Date; to: Date }, userTimezone?: string) => {
   const filteredEvents = useMemo(() => {
@@ -9,12 +9,20 @@ export const useCallStatsCalculations = (calendlyEvents: any[], dateRange: { fro
     return filterEventsByDateRange(calendlyEvents, dateRange, userTimezone);
   }, [calendlyEvents, dateRange.from.toISOString(), dateRange.to.toISOString(), userTimezone]);
 
+  // Also get events filtered by scheduled date for more accurate call stats
+  const scheduledFilteredEvents = useMemo(() => {
+    console.log('🔄 Recalculating scheduled filtered events for metrics with timezone:', userTimezone);
+    return filterEventsByScheduledDateRange(calendlyEvents, dateRange, userTimezone);
+  }, [calendlyEvents, dateRange.from.toISOString(), dateRange.to.toISOString(), userTimezone]);
+
   const callStats = useMemo(() => {
     console.log('\n=== METRICS CALCULATION WITH TIMEZONE ===');
     console.log('Filtered events for metrics (by created_at):', filteredEvents.length);
+    console.log('Filtered events for metrics (by scheduled_at):', scheduledFilteredEvents.length);
     console.log('Using timezone for calculations:', userTimezone);
 
-    return filteredEvents.reduce((stats, event) => {
+    // Use created events for total bookings
+    const bookingStats = filteredEvents.reduce((stats, event) => {
       stats.totalBookings++;
       switch (event.status) {
         case 'active':
@@ -33,7 +41,41 @@ export const useCallStatsCalculations = (calendlyEvents: any[], dateRange: { fro
       }
       return stats;
     }, { totalBookings: 0, scheduled: 0, cancelled: 0, noShows: 0, other: 0 });
-  }, [filteredEvents, userTimezone]);
+
+    // Use scheduled events for actual call performance metrics
+    const callPerformanceStats = scheduledFilteredEvents.reduce((stats, event) => {
+      switch (event.status) {
+        case 'active':
+        case 'scheduled':
+          stats.scheduledCalls++;
+          break;
+        case 'canceled':
+        case 'cancelled':
+          stats.cancelledCalls++;
+          break;
+        case 'no_show':
+          stats.noShowCalls++;
+          break;
+      }
+      return stats;
+    }, { scheduledCalls: 0, cancelledCalls: 0, noShowCalls: 0 });
+
+    console.log('Booking stats (by created_at):', bookingStats);
+    console.log('Call performance stats (by scheduled_at):', callPerformanceStats);
+
+    // Combine the stats appropriately
+    return {
+      totalBookings: bookingStats.totalBookings,
+      scheduled: bookingStats.scheduled,
+      cancelled: bookingStats.cancelled,
+      noShows: bookingStats.noShows,
+      other: bookingStats.other,
+      // Use scheduled events data for actual call performance
+      actualScheduledCalls: callPerformanceStats.scheduledCalls,
+      actualCancelledCalls: callPerformanceStats.cancelledCalls,
+      actualNoShows: callPerformanceStats.noShowCalls
+    };
+  }, [filteredEvents, scheduledFilteredEvents, userTimezone]);
 
   const previousStats = useMemo(() => {
     // Create previous date range based on the current range length
@@ -48,8 +90,9 @@ export const useCallStatsCalculations = (calendlyEvents: any[], dateRange: { fro
     });
     
     const previousEvents = filterEventsByDateRange(calendlyEvents, { from: previousFrom, to: previousTo }, userTimezone);
+    const previousScheduledEvents = filterEventsByScheduledDateRange(calendlyEvents, { from: previousFrom, to: previousTo }, userTimezone);
 
-    return previousEvents.reduce((stats, event) => {
+    const bookingStats = previousEvents.reduce((stats, event) => {
       stats.totalBookings++;
       switch (event.status) {
         case 'active':
@@ -66,12 +109,49 @@ export const useCallStatsCalculations = (calendlyEvents: any[], dateRange: { fro
       }
       return stats;
     }, { totalBookings: 0, scheduled: 0, cancelled: 0, noShows: 0 });
+
+    const callPerformanceStats = previousScheduledEvents.reduce((stats, event) => {
+      switch (event.status) {
+        case 'active':
+        case 'scheduled':
+          stats.scheduledCalls++;
+          break;
+        case 'canceled':
+        case 'cancelled':
+          stats.cancelledCalls++;
+          break;
+        case 'no_show':
+          stats.noShowCalls++;
+          break;
+      }
+      return stats;
+    }, { scheduledCalls: 0, cancelledCalls: 0, noShowCalls: 0 });
+
+    return {
+      totalBookings: bookingStats.totalBookings,
+      scheduled: bookingStats.scheduled,
+      cancelled: bookingStats.cancelled,
+      noShows: bookingStats.noShows,
+      actualScheduledCalls: callPerformanceStats.scheduledCalls,
+      actualCancelledCalls: callPerformanceStats.cancelledCalls,
+      actualNoShows: callPerformanceStats.noShowCalls
+    };
   }, [calendlyEvents, dateRange, userTimezone]);
 
-  const callsTaken = callStats.scheduled - callStats.noShows;
-  const showUpRate = callStats.scheduled > 0 ? ((callsTaken / callStats.scheduled) * 100) : 0;
-  const previousCallsTaken = previousStats.scheduled - previousStats.noShows;
-  const previousShowUpRate = previousStats.scheduled > 0 ? ((previousCallsTaken / previousStats.scheduled) * 100) : 0;
+  // Calculate calls taken using actual scheduled call data
+  const callsTaken = Math.max(0, callStats.actualScheduledCalls - callStats.actualNoShows);
+  const showUpRate = callStats.actualScheduledCalls > 0 ? ((callsTaken / callStats.actualScheduledCalls) * 100) : 0;
+  const previousCallsTaken = Math.max(0, previousStats.actualScheduledCalls - previousStats.actualNoShows);
+  const previousShowUpRate = previousStats.actualScheduledCalls > 0 ? ((previousCallsTaken / previousStats.actualScheduledCalls) * 100) : 0;
+
+  console.log('Final calculated metrics:', {
+    callsTaken,
+    showUpRate,
+    previousCallsTaken,
+    previousShowUpRate,
+    totalBookings: callStats.totalBookings,
+    actualScheduledCalls: callStats.actualScheduledCalls
+  });
 
   return {
     callStats,
