@@ -135,22 +135,24 @@ serve(async (req) => {
       inviteeEmail: webhookData.payload?.invitee?.email
     });
 
-    // Extract event information
+    // Extract event information - FIX: Get event type from scheduled_event
     const scheduledEvent = webhookData.payload?.scheduled_event;
-    const eventType = webhookData.payload?.event_type;
     const invitee = webhookData.payload?.invitee;
     
+    // The event type URI is in scheduled_event.event_type, not payload.event_type
+    const eventTypeUri = scheduledEvent?.event_type;
+    
     console.log('🔍 Extracted data:', {
-      eventTypeUri: eventType?.uri,
+      eventTypeUri: eventTypeUri,
       scheduledEventUri: scheduledEvent?.uri,
       inviteeEmail: invitee?.email,
-      eventTypeName: eventType?.name
+      eventTypeName: scheduledEvent?.name
     });
     
-    if (!scheduledEvent || !eventType) {
+    if (!scheduledEvent || !eventTypeUri) {
       console.error('❌ Missing required event data:', {
         hasScheduledEvent: !!scheduledEvent,
-        hasEventType: !!eventType
+        hasEventType: !!eventTypeUri
       });
       return new Response('Missing event data', { 
         status: 400, 
@@ -159,11 +161,11 @@ serve(async (req) => {
     }
 
     // CHECK IF EVENT TYPE EXISTS IN MAPPINGS
-    console.log('🔍 Checking for event type mappings for URI:', eventType.uri);
+    console.log('🔍 Checking for event type mappings for URI:', eventTypeUri);
     const { data: mappings, error: mappingError } = await supabase
       .from('calendly_event_mappings')
       .select('project_id')
-      .eq('calendly_event_type_id', eventType.uri)
+      .eq('calendly_event_type_id', eventTypeUri)
       .eq('is_active', true);
 
     if (mappingError) {
@@ -175,7 +177,7 @@ serve(async (req) => {
     }
 
     if (!mappings || mappings.length === 0) {
-      console.warn('⚠️ No mapping found for event type URI:', eventType.uri);
+      console.warn('⚠️ No mapping found for event type URI:', eventTypeUri);
       console.log('💡 Available mappings can be checked in calendly_event_mappings table');
       return new Response('No mappings found', { 
         status: 200, 
@@ -222,8 +224,8 @@ serve(async (req) => {
       const eventData = {
         project_id: projectId,
         calendly_event_id: scheduledEvent.uri,
-        calendly_event_type_id: eventType.uri,
-        event_type_name: eventType.name,
+        calendly_event_type_id: eventTypeUri,
+        event_type_name: scheduledEvent.name,
         scheduled_at: scheduledEvent.start_time,
         status: status,
         invitee_name: invitee?.name || null,
@@ -273,7 +275,7 @@ serve(async (req) => {
     const syncResponse = await supabase.functions.invoke('calendly-sync-gaps', {
       body: { 
         triggerReason: 'webhook',
-        eventTypeUri: eventType.uri 
+        eventTypeUri: eventTypeUri 
       }
     });
 
