@@ -1,8 +1,6 @@
-
 import { useCalendlyData } from "@/hooks/useCalendlyData";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
-import { AdvancedDateRangePicker } from "./AdvancedDateRangePicker";
 import { LandingPageMetrics } from "./LandingPageMetrics";
 import { CallStatsMetrics } from "./CallStatsMetrics";
 import { SalesConversionMetrics } from "./SalesConversionMetrics";
@@ -14,20 +12,13 @@ import { useToast } from "@/hooks/use-toast";
 
 interface BookCallFunnelProps {
   projectId: string;
+  dateRange: { from: Date; to: Date };
 }
 
-export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
+export const BookCallFunnel = ({ projectId, dateRange }: BookCallFunnelProps) => {
   const { calendlyEvents, getRecentBookings, getMonthlyComparison, refetch } = useCalendlyData(projectId);
   const { getUserTimezone, profile } = useUserProfile();
   const { toast } = useToast();
-  
-  const [dateRange, setDateRange] = useState(() => {
-    const today = new Date();
-    return {
-      from: startOfDay(subDays(today, 29)),
-      to: endOfDay(today)
-    };
-  });
   
   const userTimezone = getUserTimezone();
   
@@ -286,20 +277,6 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
   const costPerBooking = callStats.totalBookings > 0 ? (1500 / callStats.totalBookings) : 0;
   const previousCostPerBooking = previousStats.totalBookings > 0 ? costPerBooking * 1.15 : 0;
 
-  const handleDateChange = (from: Date, to: Date) => {
-    console.log('🚀 Date range changed FROM PICKER:', format(from, 'yyyy-MM-dd HH:mm:ss'), 'to', format(to, 'yyyy-MM-dd HH:mm:ss'));
-    
-    const normalizedFrom = startOfDay(from);
-    const normalizedTo = endOfDay(to);
-    
-    console.log('🚀 Normalized dates:', format(normalizedFrom, 'yyyy-MM-dd HH:mm:ss'), 'to', format(normalizedTo, 'yyyy-MM-dd HH:mm:ss'));
-    
-    setDateRange({ 
-      from: normalizedFrom, 
-      to: normalizedTo 
-    });
-  };
-
   console.log('\n=== FINAL COMPONENT STATE ===');
   console.log('Chart data length:', chartData.length);
   console.log('Total bookings for metrics:', callStats.totalBookings);
@@ -320,10 +297,9 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
 
   return (
     <div className="space-y-6">
-      {/* Date Range Picker */}
+      {/* Header without date picker */}
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Book Call Funnel</h2>
-        <AdvancedDateRangePicker onDateChange={handleDateChange} />
       </div>
 
       <LandingPageMetrics

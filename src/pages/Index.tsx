@@ -20,6 +20,7 @@ import { BarChart3, Settings, MessageSquare, Target, TrendingUp, Facebook, Activ
 import { useProjects } from "@/hooks/useProjects";
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { subDays, startOfDay, endOfDay } from "date-fns";
 
 interface FunnelProductConfig {
   id: string;
@@ -29,7 +30,15 @@ interface FunnelProductConfig {
 }
 
 const Index = () => {
-  const [dateRange, setDateRange] = useState({ from: new Date(), to: new Date() });
+  // Initialize dateRange to last 30 days (matching BookCallFunnel's previous default)
+  const [dateRange, setDateRange] = useState(() => {
+    const today = new Date();
+    return {
+      from: startOfDay(subDays(today, 29)),
+      to: endOfDay(today)
+    };
+  });
+  
   const [selectedProducts, setSelectedProducts] = useState<FunnelProductConfig[]>([
     { id: 'mainProduct', label: 'Main Product Rate', visible: true, color: '#10B981' },
     { id: 'bump', label: 'Bump Rate', visible: true, color: '#3B82F6' },
@@ -102,8 +111,8 @@ const Index = () => {
   });
 
   const handleDateChange = (from: Date, to: Date) => {
+    console.log('🚀 Main date range changed:', from, 'to', to);
     setDateRange({ from, to });
-    console.log("Date range changed:", { from, to });
   };
 
   const handleProductsChange = (products: FunnelProductConfig[]) => {
@@ -164,7 +173,7 @@ const Index = () => {
 
     switch (selectedProject.funnel_type) {
       case "book_call":
-        return <BookCallFunnel projectId={selectedProjectId} />;
+        return <BookCallFunnel projectId={selectedProjectId} dateRange={dateRange} />;
       case "high_ticket":
       case "webinar":
         return (
