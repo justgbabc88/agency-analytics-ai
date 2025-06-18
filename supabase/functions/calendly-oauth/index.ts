@@ -134,23 +134,50 @@ serve(async (req) => {
         user_uri: userData.resource.uri
       };
 
-      // Update project integration
-      const { error: integrationError } = await supabase
+      // Check if integration already exists
+      const { data: existingIntegration } = await supabase
         .from('project_integrations')
-        .upsert({
-          project_id: projectId,
-          platform: 'calendly',
-          is_connected: true,
-          last_sync: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        });
+        .select('id')
+        .eq('project_id', projectId)
+        .eq('platform', 'calendly')
+        .maybeSingle();
 
-      if (integrationError) {
-        console.error('Failed to update project integration:', integrationError);
-        throw new Error('Failed to update integration status');
+      if (existingIntegration) {
+        // Update existing integration
+        const { error: integrationError } = await supabase
+          .from('project_integrations')
+          .update({
+            is_connected: true,
+            last_sync: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('project_id', projectId)
+          .eq('platform', 'calendly');
+
+        if (integrationError) {
+          console.error('Failed to update project integration:', integrationError);
+          throw new Error('Failed to update integration status');
+        }
+      } else {
+        // Create new integration
+        const { error: integrationError } = await supabase
+          .from('project_integrations')
+          .insert({
+            project_id: projectId,
+            platform: 'calendly',
+            is_connected: true,
+            last_sync: new Date().toISOString(),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+
+        if (integrationError) {
+          console.error('Failed to create project integration:', integrationError);
+          throw new Error('Failed to create integration status');
+        }
       }
 
-      // Store integration data
+      // Store integration data (use upsert for integration data)
       const { error: dataError } = await supabase
         .from('project_integration_data')
         .upsert({
