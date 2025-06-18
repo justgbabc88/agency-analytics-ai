@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -28,8 +27,8 @@ serve(async (req) => {
     console.log('Method:', req.method);
     console.log('Action:', action, 'ProjectId:', projectId);
 
-    // Define redirect URI
-    const redirectUri = `${Deno.env.get('SUPABASE_URL')}/functions/v1/calendly-oauth`;
+    // Define redirect URI - this should point to your app's callback page, not the function
+    const redirectUri = 'https://lovable.dev/calendly-callback';
 
     if (action === 'get_events_by_date') {
       console.log('=== GET EVENTS BY DATE ===');
