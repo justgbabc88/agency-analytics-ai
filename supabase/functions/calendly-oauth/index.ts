@@ -27,8 +27,11 @@ serve(async (req) => {
     console.log('Method:', req.method);
     console.log('Action:', action, 'ProjectId:', projectId);
 
-    // Define redirect URI - this should point to your app's callback page, not the function
-    const redirectUri = 'https://lovable.dev/calendly-callback';
+    // Define redirect URI - use the current domain with the callback route
+    const baseUrl = req.headers.get('origin') || 'https://lovable.dev';
+    const redirectUri = `${baseUrl}/calendly-callback`;
+
+    console.log('Using redirect URI:', redirectUri);
 
     if (action === 'get_events_by_date') {
       console.log('=== GET EVENTS BY DATE ===');
