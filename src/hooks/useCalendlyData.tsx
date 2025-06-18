@@ -8,16 +8,25 @@ export const useCalendlyData = (projectId?: string) => {
     queryFn: async () => {
       if (!projectId) return [];
       
+      console.log('🔄 Fetching Calendly events for project:', projectId);
+      
       const { data, error } = await supabase
         .from('calendly_events')
         .select('*')
         .eq('project_id', projectId)
         .order('scheduled_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error fetching Calendly events:', error);
+        throw error;
+      }
+      
+      console.log('✅ Fetched Calendly events:', data?.length || 0);
       return data || [];
     },
     enabled: !!projectId,
+    staleTime: 30000, // 30 seconds
+    refetchInterval: 60000, // 1 minute
   });
 
   const { data: eventMappings } = useQuery({
@@ -25,16 +34,24 @@ export const useCalendlyData = (projectId?: string) => {
     queryFn: async () => {
       if (!projectId) return [];
       
+      console.log('🔄 Fetching Calendly event mappings for project:', projectId);
+      
       const { data, error } = await supabase
         .from('calendly_event_mappings')
         .select('*')
         .eq('project_id', projectId)
         .eq('is_active', true);
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error fetching Calendly event mappings:', error);
+        throw error;
+      }
+      
+      console.log('✅ Fetched Calendly event mappings:', data?.length || 0);
       return data || [];
     },
     enabled: !!projectId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   // Calculate metrics for the last 7 days
