@@ -24,12 +24,15 @@ serve(async (req) => {
     const { action, projectId, code, webhookUrl } = await req.json();
     console.log('Action:', action, 'ProjectId:', projectId);
 
+    // Get the origin from the request to determine the correct redirect URI
+    const origin = req.headers.get('origin') || req.headers.get('referer')?.split('/')[0] + '//' + req.headers.get('referer')?.split('/')[2];
+    const redirectUri = `${origin}/calendly-oauth-callback`;
+    
+    console.log('Using redirect URI:', redirectUri);
+
     switch (action) {
       case 'get_auth_url': {
         const clientId = Deno.env.get('CALENDLY_CLIENT_ID');
-        
-        // Use a fixed redirect URI that matches what's configured in Calendly
-        const redirectUri = 'https://lovable.dev/calendly-oauth-callback';
         
         if (!clientId) {
           throw new Error('Calendly client ID not configured');
@@ -48,7 +51,6 @@ serve(async (req) => {
       case 'exchange_code': {
         const clientId = Deno.env.get('CALENDLY_CLIENT_ID');
         const clientSecret = Deno.env.get('CALENDLY_CLIENT_SECRET');
-        const redirectUri = 'https://lovable.dev/calendly-oauth-callback';
 
         if (!clientId || !clientSecret) {
           throw new Error('Calendly credentials not configured');
