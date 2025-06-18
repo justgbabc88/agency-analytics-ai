@@ -111,29 +111,46 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
       )
       .subscribe();
 
-    // Trigger initial gap sync when component loads
-    const triggerGapSync = async () => {
+    // Trigger manual gap sync when component loads
+    const triggerManualSync = async () => {
       try {
-        console.log('🔄 Triggering initial gap sync...');
+        console.log('🔄 Triggering manual gap sync for missing events...');
         await supabase.functions.invoke('calendly-sync-gaps', {
           body: { 
-            triggerReason: 'component_load',
+            triggerReason: 'manual_component_sync',
             projectId 
           }
         });
         
-        // Refresh data after gap sync
-        setTimeout(() => refetch(), 2000);
+        // Refresh data after gap sync with a longer delay
+        setTimeout(() => {
+          console.log('🔄 Refreshing data after manual sync...');
+          refetch();
+        }, 3000);
       } catch (error) {
-        console.error('Gap sync trigger failed:', error);
+        console.error('Manual gap sync failed:', error);
       }
     };
 
-    triggerGapSync();
+    // Trigger sync immediately and then every 30 seconds for the first 5 minutes
+    triggerManualSync();
+    
+    const syncInterval = setInterval(() => {
+      console.log('🔄 Periodic sync check...');
+      triggerManualSync();
+    }, 30000);
+
+    // Clear interval after 5 minutes
+    const clearSyncTimeout = setTimeout(() => {
+      clearInterval(syncInterval);
+      console.log('🛑 Stopping periodic sync - switching to real-time only');
+    }, 5 * 60 * 1000);
 
     return () => {
-      console.log('🎧 Cleaning up real-time listener...');
+      console.log('🎧 Cleaning up real-time listener and sync intervals...');
       supabase.removeChannel(channel);
+      clearInterval(syncInterval);
+      clearTimeout(clearSyncTimeout);
     };
   }, [projectId, refetch, toast]);
 

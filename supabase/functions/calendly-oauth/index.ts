@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -140,6 +141,52 @@ serve(async (req) => {
         if (dataError) {
           console.error('Data storage failed:', dataError);
           throw dataError;
+        }
+
+        // Automatically set up webhooks after successful integration
+        try {
+          console.log('Setting up webhooks automatically...');
+          
+          // Create webhook subscription  
+          const webhookResponse = await fetch('https://api.calendly.com/webhook_subscriptions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${tokenData.access_token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/calendly-webhook`,
+              events: [
+                'invitee.created',
+                'invitee.canceled'
+              ],
+              organization: userData.resource.current_organization,
+              scope: 'organization'
+            })
+          });
+
+          if (webhookResponse.ok) {
+            const webhookData = await webhookResponse.json();
+            console.log('✅ Webhook set up successfully:', webhookData.resource.uri);
+          } else {
+            const errorText = await webhookResponse.text();
+            console.error('Webhook setup failed:', errorText);
+          }
+        } catch (webhookError) {
+          console.error('Webhook setup error:', webhookError);
+        }
+
+        // Trigger an immediate gap sync to catch recent events
+        try {
+          console.log('Triggering initial gap sync...');
+          await supabase.functions.invoke('calendly-sync-gaps', {
+            body: { 
+              triggerReason: 'initial_integration',
+              projectId 
+            }
+          });
+        } catch (syncError) {
+          console.error('Initial sync failed:', syncError);
         }
 
         console.log('Calendly integration completed successfully');

@@ -19,9 +19,9 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { triggerReason, eventTypeUri } = await req.json();
+    const { triggerReason, eventTypeUri, projectId: specificProjectId } = await req.json();
     
-    console.log('🔄 Starting gap detection sync:', { triggerReason, eventTypeUri });
+    console.log('🔄 Starting gap detection sync:', { triggerReason, eventTypeUri, specificProjectId });
 
     // Get all active project integrations for Calendly
     const { data: integrations, error: integrationsError } = await supabase
@@ -37,9 +37,17 @@ serve(async (req) => {
     let totalSynced = 0;
     let totalGapsFound = 0;
 
+    // If a specific project was provided, filter to just that one
+    const projectsToSync = specificProjectId 
+      ? integrations?.filter(i => i.project_id === specificProjectId) || []
+      : integrations || [];
+
+    console.log(`Processing ${projectsToSync.length} projects for sync`);
+
     // Process each connected project
-    for (const integration of integrations || []) {
+    for (const integration of projectsToSync) {
       const projectId = integration.project_id;
+      console.log(`🔄 Processing project: ${projectId}`);
       
       // Get Calendly access token for this project
       const { data: tokenData } = await supabase.functions.invoke('calendly-oauth', {
@@ -66,7 +74,7 @@ serve(async (req) => {
         continue;
       }
 
-      // Get the most recent event to determine sync window
+      // Get the most recent event to determine sync window - extended to 24 hours
       const { data: latestEvent } = await supabase
         .from('calendly_events')
         .select('created_at, scheduled_at')
@@ -75,16 +83,16 @@ serve(async (req) => {
         .limit(1)
         .maybeSingle();
 
-      // Determine sync window (last 7 days or since latest event)
+      // Determine sync window (last 24 hours or since latest event)
       const now = new Date();
-      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
       const syncFromDate = latestEvent 
-        ? new Date(Math.min(new Date(latestEvent.created_at).getTime(), sevenDaysAgo.getTime()))
-        : sevenDaysAgo;
+        ? new Date(Math.min(new Date(latestEvent.created_at).getTime(), twentyFourHoursAgo.getTime()))
+        : twentyFourHoursAgo;
 
       console.log('Syncing events for project:', projectId, 'from:', syncFromDate.toISOString());
 
-      // Fetch events from Calendly API
+      // Fetch events from Calendly API with extended time range
       const calendlyResponse = await fetch(
         `https://api.calendly.com/scheduled_events?user=${encodeURIComponent(tokenData.user_uri)}&min_start_time=${syncFromDate.toISOString()}&max_start_time=${now.toISOString()}&count=100&sort=start_time:desc`,
         {
@@ -137,9 +145,36 @@ serve(async (req) => {
       if (missingEvents.length > 0) {
         console.log(`Found ${missingEvents.length} missing events for project ${projectId}`);
 
-        // Insert missing events
+        // Insert missing events using upsert to handle duplicates
         for (const event of missingEvents) {
           const eventTypeMapping = mappings.find(m => m.calendly_event_type_id === event.event_type);
+          
+          // Try to extract invitee information from the event
+          let inviteeName = null;
+          let inviteeEmail = null;
+          
+          // Fetch event details if we have invitee info
+          if (event.event_memberships && event.event_memberships.length > 0) {
+            try {
+              const detailResponse = await fetch(event.uri, {
+                headers: {
+                  'Authorization': `Bearer ${tokenData.access_token}`,
+                  'Content-Type': 'application/json'
+                }
+              });
+              
+              if (detailResponse.ok) {
+                const eventDetail = await detailResponse.json();
+                if (eventDetail.resource?.event_memberships?.[0]) {
+                  const membership = eventDetail.resource.event_memberships[0];
+                  inviteeName = membership.user?.name;
+                  inviteeEmail = membership.user?.email;
+                }
+              }
+            } catch (error) {
+              console.warn('Could not fetch event details:', error);
+            }
+          }
           
           const eventData = {
             project_id: projectId,
@@ -148,15 +183,18 @@ serve(async (req) => {
             event_type_name: eventTypeMapping?.event_type_name || 'Unknown',
             scheduled_at: event.start_time,
             status: event.status || 'active',
-            invitee_name: event.event_memberships?.[0]?.user_name || null,
-            invitee_email: event.event_memberships?.[0]?.user_email || null,
+            invitee_name: inviteeName,
+            invitee_email: inviteeEmail,
             created_at: event.created_at,
             updated_at: new Date().toISOString()
           };
 
+          // Use upsert to handle potential duplicates
           const { error: insertError } = await supabase
             .from('calendly_events')
-            .insert(eventData);
+            .upsert(eventData, {
+              onConflict: 'calendly_event_id'
+            });
 
           if (insertError) {
             console.error('Error inserting missing event:', insertError);
@@ -181,7 +219,7 @@ serve(async (req) => {
       success: true,
       gapsFound: totalGapsFound,
       eventsSynced: totalSynced,
-      projectsProcessed: integrations?.length || 0
+      projectsProcessed: projectsToSync.length
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
