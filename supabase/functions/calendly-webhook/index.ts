@@ -150,19 +150,10 @@ serve(async (req) => {
     // 2. Extract the v1 signature value from the 'calendly-webhook-signature' header
     const signatureHeader = req.headers.get('calendly-webhook-signature');
     const v1Signature = signatureHeader?.split(',').find(p => p.startsWith('v1='))?.replace('v1=', '');
-    const webhookSecret = Deno.env.get('CALENDLY_WEBHOOK_SIGNING_KEY');
     
-    if (!signatureHeader || !webhookSecret) {
-      console.error('❌ Missing signature header or webhook secret');
-      return new Response('Missing signature or webhook secret', { 
-        status: 400, 
-        headers: corsHeaders 
-      });
-    }
-
-    if (!v1Signature) {
-      console.error('❌ No v1 signature found in header:', signatureHeader);
-      return new Response('Invalid signature format', { 
+    if (!signatureHeader || !v1Signature) {
+      console.error('❌ Missing or invalid signature header:', signatureHeader);
+      return new Response('Missing signature', { 
         status: 400, 
         headers: corsHeaders 
       });
@@ -171,40 +162,7 @@ serve(async (req) => {
     console.log('🔍 Signature header format:', signatureHeader);
     console.log('🔍 Extracted v1 signature:', v1Signature);
 
-    // 3. Verify the signature using HMAC SHA-256
-    const encoder = new TextEncoder();
-    const key = await crypto.subtle.importKey(
-      'raw',
-      encoder.encode(webhookSecret),
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['verify']
-    );
-    const expectedSigBytes = hexToUint8Array(v1Signature);
-    
-    console.log('🔐 Verifying signature with crypto.subtle.verify...');
-
-    const isValid = await crypto.subtle.verify(
-      'HMAC',
-      key,
-      expectedSigBytes,
-      encoder.encode(rawBody)
-    );
-
-    console.log('🔐 Signature verification result:', isValid);
-
-    // 4. If the signature is invalid, log an error and return a 401
-    if (!isValid) {
-      console.error('❌ Invalid webhook signature');
-      return new Response('Invalid signature', { 
-        status: 401, 
-        headers: corsHeaders 
-      });
-    }
-
-    console.log('✅ Webhook signature verified successfully');
-
-    // 5. Only after validation passes, parse the body
+    // 3. Parse webhook data to get organization info
     const webhookData: CalendlyWebhookEvent = JSON.parse(rawBody);
     
     console.log('📞 Processed Calendly webhook:', {
@@ -227,32 +185,123 @@ serve(async (req) => {
 
     console.log('🔍 Scheduled event URI:', scheduledEvent.uri);
 
-    // FETCH FULL EVENT DETAILS FROM CALENDLY API
-    console.log('🌐 Fetching full event details from Calendly API...');
-    
-    // First, get a project's access token to make the API call
+    // Extract event ID from URI for API call
+    const eventId = scheduledEvent.uri.split('/').pop();
+
+    // 4. Find the signing key for this organization/webhook
+    // We'll look up by getting the first available integration with a signing key
     const { data: integrationData, error: integrationError } = await supabase
       .from('project_integration_data')
       .select('data, project_id')
       .eq('platform', 'calendly')
       .order('synced_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(10); // Get multiple to find the right one
 
-    if (integrationError || !integrationData) {
-      console.error('❌ No Calendly integration found:', integrationError);
-      return new Response('No Calendly integration found', { 
+    if (integrationError || !integrationData || integrationData.length === 0) {
+      console.error('❌ No Calendly integrations found:', integrationError);
+      return new Response('No Calendly integrations found', { 
         status: 500, 
         headers: corsHeaders 
       });
     }
 
-    const accessToken = integrationData.data.access_token;
-    console.log('🔑 Found access token for API call');
+    // Find integration with signing key
+    let signingKey = null;
+    let accessToken = null;
+    let eventTypeUri = null;
 
-    // Extract event ID from URI (last part after the last slash)
-    const eventId = scheduledEvent.uri.split('/').pop();
+    // Try to verify signature with each integration's signing key
+    for (const integration of integrationData) {
+      if (integration.data.signing_key) {
+        try {
+          console.log('🔐 Trying signature verification with integration for project:', integration.project_id);
+          
+          const encoder = new TextEncoder();
+          const key = await crypto.subtle.importKey(
+            'raw',
+            encoder.encode(integration.data.signing_key),
+            { name: 'HMAC', hash: 'SHA-256' },
+            false,
+            ['verify']
+          );
+          const expectedSigBytes = hexToUint8Array(v1Signature);
+          
+          const isValid = await crypto.subtle.verify(
+            'HMAC',
+            key,
+            expectedSigBytes,
+            encoder.encode(rawBody)
+          );
+
+          console.log('🔐 Signature verification result:', isValid);
+
+          if (isValid) {
+            console.log('✅ Webhook signature verified successfully with project:', integration.project_id);
+            signingKey = integration.data.signing_key;
+            accessToken = integration.data.access_token;
+            break;
+          }
+        } catch (error) {
+          console.warn('⚠️ Signature verification failed for integration:', error);
+          continue;
+        }
+      }
+    }
+
+    // Fallback to global signing key if no project-specific key worked
+    if (!signingKey) {
+      console.log('🔄 Falling back to global signing key');
+      const globalSigningKey = Deno.env.get('CALENDLY_WEBHOOK_SIGNING_KEY');
+      
+      if (globalSigningKey) {
+        const encoder = new TextEncoder();
+        const key = await crypto.subtle.importKey(
+          'raw',
+          encoder.encode(globalSigningKey),
+          { name: 'HMAC', hash: 'SHA-256' },
+          false,
+          ['verify']
+        );
+        const expectedSigBytes = hexToUint8Array(v1Signature);
+        
+        const isValid = await crypto.subtle.verify(
+          'HMAC',
+          key,
+          expectedSigBytes,
+          encoder.encode(rawBody)
+        );
+
+        if (isValid) {
+          console.log('✅ Webhook signature verified with global signing key');
+          // Use the first available access token for API calls
+          accessToken = integrationData[0]?.data?.access_token;
+        } else {
+          console.error('❌ Invalid webhook signature (global key)');
+          return new Response('Invalid signature', { 
+            status: 401, 
+            headers: corsHeaders 
+          });
+        }
+      } else {
+        console.error('❌ No signing key available');
+        return new Response('No signing key available', { 
+          status: 500, 
+          headers: corsHeaders 
+        });
+      }
+    }
+
+    // FETCH FULL EVENT DETAILS FROM CALENDLY API
+    console.log('🌐 Fetching full event details from Calendly API...');
     
+    if (!accessToken) {
+      console.error('❌ No access token available for API call');
+      return new Response('No access token available', { 
+        status: 500, 
+        headers: corsHeaders 
+      });
+    }
+
     let fullEventData;
     try {
       fullEventData = await fetchCalendlyEventWithRetry(eventId!, accessToken);
@@ -274,7 +323,7 @@ serve(async (req) => {
 
     // Extract the complete event information
     const eventResource = fullEventData.resource;
-    const eventTypeUri = eventResource.event_type;
+    eventTypeUri = eventResource.event_type;
     const eventStartTime = eventResource.start_time;
     const eventEndTime = eventResource.end_time;
     const eventStatus = eventResource.status;
