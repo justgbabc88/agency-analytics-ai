@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -46,8 +47,27 @@ serve(async (req) => {
 
       console.log('Token found, checking webhooks...');
       
-      // Get existing webhook subscriptions
-      const webhooksUrl = `https://api.calendly.com/webhook_subscriptions?organization=${encodeURIComponent(tokenData.user_uri.replace('/users/', '/organizations/'))}`;
+      // Get user's organization URI first
+      const userResponse = await fetch('https://api.calendly.com/users/me', {
+        headers: {
+          'Authorization': `Bearer ${tokenData.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!userResponse.ok) {
+        const errorText = await userResponse.text();
+        console.error('User info fetch failed:', userResponse.status, errorText);
+        throw new Error(`Failed to get user info: ${userResponse.status}`);
+      }
+
+      const userData = await userResponse.json();
+      const organizationUri = userData.resource.current_organization;
+      
+      console.log('Organization URI:', organizationUri);
+      
+      // Get existing webhook subscriptions with proper scope
+      const webhooksUrl = `https://api.calendly.com/webhook_subscriptions?organization=${encodeURIComponent(organizationUri)}&scope=organization`;
       console.log('Webhooks API URL:', webhooksUrl);
 
       const webhooksResponse = await fetch(webhooksUrl, {
@@ -407,8 +427,23 @@ serve(async (req) => {
           throw new Error('Access token not found');
         }
 
+        // Get user info to get organization
+        const userResponse = await fetch('https://api.calendly.com/users/me', {
+          headers: {
+            'Authorization': `Bearer ${tokenData.data.access_token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!userResponse.ok) {
+          throw new Error('Failed to get user info');
+        }
+
+        const userData = await userResponse.json();
+        const organizationUri = userData.resource.current_organization;
+
         // First, check if webhook already exists
-        const webhooksUrl = `https://api.calendly.com/webhook_subscriptions?organization=${encodeURIComponent(tokenData.data.user_uri.replace('/users/', '/organizations/'))}`;
+        const webhooksUrl = `https://api.calendly.com/webhook_subscriptions?organization=${encodeURIComponent(organizationUri)}&scope=organization`;
         const existingWebhooksResponse = await fetch(webhooksUrl, {
           headers: {
             'Authorization': `Bearer ${tokenData.data.access_token}`,
@@ -446,7 +481,7 @@ serve(async (req) => {
               'invitee.created',
               'invitee.canceled'
             ],
-            organization: tokenData.data.user_uri.replace('/users/', '/organizations/'),
+            organization: organizationUri,
             scope: 'organization'
           })
         });
