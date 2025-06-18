@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -100,14 +99,17 @@ serve(async (req) => {
 
         console.log('User info retrieved successfully');
 
-        // Store the integration
+        // Store the integration using upsert to handle existing entries
         const { error: integrationError } = await supabase
           .from('project_integrations')
           .upsert({
             project_id: projectId,
             platform: 'calendly',
             is_connected: true,
-            last_sync: new Date().toISOString()
+            last_sync: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'project_id,platform'
           });
 
         if (integrationError) {
@@ -115,7 +117,7 @@ serve(async (req) => {
           throw integrationError;
         }
 
-        // Store the access token and user info in integration data
+        // Store the access token and user info in integration data using upsert
         const { error: dataError } = await supabase
           .from('project_integration_data')
           .upsert({
@@ -129,7 +131,10 @@ serve(async (req) => {
               user_email: userData.resource.email,
               token_expires_at: tokenData.expires_at ? new Date(Date.now() + (tokenData.expires_in * 1000)).toISOString() : null
             },
-            synced_at: new Date().toISOString()
+            synced_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'project_id,platform'
           });
 
         if (dataError) {
