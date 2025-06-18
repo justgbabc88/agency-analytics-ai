@@ -1,3 +1,4 @@
+
 import { useCalendlyData } from "@/hooks/useCalendlyData";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
@@ -25,11 +26,35 @@ export const BookCallFunnel = ({ projectId, dateRange }: BookCallFunnelProps) =>
   console.log('🔄 BookCallFunnel render - Project ID:', projectId);
   console.log('🔄 User timezone from profile:', userTimezone);
   console.log('🔄 Profile timezone setting:', profile?.timezone);
-  console.log('🔄 Current date range:', {
+  console.log('🔄 Received date range from parent:', {
     from: format(dateRange.from, 'yyyy-MM-dd HH:mm:ss'),
-    to: format(dateRange.to, 'yyyy-MM-dd HH:mm:ss')
+    to: format(dateRange.to, 'yyyy-MM-dd HH:mm:ss'),
+    fromISO: dateRange.from.toISOString(),
+    toISO: dateRange.to.toISOString()
   });
   console.log('🔄 All Calendly events available:', calendlyEvents.length);
+
+  // DEBUG: Check if today is included in the date range
+  useEffect(() => {
+    const today = new Date();
+    const todayStart = startOfDay(today);
+    const todayEnd = endOfDay(today);
+    
+    const isTodayInRange = todayStart >= dateRange.from && todayEnd <= dateRange.to;
+    
+    console.log('\n=== DATE RANGE ANALYSIS ===');
+    console.log('Today (start of day):', format(todayStart, 'yyyy-MM-dd HH:mm:ss'));
+    console.log('Today (end of day):', format(todayEnd, 'yyyy-MM-dd HH:mm:ss'));
+    console.log('Date range from:', format(dateRange.from, 'yyyy-MM-dd HH:mm:ss'));
+    console.log('Date range to:', format(dateRange.to, 'yyyy-MM-dd HH:mm:ss'));
+    console.log('Is today included in date range?', isTodayInRange);
+    
+    if (!isTodayInRange) {
+      console.log('⚠️ TODAY IS NOT INCLUDED IN THE CURRENT DATE RANGE!');
+      console.log('This is why your recent booking is not showing up.');
+      console.log('You need to adjust the date range to include today.');
+    }
+  }, [dateRange]);
 
   // Real-time listener for new Calendly events
   useEffect(() => {
@@ -212,7 +237,8 @@ export const BookCallFunnel = ({ projectId, dateRange }: BookCallFunnelProps) =>
           status: testBooking.status,
           invitee_email: testBooking.invitee_email,
           createdAtLocal: new Date(testBooking.created_at).toLocaleString(),
-          isInToday: new Date(testBooking.created_at) >= todayStart && new Date(testBooking.created_at) <= todayEnd
+          isInToday: new Date(testBooking.created_at) >= todayStart && new Date(testBooking.created_at) <= todayEnd,
+          isInDateRange: new Date(testBooking.created_at) >= dateRange.from && new Date(testBooking.created_at) <= dateRange.to
         });
       } else {
         console.log('❌ Test booking not found in calendlyEvents array');
