@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -26,7 +27,7 @@ serve(async (req) => {
 
     // Get the origin from the request to determine the correct redirect URI
     const origin = req.headers.get('origin') || req.headers.get('referer')?.split('/')[0] + '//' + req.headers.get('referer')?.split('/')[2];
-    const redirectUri = `${origin}/calendly-oauth-callback`;
+    const redirectUri = `${origin}/calendly-callback`;
     
     console.log('Using redirect URI:', redirectUri);
 
