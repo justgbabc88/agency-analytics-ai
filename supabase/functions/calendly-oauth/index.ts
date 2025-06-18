@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -34,8 +35,8 @@ serve(async (req) => {
 
       const clientId = Deno.env.get('CALENDLY_CLIENT_ID');
       
-      // Use the full Supabase project URL for the callback
-      const redirectUri = `https://iqxvtfupjjxjkbajgcve.supabase.co/functions/v1/calendly-oauth-callback`;
+      // Use the user's configured redirect URI
+      const redirectUri = 'https://agency-analytics-ai.lovable.app/calendly-callback';
       
       const authUrl = new URL('https://auth.calendly.com/oauth/authorize');
       authUrl.searchParams.set('client_id', clientId);
@@ -55,7 +56,7 @@ serve(async (req) => {
       }
 
       // Use the same redirect URI for token exchange
-      const redirectUri = `https://iqxvtfupjjxjkbajgcve.supabase.co/functions/v1/calendly-oauth-callback`;
+      const redirectUri = 'https://agency-analytics-ai.lovable.app/calendly-callback';
 
       // Exchange authorization code for access token
       const tokenResponse = await fetch('https://auth.calendly.com/oauth/token', {

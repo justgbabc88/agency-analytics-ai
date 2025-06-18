@@ -76,58 +76,10 @@ export const CalendlyConnector = ({
         throw new Error(error.message || 'Failed to get authorization URL');
       }
 
-      console.log('Opening OAuth popup...');
-
-      // Open OAuth popup
-      const popup = window.open(
-        data.auth_url,
-        'calendly-oauth',
-        'width=600,height=700,scrollbars=yes,resizable=yes,left=' + 
-        (window.screen.width / 2 - 300) + ',top=' + (window.screen.height / 2 - 350)
-      );
-
-      if (!popup) {
-        throw new Error('Popup was blocked. Please allow popups for this site.');
-      }
-
-      // Listen for success message from popup
-      const messageHandler = (event: MessageEvent) => {
-        if (event.data.type === 'calendly_connected' && event.data.success && event.data.projectId === projectId) {
-          console.log('Received success message from popup');
-          window.removeEventListener('message', messageHandler);
-          
-          // Check connection status and setup webhooks
-          setTimeout(async () => {
-            await checkConnectionStatus();
-          }, 1500);
-        }
-      };
-
-      window.addEventListener('message', messageHandler);
-
-      // Monitor popup closure
-      const checkClosed = setInterval(() => {
-        if (popup?.closed) {
-          clearInterval(checkClosed);
-          window.removeEventListener('message', messageHandler);
-          
-          // Check status even if popup closed without message
-          setTimeout(() => {
-            setConnecting(false);
-            checkConnectionStatus();
-          }, 1000);
-        }
-      }, 1000);
-
-      // Cleanup after timeout
-      setTimeout(() => {
-        clearInterval(checkClosed);
-        window.removeEventListener('message', messageHandler);
-        if (popup && !popup.closed) {
-          popup.close();
-        }
-        setConnecting(false);
-      }, 300000); // 5 minutes
+      console.log('Redirecting to OAuth URL...');
+      
+      // Redirect to the OAuth URL directly
+      window.location.href = data.auth_url;
 
     } catch (error) {
       console.error('Connection error:', error);
