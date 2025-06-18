@@ -55,54 +55,9 @@ interface CalendlyWebhookEvent {
 function hexStringToUint8Array(hex: string): Uint8Array {
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < hex.length; i += 2) {
-    bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
+    bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
   }
   return bytes;
-}
-
-// Helper function to verify webhook signature
-async function verifyWebhookSignature(rawBody: string, signatureHeader: string, secret: string): Promise<boolean> {
-  try {
-    // Extract the v1 signature value from Calendly's format: t=TIMESTAMP,v1=HASH
-    const signature = signatureHeader?.split(',').find(p => p.startsWith('v1='))?.replace('v1=', '');
-    
-    if (!signature) {
-      console.error('❌ No v1 signature found in header:', signatureHeader);
-      return false;
-    }
-
-    console.log('🔍 Extracted signature from header:', signature);
-
-    // Create HMAC key from the webhook secret
-    const encoder = new TextEncoder();
-    const key = await crypto.subtle.importKey(
-      'raw',
-      encoder.encode(secret),
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['verify']
-    );
-
-    // Convert hex signature to bytes
-    const expectedSigBytes = hexStringToUint8Array(signature);
-    
-    console.log('🔐 Verifying signature with crypto.subtle.verify...');
-
-    // Verify the signature
-    const isValid = await crypto.subtle.verify(
-      'HMAC',
-      key,
-      expectedSigBytes,
-      encoder.encode(rawBody)
-    );
-
-    console.log('🔐 Signature verification result:', isValid);
-    
-    return isValid;
-  } catch (error) {
-    console.error('❌ Signature verification error:', error);
-    return false;
-  }
 }
 
 // Helper function to fetch Calendly event with retry logic
@@ -184,12 +139,13 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Capture raw body BEFORE any parsing
+    // 1. Capture raw body BEFORE any parsing
     const rawBody = await req.text();
     console.log('📝 Raw webhook body length:', rawBody.length);
     
-    // Verify webhook signature
+    // 2. Extract the v1 signature value from the 'calendly-webhook-signature' header
     const signatureHeader = req.headers.get('calendly-webhook-signature');
+    const signature = signatureHeader?.split(',').find(p => p.startsWith('v1='))?.replace('v1=', '');
     const webhookSecret = Deno.env.get('CALENDLY_WEBHOOK_SIGNING_KEY');
     
     if (!signatureHeader || !webhookSecret) {
@@ -200,10 +156,41 @@ serve(async (req) => {
       });
     }
 
-    console.log('🔍 Signature header format:', signatureHeader);
+    if (!signature) {
+      console.error('❌ No v1 signature found in header:', signatureHeader);
+      return new Response('Invalid signature format', { 
+        status: 400, 
+        headers: corsHeaders 
+      });
+    }
 
-    const isValidSignature = await verifyWebhookSignature(rawBody, signatureHeader, webhookSecret);
-    if (!isValidSignature) {
+    console.log('🔍 Signature header format:', signatureHeader);
+    console.log('🔍 Extracted signature from header:', signature);
+
+    // 4. Verify the signature using HMAC SHA-256
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(webhookSecret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify']
+    );
+    const expectedSigBytes = hexStringToUint8Array(signature);
+    
+    console.log('🔐 Verifying signature with crypto.subtle.verify...');
+
+    const isValid = await crypto.subtle.verify(
+      'HMAC',
+      key,
+      expectedSigBytes,
+      encoder.encode(rawBody)
+    );
+
+    console.log('🔐 Signature verification result:', isValid);
+
+    // 5. If the signature is invalid, log an error and return a 401
+    if (!isValid) {
       console.error('❌ Invalid webhook signature');
       return new Response('Invalid signature', { 
         status: 401, 
@@ -213,6 +200,7 @@ serve(async (req) => {
 
     console.log('✅ Webhook signature verified successfully');
 
+    // 6. Only after validation passes, parse the body
     const webhookData: CalendlyWebhookEvent = JSON.parse(rawBody);
     
     console.log('📞 Processed Calendly webhook:', {
