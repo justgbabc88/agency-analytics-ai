@@ -52,8 +52,18 @@ interface CalendlyWebhookEvent {
 }
 
 // Helper function to verify webhook signature
-async function verifyWebhookSignature(body: string, signature: string, secret: string): Promise<boolean> {
+async function verifyWebhookSignature(body: string, signatureHeader: string, secret: string): Promise<boolean> {
   try {
+    // Extract the v1 signature value from Calendly's format: t=TIMESTAMP,v1=HASH
+    const signature = signatureHeader?.split(',').find(p => p.startsWith('v1='))?.replace('v1=', '');
+    
+    if (!signature) {
+      console.error('❌ No v1 signature found in header:', signatureHeader);
+      return false;
+    }
+
+    console.log('🔍 Extracted signature from header:', signature);
+
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(
       'raw',
@@ -74,6 +84,7 @@ async function verifyWebhookSignature(body: string, signature: string, secret: s
       encoder.encode(body)
     );
 
+    console.log('🔐 Signature verification result:', isValid);
     return isValid;
   } catch (error) {
     console.error('❌ Signature verification error:', error);
@@ -164,18 +175,20 @@ serve(async (req) => {
     console.log('📝 Raw webhook body length:', body.length);
     
     // Verify webhook signature
-    const signature = req.headers.get('calendly-webhook-signature');
+    const signatureHeader = req.headers.get('calendly-webhook-signature');
     const webhookSecret = Deno.env.get('CALENDLY_WEBHOOK_SIGNING_KEY');
     
-    if (!signature || !webhookSecret) {
-      console.error('❌ Missing signature or webhook secret');
+    if (!signatureHeader || !webhookSecret) {
+      console.error('❌ Missing signature header or webhook secret');
       return new Response('Missing signature or webhook secret', { 
         status: 400, 
         headers: corsHeaders 
       });
     }
 
-    const isValidSignature = await verifyWebhookSignature(body, signature, webhookSecret);
+    console.log('🔍 Signature header format:', signatureHeader);
+
+    const isValidSignature = await verifyWebhookSignature(body, signatureHeader, webhookSecret);
     if (!isValidSignature) {
       console.error('❌ Invalid webhook signature');
       return new Response('Invalid signature', { 
