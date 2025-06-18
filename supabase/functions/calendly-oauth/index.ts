@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -28,7 +27,9 @@ serve(async (req) => {
     switch (action) {
       case 'get_auth_url': {
         const clientId = Deno.env.get('CALENDLY_CLIENT_ID');
-        const redirectUri = `${req.headers.get('origin')}/calendly-oauth-callback`;
+        
+        // Use a fixed redirect URI that matches what's configured in Calendly
+        const redirectUri = 'https://lovable.dev/calendly-oauth-callback';
         
         if (!clientId) {
           throw new Error('Calendly client ID not configured');
@@ -36,19 +37,24 @@ serve(async (req) => {
 
         const authUrl = `https://auth.calendly.com/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=default&state=${projectId}`;
         
+        console.log('Generated auth URL with redirect:', redirectUri);
+        
         return new Response(JSON.stringify({ auth_url: authUrl }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
 
+      case 'handle_callback':
       case 'exchange_code': {
         const clientId = Deno.env.get('CALENDLY_CLIENT_ID');
         const clientSecret = Deno.env.get('CALENDLY_CLIENT_SECRET');
-        const redirectUri = `${req.headers.get('origin')}/calendly-oauth-callback`;
+        const redirectUri = 'https://lovable.dev/calendly-oauth-callback';
 
         if (!clientId || !clientSecret) {
           throw new Error('Calendly credentials not configured');
         }
+
+        console.log('Exchanging code with redirect URI:', redirectUri);
 
         // Exchange code for access token
         const tokenResponse = await fetch('https://auth.calendly.com/oauth/token', {
@@ -68,8 +74,11 @@ serve(async (req) => {
         const tokenData = await tokenResponse.json();
 
         if (!tokenResponse.ok) {
+          console.error('Token exchange failed:', tokenData);
           throw new Error(`Token exchange failed: ${tokenData.error_description || tokenData.error}`);
         }
+
+        console.log('Token exchange successful');
 
         // Get user info
         const userResponse = await fetch('https://api.calendly.com/users/me', {
@@ -82,8 +91,11 @@ serve(async (req) => {
         const userData = await userResponse.json();
 
         if (!userResponse.ok) {
+          console.error('User info fetch failed:', userData);
           throw new Error('Failed to get user info');
         }
+
+        console.log('User info retrieved successfully');
 
         // Store the integration
         const { error: integrationError } = await supabase
@@ -96,6 +108,7 @@ serve(async (req) => {
           });
 
         if (integrationError) {
+          console.error('Integration storage failed:', integrationError);
           throw integrationError;
         }
 
@@ -117,9 +130,12 @@ serve(async (req) => {
           });
 
         if (dataError) {
+          console.error('Data storage failed:', dataError);
           throw dataError;
         }
 
+        console.log('Calendly integration completed successfully');
+        
         return new Response(JSON.stringify({ success: true }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
@@ -140,6 +156,7 @@ serve(async (req) => {
           .maybeSingle();
 
         if (tokenError) {
+          console.error('Token fetch error:', tokenError);
           throw tokenError;
         }
 
