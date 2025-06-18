@@ -13,28 +13,42 @@ export const isEventInDateRange = (eventCreatedAt: string, startDate: Date, endD
     // Use user's timezone or fall back to browser timezone
     const timezone = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
     
-    // Convert the date range to user's timezone first
+    console.log('🔍 Date filtering debug:', {
+      eventCreatedAt,
+      timezone,
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      eventUTC: createdDate.toISOString()
+    });
+    
+    // Convert the event creation date to the user's timezone for day comparison
+    const eventInUserTz = toZonedTime(createdDate, timezone);
+    const eventDayInUserTz = startOfDay(eventInUserTz);
+    
+    // Convert the date range boundaries to user timezone for day comparison
     const startInUserTz = toZonedTime(startDate, timezone);
     const endInUserTz = toZonedTime(endDate, timezone);
     
     // Get day boundaries in the user's timezone
-    const rangeStart = startOfDay(startInUserTz);
-    const rangeEnd = endOfDay(endInUserTz);
+    const rangeStartDay = startOfDay(startInUserTz);
+    const rangeEndDay = endOfDay(endInUserTz);
     
-    // Convert the event creation date to the user's timezone
-    const eventInUserTz = toZonedTime(createdDate, timezone);
-    
-    // Check if the event falls within the date range in the user's timezone
-    const isInRange = isWithinInterval(eventInUserTz, {
-      start: rangeStart,
-      end: rangeEnd
-    });
-    
-    console.log('🔍 Date range check result:', {
+    console.log('🔍 Timezone conversion details:', {
       eventUTC: createdDate.toISOString(),
       eventInUserTz: formatInTimeZone(createdDate, timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
-      rangeStart: formatInTimeZone(rangeStart, timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
-      rangeEnd: formatInTimeZone(rangeEnd, timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
+      eventDayInUserTz: formatInTimeZone(eventDayInUserTz, timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
+      rangeStartDay: formatInTimeZone(rangeStartDay, timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
+      rangeEndDay: formatInTimeZone(rangeEndDay, timezone, 'yyyy-MM-dd HH:mm:ss zzz')
+    });
+    
+    // Check if the event day falls within the date range in the user's timezone
+    const isInRange = isWithinInterval(eventDayInUserTz, {
+      start: rangeStartDay,
+      end: rangeEndDay
+    });
+    
+    console.log('🎯 Date range check result:', {
+      eventCreatedAt,
       isInRange,
       timezone
     });
@@ -57,27 +71,23 @@ export const isEventScheduledOnDate = (eventScheduledAt: string, targetDate: Dat
     // Use user's timezone or fall back to browser timezone
     const timezone = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
     
+    // Convert scheduled date to user timezone for day comparison
+    const eventInUserTz = toZonedTime(scheduledDate, timezone);
+    const eventDayInUserTz = startOfDay(eventInUserTz);
+    
     // Convert target date to user's timezone and get day boundaries
     const targetInUserTz = toZonedTime(targetDate, timezone);
-    const targetStart = startOfDay(targetInUserTz);
-    const targetEnd = endOfDay(targetInUserTz);
+    const targetDayInUserTz = startOfDay(targetInUserTz);
     
-    // Convert the event scheduled date to the user's timezone for comparison
-    const eventInUserTz = toZonedTime(scheduledDate, timezone);
-    
-    // Check if the event falls within the target date's range in the user's timezone
-    const isOnDate = isWithinInterval(eventInUserTz, {
-      start: targetStart,
-      end: targetEnd
-    });
+    // Check if both dates are on the same day in user's timezone
+    const isOnDate = eventDayInUserTz.getTime() === targetDayInUserTz.getTime();
     
     console.log(`🔍 Checking if event scheduled on ${format(targetDate, 'yyyy-MM-dd')} (with timezone):`, {
       eventScheduledAt,
       timezone,
       eventUTC: scheduledDate.toISOString(),
-      eventInUserTz: formatInTimeZone(scheduledDate, timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
-      targetStart: formatInTimeZone(targetStart, timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
-      targetEnd: formatInTimeZone(targetEnd, timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
+      eventDayInUserTz: formatInTimeZone(eventDayInUserTz, timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
+      targetDayInUserTz: formatInTimeZone(targetDayInUserTz, timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
       isOnDate
     });
     
@@ -99,31 +109,24 @@ export const isEventScheduledToday = (eventScheduledAt: string, userTimezone?: s
     // Use user's timezone or fall back to browser timezone
     const timezone = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
     
-    // Get current time in user's timezone
+    // Get current time and today's boundaries in user's timezone
     const now = new Date();
     const nowInUserTz = toZonedTime(now, timezone);
+    const todayInUserTz = startOfDay(nowInUserTz);
     
-    // Get today's date boundaries in the user's timezone
-    const todayStart = startOfDay(nowInUserTz);
-    const todayEnd = endOfDay(nowInUserTz);
-    
-    // Convert the event scheduled date to the user's timezone for comparison
+    // Convert the event scheduled date to the user's timezone for day comparison
     const eventInUserTz = toZonedTime(scheduledDate, timezone);
+    const eventDayInUserTz = startOfDay(eventInUserTz);
     
-    // Check if the event falls within today's range in the user's timezone
-    const isScheduledToday = isWithinInterval(eventInUserTz, {
-      start: todayStart,
-      end: todayEnd
-    });
+    // Check if both dates are on the same day in user's timezone
+    const isScheduledToday = eventDayInUserTz.getTime() === todayInUserTz.getTime();
     
     console.log('🔍 Checking if event is scheduled for today (with timezone):', {
       eventScheduledAt,
       timezone,
       eventUTC: scheduledDate.toISOString(),
-      eventInUserTz: formatInTimeZone(scheduledDate, timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
-      nowInUserTz: formatInTimeZone(nowInUserTz, timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
-      todayStart: formatInTimeZone(todayStart, timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
-      todayEnd: formatInTimeZone(todayEnd, timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
+      eventDayInUserTz: formatInTimeZone(eventDayInUserTz, timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
+      todayInUserTz: formatInTimeZone(todayInUserTz, timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
       isScheduledToday
     });
     
@@ -145,31 +148,24 @@ export const isEventCreatedToday = (eventCreatedAt: string, userTimezone?: strin
     // Use user's timezone or fall back to browser timezone
     const timezone = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
     
-    // Get current time in user's timezone
+    // Get current time and today's boundaries in user's timezone
     const now = new Date();
     const nowInUserTz = toZonedTime(now, timezone);
+    const todayInUserTz = startOfDay(nowInUserTz);
     
-    // Get today's date boundaries in the user's timezone
-    const todayStart = startOfDay(nowInUserTz);
-    const todayEnd = endOfDay(nowInUserTz);
-    
-    // Convert the event creation date to the user's timezone for comparison
+    // Convert the event creation date to the user's timezone for day comparison
     const eventInUserTz = toZonedTime(createdDate, timezone);
+    const eventDayInUserTz = startOfDay(eventInUserTz);
     
-    // Check if the event falls within today's range in the user's timezone
-    const isCreatedToday = isWithinInterval(eventInUserTz, {
-      start: todayStart,
-      end: todayEnd
-    });
+    // Check if both dates are on the same day in user's timezone
+    const isCreatedToday = eventDayInUserTz.getTime() === todayInUserTz.getTime();
     
     console.log('🔍 Checking if event is created today (with timezone):', {
       eventCreatedAt,
       timezone,
       eventUTC: createdDate.toISOString(),
-      eventInUserTz: formatInTimeZone(createdDate, timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
-      nowInUserTz: formatInTimeZone(nowInUserTz, timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
-      todayStart: formatInTimeZone(todayStart, timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
-      todayEnd: formatInTimeZone(todayEnd, timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
+      eventDayInUserTz: formatInTimeZone(eventDayInUserTz, timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
+      todayInUserTz: formatInTimeZone(todayInUserTz, timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
       isCreatedToday
     });
     
@@ -191,27 +187,23 @@ export const isEventCreatedOnDate = (eventCreatedAt: string, targetDate: Date, u
     // Use user's timezone or fall back to browser timezone
     const timezone = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
     
-    // Convert target date to user's timezone and get day boundaries
-    const targetInUserTz = toZonedTime(targetDate, timezone);
-    const targetStart = startOfDay(targetInUserTz);
-    const targetEnd = endOfDay(targetInUserTz);
-    
-    // Convert the event creation date to the user's timezone for comparison
+    // Convert created date to user timezone for day comparison
     const eventInUserTz = toZonedTime(createdDate, timezone);
+    const eventDayInUserTz = startOfDay(eventInUserTz);
     
-    // Check if the event falls within the target date's range in the user's timezone
-    const isOnDate = isWithinInterval(eventInUserTz, {
-      start: targetStart,
-      end: targetEnd
-    });
+    // Convert target date to user's timezone for day comparison
+    const targetInUserTz = toZonedTime(targetDate, timezone);
+    const targetDayInUserTz = startOfDay(targetInUserTz);
+    
+    // Check if both dates are on the same day in user's timezone
+    const isOnDate = eventDayInUserTz.getTime() === targetDayInUserTz.getTime();
     
     console.log(`🔍 Checking if event created on ${format(targetDate, 'yyyy-MM-dd')} (with timezone):`, {
       eventCreatedAt,
       timezone,
       eventUTC: createdDate.toISOString(),
-      eventInUserTz: formatInTimeZone(createdDate, timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
-      targetStart: formatInTimeZone(targetStart, timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
-      targetEnd: formatInTimeZone(targetEnd, timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
+      eventDayInUserTz: formatInTimeZone(eventDayInUserTz, timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
+      targetDayInUserTz: formatInTimeZone(targetDayInUserTz, timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
       isOnDate
     });
     
@@ -265,21 +257,22 @@ export const filterEventsByScheduledDateRange = (events: any[], dateRange: { fro
       const scheduledDate = parseISO(event.scheduled_at);
       if (!isValid(scheduledDate)) return false;
       
-      // Convert the date range to user's timezone
+      // Convert scheduled date to user timezone for day comparison
+      const eventInUserTz = toZonedTime(scheduledDate, timezone);
+      const eventDayInUserTz = startOfDay(eventInUserTz);
+      
+      // Convert the date range to user's timezone for day comparison
       const startInUserTz = toZonedTime(dateRange.from, timezone);
       const endInUserTz = toZonedTime(dateRange.to, timezone);
       
       // Get day boundaries in the user's timezone
-      const rangeStart = startOfDay(startInUserTz);
-      const rangeEnd = endOfDay(endInUserTz);
+      const rangeStartDay = startOfDay(startInUserTz);
+      const rangeEndDay = endOfDay(endInUserTz);
       
-      // Convert the event scheduled date to the user's timezone
-      const eventInUserTz = toZonedTime(scheduledDate, timezone);
-      
-      // Check if the event falls within the date range in the user's timezone
-      return isWithinInterval(eventInUserTz, {
-        start: rangeStart,
-        end: rangeEnd
+      // Check if the event day falls within the date range
+      return isWithinInterval(eventDayInUserTz, {
+        start: rangeStartDay,
+        end: rangeEndDay
       });
     } catch (error) {
       console.warn('Error filtering event by scheduled date:', event.scheduled_at, error);
