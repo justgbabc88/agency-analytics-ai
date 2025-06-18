@@ -25,7 +25,17 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { action, projectId, code, webhookUrl } = await req.json();
+    const requestBody = await req.json();
+    console.log('📥 OAuth request received:', requestBody);
+    
+    const { action, projectId, code, webhookUrl } = requestBody;
+
+    if (!action) {
+      console.error('❌ Missing action parameter');
+      throw new Error('Action parameter is required');
+    }
+
+    console.log('🎯 Processing action:', action, 'for project:', projectId);
 
     if (action === 'get_auth_url') {
       if (!projectId) {
@@ -44,6 +54,7 @@ serve(async (req) => {
       authUrl.searchParams.set('state', projectId);
       authUrl.searchParams.set('scope', 'default');
 
+      console.log('✅ Generated auth URL for project:', projectId);
       return new Response(JSON.stringify({ auth_url: authUrl.toString() }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -84,6 +95,7 @@ serve(async (req) => {
       webhooksUrl.searchParams.set('organization', organization);
       webhooksUrl.searchParams.set('scope', 'organization');
 
+      console.log('📡 Listing webhooks for organization:', organization);
       const webhooksResponse = await fetch(webhooksUrl.toString(), {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -93,10 +105,12 @@ serve(async (req) => {
 
       if (!webhooksResponse.ok) {
         const errorText = await webhooksResponse.text();
+        console.error('❌ Failed to list webhooks:', errorText);
         throw new Error(`Failed to list webhooks: ${errorText}`);
       }
 
       const webhooksData = await webhooksResponse.json();
+      console.log('✅ Successfully listed webhooks, count:', webhooksData.collection?.length || 0);
       
       return new Response(JSON.stringify({
         webhooks: webhooksData.collection || []
@@ -110,6 +124,8 @@ serve(async (req) => {
         throw new Error('Project ID is required');
       }
 
+      console.log('🧹 Starting webhook cleanup for project:', projectId);
+
       // Get stored access token and organization
       const { data: integrationData, error } = await supabase
         .from('project_integration_data')
@@ -121,6 +137,7 @@ serve(async (req) => {
         .maybeSingle();
 
       if (error || !integrationData) {
+        console.error('❌ No integration found for cleanup');
         throw new Error('No Calendly integration found');
       }
 
@@ -142,6 +159,7 @@ serve(async (req) => {
       webhooksUrl.searchParams.set('organization', organization);
       webhooksUrl.searchParams.set('scope', 'organization');
 
+      console.log('🔍 Checking existing webhooks for cleanup...');
       const webhooksResponse = await fetch(webhooksUrl.toString(), {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -150,6 +168,7 @@ serve(async (req) => {
       });
 
       if (!webhooksResponse.ok) {
+        console.error('❌ Failed to list webhooks for cleanup');
         throw new Error('Failed to list existing webhooks');
       }
 
@@ -173,6 +192,7 @@ serve(async (req) => {
         } else {
           // Delete duplicates
           try {
+            console.log(`🗑️ Deleting duplicate webhook: ${webhook.uri}`);
             const deleteResponse = await fetch(`https://api.calendly.com/webhook_subscriptions/${webhook.uri}`, {
               method: 'DELETE',
               headers: {
@@ -203,7 +223,7 @@ serve(async (req) => {
           webhook_url: targetWebhookUrl
         };
 
-        await supabase
+        const { error: updateError } = await supabase
           .from('project_integration_data')
           .update({
             data: updatedData,
@@ -212,8 +232,14 @@ serve(async (req) => {
           .eq('project_id', projectId)
           .eq('platform', 'calendly');
 
-        console.log('✅ Updated stored webhook data after cleanup');
+        if (updateError) {
+          console.error('❌ Failed to update webhook data:', updateError);
+        } else {
+          console.log('✅ Updated stored webhook data after cleanup');
+        }
       }
+
+      console.log(`🎉 Cleanup completed: ${cleanedCount} duplicates removed, ${keptWebhook ? 1 : 0} webhook kept`);
 
       return new Response(JSON.stringify({ 
         success: true,
@@ -233,6 +259,7 @@ serve(async (req) => {
       // Use the same redirect URI for token exchange
       const redirectUri = 'https://agency-analytics-ai.lovable.app/calendly-callback';
 
+      console.log('🔄 Exchanging authorization code for access token...');
       // Exchange authorization code for access token
       const tokenResponse = await fetch('https://auth.calendly.com/oauth/token', {
         method: 'POST',
@@ -250,6 +277,7 @@ serve(async (req) => {
 
       if (!tokenResponse.ok) {
         const errorText = await tokenResponse.text();
+        console.error('❌ Token exchange failed:', errorText);
         throw new Error(`Token exchange failed: ${errorText}`);
       }
 
@@ -265,6 +293,7 @@ serve(async (req) => {
       });
 
       if (!userResponse.ok) {
+        console.error('❌ Failed to get user info');
         throw new Error('Failed to get user info from Calendly');
       }
 
@@ -306,6 +335,7 @@ serve(async (req) => {
           webhookMessage = 'Discovered and reused existing webhook';
         } else {
           // No existing webhook, create new one
+          console.log('➕ Creating new webhook...');
           const webhookResponse = await fetch('https://api.calendly.com/webhook_subscriptions', {
             method: 'POST',
             headers: {
@@ -679,6 +709,7 @@ serve(async (req) => {
       });
     }
 
+    console.error('❌ Invalid action received:', action);
     throw new Error('Invalid action');
 
   } catch (error) {
