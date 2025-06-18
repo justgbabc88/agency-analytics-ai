@@ -1,3 +1,4 @@
+
 import { useCalendlyData } from "@/hooks/useCalendlyData";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
@@ -154,89 +155,79 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
     };
   }, [projectId, refetch, toast]);
 
-  // DEBUG: Log the most recent events to help identify the missing booking
+  // DEBUG: Enhanced logging for today's events and timezone handling
   useEffect(() => {
     if (calendlyEvents.length > 0) {
-      console.log('\n=== DEBUGGING RECENT CALENDLY EVENTS ===');
+      console.log('\n=== DEBUGGING TODAY\'S BOOKINGS ===');
       console.log('Total events in database:', calendlyEvents.length);
-      
-      // Sort by created_at to see most recent bookings
-      const sortedByCreated = [...calendlyEvents].sort((a, b) => 
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
-      
-      console.log('Most recent 5 events by created_at (when booked):');
-      sortedByCreated.slice(0, 5).forEach((event, index) => {
-        const createdAt = new Date(event.created_at);
-        const scheduledAt = new Date(event.scheduled_at);
-        const phoenixTime = createdAt.toLocaleString('en-US', { 
-          timeZone: 'America/Phoenix',
-          month: '2-digit',
-          day: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true
-        });
-        
-        console.log(`${index + 1}. Event ID: ${event.calendly_event_id}`);
-        console.log(`   Created: ${event.created_at} (${phoenixTime} Phoenix)`);
-        console.log(`   Scheduled: ${event.scheduled_at}`);
-        console.log(`   Status: ${event.status}`);
-        console.log(`   Event Type: ${event.event_type_name}`);
-        console.log('   ---');
+      console.log('User timezone:', userTimezone);
+      console.log('Today\'s date range for filtering:', {
+        from: dateRange.from.toISOString(),
+        to: dateRange.to.toISOString()
       });
-
-      // Check if there are any events created in the last 2 hours
-      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
-      const recentEvents = calendlyEvents.filter(event => 
-        new Date(event.created_at) > twoHoursAgo
-      );
       
-      console.log(`Events created in the last 2 hours: ${recentEvents.length}`);
-      if (recentEvents.length > 0) {
-        recentEvents.forEach(event => {
-          const phoenixTime = new Date(event.created_at).toLocaleString('en-US', { 
-            timeZone: 'America/Phoenix',
-            month: '2-digit',
-            day: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true
-          });
-          console.log(`Recent: ${event.calendly_event_id} - Created at ${phoenixTime} Phoenix`);
-        });
-      }
-
-      // Check for events that might match the 12:14 PM Phoenix time booking
-      console.log('\n=== LOOKING FOR 12:14 PM PHOENIX BOOKING ===');
+      // Check events created today
       const today = new Date();
-      const targetTime = new Date(today);
-      targetTime.setHours(19, 14, 0, 0); // 12:14 PM Phoenix = ~7:14 PM UTC (depending on DST)
+      const todayStart = startOfDay(today);
+      const todayEnd = endOfDay(today);
       
-      const timeWindow = 30 * 60 * 1000; // 30 minutes window
-      const possibleMatches = calendlyEvents.filter(event => {
-        const eventTime = new Date(event.created_at);
-        const timeDiff = Math.abs(eventTime.getTime() - targetTime.getTime());
-        return timeDiff <= timeWindow;
+      console.log('Today boundaries (local):', {
+        start: todayStart.toISOString(),
+        end: todayEnd.toISOString()
       });
       
-      console.log(`Events near 12:14 PM Phoenix time window: ${possibleMatches.length}`);
-      possibleMatches.forEach(event => {
-        const phoenixTime = new Date(event.created_at).toLocaleString('en-US', { 
-          timeZone: 'America/Phoenix',
-          month: '2-digit',
-          day: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true
+      // Find events created today
+      const todaysEvents = calendlyEvents.filter(event => {
+        const createdAt = new Date(event.created_at);
+        const isToday = createdAt >= todayStart && createdAt <= todayEnd;
+        
+        if (isToday) {
+          console.log('✅ Event created today:', {
+            id: event.calendly_event_id,
+            created_at: event.created_at,
+            scheduled_at: event.scheduled_at,
+            status: event.status,
+            event_type: event.event_type_name,
+            createdAtLocal: createdAt.toLocaleString()
+          });
+        }
+        
+        return isToday;
+      });
+      
+      console.log(`Found ${todaysEvents.length} events created today`);
+      
+      // Check the most recent events to see if our test booking is there
+      const recentEvents = [...calendlyEvents]
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, 5);
+      
+      console.log('Most recent 5 events:');
+      recentEvents.forEach((event, index) => {
+        console.log(`${index + 1}. ${event.calendly_event_id} - Created: ${event.created_at} - Type: ${event.event_type_name}`);
+      });
+      
+      // Check if we have the test booking from justin.babcock98@gmail.com
+      const testBooking = calendlyEvents.find(event => 
+        event.invitee_email === 'justin.babcock98@gmail.com' || 
+        event.calendly_event_id?.includes('b3135d95-c8f9-436d-b4f8-90e347d5aea2')
+      );
+      
+      if (testBooking) {
+        console.log('🎯 Found test booking:', {
+          id: testBooking.calendly_event_id,
+          created_at: testBooking.created_at,
+          scheduled_at: testBooking.scheduled_at,
+          status: testBooking.status,
+          invitee_email: testBooking.invitee_email,
+          createdAtLocal: new Date(testBooking.created_at).toLocaleString(),
+          isInToday: new Date(testBooking.created_at) >= todayStart && new Date(testBooking.created_at) <= todayEnd
         });
-        console.log(`Possible match: ${event.calendly_event_id} - Created at ${phoenixTime} Phoenix`);
-      });
+      } else {
+        console.log('❌ Test booking not found in calendlyEvents array');
+      }
     }
-  }, [calendlyEvents]);
+  }, [calendlyEvents, dateRange, userTimezone]);
   
   // Create a more specific dependency key that includes both timezone sources
   const dateRangeKey = useMemo(() => {
@@ -280,9 +271,10 @@ export const BookCallFunnel = ({ projectId }: BookCallFunnelProps) => {
       totalEvents: calendlyEvents.length,
       userTimezone,
       profileTimezone: profile?.timezone,
-      dateRangeKey
+      dateRangeKey,
+      totalBookings: callStats.totalBookings
     });
-  }, [dateRange, calendlyEvents.length, userTimezone, profile?.timezone, dateRangeKey]);
+  }, [dateRange, calendlyEvents.length, userTimezone, profile?.timezone, dateRangeKey, callStats.totalBookings]);
 
   const recentBookings = getRecentBookings(7);
   const monthlyComparison = getMonthlyComparison();
