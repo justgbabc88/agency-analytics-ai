@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -55,7 +54,7 @@ serve(async (req) => {
         throw new Error('Project ID is required');
       }
 
-      // Get stored access token
+      // Get stored access token and organization
       const { data: integrationData, error } = await supabase
         .from('project_integration_data')
         .select('data')
@@ -70,12 +69,22 @@ serve(async (req) => {
       }
 
       const accessToken = integrationData.data.access_token;
+      const organization = integrationData.data.organization;
+      
       if (!accessToken) {
         throw new Error('No access token found');
       }
 
-      // List existing webhooks
-      const webhooksResponse = await fetch('https://api.calendly.com/webhook_subscriptions', {
+      if (!organization) {
+        throw new Error('No organization found in integration data');
+      }
+
+      // List existing webhooks with proper query parameters
+      const webhooksUrl = new URL('https://api.calendly.com/webhook_subscriptions');
+      webhooksUrl.searchParams.set('organization', organization);
+      webhooksUrl.searchParams.set('scope', 'organization');
+
+      const webhooksResponse = await fetch(webhooksUrl.toString(), {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json'
@@ -101,7 +110,7 @@ serve(async (req) => {
         throw new Error('Project ID is required');
       }
 
-      // Get stored access token
+      // Get stored access token and organization
       const { data: integrationData, error } = await supabase
         .from('project_integration_data')
         .select('data')
@@ -116,14 +125,24 @@ serve(async (req) => {
       }
 
       const accessToken = integrationData.data.access_token;
+      const organization = integrationData.data.organization;
+      
       if (!accessToken) {
         throw new Error('No access token found');
       }
 
+      if (!organization) {
+        throw new Error('No organization found in integration data');
+      }
+
       const targetWebhookUrl = `https://iqxvtfupjjxjkbajgcve.supabase.co/functions/v1/calendly-webhook`;
 
-      // List existing webhooks first
-      const webhooksResponse = await fetch('https://api.calendly.com/webhook_subscriptions', {
+      // List existing webhooks first with proper parameters
+      const webhooksUrl = new URL('https://api.calendly.com/webhook_subscriptions');
+      webhooksUrl.searchParams.set('organization', organization);
+      webhooksUrl.searchParams.set('scope', 'organization');
+
+      const webhooksResponse = await fetch(webhooksUrl.toString(), {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json'
@@ -223,8 +242,12 @@ serve(async (req) => {
       console.log('🔗 Setting up webhooks with cleanup...');
       const webhookUrl = `https://iqxvtfupjjxjkbajgcve.supabase.co/functions/v1/calendly-webhook`;
       
-      // First, list existing webhooks
-      const existingWebhooksResponse = await fetch('https://api.calendly.com/webhook_subscriptions', {
+      // First, list existing webhooks with proper parameters
+      const existingWebhooksUrl = new URL('https://api.calendly.com/webhook_subscriptions');
+      existingWebhooksUrl.searchParams.set('organization', currentOrganization);
+      existingWebhooksUrl.searchParams.set('scope', 'organization');
+
+      const existingWebhooksResponse = await fetch(existingWebhooksUrl.toString(), {
         headers: {
           'Authorization': `Bearer ${tokenData.access_token}`,
           'Content-Type': 'application/json'
@@ -399,8 +422,12 @@ serve(async (req) => {
 
       // First check if webhook already exists
       if (!integrationData.data.webhook_id || integrationData.data.webhook_status !== 'registered') {
-        // List existing webhooks first
-        const existingWebhooksResponse = await fetch('https://api.calendly.com/webhook_subscriptions', {
+        // List existing webhooks first with proper parameters
+        const existingWebhooksUrl = new URL('https://api.calendly.com/webhook_subscriptions');
+        existingWebhooksUrl.searchParams.set('organization', organization);
+        existingWebhooksUrl.searchParams.set('scope', 'organization');
+
+        const existingWebhooksResponse = await fetch(existingWebhooksUrl.toString(), {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json'
