@@ -51,6 +51,89 @@ interface CalendlyWebhookEvent {
   };
 }
 
+// Helper function to verify webhook signature
+async function verifyWebhookSignature(body: string, signature: string, secret: string): Promise<boolean> {
+  try {
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify']
+    );
+
+    const signatureBytes = new Uint8Array(
+      signature.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []
+    );
+
+    const isValid = await crypto.subtle.verify(
+      'HMAC',
+      key,
+      signatureBytes,
+      encoder.encode(body)
+    );
+
+    return isValid;
+  } catch (error) {
+    console.error('❌ Signature verification error:', error);
+    return false;
+  }
+}
+
+// Helper function to fetch Calendly event with retry logic
+async function fetchCalendlyEventWithRetry(eventId: string, accessToken: string, maxRetries = 3): Promise<any> {
+  const calendlyApiUrl = `https://api.calendly.com/scheduled_events/${eventId}`;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`📡 Calling Calendly API (attempt ${attempt}/${maxRetries}):`, calendlyApiUrl);
+
+      const calendlyResponse = await fetch(calendlyApiUrl, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!calendlyResponse.ok) {
+        const errorText = await calendlyResponse.text();
+        console.error(`❌ Calendly API call failed (attempt ${attempt}):`, calendlyResponse.status, errorText);
+        
+        if (calendlyResponse.status === 404) {
+          console.warn('⚠️ Event not found, skipping gracefully');
+          return null;
+        }
+        
+        // Retry on server errors (5xx) or rate limiting (429)
+        if (attempt < maxRetries && (calendlyResponse.status >= 500 || calendlyResponse.status === 429)) {
+          const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
+          console.log(`⏳ Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        
+        throw new Error(`Calendly API error: ${calendlyResponse.status}`);
+      }
+
+      const fullEventData = await calendlyResponse.json();
+      console.log('✅ Successfully fetched full event data from Calendly API');
+      return fullEventData;
+      
+    } catch (error) {
+      console.error(`❌ Attempt ${attempt} failed:`, error);
+      
+      if (attempt === maxRetries) {
+        throw error;
+      }
+      
+      const delay = Math.pow(2, attempt) * 1000;
+      console.log(`⏳ Retrying in ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+}
+
 serve(async (req) => {
   console.log('📞 Calendly webhook received:', {
     method: req.method,
@@ -77,20 +160,33 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Get webhook signature for verification
-    const signature = req.headers.get('calendly-webhook-signature');
-    const webhookSecret = Deno.env.get('CALENDLY_WEBHOOK_SIGNING_KEY');
-    
     const body = await req.text();
     console.log('📝 Raw webhook body length:', body.length);
     
-    // TEMPORARILY BYPASS SIGNATURE VERIFICATION FOR TESTING
-    console.log('⚠️ SIGNATURE VERIFICATION TEMPORARILY DISABLED FOR TESTING');
+    // Verify webhook signature
+    const signature = req.headers.get('calendly-webhook-signature');
+    const webhookSecret = Deno.env.get('CALENDLY_WEBHOOK_SIGNING_KEY');
+    
+    if (!signature || !webhookSecret) {
+      console.error('❌ Missing signature or webhook secret');
+      return new Response('Missing signature or webhook secret', { 
+        status: 400, 
+        headers: corsHeaders 
+      });
+    }
+
+    const isValidSignature = await verifyWebhookSignature(body, signature, webhookSecret);
+    if (!isValidSignature) {
+      console.error('❌ Invalid webhook signature');
+      return new Response('Invalid signature', { 
+        status: 401, 
+        headers: corsHeaders 
+      });
+    }
+
+    console.log('✅ Webhook signature verified successfully');
 
     const webhookData: CalendlyWebhookEvent = JSON.parse(body);
-    
-    // LOG FULL WEBHOOK PAYLOAD
-    console.log('📦 Full webhook payload:', JSON.stringify(webhookData, null, 2));
     
     console.log('📞 Processed Calendly webhook:', {
       event: webhookData.event,
@@ -137,38 +233,25 @@ serve(async (req) => {
 
     // Extract event ID from URI (last part after the last slash)
     const eventId = scheduledEvent.uri.split('/').pop();
-    const calendlyApiUrl = `https://api.calendly.com/scheduled_events/${eventId}`;
     
-    console.log('📡 Calling Calendly API:', calendlyApiUrl);
-
-    const calendlyResponse = await fetch(calendlyApiUrl, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (!calendlyResponse.ok) {
-      const errorText = await calendlyResponse.text();
-      console.error('❌ Calendly API call failed:', calendlyResponse.status, errorText);
-      
-      if (calendlyResponse.status === 404) {
-        console.warn('⚠️ Event not found, skipping gracefully');
-        return new Response('Event not found', { 
-          status: 200, 
-          headers: corsHeaders 
-        });
-      }
-      
-      return new Response('Calendly API error', { 
+    let fullEventData;
+    try {
+      fullEventData = await fetchCalendlyEventWithRetry(eventId!, accessToken);
+    } catch (error) {
+      console.error('❌ Failed to fetch event details after retries:', error);
+      return new Response('Failed to fetch event details', { 
         status: 500, 
         headers: corsHeaders 
       });
     }
 
-    const fullEventData = await calendlyResponse.json();
-    console.log('✅ Successfully fetched full event data from Calendly API');
-    console.log('📋 Full event data:', JSON.stringify(fullEventData, null, 2));
+    if (!fullEventData) {
+      console.warn('⚠️ Event not found, skipping gracefully');
+      return new Response('Event not found', { 
+        status: 200, 
+        headers: corsHeaders 
+      });
+    }
 
     // Extract the complete event information
     const eventResource = fullEventData.resource;
@@ -268,36 +351,45 @@ serve(async (req) => {
 
       console.log('💾 Event data to save:', eventData);
 
-      if (existingEvent) {
-        // Update existing event
-        console.log('🔄 Updating existing event:', existingEvent.id);
-        const { error: updateError } = await supabase
-          .from('calendly_events')
-          .update(eventData)
-          .eq('id', existingEvent.id);
+      try {
+        if (existingEvent) {
+          // Update existing event
+          console.log('🔄 Updating existing event:', existingEvent.id);
+          const { error: updateError } = await supabase
+            .from('calendly_events')
+            .update(eventData)
+            .eq('id', existingEvent.id);
 
-        if (updateError) {
-          console.error('❌ Error updating event:', updateError);
+          if (updateError) {
+            console.error('❌ Error updating event:', updateError);
+          } else {
+            console.log('✅ Successfully updated existing event:', scheduledEvent.uri);
+            totalProcessed++;
+          }
         } else {
-          console.log('✅ Successfully updated existing event:', scheduledEvent.uri);
-          totalProcessed++;
-        }
-      } else {
-        // Create new event
-        console.log('➕ Creating new event');
-        const { error: insertError } = await supabase
-          .from('calendly_events')
-          .insert({
-            ...eventData,
-            created_at: createdAt
-          });
+          // Create new event
+          console.log('➕ Creating new event');
+          const { error: insertError } = await supabase
+            .from('calendly_events')
+            .insert({
+              ...eventData,
+              created_at: createdAt
+            });
 
-        if (insertError) {
-          console.error('❌ Error inserting event:', insertError);
-        } else {
-          console.log('✅ Successfully created new event:', scheduledEvent.uri);
-          totalProcessed++;
+          if (insertError) {
+            // Handle duplicate key constraint gracefully
+            if (insertError.message?.includes('duplicate key') || insertError.message?.includes('calendly_event_id')) {
+              console.log('⚠️ Skipping duplicate insert for event:', scheduledEvent.uri);
+            } else {
+              console.error('❌ Error inserting event:', insertError);
+            }
+          } else {
+            console.log('✅ Successfully created new event:', scheduledEvent.uri);
+            totalProcessed++;
+          }
         }
+      } catch (error) {
+        console.error('❌ Unexpected error during event save:', error);
       }
     }
 
