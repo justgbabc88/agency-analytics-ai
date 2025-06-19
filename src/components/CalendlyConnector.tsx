@@ -438,7 +438,7 @@ export const CalendlyConnector = ({
         console.log('✅ Successfully deactivated mapping for:', eventType.name);
       }
 
-      // Reload mappings without triggering full connection check
+      // Reload mappings ONLY - don't trigger connection check
       await loadEventMappings();
       
       toast({
