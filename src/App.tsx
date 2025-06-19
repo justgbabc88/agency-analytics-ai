@@ -13,10 +13,12 @@ import {
 import Index from "./pages/Index"
 import Integrations from "./pages/Integrations"
 import Settings from "./pages/Settings"
+import AuthPage from "./pages/auth"
 import { Toaster } from "@/components/ui/toaster"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { GoogleOAuthCallback } from './components/GoogleOAuthCallback';
 import CalendlyOAuthCallback from "@/pages/CalendlyOAuthCallback";
+import { ProtectedRoute } from './components/ProtectedRoute';
 
 const queryClient = new QueryClient()
 
@@ -27,11 +29,24 @@ function App() {
         <Toaster />
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/integrations" element={<Integrations />} />
-            <Route path="/settings" element={<Settings />} />
+            <Route path="/auth" element={<AuthPage />} />
             <Route path="/google-oauth-callback" element={<GoogleOAuthCallback />} />
             <Route path="/calendly-callback" element={<CalendlyOAuthCallback />} />
+            <Route path="/" element={
+              <ProtectedRoute>
+                <Index />
+              </ProtectedRoute>
+            } />
+            <Route path="/integrations" element={
+              <ProtectedRoute>
+                <Integrations />
+              </ProtectedRoute>
+            } />
+            <Route path="/settings" element={
+              <ProtectedRoute>
+                <Settings />
+              </ProtectedRoute>
+            } />
           </Routes>
         </BrowserRouter>
       </TooltipProvider>
