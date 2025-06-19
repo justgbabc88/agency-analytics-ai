@@ -284,6 +284,88 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
 
+      case 'disconnect':
+        console.log('🔌 Disconnecting Calendly integration for project:', projectId);
+        
+        try {
+          // Get current integration data to clean up webhooks
+          const { data: currentData } = await supabase
+            .from('project_integration_data')
+            .select('data')
+            .eq('project_id', projectId)
+            .eq('platform', 'calendly')
+            .single();
+
+          if (currentData?.data?.access_token) {
+            // Try to clean up webhooks
+            try {
+              const webhookListResponse = await fetch('https://api.calendly.com/webhook_subscriptions', {
+                headers: {
+                  'Authorization': `Bearer ${currentData.data.access_token}`,
+                  'Content-Type': 'application/json'
+                }
+              });
+
+              if (webhookListResponse.ok) {
+                const webhookData = await webhookListResponse.json();
+                const ourWebhookUrl = 'https://iqxvtfupjjxjkbajgcve.supabase.co/functions/v1/calendly-webhook';
+                
+                for (const webhook of webhookData.collection || []) {
+                  if (webhook.callback_url === ourWebhookUrl) {
+                    await fetch(`https://api.calendly.com/webhook_subscriptions/${webhook.uri.split('/').pop()}`, {
+                      method: 'DELETE',
+                      headers: {
+                        'Authorization': `Bearer ${currentData.data.access_token}`,
+                      }
+                    });
+                    console.log('🗑️ Removed webhook:', webhook.uri);
+                  }
+                }
+              }
+            } catch (webhookError) {
+              console.warn('⚠️ Failed to clean up webhooks:', webhookError);
+            }
+          }
+
+          // Remove integration data
+          await supabase
+            .from('project_integration_data')
+            .delete()
+            .eq('project_id', projectId)
+            .eq('platform', 'calendly');
+
+          // Update integration status
+          await supabase
+            .from('project_integrations')
+            .update({
+              is_connected: false,
+              last_sync: null
+            })
+            .eq('project_id', projectId)
+            .eq('platform', 'calendly');
+
+          // Remove event mappings
+          await supabase
+            .from('calendly_event_mappings')
+            .delete()
+            .eq('project_id', projectId);
+
+          // Remove stored events
+          await supabase
+            .from('calendly_events')
+            .delete()
+            .eq('project_id', projectId);
+
+          console.log('✅ Calendly integration disconnected successfully');
+
+          return new Response(JSON.stringify({ success: true }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        } catch (error) {
+          console.error('❌ Error during disconnect:', error);
+          throw error;
+        }
+
       default:
         console.error('❌ Invalid action received:', action);
         throw new Error('Invalid action');
