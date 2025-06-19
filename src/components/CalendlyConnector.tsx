@@ -403,40 +403,8 @@ export const CalendlyConnector = ({
     });
 
     try {
-      // First, always check if a mapping exists for this project and event type
-      const { data: existingMapping, error: fetchError } = await supabase
-        .from('calendly_event_mappings')
-        .select('*')
-        .eq('project_id', projectId)
-        .eq('calendly_event_type_id', eventType.uri)
-        .maybeSingle();
-
-      if (fetchError) {
-        console.error('❌ Error fetching existing mapping:', fetchError);
-        throw fetchError;
-      }
-
-      if (existingMapping) {
-        // Update existing mapping
-        console.log('📋 Updating existing mapping:', existingMapping.id);
-        
-        const { error: updateError } = await supabase
-          .from('calendly_event_mappings')
-          .update({ 
-            is_active: isActive, 
-            event_type_name: eventType.name,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', existingMapping.id);
-
-        if (updateError) {
-          console.error('❌ Error updating mapping:', updateError);
-          throw updateError;
-        }
-        
-        console.log('✅ Successfully updated mapping for:', eventType.name);
-      } else if (isActive) {
-        // Only create new mapping if we're activating and no mapping exists
+      if (isActive) {
+        // Create new mapping when activating
         console.log('📝 Creating new mapping for:', eventType.name);
         
         const mappingData = {
@@ -457,8 +425,21 @@ export const CalendlyConnector = ({
         
         console.log('✅ Successfully created new mapping for:', eventType.name);
       } else {
-        // If we're trying to deactivate but no mapping exists, that's fine - nothing to do
-        console.log('📝 No mapping exists to deactivate for:', eventType.name);
+        // Delete mapping when deactivating
+        console.log('🗑️ Deleting mapping for:', eventType.name);
+        
+        const { error: deleteError } = await supabase
+          .from('calendly_event_mappings')
+          .delete()
+          .eq('project_id', projectId)
+          .eq('calendly_event_type_id', eventType.uri);
+
+        if (deleteError) {
+          console.error('❌ Error deleting mapping:', deleteError);
+          throw deleteError;
+        }
+        
+        console.log('✅ Successfully deleted mapping for:', eventType.name);
       }
 
       await loadEventMappings();
@@ -489,11 +470,10 @@ export const CalendlyConnector = ({
 
   const isEventMapped = (eventTypeUri: string) => {
     const mapping = eventMappings.find(mapping => 
-      mapping.calendly_event_type_id === eventTypeUri
+      mapping.calendly_event_type_id === eventTypeUri && mapping.is_active
     );
     
-    // Return true only if mapping exists AND is active
-    return mapping ? mapping.is_active : false;
+    return !!mapping;
   };
 
   const handleDisconnect = async () => {
