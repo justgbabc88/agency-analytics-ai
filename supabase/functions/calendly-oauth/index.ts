@@ -37,43 +37,6 @@ serve(async (req) => {
 
     console.log('🎯 Processing action:', action, 'for project:', projectId);
 
-    if (action === 'get_access_token') {
-      if (!projectId) {
-        throw new Error('Project ID is required');
-      }
-
-      console.log('🔑 Getting access token for project:', projectId);
-
-      // Get stored access token from integration data
-      const { data: integrationData, error } = await supabase
-        .from('project_integration_data')
-        .select('data')
-        .eq('project_id', projectId)
-        .eq('platform', 'calendly')
-        .order('synced_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        console.error('❌ Error fetching integration data:', error);
-        throw new Error('Failed to fetch integration data');
-      }
-
-      if (!integrationData || !integrationData.data?.access_token) {
-        console.error('❌ No access token found for project:', projectId);
-        throw new Error('No access token found. Please reconnect your Calendly account.');
-      }
-
-      console.log('✅ Access token found for project:', projectId);
-      return new Response(JSON.stringify({ 
-        access_token: integrationData.data.access_token,
-        organization: integrationData.data.organization,
-        user_uri: integrationData.data.user_uri
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
     if (action === 'get_auth_url') {
       if (!projectId) {
         throw new Error('Project ID is required');
@@ -93,60 +56,6 @@ serve(async (req) => {
 
       console.log('✅ Generated auth URL for project:', projectId);
       return new Response(JSON.stringify({ auth_url: authUrl.toString() }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    if (action === 'get_events_by_date') {
-      if (!projectId) {
-        throw new Error('Project ID is required');
-      }
-
-      const { startDate, endDate } = requestBody;
-      
-      // Get stored access token
-      const { data: integrationData, error } = await supabase
-        .from('project_integration_data')
-        .select('data')
-        .eq('project_id', projectId)
-        .eq('platform', 'calendly')
-        .order('synced_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error || !integrationData) {
-        throw new Error('No Calendly integration found');
-      }
-
-      const accessToken = integrationData.data.access_token;
-      const organization = integrationData.data.organization;
-      
-      if (!accessToken) {
-        throw new Error('No access token found');
-      }
-
-      // Get events from Calendly API
-      const eventsUrl = new URL('https://api.calendly.com/scheduled_events');
-      eventsUrl.searchParams.set('organization', organization);
-      if (startDate) eventsUrl.searchParams.set('min_start_time', startDate);
-      if (endDate) eventsUrl.searchParams.set('max_start_time', endDate);
-
-      const eventsResponse = await fetch(eventsUrl.toString(), {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!eventsResponse.ok) {
-        throw new Error('Failed to fetch events from Calendly');
-      }
-
-      const eventsData = await eventsResponse.json();
-      
-      return new Response(JSON.stringify({
-        events: eventsData.collection || []
-      }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
@@ -800,24 +709,8 @@ serve(async (req) => {
       });
     }
 
-    console.warn('⚠️ Unknown action received:', action, '- returning error response');
-    return new Response(JSON.stringify({ 
-      error: `Unknown action: ${action}`,
-      available_actions: [
-        'get_auth_url',
-        'handle_callback', 
-        'get_event_types',
-        'get_access_token',
-        'get_events_by_date',
-        'list_webhooks',
-        'cleanup_webhooks',
-        'setup_webhooks',
-        'disconnect'
-      ]
-    }), {
-      status: 400,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    console.error('❌ Invalid action received:', action);
+    throw new Error('Invalid action');
 
   } catch (error) {
     console.error('Calendly OAuth error:', error);

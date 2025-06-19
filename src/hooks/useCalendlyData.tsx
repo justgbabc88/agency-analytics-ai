@@ -3,6 +3,32 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 export const useCalendlyData = (projectId?: string) => {
+  const { data: calendlyEvents, isLoading, refetch } = useQuery({
+    queryKey: ['calendly-events', projectId],
+    queryFn: async () => {
+      if (!projectId) return [];
+      
+      console.log('🔄 Fetching Calendly events for project:', projectId);
+      
+      const { data, error } = await supabase
+        .from('calendly_events')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('scheduled_at', { ascending: false });
+
+      if (error) {
+        console.error('❌ Error fetching Calendly events:', error);
+        throw error;
+      }
+      
+      console.log('✅ Fetched Calendly events:', data?.length || 0);
+      return data || [];
+    },
+    enabled: !!projectId,
+    staleTime: 30000, // 30 seconds
+    refetchInterval: 60000, // 1 minute
+  });
+
   const { data: eventMappings } = useQuery({
     queryKey: ['calendly-mappings', projectId],
     queryFn: async () => {
@@ -26,45 +52,6 @@ export const useCalendlyData = (projectId?: string) => {
     },
     enabled: !!projectId,
     staleTime: 5 * 60 * 1000, // 5 minutes
-  });
-
-  const { data: calendlyEvents, isLoading, refetch } = useQuery({
-    queryKey: ['calendly-events', projectId, eventMappings],
-    queryFn: async () => {
-      if (!projectId) return [];
-      
-      console.log('🔄 Fetching Calendly events for project:', projectId);
-      console.log('🎯 Active event mappings:', eventMappings?.length || 0);
-      
-      // If no event mappings are active, return empty array
-      if (!eventMappings || eventMappings.length === 0) {
-        console.log('⚠️ No active event mappings found, returning empty events array');
-        return [];
-      }
-
-      // Get the event type IDs that should be included
-      const activeEventTypeIds = eventMappings.map(mapping => mapping.calendly_event_type_id);
-      console.log('🎯 Filtering for event types:', activeEventTypeIds);
-      
-      // CRITICAL FIX: Only use database queries, no edge function calls from hooks
-      const { data, error } = await supabase
-        .from('calendly_events')
-        .select('*')
-        .eq('project_id', projectId)
-        .in('calendly_event_type_id', activeEventTypeIds)
-        .order('scheduled_at', { ascending: false });
-
-      if (error) {
-        console.error('❌ Error fetching Calendly events:', error);
-        throw error;
-      }
-      
-      console.log('✅ Fetched filtered Calendly events:', data?.length || 0);
-      return data || [];
-    },
-    enabled: !!projectId && !!eventMappings,
-    staleTime: 30000, // 30 seconds
-    refetchInterval: 60000, // 1 minute
   });
 
   // Calculate metrics for the last 7 days
