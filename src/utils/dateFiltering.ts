@@ -13,14 +13,6 @@ export const isEventInDateRange = (eventCreatedAt: string, startDate: Date, endD
     // Use user's timezone or fall back to browser timezone
     const timezone = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
     
-    console.log('🔍 Date filtering debug:', {
-      eventCreatedAt,
-      timezone,
-      startDate: startDate.toISOString(),
-      endDate: endDate.toISOString(),
-      eventUTC: createdDate.toISOString()
-    });
-    
     // Convert everything to the user's timezone for accurate day comparison
     const eventInUserTz = toZonedTime(createdDate, timezone);
     const startInUserTz = toZonedTime(startDate, timezone);
@@ -31,23 +23,8 @@ export const isEventInDateRange = (eventCreatedAt: string, startDate: Date, endD
     const startDateInUserTz = format(startInUserTz, 'yyyy-MM-dd');
     const endDateInUserTz = format(endInUserTz, 'yyyy-MM-dd');
     
-    console.log('🔍 Timezone conversion details:', {
-      eventUTC: createdDate.toISOString(),
-      eventInUserTz: formatInTimeZone(createdDate, timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
-      eventDateInUserTz,
-      startDateInUserTz,
-      endDateInUserTz,
-      rangeCheck: `${eventDateInUserTz} >= ${startDateInUserTz} && ${eventDateInUserTz} <= ${endDateInUserTz}`
-    });
-    
     // Simple string comparison of dates in user timezone
     const isInRange = eventDateInUserTz >= startDateInUserTz && eventDateInUserTz <= endDateInUserTz;
-    
-    console.log('🎯 Date range check result:', {
-      eventCreatedAt,
-      isInRange,
-      timezone
-    });
     
     return isInRange;
   } catch (error) {
@@ -72,15 +49,6 @@ export const isEventScheduledOnDate = (eventScheduledAt: string, targetDate: Dat
     const targetDateInUserTz = format(toZonedTime(targetDate, timezone), 'yyyy-MM-dd');
     
     const isOnDate = eventDateInUserTz === targetDateInUserTz;
-    
-    console.log(`🔍 Checking if event scheduled on ${format(targetDate, 'yyyy-MM-dd')} (with timezone):`, {
-      eventScheduledAt,
-      timezone,
-      eventUTC: scheduledDate.toISOString(),
-      eventDateInUserTz,
-      targetDateInUserTz,
-      isOnDate
-    });
     
     return isOnDate;
   } catch (error) {
@@ -110,16 +78,6 @@ export const isEventCancelledOnDate = (event: any, targetDate: Date, userTimezon
     
     const isOnDate = eventDateInUserTz === targetDateInUserTz;
     
-    console.log(`🔍 Checking if event cancelled on ${format(targetDate, 'yyyy-MM-dd')} (with timezone):`, {
-      eventId: event.calendly_event_id,
-      updated_at: event.updated_at,
-      timezone,
-      eventUTC: cancelledDate.toISOString(),
-      eventDateInUserTz,
-      targetDateInUserTz,
-      isOnDate
-    });
-    
     return isOnDate;
   } catch (error) {
     console.warn('Error checking event cancellation date:', event.updated_at, error);
@@ -143,15 +101,6 @@ export const isEventScheduledToday = (eventScheduledAt: string, userTimezone?: s
     const eventDateInUserTz = format(toZonedTime(scheduledDate, timezone), 'yyyy-MM-dd');
     
     const isScheduledToday = eventDateInUserTz === todayInUserTz;
-    
-    console.log('🔍 Checking if event is scheduled for today (with timezone):', {
-      eventScheduledAt,
-      timezone,
-      eventUTC: scheduledDate.toISOString(),
-      eventDateInUserTz,
-      todayInUserTz,
-      isScheduledToday
-    });
     
     return isScheduledToday;
   } catch (error) {
@@ -177,15 +126,6 @@ export const isEventCreatedToday = (eventCreatedAt: string, userTimezone?: strin
     
     const isCreatedToday = eventDateInUserTz === todayInUserTz;
     
-    console.log('🔍 Checking if event is created today (with timezone):', {
-      eventCreatedAt,
-      timezone,
-      eventUTC: createdDate.toISOString(),
-      eventDateInUserTz,
-      todayInUserTz,
-      isCreatedToday
-    });
-    
     return isCreatedToday;
   } catch (error) {
     console.warn('Error parsing event date for today check:', eventCreatedAt, error);
@@ -210,15 +150,6 @@ export const isEventCreatedOnDate = (eventCreatedAt: string, targetDate: Date, u
     
     const isOnDate = eventDateInUserTz === targetDateInUserTz;
     
-    console.log(`🔍 Checking if event created on ${format(targetDate, 'yyyy-MM-dd')} (with timezone):`, {
-      eventCreatedAt,
-      timezone,
-      eventUTC: createdDate.toISOString(),
-      eventDateInUserTz,
-      targetDateInUserTz,
-      isOnDate
-    });
-    
     return isOnDate;
   } catch (error) {
     console.warn('Error checking event date:', eventCreatedAt, error);
@@ -236,6 +167,34 @@ export const filterEventsByDateRange = (events: any[], dateRange: { from: Date; 
   console.log('User timezone:', userTimezone);
   console.log('Total events to filter:', events.length);
   
+  // Get today's date string for debugging
+  const timezone = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const todayInUserTz = format(toZonedTime(new Date(), timezone), 'yyyy-MM-dd');
+  console.log('🗓️ Today\'s date in user timezone:', todayInUserTz);
+  
+  // Check for events created today specifically
+  const todaysEvents = events.filter(event => {
+    if (!event.created_at) return false;
+    try {
+      const createdDate = parseISO(event.created_at);
+      if (!isValid(createdDate)) return false;
+      const eventDateInUserTz = format(toZonedTime(createdDate, timezone), 'yyyy-MM-dd');
+      return eventDateInUserTz === todayInUserTz;
+    } catch (error) {
+      return false;
+    }
+  });
+  
+  console.log('🎯 Events created TODAY:', todaysEvents.length);
+  if (todaysEvents.length > 0) {
+    console.log('📋 TODAY\'S EVENTS:', todaysEvents.map(e => ({
+      id: e.calendly_event_id,
+      created_at: e.created_at,
+      status: e.status,
+      event_type_name: e.event_type_name
+    })));
+  }
+  
   const filtered = events.filter(event => 
     isEventInDateRange(event.created_at, dateRange.from, dateRange.to, userTimezone)
   );
@@ -244,7 +203,8 @@ export const filterEventsByDateRange = (events: any[], dateRange: { from: Date; 
   console.log('Sample filtered events:', filtered.slice(0, 3).map(e => ({
     id: e.calendly_event_id,
     created_at: e.created_at,
-    scheduled_at: e.scheduled_at
+    scheduled_at: e.scheduled_at,
+    status: e.status
   })));
   
   return filtered;

@@ -6,19 +6,42 @@ import { filterEventsByDateRange, filterEventsByScheduledDateRange, filterCancel
 export const useCallStatsCalculations = (calendlyEvents: any[], dateRange: { from: Date; to: Date }, userTimezone?: string) => {
   const filteredEvents = useMemo(() => {
     console.log('🔄 Recalculating filtered events for metrics with timezone:', userTimezone);
-    return filterEventsByDateRange(calendlyEvents, dateRange, userTimezone);
+    console.log('📊 Total Calendly events available:', calendlyEvents.length);
+    console.log('📅 Date range for filtering:', {
+      from: dateRange.from.toISOString(),
+      to: dateRange.to.toISOString()
+    });
+    
+    // Log sample events to see what we're working with
+    if (calendlyEvents.length > 0) {
+      console.log('📋 Sample Calendly events:', calendlyEvents.slice(0, 5).map(event => ({
+        id: event.calendly_event_id,
+        created_at: event.created_at,
+        scheduled_at: event.scheduled_at,
+        status: event.status,
+        event_type_name: event.event_type_name
+      })));
+    }
+    
+    const filtered = filterEventsByDateRange(calendlyEvents, dateRange, userTimezone);
+    console.log('✅ Events filtered by creation date:', filtered.length);
+    return filtered;
   }, [calendlyEvents, dateRange.from.toISOString(), dateRange.to.toISOString(), userTimezone]);
 
   // Also get events filtered by scheduled date for more accurate call stats
   const scheduledFilteredEvents = useMemo(() => {
     console.log('🔄 Recalculating scheduled filtered events for metrics with timezone:', userTimezone);
-    return filterEventsByScheduledDateRange(calendlyEvents, dateRange, userTimezone);
+    const filtered = filterEventsByScheduledDateRange(calendlyEvents, dateRange, userTimezone);
+    console.log('✅ Events filtered by scheduled date:', filtered.length);
+    return filtered;
   }, [calendlyEvents, dateRange.from.toISOString(), dateRange.to.toISOString(), userTimezone]);
 
   // NEW: Get cancelled events filtered by their cancellation date
   const cancelledFilteredEvents = useMemo(() => {
     console.log('🔄 Recalculating cancelled filtered events for metrics with timezone:', userTimezone);
-    return filterCancelledEventsByDateRange(calendlyEvents, dateRange, userTimezone);
+    const filtered = filterCancelledEventsByDateRange(calendlyEvents, dateRange, userTimezone);
+    console.log('✅ Events filtered by cancellation date:', filtered.length);
+    return filtered;
   }, [calendlyEvents, dateRange.from.toISOString(), dateRange.to.toISOString(), userTimezone]);
 
   const callStats = useMemo(() => {
@@ -32,6 +55,14 @@ export const useCallStatsCalculations = (calendlyEvents: any[], dateRange: { fro
     const activeBookings = filteredEvents.filter(event => 
       event.status !== 'canceled' && event.status !== 'cancelled'
     );
+    
+    console.log('🎯 Active bookings (non-cancelled):', activeBookings.length);
+    console.log('🎯 Active bookings details:', activeBookings.map(event => ({
+      id: event.calendly_event_id,
+      created_at: event.created_at,
+      status: event.status,
+      event_type_name: event.event_type_name
+    })));
     
     const bookingStats = activeBookings.reduce((stats, event) => {
       stats.totalBookings++;
@@ -70,9 +101,9 @@ export const useCallStatsCalculations = (calendlyEvents: any[], dateRange: { fro
       return stats;
     }, { scheduledCalls: 0, cancelledCalls: 0, noShowCalls: 0 });
 
-    console.log('Booking stats (by created_at, excluding cancelled):', bookingStats);
-    console.log('Call performance stats (by scheduled_at):', callPerformanceStats);
-    console.log('Cancelled events stats (by cancellation date):', cancelledFilteredEvents.length);
+    console.log('📈 Final booking stats (by created_at, excluding cancelled):', bookingStats);
+    console.log('📞 Call performance stats (by scheduled_at):', callPerformanceStats);
+    console.log('❌ Cancelled events stats (by cancellation date):', cancelledFilteredEvents.length);
 
     // Combine the stats appropriately
     return {
@@ -160,14 +191,14 @@ export const useCallStatsCalculations = (calendlyEvents: any[], dateRange: { fro
   const previousCallsTaken = Math.max(0, previousStats.actualScheduledCalls - previousStats.actualNoShows);
   const previousShowUpRate = previousStats.actualScheduledCalls > 0 ? ((previousCallsTaken / previousStats.actualScheduledCalls) * 100) : 0;
 
-  console.log('Final calculated metrics:', {
+  console.log('🎯 FINAL CALCULATED METRICS:', {
+    totalBookingsDisplayed: callStats.totalBookings,
     callsTaken,
-    showUpRate,
+    showUpRate: showUpRate.toFixed(1) + '%',
     previousCallsTaken,
-    previousShowUpRate,
-    totalBookings: callStats.totalBookings,
-    cancelled: callStats.cancelled,
-    actualScheduledCalls: callStats.actualScheduledCalls
+    previousShowUpRate: previousShowUpRate.toFixed(1) + '%',
+    actualScheduledCalls: callStats.actualScheduledCalls,
+    cancelled: callStats.cancelled
   });
 
   return {
