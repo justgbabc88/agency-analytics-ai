@@ -103,7 +103,7 @@ export const CalendlyDebugPanel = ({ projectId }: CalendlyDebugPanelProps) => {
         end: endOfDay.toISOString()
       });
 
-      // Get events from Calendly API for today
+      // CRITICAL FIX: Use get_events_by_date instead of any non-existent actions
       const { data: apiData, error: apiError } = await supabase.functions.invoke('calendly-oauth', {
         body: { 
           action: 'get_events_by_date',

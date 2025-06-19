@@ -46,6 +46,7 @@ export const useCalendlyData = (projectId?: string) => {
       const activeEventTypeIds = eventMappings.map(mapping => mapping.calendly_event_type_id);
       console.log('🎯 Filtering for event types:', activeEventTypeIds);
       
+      // CRITICAL FIX: Only use database queries, no edge function calls from hooks
       const { data, error } = await supabase
         .from('calendly_events')
         .select('*')
