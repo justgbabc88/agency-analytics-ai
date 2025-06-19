@@ -395,7 +395,7 @@ export const CalendlyConnector = ({
   const toggleEventMapping = async (eventType: EventType, isActive: boolean) => {
     if (!projectId) return;
 
-    console.log('🎯 Attempting to toggle event mapping:', {
+    console.log('🎯 Toggling event mapping:', {
       eventName: eventType.name,
       eventUri: eventType.uri,
       isActive,
@@ -404,42 +404,38 @@ export const CalendlyConnector = ({
 
     try {
       if (isActive) {
-        // Create new mapping when activating
-        console.log('📝 Creating new mapping for:', eventType.name);
-        
-        const mappingData = {
-          project_id: projectId,
-          calendly_event_type_id: eventType.uri,
-          event_type_name: eventType.name,
-          is_active: true,
-        };
-        
-        const { error: insertError } = await supabase
+        // Use upsert to handle the unique constraint
+        const { error } = await supabase
           .from('calendly_event_mappings')
-          .insert(mappingData);
+          .upsert({
+            project_id: projectId,
+            calendly_event_type_id: eventType.uri,
+            event_type_name: eventType.name,
+            is_active: true,
+          }, {
+            onConflict: 'project_id,calendly_event_type_id'
+          });
 
-        if (insertError) {
-          console.error('❌ Error creating mapping:', insertError);
-          throw insertError;
+        if (error) {
+          console.error('❌ Error upserting mapping:', error);
+          throw error;
         }
         
-        console.log('✅ Successfully created new mapping for:', eventType.name);
+        console.log('✅ Successfully activated mapping for:', eventType.name);
       } else {
-        // Delete mapping when deactivating
-        console.log('🗑️ Deleting mapping for:', eventType.name);
-        
-        const { error: deleteError } = await supabase
+        // Delete the mapping when deactivating
+        const { error } = await supabase
           .from('calendly_event_mappings')
           .delete()
           .eq('project_id', projectId)
           .eq('calendly_event_type_id', eventType.uri);
 
-        if (deleteError) {
-          console.error('❌ Error deleting mapping:', deleteError);
-          throw deleteError;
+        if (error) {
+          console.error('❌ Error deleting mapping:', error);
+          throw error;
         }
         
-        console.log('✅ Successfully deleted mapping for:', eventType.name);
+        console.log('✅ Successfully deactivated mapping for:', eventType.name);
       }
 
       await loadEventMappings();
