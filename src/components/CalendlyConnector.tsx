@@ -148,7 +148,7 @@ export const CalendlyConnector = ({
         console.log('📊 Webhook status:', status, '-', message);
       }
 
-      // Try to fetch event types to verify the connection is still valid
+      // FIXED: Use the correct action 'get_event_types' instead of 'get_access_token'
       const { data, error } = await supabase.functions.invoke('calendly-oauth', {
         body: { action: 'get_event_types', projectId }
       });
@@ -438,7 +438,7 @@ export const CalendlyConnector = ({
         console.log('✅ Successfully deactivated mapping for:', eventType.name);
       }
 
-      // Reload mappings ONLY - don't trigger connection check
+      // FIXED: Only reload mappings, don't trigger connection check that causes the error
       await loadEventMappings();
       
       toast({
