@@ -31,9 +31,12 @@ serve(async (req) => {
       throw new Error('Missing Calendly credentials');
     }
 
+    // Define the redirect URI that matches what we configured in Calendly
+    const redirectUri = 'https://iqxvtfupjjxjkbajgcve.supabase.co/functions/v1/calendly-oauth-callback';
+
     switch (action) {
       case 'get_auth_url':
-        const authUrl = `https://auth.calendly.com/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent('https://iqxvtfupjjxjkbajgcve.supabase.co/functions/v1/calendly-oauth-callback')}&scope=default&state=${projectId}`;
+        const authUrl = `https://auth.calendly.com/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=default&state=${projectId}`;
         console.log('✅ Generated auth URL for project:', projectId);
         return new Response(JSON.stringify({ authUrl }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -50,7 +53,7 @@ serve(async (req) => {
           body: new URLSearchParams({
             grant_type: 'authorization_code',
             code,
-            redirect_uri: 'https://iqxvtfupjjxjkbajgcve.supabase.co/functions/v1/calendly-oauth-callback',
+            redirect_uri: redirectUri,
             client_id: clientId,
             client_secret: clientSecret,
           }),
