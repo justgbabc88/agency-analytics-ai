@@ -101,7 +101,7 @@ export const CalendlyConnector = ({
   const checkConnectionStatus = async () => {
     if (!projectId) return;
 
-    console.log('Checking connection status for project:', projectId);
+    console.log('🔍 Checking connection status for project:', projectId);
     setLoading(true);
 
     try {
@@ -148,13 +148,14 @@ export const CalendlyConnector = ({
         console.log('📊 Webhook status:', status, '-', message);
       }
 
-      // Use the correct action 'get_event_types' to verify connection
+      // CRITICAL FIX: Use ONLY the get_event_types action - no other actions
+      console.log('🔍 Calling get_event_types action...');
       const { data, error } = await supabase.functions.invoke('calendly-oauth', {
         body: { action: 'get_event_types', projectId }
       });
 
       if (error) {
-        console.error('Event types check error:', error);
+        console.error('❌ get_event_types error:', error);
         
         // Only mark as disconnected if it's an auth error, not a network error
         if (error.message?.includes('authorization') || error.message?.includes('expired') || error.message?.includes('not connected')) {
@@ -174,6 +175,7 @@ export const CalendlyConnector = ({
       }
 
       // Success!
+      console.log('✅ get_event_types success:', data);
       setEventTypes(data.event_types || []);
       onConnectionChange(true);
       
@@ -198,7 +200,7 @@ export const CalendlyConnector = ({
       await loadEventMappings();
       
     } catch (error) {
-      console.error('Failed to check connection status:', error);
+      console.error('❌ Failed to check connection status:', error);
       // Don't automatically disconnect on network errors
       console.log('Keeping current connection status due to network error');
       
@@ -438,7 +440,8 @@ export const CalendlyConnector = ({
         console.log('✅ Successfully deactivated mapping for:', eventType.name);
       }
 
-      // CRITICAL FIX: Only reload mappings, don't trigger any other API calls
+      // CRITICAL FIX: Only reload mappings, absolutely no other API calls
+      console.log('🔄 Reloading event mappings only...');
       await loadEventMappings();
       
       toast({
@@ -505,12 +508,24 @@ export const CalendlyConnector = ({
     }
   };
 
-  // CRITICAL FIX: Only call checkConnectionStatus when truly necessary
+  // CRITICAL FIX: Completely prevent unnecessary connection checks
   useEffect(() => {
-    if (isConnected && projectId && eventTypes.length === 0) {
+    console.log('🔍 useEffect triggered:', { isConnected, projectId, eventTypesLength: eventTypes.length });
+    
+    if (!projectId) {
+      console.log('⚠️ No projectId, skipping useEffect');
+      return;
+    }
+    
+    if (!isConnected) {
+      console.log('⚠️ Not connected, skipping useEffect');
+      return;
+    }
+
+    if (eventTypes.length === 0) {
       console.log('🔄 Initial connection check for project:', projectId);
       checkConnectionStatus();
-    } else if (isConnected && projectId && eventTypes.length > 0) {
+    } else {
       // Just load event mappings if we already have event types
       console.log('📊 Loading event mappings for existing connection');
       loadEventMappings();
