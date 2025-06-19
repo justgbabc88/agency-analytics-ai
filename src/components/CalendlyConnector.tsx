@@ -82,10 +82,59 @@ export const CalendlyConnector = ({
         throw new Error(error.message || 'Failed to get authorization URL');
       }
 
-      console.log('Redirecting to OAuth URL...');
+      console.log('Opening OAuth URL in popup...');
       
-      // Redirect to the OAuth URL directly
-      window.location.href = data.auth_url;
+      // Open OAuth URL in a popup window instead of direct redirect
+      const popup = window.open(
+        data.authUrl, 
+        'calendly-oauth', 
+        'width=500,height=600,scrollbars=yes,resizable=yes'
+      );
+
+      if (!popup) {
+        throw new Error('Popup blocked. Please allow popups for this site.');
+      }
+
+      // Listen for the popup to close or send a message
+      const checkClosed = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(checkClosed);
+          setConnecting(false);
+          // Check connection status after popup closes
+          setTimeout(() => checkConnectionStatus(), 1000);
+        }
+      }, 1000);
+
+      // Listen for messages from the popup
+      const messageListener = (event: MessageEvent) => {
+        if (event.origin !== window.location.origin) return;
+        
+        if (event.data.type === 'calendly_connected' && event.data.success) {
+          clearInterval(checkClosed);
+          popup.close();
+          window.removeEventListener('message', messageListener);
+          setConnecting(false);
+          
+          toast({
+            title: "Connected Successfully",
+            description: "Your Calendly account has been connected",
+          });
+          
+          // Refresh connection status
+          setTimeout(() => checkConnectionStatus(), 1000);
+        }
+      };
+
+      window.addEventListener('message', messageListener);
+
+      // Cleanup if popup is closed manually
+      setTimeout(() => {
+        if (popup.closed) {
+          clearInterval(checkClosed);
+          window.removeEventListener('message', messageListener);
+          setConnecting(false);
+        }
+      }, 300000); // 5 minutes timeout
 
     } catch (error) {
       console.error('Connection error:', error);
