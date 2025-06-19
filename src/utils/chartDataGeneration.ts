@@ -1,7 +1,7 @@
 
 import { format } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
-import { isEventCreatedOnDate, isEventCreatedToday, isEventScheduledOnDate, isEventScheduledToday } from "./dateFiltering";
+import { isEventCreatedOnDate, isEventCreatedToday, isEventScheduledOnDate, isEventScheduledToday, isEventCancelledOnDate } from "./dateFiltering";
 
 // Generate chart data based on real Calendly events with improved date filtering and timezone support
 export const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Date; to: Date }, userTimezone?: string) => {
@@ -78,8 +78,14 @@ export const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { f
       isEventScheduledOnDate(event.scheduled_at, currentDate, timezone)
     );
     
+    // NEW: Get events that were cancelled on this specific day
+    const eventsCancelledThisDay = calendlyEvents.filter(event => 
+      isEventCancelledOnDate(event, currentDate, timezone)
+    );
+    
     console.log(`Events created on ${currentDateStr}: ${eventsCreatedThisDay.length}`);
     console.log(`Events scheduled on ${currentDateStr}: ${eventsScheduledThisDay.length}`);
+    console.log(`Events cancelled on ${currentDateStr}: ${eventsCancelledThisDay.length}`);
     
     if (eventsCreatedThisDay.length > 0) {
       console.log('Sample events created this day:', eventsCreatedThisDay.slice(0, 2).map(e => ({
@@ -99,11 +105,24 @@ export const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { f
       })));
     }
     
-    // Use created events for booking metrics (when people booked)
-    const callsBooked = eventsCreatedThisDay.length;
-    const cancelled = eventsCreatedThisDay.filter(event => 
-      event.status === 'canceled' || event.status === 'cancelled'
-    ).length;
+    if (eventsCancelledThisDay.length > 0) {
+      console.log('Sample events cancelled this day:', eventsCancelledThisDay.slice(0, 2).map(e => ({
+        updated_at: e.updated_at,
+        cancelled_in_timezone: formatInTimeZone(new Date(e.updated_at), timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
+        scheduled_at: e.scheduled_at,
+        status: e.status
+      })));
+    }
+    
+    // Use created events for booking metrics (when people booked), excluding cancelled events from creation day
+    const activeEventsCreatedThisDay = eventsCreatedThisDay.filter(event => 
+      event.status !== 'canceled' && event.status !== 'cancelled'
+    );
+    const callsBooked = activeEventsCreatedThisDay.length;
+    
+    // Count cancellations that happened on this day specifically
+    const cancelled = eventsCancelledThisDay.length;
+    
     const noShows = eventsCreatedThisDay.filter(event => event.status === 'no_show').length;
     const scheduled = eventsCreatedThisDay.filter(event => 
       event.status === 'active' || event.status === 'scheduled'
@@ -138,6 +157,7 @@ export const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { f
   console.log('Generated data points:', dates.length);
   console.log('Total calls booked across all days:', dates.reduce((sum, d) => sum + d.callsBooked, 0));
   console.log('Total calls taken across all days:', dates.reduce((sum, d) => sum + d.callsTaken, 0));
+  console.log('Total cancelled calls across all days:', dates.reduce((sum, d) => sum + d.cancelled, 0));
   console.log('Sample data point:', dates[0]);
   console.log('Timezone used for generation:', timezone);
   

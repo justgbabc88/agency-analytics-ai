@@ -89,6 +89,44 @@ export const isEventScheduledOnDate = (eventScheduledAt: string, targetDate: Dat
   }
 };
 
+// NEW: Function to check if an event was cancelled on a specific date
+export const isEventCancelledOnDate = (event: any, targetDate: Date, userTimezone?: string): boolean => {
+  // Only check cancelled events
+  if (event.status !== 'canceled' && event.status !== 'cancelled') return false;
+  
+  // Use updated_at as the cancellation date
+  if (!event.updated_at) return false;
+  
+  try {
+    const cancelledDate = parseISO(event.updated_at);
+    if (!isValid(cancelledDate)) return false;
+    
+    // Use user's timezone or fall back to browser timezone
+    const timezone = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    
+    // Convert to user timezone and compare date strings
+    const eventDateInUserTz = format(toZonedTime(cancelledDate, timezone), 'yyyy-MM-dd');
+    const targetDateInUserTz = format(toZonedTime(targetDate, timezone), 'yyyy-MM-dd');
+    
+    const isOnDate = eventDateInUserTz === targetDateInUserTz;
+    
+    console.log(`🔍 Checking if event cancelled on ${format(targetDate, 'yyyy-MM-dd')} (with timezone):`, {
+      eventId: event.calendly_event_id,
+      updated_at: event.updated_at,
+      timezone,
+      eventUTC: cancelledDate.toISOString(),
+      eventDateInUserTz,
+      targetDateInUserTz,
+      isOnDate
+    });
+    
+    return isOnDate;
+  } catch (error) {
+    console.warn('Error checking event cancellation date:', event.updated_at, error);
+    return false;
+  }
+};
+
 // Enhanced date filtering for today's events with timezone support (using scheduled_at)
 export const isEventScheduledToday = (eventScheduledAt: string, userTimezone?: string): boolean => {
   if (!eventScheduledAt) return false;
@@ -250,6 +288,49 @@ export const filterEventsByScheduledDateRange = (events: any[], dateRange: { fro
     scheduled_at: e.scheduled_at,
     status: e.status
   })));
+  
+  return filtered;
+};
+
+// NEW: Helper function to filter cancelled events by cancellation date
+export const filterCancelledEventsByDateRange = (events: any[], dateRange: { from: Date; to: Date }, userTimezone?: string) => {
+  console.log('\n=== FILTERING CANCELLED EVENTS BY CANCELLATION DATE ===');
+  console.log('Date range:', {
+    from: dateRange.from.toISOString(),
+    to: dateRange.to.toISOString()
+  });
+  console.log('User timezone:', userTimezone);
+  
+  const timezone = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  
+  // First filter only cancelled events
+  const cancelledEvents = events.filter(event => 
+    event.status === 'canceled' || event.status === 'cancelled'
+  );
+  
+  console.log('Total cancelled events:', cancelledEvents.length);
+  
+  // Then filter by cancellation date (updated_at)
+  const filtered = cancelledEvents.filter(event => {
+    if (!event.updated_at) return false;
+    
+    try {
+      const cancelledDate = parseISO(event.updated_at);
+      if (!isValid(cancelledDate)) return false;
+      
+      // Convert to user timezone and compare date strings
+      const eventDateInUserTz = format(toZonedTime(cancelledDate, timezone), 'yyyy-MM-dd');
+      const startDateInUserTz = format(toZonedTime(dateRange.from, timezone), 'yyyy-MM-dd');
+      const endDateInUserTz = format(toZonedTime(dateRange.to, timezone), 'yyyy-MM-dd');
+      
+      return eventDateInUserTz >= startDateInUserTz && eventDateInUserTz <= endDateInUserTz;
+    } catch (error) {
+      console.warn('Error filtering cancelled event by date:', event.updated_at, error);
+      return false;
+    }
+  });
+  
+  console.log('Filtered cancelled events by cancellation date:', filtered.length);
   
   return filtered;
 };

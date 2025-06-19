@@ -1,7 +1,7 @@
 
 import { useMemo } from "react";
 import { subDays, parseISO, isValid } from "date-fns";
-import { filterEventsByDateRange, filterEventsByScheduledDateRange } from "@/utils/dateFiltering";
+import { filterEventsByDateRange, filterEventsByScheduledDateRange, filterCancelledEventsByDateRange } from "@/utils/dateFiltering";
 
 export const useCallStatsCalculations = (calendlyEvents: any[], dateRange: { from: Date; to: Date }, userTimezone?: string) => {
   const filteredEvents = useMemo(() => {
@@ -15,23 +15,30 @@ export const useCallStatsCalculations = (calendlyEvents: any[], dateRange: { fro
     return filterEventsByScheduledDateRange(calendlyEvents, dateRange, userTimezone);
   }, [calendlyEvents, dateRange.from.toISOString(), dateRange.to.toISOString(), userTimezone]);
 
+  // NEW: Get cancelled events filtered by their cancellation date
+  const cancelledFilteredEvents = useMemo(() => {
+    console.log('🔄 Recalculating cancelled filtered events for metrics with timezone:', userTimezone);
+    return filterCancelledEventsByDateRange(calendlyEvents, dateRange, userTimezone);
+  }, [calendlyEvents, dateRange.from.toISOString(), dateRange.to.toISOString(), userTimezone]);
+
   const callStats = useMemo(() => {
     console.log('\n=== METRICS CALCULATION WITH TIMEZONE ===');
     console.log('Filtered events for metrics (by created_at):', filteredEvents.length);
     console.log('Filtered events for metrics (by scheduled_at):', scheduledFilteredEvents.length);
+    console.log('Filtered cancelled events (by cancellation date):', cancelledFilteredEvents.length);
     console.log('Using timezone for calculations:', userTimezone);
 
-    // Use created events for total bookings
-    const bookingStats = filteredEvents.reduce((stats, event) => {
+    // Use created events for total bookings, excluding cancelled ones
+    const activeBookings = filteredEvents.filter(event => 
+      event.status !== 'canceled' && event.status !== 'cancelled'
+    );
+    
+    const bookingStats = activeBookings.reduce((stats, event) => {
       stats.totalBookings++;
       switch (event.status) {
         case 'active':
         case 'scheduled':
           stats.scheduled++;
-          break;
-        case 'canceled':
-        case 'cancelled':
-          stats.cancelled++;
           break;
         case 'no_show':
           stats.noShows++;
@@ -41,6 +48,9 @@ export const useCallStatsCalculations = (calendlyEvents: any[], dateRange: { fro
       }
       return stats;
     }, { totalBookings: 0, scheduled: 0, cancelled: 0, noShows: 0, other: 0 });
+
+    // Use cancelled events filtered by cancellation date
+    bookingStats.cancelled = cancelledFilteredEvents.length;
 
     // Use scheduled events for actual call performance metrics
     const callPerformanceStats = scheduledFilteredEvents.reduce((stats, event) => {
@@ -60,14 +70,15 @@ export const useCallStatsCalculations = (calendlyEvents: any[], dateRange: { fro
       return stats;
     }, { scheduledCalls: 0, cancelledCalls: 0, noShowCalls: 0 });
 
-    console.log('Booking stats (by created_at):', bookingStats);
+    console.log('Booking stats (by created_at, excluding cancelled):', bookingStats);
     console.log('Call performance stats (by scheduled_at):', callPerformanceStats);
+    console.log('Cancelled events stats (by cancellation date):', cancelledFilteredEvents.length);
 
     // Combine the stats appropriately
     return {
       totalBookings: bookingStats.totalBookings,
       scheduled: bookingStats.scheduled,
-      cancelled: bookingStats.cancelled,
+      cancelled: bookingStats.cancelled, // Now uses cancellation date
       noShows: bookingStats.noShows,
       other: bookingStats.other,
       // Use scheduled events data for actual call performance
@@ -75,7 +86,7 @@ export const useCallStatsCalculations = (calendlyEvents: any[], dateRange: { fro
       actualCancelledCalls: callPerformanceStats.cancelledCalls,
       actualNoShows: callPerformanceStats.noShowCalls
     };
-  }, [filteredEvents, scheduledFilteredEvents, userTimezone]);
+  }, [filteredEvents, scheduledFilteredEvents, cancelledFilteredEvents, userTimezone]);
 
   const previousStats = useMemo(() => {
     // Create previous date range based on the current range length
@@ -91,17 +102,19 @@ export const useCallStatsCalculations = (calendlyEvents: any[], dateRange: { fro
     
     const previousEvents = filterEventsByDateRange(calendlyEvents, { from: previousFrom, to: previousTo }, userTimezone);
     const previousScheduledEvents = filterEventsByScheduledDateRange(calendlyEvents, { from: previousFrom, to: previousTo }, userTimezone);
+    const previousCancelledEvents = filterCancelledEventsByDateRange(calendlyEvents, { from: previousFrom, to: previousTo }, userTimezone);
 
-    const bookingStats = previousEvents.reduce((stats, event) => {
+    // Use created events for total bookings, excluding cancelled ones
+    const previousActiveBookings = previousEvents.filter(event => 
+      event.status !== 'canceled' && event.status !== 'cancelled'
+    );
+
+    const bookingStats = previousActiveBookings.reduce((stats, event) => {
       stats.totalBookings++;
       switch (event.status) {
         case 'active':
         case 'scheduled':
           stats.scheduled++;
-          break;
-        case 'canceled':
-        case 'cancelled':
-          stats.cancelled++;
           break;
         case 'no_show':
           stats.noShows++;
@@ -109,6 +122,9 @@ export const useCallStatsCalculations = (calendlyEvents: any[], dateRange: { fro
       }
       return stats;
     }, { totalBookings: 0, scheduled: 0, cancelled: 0, noShows: 0 });
+
+    // Use cancelled events filtered by cancellation date
+    bookingStats.cancelled = previousCancelledEvents.length;
 
     const callPerformanceStats = previousScheduledEvents.reduce((stats, event) => {
       switch (event.status) {
@@ -130,7 +146,7 @@ export const useCallStatsCalculations = (calendlyEvents: any[], dateRange: { fro
     return {
       totalBookings: bookingStats.totalBookings,
       scheduled: bookingStats.scheduled,
-      cancelled: bookingStats.cancelled,
+      cancelled: bookingStats.cancelled, // Now uses cancellation date
       noShows: bookingStats.noShows,
       actualScheduledCalls: callPerformanceStats.scheduledCalls,
       actualCancelledCalls: callPerformanceStats.cancelledCalls,
@@ -150,6 +166,7 @@ export const useCallStatsCalculations = (calendlyEvents: any[], dateRange: { fro
     previousCallsTaken,
     previousShowUpRate,
     totalBookings: callStats.totalBookings,
+    cancelled: callStats.cancelled,
     actualScheduledCalls: callStats.actualScheduledCalls
   });
 
