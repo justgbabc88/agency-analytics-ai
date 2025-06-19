@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -396,34 +395,66 @@ export const CalendlyConnector = ({
   const toggleEventMapping = async (eventType: EventType, isActive: boolean) => {
     if (!projectId) return;
 
+    console.log('🎯 Attempting to toggle event mapping:', {
+      eventName: eventType.name,
+      eventUri: eventType.uri,
+      isActive,
+      projectId
+    });
+
     try {
       if (isActive) {
         // Create mapping
+        console.log('📝 Creating mapping for:', eventType.name);
+        
+        const mappingData = {
+          project_id: projectId,
+          calendly_event_type_id: eventType.uri,
+          event_type_name: eventType.name,
+          is_active: true,
+        };
+        
+        console.log('📤 Inserting mapping data:', mappingData);
+        
         const { error } = await supabase
           .from('calendly_event_mappings')
-          .upsert({
-            project_id: projectId,
-            calendly_event_type_id: eventType.uri,
-            event_type_name: eventType.name,
-            is_active: true,
-          });
+          .upsert(mappingData);
 
-        if (error) throw error;
+        if (error) {
+          console.error('❌ Database error creating mapping:', error);
+          console.error('Error details:', {
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint
+          });
+          throw error;
+        }
+        
+        console.log('✅ Successfully created mapping for:', eventType.name);
         
         // Auto-sync historical events when first event type is added
         const currentMappings = eventMappings.filter(m => m.is_active);
         if (currentMappings.length === 0) {
+          console.log('🔄 Triggering auto-sync for first event mapping');
           setTimeout(() => manualResyncEvents(), 1000);
         }
       } else {
         // Remove mapping
+        console.log('🗑️ Removing mapping for:', eventType.name);
+        
         const { error } = await supabase
           .from('calendly_event_mappings')
           .delete()
           .eq('project_id', projectId)
           .eq('calendly_event_type_id', eventType.uri);
 
-        if (error) throw error;
+        if (error) {
+          console.error('❌ Database error removing mapping:', error);
+          throw error;
+        }
+        
+        console.log('✅ Successfully removed mapping for:', eventType.name);
       }
 
       await loadEventMappings();
@@ -433,12 +464,32 @@ export const CalendlyConnector = ({
         description: `${eventType.name} ${isActive ? 'will now be' : 'will no longer be'} tracked`,
       });
     } catch (error) {
-      console.error('Failed to update event mapping:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update event tracking",
-        variant: "destructive",
-      });
+      console.error('💥 Failed to update event mapping for:', eventType.name, error);
+      
+      // Enhanced error reporting
+      if (error.code === '23505') {
+        console.error('🔍 Duplicate key violation - checking existing mappings...');
+        
+        // Check if mapping already exists
+        const { data: existingMappings } = await supabase
+          .from('calendly_event_mappings')
+          .select('*')
+          .eq('calendly_event_type_id', eventType.uri);
+          
+        console.error('📋 Existing mappings for this event type:', existingMappings);
+        
+        toast({
+          title: "Mapping Already Exists",
+          description: `${eventType.name} is already being tracked. Try refreshing the page.`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: `Failed to update event tracking for ${eventType.name}: ${error.message}`,
+          variant: "destructive",
+        });
+      }
     }
   };
 
