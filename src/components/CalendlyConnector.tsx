@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -304,10 +303,10 @@ export const CalendlyConnector = ({
 
         logDebug('Update successful');
       } else if (isActive) {
-        // Only create new mapping if activating
+        // Only create new mapping if activating and no existing mapping found
         logDebug('Creating new mapping');
         
-        // Prepare insert data with explicit project_id
+        // Use upsert with the unique constraint to handle any race conditions
         const insertData = {
           project_id: projectId,
           calendly_event_type_id: eventType.uri,
@@ -317,29 +316,23 @@ export const CalendlyConnector = ({
 
         logDebug('Insert data prepared:', insertData);
 
-        // Try direct insert first
+        // Use upsert to handle the unique constraint properly
         const { data: insertResult, error: insertError } = await supabase
           .from('calendly_event_mappings')
-          .insert(insertData)
+          .upsert(insertData, { 
+            onConflict: 'calendly_event_type_id',
+            ignoreDuplicates: false 
+          })
           .select();
 
-        logDebug('Insert result:', { insertResult, insertError });
+        logDebug('Upsert result:', { insertResult, insertError });
 
         if (insertError) {
-          logDebug('Insert failed with RLS error, debugging further...', insertError);
-          
-          // Additional debugging - check if we can even read from the table
-          const { data: testRead, error: readError } = await supabase
-            .from('calendly_event_mappings')
-            .select('count(*)')
-            .eq('project_id', projectId);
-            
-          logDebug('Test read result:', { testRead, readError });
-          
+          logDebug('Upsert failed:', insertError);
           throw new Error(`Insert failed: ${insertError.message}`);
         }
 
-        logDebug('Insert successful');
+        logDebug('Upsert successful');
       } else {
         logDebug('Deactivating non-existent mapping - no action needed');
       }
