@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -80,7 +81,7 @@ serve(async (req) => {
         }
 
         const userData = await userResponse.json();
-        const userUri = userData.resource.uri;
+        const currentUserUri = userData.resource.uri;
         console.log('📋 Current organization:', userData.resource.current_organization);
 
         // Store the tokens
@@ -92,7 +93,7 @@ serve(async (req) => {
             data: {
               access_token: tokenData.access_token,
               refresh_token: tokenData.refresh_token,
-              user_uri: userUri,
+              user_uri: currentUserUri,
               organization_uri: userData.resource.current_organization,
               scope: tokenData.scope,
               token_type: tokenData.token_type,
@@ -166,7 +167,7 @@ serve(async (req) => {
 
         return new Response(JSON.stringify({ 
           success: true,
-          user_uri: userUri,
+          user_uri: currentUserUri,
           organization: userData.resource.current_organization
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -274,12 +275,12 @@ serve(async (req) => {
         }
 
         const accessToken = tokenDataForTypes.data.access_token;
-        const userUri = tokenDataForTypes.data.user_uri;
+        const eventTypesUserUri = tokenDataForTypes.data.user_uri;
         
-        console.log('👤 Using user URI for event types:', userUri);
+        console.log('👤 Using user URI for event types:', eventTypesUserUri);
         console.log('🔑 Access token available:', !!accessToken);
         
-        const eventTypesUrl = `https://api.calendly.com/event_types?user=${encodeURIComponent(userUri)}`;
+        const eventTypesUrl = `https://api.calendly.com/event_types?user=${encodeURIComponent(eventTypesUserUri)}`;
         console.log('🌐 Fetching event types from URL:', eventTypesUrl);
 
         const eventTypesResponse = await fetch(eventTypesUrl, {
