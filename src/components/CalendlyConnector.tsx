@@ -274,6 +274,7 @@ export const CalendlyConnector = ({
         .eq('project_id', projectId);
 
       if (error) throw error;
+      console.log('📋 Loaded event mappings:', data);
       setEventMappings(data || []);
     } catch (error) {
       console.error('Failed to load event mappings:', error);
@@ -453,34 +454,68 @@ export const CalendlyConnector = ({
 
     try {
       if (isActive) {
-        // Create mapping
-        console.log('📝 Creating mapping for:', eventType.name);
-        
-        const mappingData = {
-          project_id: projectId,
-          calendly_event_type_id: eventType.uri,
-          event_type_name: eventType.name,
-          is_active: true,
-        };
-        
-        console.log('📤 Inserting mapping data:', mappingData);
-        
-        const { error } = await supabase
+        // First check if mapping already exists
+        console.log('🔍 Checking for existing mapping...');
+        const { data: existingMappings, error: checkError } = await supabase
           .from('calendly_event_mappings')
-          .upsert(mappingData);
+          .select('*')
+          .eq('project_id', projectId)
+          .eq('calendly_event_type_id', eventType.uri);
 
-        if (error) {
-          console.error('❌ Database error creating mapping:', error);
-          console.error('Error details:', {
-            message: error.message,
-            code: error.code,
-            details: error.details,
-            hint: error.hint
-          });
-          throw error;
+        if (checkError) {
+          console.error('❌ Error checking existing mappings:', checkError);
+          throw checkError;
         }
-        
-        console.log('✅ Successfully created mapping for:', eventType.name);
+
+        console.log('📋 Existing mappings found:', existingMappings);
+
+        if (existingMappings && existingMappings.length > 0) {
+          // Mapping exists, update it to active if it's inactive
+          const existingMapping = existingMappings[0];
+          if (!existingMapping.is_active) {
+            console.log('📝 Updating existing inactive mapping to active...');
+            const { error: updateError } = await supabase
+              .from('calendly_event_mappings')
+              .update({ 
+                is_active: true,
+                event_type_name: eventType.name, // Update name in case it changed
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', existingMapping.id);
+
+            if (updateError) {
+              console.error('❌ Error updating existing mapping:', updateError);
+              throw updateError;
+            }
+            
+            console.log('✅ Successfully updated existing mapping to active');
+          } else {
+            console.log('ℹ️ Mapping already exists and is active');
+          }
+        } else {
+          // Create new mapping
+          console.log('📝 Creating new mapping for:', eventType.name);
+          
+          const mappingData = {
+            project_id: projectId,
+            calendly_event_type_id: eventType.uri,
+            event_type_name: eventType.name,
+            is_active: true,
+          };
+          
+          console.log('📤 Inserting mapping data:', mappingData);
+          
+          const { error: insertError } = await supabase
+            .from('calendly_event_mappings')
+            .insert(mappingData);
+
+          if (insertError) {
+            console.error('❌ Database error creating mapping:', insertError);
+            throw insertError;
+          }
+          
+          console.log('✅ Successfully created new mapping for:', eventType.name);
+        }
         
         // Auto-sync historical events when first event type is added
         const currentMappings = eventMappings.filter(m => m.is_active);
@@ -489,21 +524,24 @@ export const CalendlyConnector = ({
           setTimeout(() => manualResyncEvents(), 1000);
         }
       } else {
-        // Remove mapping
-        console.log('🗑️ Removing mapping for:', eventType.name);
+        // Remove mapping by setting it to inactive
+        console.log('🗑️ Deactivating mapping for:', eventType.name);
         
-        const { error } = await supabase
+        const { error: updateError } = await supabase
           .from('calendly_event_mappings')
-          .delete()
+          .update({ 
+            is_active: false,
+            updated_at: new Date().toISOString()
+          })
           .eq('project_id', projectId)
           .eq('calendly_event_type_id', eventType.uri);
 
-        if (error) {
-          console.error('❌ Database error removing mapping:', error);
-          throw error;
+        if (updateError) {
+          console.error('❌ Database error deactivating mapping:', updateError);
+          throw updateError;
         }
         
-        console.log('✅ Successfully removed mapping for:', eventType.name);
+        console.log('✅ Successfully deactivated mapping for:', eventType.name);
       }
 
       await loadEventMappings();
@@ -515,37 +553,20 @@ export const CalendlyConnector = ({
     } catch (error) {
       console.error('💥 Failed to update event mapping for:', eventType.name, error);
       
-      // Enhanced error reporting
-      if (error.code === '23505') {
-        console.error('🔍 Duplicate key violation - checking existing mappings...');
-        
-        // Check if mapping already exists
-        const { data: existingMappings } = await supabase
-          .from('calendly_event_mappings')
-          .select('*')
-          .eq('calendly_event_type_id', eventType.uri);
-          
-        console.error('📋 Existing mappings for this event type:', existingMappings);
-        
-        toast({
-          title: "Mapping Already Exists",
-          description: `${eventType.name} is already being tracked. Try refreshing the page.`,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Error",
-          description: `Failed to update event tracking for ${eventType.name}: ${error.message}`,
-          variant: "destructive",
-        });
-      }
+      toast({
+        title: "Error",
+        description: `Failed to update event tracking for ${eventType.name}: ${error.message}`,
+        variant: "destructive",
+      });
     }
   };
 
   const isEventMapped = (eventTypeUri: string) => {
-    return eventMappings.some(mapping => 
+    const mapped = eventMappings.some(mapping => 
       mapping.calendly_event_type_id === eventTypeUri && mapping.is_active
     );
+    console.log('🔍 Checking if event is mapped:', eventTypeUri, 'Result:', mapped);
+    return mapped;
   };
 
   const handleDisconnect = async () => {
