@@ -131,12 +131,7 @@ export const CalendlyConnector = ({
         .eq('is_connected', true)
         .maybeSingle();
 
-      if (integrationError) {
-        onConnectionChange(false);
-        return;
-      }
-
-      if (!integration) {
+      if (integrationError || !integration) {
         onConnectionChange(false);
         return;
       }
@@ -165,13 +160,7 @@ export const CalendlyConnector = ({
       await loadEventMappings();
       
     } catch (error) {
-      if (!connecting) {
-        toast({
-          title: "Connection Check Failed",
-          description: "Network error while checking connection. Refresh to retry.",
-          variant: "default",
-        });
-      }
+      // Silent fail for connection check
     } finally {
       setLoading(false);
       setConnecting(false);
@@ -194,7 +183,7 @@ export const CalendlyConnector = ({
     }
   };
 
-  const manualResyncEvents = async () => {
+  const syncEvents = async () => {
     if (!projectId) return;
 
     setSyncing(true);
@@ -231,79 +220,44 @@ export const CalendlyConnector = ({
     if (!projectId) return;
 
     try {
-      if (isActive) {
-        // Check if mapping already exists
-        const { data: existingMappings } = await supabase
-          .from('calendly_event_mappings')
-          .select('*')
-          .eq('calendly_event_type_id', eventType.uri)
-          .eq('project_id', projectId);
+      // Check if mapping exists
+      const existingMapping = eventMappings.find(m => 
+        m.calendly_event_type_id === eventType.uri
+      );
 
-        if (existingMappings && existingMappings.length > 0) {
-          // Update existing mapping to active
-          const { error: updateError } = await supabase
-            .from('calendly_event_mappings')
-            .update({ 
-              is_active: true,
-              event_type_name: eventType.name,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', existingMappings[0].id);
-
-          if (updateError) throw updateError;
-        } else {
-          // Create new mapping
-          const { error: insertError } = await supabase
-            .from('calendly_event_mappings')
-            .insert({
-              project_id: projectId,
-              calendly_event_type_id: eventType.uri,
-              event_type_name: eventType.name,
-              is_active: true,
-            });
-
-          if (insertError) {
-            if (insertError.code === '23505') {
-              // Handle unique constraint by updating
-              const { error: updateError } = await supabase
-                .from('calendly_event_mappings')
-                .update({ 
-                  is_active: true,
-                  event_type_name: eventType.name,
-                  updated_at: new Date().toISOString()
-                })
-                .eq('project_id', projectId)
-                .eq('calendly_event_type_id', eventType.uri);
-
-              if (updateError) throw updateError;
-            } else {
-              throw insertError;
-            }
-          }
-        }
-        
-        // Auto-sync events when first event type is added
-        const currentActiveMappings = eventMappings.filter(m => m.is_active);
-        if (currentActiveMappings.length === 0) {
-          setTimeout(() => manualResyncEvents(), 1000);
-        }
-      } else {
-        // Deactivate mapping
-        const { error: updateError } = await supabase
+      if (existingMapping) {
+        // Update existing mapping
+        const { error } = await supabase
           .from('calendly_event_mappings')
           .update({ 
-            is_active: false,
+            is_active: isActive,
+            event_type_name: eventType.name,
             updated_at: new Date().toISOString()
           })
-          .eq('project_id', projectId)
-          .eq('calendly_event_type_id', eventType.uri);
+          .eq('id', existingMapping.id);
 
-        if (updateError) throw updateError;
+        if (error) throw error;
+      } else if (isActive) {
+        // Create new mapping only if activating
+        const { error } = await supabase
+          .from('calendly_event_mappings')
+          .insert({
+            project_id: projectId,
+            calendly_event_type_id: eventType.uri,
+            event_type_name: eventType.name,
+            is_active: true,
+          });
+
+        if (error) throw error;
       }
 
-      // Reload mappings and refresh events
+      // Reload mappings to update UI
       await loadEventMappings();
-      setTimeout(() => manualResyncEvents(), 500);
+      
+      // Sync events when toggling
+      if (isActive) {
+        setTimeout(() => syncEvents(), 500);
+      }
       
       toast({
         title: isActive ? "Event Added" : "Event Removed",
@@ -415,7 +369,7 @@ export const CalendlyConnector = ({
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  onClick={manualResyncEvents}
+                  onClick={syncEvents}
                   disabled={syncing}
                 >
                   <RefreshCw className={`h-4 w-4 mr-1 ${syncing ? 'animate-spin' : ''}`} />
