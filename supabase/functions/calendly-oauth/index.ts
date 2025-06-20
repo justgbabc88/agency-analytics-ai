@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -259,6 +258,8 @@ serve(async (req) => {
         });
 
       case 'get_event_types':
+        console.log('🔍 Starting event types fetch for project:', projectId);
+        
         // Get access token first
         const { data: tokenDataForTypes, error: tokenError } = await supabase
           .from('project_integration_data')
@@ -268,22 +269,51 @@ serve(async (req) => {
           .single();
 
         if (tokenError || !tokenDataForTypes) {
+          console.error('❌ No access token found for project:', projectId, tokenError);
           throw new Error('No access token found');
         }
 
-        const eventTypesResponse = await fetch(`https://api.calendly.com/event_types?user=${encodeURIComponent(tokenDataForTypes.data.user_uri)}`, {
+        const accessToken = tokenDataForTypes.data.access_token;
+        const userUri = tokenDataForTypes.data.user_uri;
+        
+        console.log('👤 Using user URI for event types:', userUri);
+        console.log('🔑 Access token available:', !!accessToken);
+        
+        const eventTypesUrl = `https://api.calendly.com/event_types?user=${encodeURIComponent(userUri)}`;
+        console.log('🌐 Fetching event types from URL:', eventTypesUrl);
+
+        const eventTypesResponse = await fetch(eventTypesUrl, {
           headers: {
-            'Authorization': `Bearer ${tokenDataForTypes.data.access_token}`,
+            'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json'
           }
         });
 
+        console.log('📡 Event types response status:', eventTypesResponse.status);
+        
         if (!eventTypesResponse.ok) {
-          throw new Error('Failed to fetch event types');
+          const errorText = await eventTypesResponse.text();
+          console.error('❌ Event types API error:', {
+            status: eventTypesResponse.status,
+            statusText: eventTypesResponse.statusText,
+            body: errorText
+          });
+          throw new Error(`Failed to fetch event types: ${eventTypesResponse.status} - ${errorText}`);
         }
 
         const eventTypesData = await eventTypesResponse.json();
-        return new Response(JSON.stringify(eventTypesData), {
+        console.log('📋 Raw event types response:', JSON.stringify(eventTypesData, null, 2));
+        console.log('🎯 Event types collection length:', eventTypesData.collection?.length || 0);
+        
+        // Transform the response to match expected format
+        const transformedResponse = {
+          event_types: eventTypesData.collection || [],
+          pagination: eventTypesData.pagination || {}
+        };
+        
+        console.log('✅ Returning transformed event types:', transformedResponse.event_types.length);
+        
+        return new Response(JSON.stringify(transformedResponse), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
 
