@@ -37,7 +37,6 @@ export const CalendlyConnector = ({
   const [eventMappings, setEventMappings] = useState<EventMapping[]>([]);
   const [loading, setLoading] = useState(false);
   const [connecting, setConnecting] = useState(false);
-  const [syncing, setSyncing] = useState(false);
   const { toast } = useToast();
 
   const handleConnect = async () => {
@@ -179,40 +178,7 @@ export const CalendlyConnector = ({
       if (error) throw error;
       setEventMappings(data || []);
     } catch (error) {
-      // Silent fail for mappings load
-    }
-  };
-
-  const syncEvents = async () => {
-    if (!projectId) return;
-
-    setSyncing(true);
-    
-    try {
-      const { data, error } = await supabase.functions.invoke('calendly-sync-gaps', {
-        body: { 
-          triggerReason: 'manual_sync',
-          projectId
-        }
-      });
-
-      if (error) {
-        throw new Error(error.message || 'Failed to sync events');
-      }
-
-      toast({
-        title: "Events Synced Successfully",
-        description: `Synced ${data.eventsSynced || 0} events from Calendly.`,
-      });
-
-    } catch (error) {
-      toast({
-        title: "Sync Failed", 
-        description: error.message || "Failed to sync events",
-        variant: "destructive"
-      });
-    } finally {
-      setSyncing(false);
+      console.error('Failed to load event mappings:', error);
     }
   };
 
@@ -236,7 +202,10 @@ export const CalendlyConnector = ({
           })
           .eq('id', existingMapping.id);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Update error:', error);
+          throw new Error(`Failed to update mapping: ${error.message}`);
+        }
       } else if (isActive) {
         // Create new mapping only if activating
         const { error } = await supabase
@@ -248,25 +217,41 @@ export const CalendlyConnector = ({
             is_active: true,
           });
 
-        if (error) throw error;
+        if (error) {
+          console.error('Insert error:', error);
+          throw new Error(`Failed to create mapping: ${error.message}`);
+        }
       }
 
       // Reload mappings to update UI
       await loadEventMappings();
       
-      // Sync events when toggling
-      if (isActive) {
-        setTimeout(() => syncEvents(), 500);
-      }
-      
       toast({
         title: isActive ? "Event Added" : "Event Removed",
         description: `${eventType.name} ${isActive ? 'will now be' : 'will no longer be'} tracked`,
       });
+
+      // Auto-sync events when enabling
+      if (isActive) {
+        setTimeout(async () => {
+          try {
+            await supabase.functions.invoke('calendly-sync-gaps', {
+              body: { 
+                triggerReason: 'event_enabled',
+                projectId
+              }
+            });
+          } catch (error) {
+            console.error('Auto-sync failed:', error);
+          }
+        }, 1000);
+      }
+      
     } catch (error) {
+      console.error('Toggle event mapping error:', error);
       toast({
         title: "Error",
-        description: `Failed to update event tracking for ${eventType.name}`,
+        description: error.message || `Failed to update event tracking for ${eventType.name}`,
         variant: "destructive",
       });
     }
@@ -365,30 +350,10 @@ export const CalendlyConnector = ({
                 <CheckCircle className="h-3 w-3 mr-1" />
                 Connected
               </Badge>
-              <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={syncEvents}
-                  disabled={syncing}
-                >
-                  <RefreshCw className={`h-4 w-4 mr-1 ${syncing ? 'animate-spin' : ''}`} />
-                  Sync Events
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleDisconnect}>
-                  Disconnect
-                </Button>
-              </div>
+              <Button variant="outline" size="sm" onClick={handleDisconnect}>
+                Disconnect
+              </Button>
             </div>
-
-            {syncing && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <div className="flex items-center gap-2 text-blue-700">
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                  <span className="text-sm">Syncing events from Calendly...</span>
-                </div>
-              </div>
-            )}
 
             {eventTypes.length > 0 && (
               <div className="space-y-4">
@@ -397,27 +362,30 @@ export const CalendlyConnector = ({
                     Select Event Types to Track
                   </h4>
                   <div className="space-y-3">
-                    {eventTypes.map((eventType) => (
-                      <div key={eventType.uri} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div className="flex items-center space-x-3">
-                          <Checkbox
-                            checked={isEventMapped(eventType.uri)}
-                            onCheckedChange={(checked) => 
-                              toggleEventMapping(eventType, checked === true)
-                            }
-                          />
-                          <div>
-                            <p className="font-medium">{eventType.name}</p>
-                            <p className="text-sm text-gray-500">
-                              {eventType.duration} minutes
-                            </p>
+                    {eventTypes.map((eventType) => {
+                      const isMapped = isEventMapped(eventType.uri);
+                      return (
+                        <div key={eventType.uri} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div className="flex items-center space-x-3">
+                            <Checkbox
+                              checked={isMapped}
+                              onCheckedChange={(checked) => 
+                                toggleEventMapping(eventType, checked === true)
+                              }
+                            />
+                            <div>
+                              <p className="font-medium">{eventType.name}</p>
+                              <p className="text-sm text-gray-500">
+                                {eventType.duration} minutes
+                              </p>
+                            </div>
                           </div>
+                          {isMapped && (
+                            <CheckCircle className="h-5 w-5 text-green-600" />
+                          )}
                         </div>
-                        {isEventMapped(eventType.uri) && (
-                          <CheckCircle className="h-5 w-5 text-green-600" />
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
