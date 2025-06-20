@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -31,7 +30,7 @@ serve(async (req) => {
       throw new Error('Missing Calendly credentials');
     }
 
-    // Define the redirect URI that matches what we configured in Calendly
+    // Use the correct redirect URI that should match your Calendly app configuration
     const redirectUri = 'https://iqxvtfupjjxjkbajgcve.supabase.co/functions/v1/calendly-oauth-callback';
 
     switch (action) {
