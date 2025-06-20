@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Copy, Eye, EyeOff } from "lucide-react";
+import { Copy, Eye, EyeOff, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { PixelConfiguration } from './PixelConfiguration';
 
 interface TrackingPixelGeneratorProps {
@@ -31,6 +33,7 @@ export const TrackingPixelGenerator = ({ projectId }: TrackingPixelGeneratorProp
   const [showScript, setShowScript] = useState(false);
   const [config, setConfig] = useState(defaultConfig);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const generatePixelId = () => {
     const id = `pixel_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -40,6 +43,64 @@ export const TrackingPixelGenerator = ({ projectId }: TrackingPixelGeneratorProp
   useEffect(() => {
     generatePixelId();
   }, []);
+
+  const createPixel = useMutation({
+    mutationFn: async () => {
+      if (!pixelName.trim()) {
+        throw new Error('Pixel name is required');
+      }
+
+      console.log('Creating pixel with data:', {
+        project_id: projectId,
+        name: pixelName,
+        pixel_id: pixelId,
+        domains: domains ? domains.split(',').map(d => d.trim()) : [],
+        config
+      });
+
+      const { data, error } = await supabase
+        .from('tracking_pixels')
+        .insert({
+          project_id: projectId,
+          name: pixelName,
+          pixel_id: pixelId,
+          domains: domains ? domains.split(',').map(d => d.trim()) : [],
+          config,
+          is_active: true
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Pixel creation error:', error);
+        throw error;
+      }
+
+      console.log('Pixel created successfully:', data);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tracking-pixels', projectId] });
+      toast({
+        title: "Success",
+        description: "Tracking pixel created successfully",
+      });
+      
+      // Reset form
+      setPixelName('');
+      setDomains('');
+      generatePixelId();
+      setConfig(defaultConfig);
+    },
+    onError: (error) => {
+      console.error('Pixel creation failed:', error);
+      toast({
+        title: "Error",
+        description: `Failed to create tracking pixel: ${error.message}`,
+        variant: "destructive",
+      });
+    },
+  });
 
   const generateTrackingScript = () => {
     const supabaseUrl = "https://iqxvtfupjjxjkbajgcve.supabase.co";
@@ -358,6 +419,15 @@ export const TrackingPixelGenerator = ({ projectId }: TrackingPixelGeneratorProp
               </Button>
             </div>
           </div>
+
+          <Button 
+            onClick={() => createPixel.mutate()} 
+            disabled={createPixel.isPending || !pixelName.trim()}
+            className="w-full"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            {createPixel.isPending ? 'Creating...' : 'Create Pixel'}
+          </Button>
         </CardContent>
       </Card>
 

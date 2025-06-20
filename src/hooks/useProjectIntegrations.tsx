@@ -1,167 +1,121 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 export const useProjectIntegrations = (projectId?: string) => {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const { data: integrations, isLoading } = useQuery({
     queryKey: ['project-integrations', projectId],
     queryFn: async () => {
       if (!projectId) return [];
       
-      console.log('Fetching integrations for project:', projectId);
+      console.log('Fetching project integrations for project:', projectId);
       
-      try {
-        const { data, error } = await supabase
-          .from('project_integrations')
-          .select('*')
-          .eq('project_id', projectId)
-          .order('platform');
+      const { data, error } = await supabase
+        .from('project_integrations')
+        .select('*')
+        .eq('project_id', projectId);
 
-        if (error) {
-          console.error('Error fetching project integrations:', error);
-          throw error;
-        }
-        
-        console.log('Fetched integrations:', data);
-        return data || [];
-      } catch (error) {
-        console.error('Failed to fetch project integrations:', error);
+      if (error) {
+        console.error('Error fetching project integrations:', error);
         throw error;
       }
+      
+      console.log('Project integrations fetched:', data);
+      return data || [];
     },
     enabled: !!projectId,
-    retry: 3,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 
   const updateIntegration = useMutation({
     mutationFn: async ({ platform, isConnected }: { platform: string; isConnected: boolean }) => {
-      if (!projectId) {
-        const error = new Error('No project selected');
-        console.error('Update integration failed:', error.message);
-        throw error;
-      }
+      if (!projectId) throw new Error('No project ID provided');
       
       console.log('Updating integration:', { projectId, platform, isConnected });
       
-      try {
-        // First check if the integration exists
-        const { data: existing, error: checkError } = await supabase
-          .from('project_integrations')
-          .select('id, is_connected, last_sync')
-          .eq('project_id', projectId)
-          .eq('platform', platform)
-          .maybeSingle();
+      // Use upsert to handle the unique constraint properly
+      const { data, error } = await supabase
+        .from('project_integrations')
+        .upsert({
+          project_id: projectId,
+          platform,
+          is_connected: isConnected,
+          last_sync: isConnected ? new Date().toISOString() : null,
+        }, {
+          onConflict: 'project_id,platform',
+          ignoreDuplicates: false
+        })
+        .select()
+        .single();
 
-        if (checkError) {
-          console.error('Error checking existing integration:', checkError);
-          throw checkError;
-        }
-
-        let result;
-        const timestamp = new Date().toISOString();
-
-        if (existing) {
-          // Update existing integration
-          console.log('Updating existing integration:', existing.id);
-          const { data, error } = await supabase
-            .from('project_integrations')
-            .update({
-              is_connected: isConnected,
-              last_sync: isConnected ? timestamp : existing.last_sync,
-              updated_at: timestamp,
-            })
-            .eq('id', existing.id)
-            .select()
-            .single();
-
-          if (error) {
-            console.error('Error updating existing integration:', error);
-            throw error;
-          }
-          result = data;
-        } else {
-          // Create new integration
-          console.log('Creating new integration for platform:', platform);
-          const { data, error } = await supabase
-            .from('project_integrations')
-            .insert({
-              project_id: projectId,
-              platform,
-              is_connected: isConnected,
-              last_sync: isConnected ? timestamp : null,
-              created_at: timestamp,
-              updated_at: timestamp,
-            })
-            .select()
-            .single();
-
-          if (error) {
-            console.error('Error creating new integration:', error);
-            throw error;
-          }
-          result = data;
-        }
-        
-        console.log('Integration operation completed successfully:', result);
-        return result;
-      } catch (error) {
-        console.error('Error in updateIntegration:', error);
+      if (error) {
+        console.error('Error updating project integration:', error);
         throw error;
       }
+      
+      console.log('Integration updated successfully:', data);
+      return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['project-integrations', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['project-integrations'] });
+      toast({
+        title: "Success",
+        description: "Integration updated successfully",
+      });
     },
     onError: (error) => {
-      console.error('Integration update mutation failed:', error);
+      console.error('Integration update failed:', error);
+      toast({
+        title: "Error",
+        description: `Failed to update integration: ${error.message}`,
+        variant: "destructive",
+      });
     },
   });
 
   const syncIntegration = useMutation({
-    mutationFn: async ({ platform, apiKeys }: { platform: string; apiKeys: Record<string, string> }) => {
-      if (!projectId) {
-        const error = new Error('No project selected');
-        console.error('Sync integration failed:', error.message);
-        throw error;
-      }
+    mutationFn: async (platform: string) => {
+      if (!projectId) throw new Error('No project ID provided');
       
       console.log('Syncing integration:', { projectId, platform });
       
-      try {
-        const { data, error } = await supabase.functions.invoke('sync-project-integrations', {
-          body: { 
-            projectId,
-            platform, 
-            apiKeys 
-          }
-        });
-
-        if (error) {
-          console.error('Error syncing integration:', error);
-          throw error;
+      const { data, error } = await supabase.functions.invoke('sync-project-integrations', {
+        body: {
+          platform,
+          projectId
         }
-        
-        console.log('Sync result:', data);
-        return data;
-      } catch (error) {
-        console.error('Failed to sync integration:', error);
+      });
+
+      if (error) {
+        console.error('Error syncing integration:', error);
         throw error;
       }
+      
+      console.log('Integration synced successfully:', data);
+      return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['project-integrations', projectId] });
-      queryClient.invalidateQueries({ queryKey: ['project-integration-data', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['project-integrations'] });
+      toast({
+        title: "Success",
+        description: "Integration synced successfully",
+      });
     },
     onError: (error) => {
-      console.error('Integration sync mutation failed:', error);
+      console.error('Integration sync failed:', error);
+      toast({
+        title: "Error",
+        description: `Failed to sync integration: ${error.message}`,
+        variant: "destructive",
+      });
     },
   });
 
   return {
-    integrations: integrations || [],
+    integrations,
     isLoading,
     updateIntegration,
     syncIntegration,
