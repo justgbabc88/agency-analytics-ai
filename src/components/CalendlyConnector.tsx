@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -455,97 +454,41 @@ export const CalendlyConnector = ({
 
     try {
       if (isActive) {
-        // First, try to find ANY existing mapping for this event type
-        console.log('🔍 Checking for ANY existing mapping...');
-        const { data: existingMappings, error: checkError } = await supabase
+        // First, check if there's already a mapping for this project and event type
+        console.log('🔍 Checking for existing mapping for this project...');
+        const { data: existingMapping, error: checkError } = await supabase
           .from('calendly_event_mappings')
           .select('*')
-          .eq('calendly_event_type_id', eventType.uri);
+          .eq('calendly_event_type_id', eventType.uri)
+          .eq('project_id', projectId)
+          .maybeSingle();
 
         if (checkError) {
-          console.error('❌ Error checking existing mappings:', checkError);
+          console.error('❌ Error checking existing mapping:', checkError);
           throw checkError;
         }
 
-        console.log('📋 Found existing mappings:', existingMappings);
-
-        if (existingMappings && existingMappings.length > 0) {
-          // Check if any mapping is for our project
-          const projectMapping = existingMappings.find(m => m.project_id === projectId);
-          
-          if (projectMapping) {
-            // Update existing project mapping
-            console.log('📝 Updating existing project mapping...');
-            const { error: updateError } = await supabase
-              .from('calendly_event_mappings')
-              .update({ 
-                is_active: true,
-                event_type_name: eventType.name,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', projectMapping.id);
-
-            if (updateError) {
-              console.error('❌ Error updating existing mapping:', updateError);
-              throw updateError;
-            }
-            
-            console.log('✅ Successfully updated existing project mapping');
-          } else {
-            // There's a mapping for this event type but for a different project
-            // Let's check if we can create one for our project or if we need to handle this differently
-            console.log('📝 Creating new mapping for different project...');
-            
-            const mappingData = {
-              project_id: projectId,
-              calendly_event_type_id: eventType.uri,
-              event_type_name: eventType.name,
+        if (existingMapping) {
+          // Update existing mapping to active
+          console.log('📝 Updating existing mapping to active...');
+          const { error: updateError } = await supabase
+            .from('calendly_event_mappings')
+            .update({ 
               is_active: true,
-            };
-            
-            console.log('📤 Attempting to insert mapping data:', mappingData);
-            
-            // Use upsert to handle potential conflicts
-            const { error: insertError } = await supabase
-              .from('calendly_event_mappings')
-              .upsert(mappingData, {
-                onConflict: 'calendly_event_type_id',
-                ignoreDuplicates: false
-              });
+              event_type_name: eventType.name,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingMapping.id);
 
-            if (insertError) {
-              console.error('❌ Database error creating mapping:', insertError);
-              
-              // If we still get a duplicate error, try to find and update the existing one
-              if (insertError.message?.includes('unique_calendly_event_type_mapping')) {
-                console.log('🔄 Duplicate detected, trying to update existing mapping...');
-                
-                const { error: updateError } = await supabase
-                  .from('calendly_event_mappings')
-                  .update({ 
-                    is_active: true,
-                    event_type_name: eventType.name,
-                    project_id: projectId,
-                    updated_at: new Date().toISOString()
-                  })
-                  .eq('calendly_event_type_id', eventType.uri);
-
-                if (updateError) {
-                  console.error('❌ Error updating after duplicate:', updateError);
-                  throw updateError;
-                }
-                
-                console.log('✅ Successfully updated mapping after duplicate detection');
-              } else {
-                throw insertError;
-              }
-            } else {
-              console.log('✅ Successfully created new mapping for project');
-            }
+          if (updateError) {
+            console.error('❌ Error updating existing mapping:', updateError);
+            throw updateError;
           }
+          
+          console.log('✅ Successfully updated existing mapping');
         } else {
-          // No existing mapping, create new one
-          console.log('📝 Creating completely new mapping...');
+          // Create new mapping
+          console.log('📝 Creating new mapping...');
           
           const mappingData = {
             project_id: projectId,
@@ -562,21 +505,10 @@ export const CalendlyConnector = ({
 
           if (insertError) {
             console.error('❌ Database error creating new mapping:', insertError);
-            
-            // If we get a duplicate error even on a fresh insert, something is wrong
-            if (insertError.message?.includes('unique_calendly_event_type_mapping')) {
-              toast({
-                title: "Mapping Conflict",
-                description: "This event type is already mapped. Please refresh the page and try again.",
-                variant: "destructive",
-              });
-              return;
-            }
-            
             throw insertError;
           }
           
-          console.log('✅ Successfully created completely new mapping');
+          console.log('✅ Successfully created new mapping');
         }
         
         // Auto-sync historical events when first event type is added
@@ -626,8 +558,7 @@ export const CalendlyConnector = ({
   const isEventMapped = (eventTypeUri: string) => {
     const mapped = eventMappings.some(mapping => 
       mapping.calendly_event_type_id === eventTypeUri && 
-      mapping.is_active &&
-      mapping.project_id === projectId
+      mapping.is_active
     );
     console.log('🔍 Checking if event is mapped:', eventTypeUri, 'Result:', mapped);
     return mapped;
