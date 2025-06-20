@@ -44,6 +44,50 @@ export const CalendlyConnector = ({
     console.log(`🔍 [CalendlyConnector] ${message}`, data || '');
   };
 
+  // Debug function to check project ownership
+  const debugProjectOwnership = async () => {
+    if (!projectId) return;
+    
+    try {
+      logDebug('🔍 Debugging project ownership...', { projectId });
+      
+      // Check current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      logDebug('Current user:', { user: user?.id, userError });
+      
+      // Check if user owns project using the function
+      const { data: ownsProject, error: ownershipError } = await supabase
+        .rpc('user_owns_project', { project_uuid: projectId });
+      
+      logDebug('Project ownership check:', { 
+        projectId, 
+        userId: user?.id, 
+        ownsProject, 
+        ownershipError 
+      });
+      
+      // Also check the projects table directly
+      const { data: projects, error: projectsError } = await supabase
+        .from('projects')
+        .select(`
+          id,
+          name,
+          agency_id,
+          agencies(
+            id,
+            user_id,
+            name
+          )
+        `)
+        .eq('id', projectId);
+        
+      logDebug('Direct project query:', { projects, projectsError });
+      
+    } catch (error) {
+      logDebug('Project ownership debug failed:', error);
+    }
+  };
+
   const handleConnect = async () => {
     if (!projectId) {
       toast({
@@ -219,6 +263,9 @@ export const CalendlyConnector = ({
     });
 
     try {
+      // Debug project ownership before attempting the operation
+      await debugProjectOwnership();
+      
       // First, reload the current mappings to get the most up-to-date state
       await loadEventMappings();
       
@@ -260,7 +307,7 @@ export const CalendlyConnector = ({
         // Only create new mapping if activating
         logDebug('Creating new mapping');
         
-        // Use upsert to handle any race conditions
+        // Prepare insert data with explicit project_id
         const insertData = {
           project_id: projectId,
           calendly_event_type_id: eventType.uri,
@@ -268,20 +315,27 @@ export const CalendlyConnector = ({
           is_active: true,
         };
 
-        logDebug('Insert data:', insertData);
+        logDebug('Insert data prepared:', insertData);
 
+        // Try direct insert first
         const { data: insertResult, error: insertError } = await supabase
           .from('calendly_event_mappings')
-          .upsert(insertData, { 
-            onConflict: 'calendly_event_type_id',
-            ignoreDuplicates: false 
-          })
+          .insert(insertData)
           .select();
 
         logDebug('Insert result:', { insertResult, insertError });
 
         if (insertError) {
-          logDebug('Insert failed:', insertError);
+          logDebug('Insert failed with RLS error, debugging further...', insertError);
+          
+          // Additional debugging - check if we can even read from the table
+          const { data: testRead, error: readError } = await supabase
+            .from('calendly_event_mappings')
+            .select('count(*)')
+            .eq('project_id', projectId);
+            
+          logDebug('Test read result:', { testRead, readError });
+          
           throw new Error(`Insert failed: ${insertError.message}`);
         }
 
@@ -424,6 +478,15 @@ export const CalendlyConnector = ({
                 ))}
               </div>
             )}
+            <div className="mt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={debugProjectOwnership}
+              >
+                🔍 Debug Project Ownership
+              </Button>
+            </div>
           </div>
         )}
 
