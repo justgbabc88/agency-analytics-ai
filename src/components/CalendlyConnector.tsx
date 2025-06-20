@@ -219,7 +219,10 @@ export const CalendlyConnector = ({
     });
 
     try {
-      // Find existing mapping
+      // First, reload the current mappings to get the most up-to-date state
+      await loadEventMappings();
+      
+      // Now find existing mapping with fresh data
       const existingMapping = eventMappings.find(m => 
         m.calendly_event_type_id === eventType.uri
       );
@@ -253,49 +256,38 @@ export const CalendlyConnector = ({
         }
 
         logDebug('Update successful');
-      } else {
+      } else if (isActive) {
         // Only create new mapping if activating
-        if (isActive) {
-          logDebug('Creating new mapping');
-          
-          const insertData = {
-            project_id: projectId,
-            calendly_event_type_id: eventType.uri,
-            event_type_name: eventType.name,
-            is_active: true,
-          };
+        logDebug('Creating new mapping');
+        
+        // Use upsert to handle any race conditions
+        const insertData = {
+          project_id: projectId,
+          calendly_event_type_id: eventType.uri,
+          event_type_name: eventType.name,
+          is_active: true,
+        };
 
-          logDebug('Insert data:', insertData);
+        logDebug('Insert data:', insertData);
 
-          const { data: insertResult, error: insertError } = await supabase
-            .from('calendly_event_mappings')
-            .insert(insertData)
-            .select();
+        const { data: insertResult, error: insertError } = await supabase
+          .from('calendly_event_mappings')
+          .upsert(insertData, { 
+            onConflict: 'calendly_event_type_id',
+            ignoreDuplicates: false 
+          })
+          .select();
 
-          logDebug('Insert result:', { insertResult, insertError });
+        logDebug('Insert result:', { insertResult, insertError });
 
-          if (insertError) {
-            logDebug('Insert failed:', insertError);
-            
-            // Check if it's a unique constraint violation
-            if (insertError.message?.includes('unique') || insertError.message?.includes('duplicate')) {
-              logDebug('Unique constraint violation detected, reloading mappings');
-              await loadEventMappings();
-              toast({
-                title: "Event Already Tracked",
-                description: `${eventType.name} is already being tracked`,
-                variant: "destructive",
-              });
-              return;
-            }
-            
-            throw new Error(`Insert failed: ${insertError.message}`);
-          }
-
-          logDebug('Insert successful');
-        } else {
-          logDebug('Deactivating non-existent mapping - no action needed');
+        if (insertError) {
+          logDebug('Insert failed:', insertError);
+          throw new Error(`Insert failed: ${insertError.message}`);
         }
+
+        logDebug('Insert successful');
+      } else {
+        logDebug('Deactivating non-existent mapping - no action needed');
       }
 
       // Reload mappings to get accurate data
@@ -334,6 +326,9 @@ export const CalendlyConnector = ({
         description: `Failed to update event tracking for ${eventType.name}: ${error.message || 'Unknown error'}`,
         variant: "destructive",
       });
+      
+      // Reload mappings even on error to ensure UI is in sync
+      await loadEventMappings();
     }
   };
 
@@ -424,7 +419,7 @@ export const CalendlyConnector = ({
                 <div className="font-medium">Current Mappings:</div>
                 {eventMappings.map(mapping => (
                   <div key={mapping.id} className="text-xs">
-                    {mapping.event_type_name} ({mapping.is_active ? 'Active' : 'Inactive'})
+                    {mapping.event_type_name} ({mapping.is_active ? 'Active' : 'Inactive'}) - URI: {mapping.calendly_event_type_id}
                   </div>
                 ))}
               </div>
