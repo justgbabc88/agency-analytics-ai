@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -454,23 +455,26 @@ export const CalendlyConnector = ({
 
     try {
       if (isActive) {
-        // First, check if there's already a mapping for this project and event type
-        console.log('🔍 Checking for existing mapping for this project...');
-        const { data: existingMapping, error: checkError } = await supabase
+        // Check if mapping already exists (active or inactive)
+        console.log('🔍 Checking for existing mapping...');
+        const { data: existingMappings, error: checkError } = await supabase
           .from('calendly_event_mappings')
           .select('*')
           .eq('calendly_event_type_id', eventType.uri)
-          .eq('project_id', projectId)
-          .maybeSingle();
+          .eq('project_id', projectId);
 
         if (checkError) {
           console.error('❌ Error checking existing mapping:', checkError);
-          throw checkError;
+          throw new Error(`Database error: ${checkError.message}`);
         }
 
-        if (existingMapping) {
+        console.log('📋 Existing mappings found:', existingMappings);
+
+        if (existingMappings && existingMappings.length > 0) {
           // Update existing mapping to active
-          console.log('📝 Updating existing mapping to active...');
+          const existingMapping = existingMappings[0];
+          console.log('📝 Updating existing mapping to active:', existingMapping.id);
+          
           const { error: updateError } = await supabase
             .from('calendly_event_mappings')
             .update({ 
@@ -482,7 +486,7 @@ export const CalendlyConnector = ({
 
           if (updateError) {
             console.error('❌ Error updating existing mapping:', updateError);
-            throw updateError;
+            throw new Error(`Failed to update mapping: ${updateError.message}`);
           }
           
           console.log('✅ Successfully updated existing mapping');
@@ -499,16 +503,24 @@ export const CalendlyConnector = ({
           
           console.log('📤 Inserting new mapping data:', mappingData);
           
-          const { error: insertError } = await supabase
+          const { data: insertedData, error: insertError } = await supabase
             .from('calendly_event_mappings')
-            .insert(mappingData);
+            .insert(mappingData)
+            .select()
+            .single();
 
           if (insertError) {
             console.error('❌ Database error creating new mapping:', insertError);
-            throw insertError;
+            
+            // Handle specific constraint errors
+            if (insertError.code === '23505') { // unique constraint violation
+              throw new Error('This event type is already mapped. Please refresh the page and try again.');
+            }
+            
+            throw new Error(`Failed to create mapping: ${insertError.message}`);
           }
           
-          console.log('✅ Successfully created new mapping');
+          console.log('✅ Successfully created new mapping:', insertedData);
         }
         
         // Auto-sync historical events when first event type is added
@@ -518,7 +530,7 @@ export const CalendlyConnector = ({
           setTimeout(() => manualResyncEvents(), 1000);
         }
       } else {
-        // Remove mapping by setting it to inactive
+        // Deactivate mapping
         console.log('🗑️ Deactivating mapping for:', eventType.name);
         
         const { error: updateError } = await supabase
@@ -532,12 +544,13 @@ export const CalendlyConnector = ({
 
         if (updateError) {
           console.error('❌ Database error deactivating mapping:', updateError);
-          throw updateError;
+          throw new Error(`Failed to deactivate mapping: ${updateError.message}`);
         }
         
         console.log('✅ Successfully deactivated mapping for:', eventType.name);
       }
 
+      // Reload mappings to reflect changes
       await loadEventMappings();
       
       toast({
@@ -549,7 +562,7 @@ export const CalendlyConnector = ({
       
       toast({
         title: "Error",
-        description: `Failed to update event tracking for ${eventType.name}. Please try refreshing the page.`,
+        description: error.message || `Failed to update event tracking for ${eventType.name}. Please try refreshing the page.`,
         variant: "destructive",
       });
     }
