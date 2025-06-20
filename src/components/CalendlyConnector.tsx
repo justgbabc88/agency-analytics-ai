@@ -37,7 +37,12 @@ export const CalendlyConnector = ({
   const [eventMappings, setEventMappings] = useState<EventMapping[]>([]);
   const [loading, setLoading] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [debugMode, setDebugMode] = useState(false);
   const { toast } = useToast();
+
+  const logDebug = (message: string, data?: any) => {
+    console.log(`🔍 [CalendlyConnector] ${message}`, data || '');
+  };
 
   const handleConnect = async () => {
     if (!projectId) {
@@ -120,6 +125,7 @@ export const CalendlyConnector = ({
     if (!projectId) return;
 
     setLoading(true);
+    logDebug('Checking connection status for project:', projectId);
 
     try {
       const { data: integration, error: integrationError } = await supabase
@@ -130,7 +136,10 @@ export const CalendlyConnector = ({
         .eq('is_connected', true)
         .maybeSingle();
 
+      logDebug('Integration check result:', { integration, integrationError });
+
       if (integrationError || !integration) {
+        logDebug('No integration found or error occurred');
         onConnectionChange(false);
         return;
       }
@@ -139,7 +148,10 @@ export const CalendlyConnector = ({
         body: { action: 'get_event_types', projectId }
       });
 
+      logDebug('Event types fetch result:', { data, error });
+
       if (error) {
+        logDebug('Event types fetch failed:', error);
         if (error.message?.includes('authorization') || error.message?.includes('expired') || error.message?.includes('not connected')) {
           onConnectionChange(false);
         }
@@ -159,7 +171,7 @@ export const CalendlyConnector = ({
       await loadEventMappings();
       
     } catch (error) {
-      // Silent fail for connection check
+      logDebug('Connection check failed:', error);
     } finally {
       setLoading(false);
       setConnecting(false);
@@ -169,21 +181,42 @@ export const CalendlyConnector = ({
   const loadEventMappings = async () => {
     if (!projectId) return;
 
+    logDebug('Loading event mappings for project:', projectId);
+
     try {
       const { data, error } = await supabase
         .from('calendly_event_mappings')
         .select('*')
         .eq('project_id', projectId);
 
-      if (error) throw error;
+      logDebug('Event mappings query result:', { data, error, count: data?.length });
+
+      if (error) {
+        logDebug('Event mappings query failed:', error);
+        throw error;
+      }
+      
       setEventMappings(data || []);
+      logDebug('Event mappings loaded successfully:', data?.length || 0);
     } catch (error) {
+      logDebug('Failed to load event mappings:', error);
       console.error('Failed to load event mappings:', error);
     }
   };
 
   const toggleEventMapping = async (eventType: EventType, isActive: boolean) => {
-    if (!projectId) return;
+    if (!projectId) {
+      logDebug('No project ID available for toggle');
+      return;
+    }
+
+    logDebug('Toggle event mapping called', {
+      eventType: eventType.uri,
+      eventName: eventType.name,
+      isActive,
+      projectId,
+      currentMappings: eventMappings.length
+    });
 
     try {
       // Find existing mapping
@@ -191,64 +224,92 @@ export const CalendlyConnector = ({
         m.calendly_event_type_id === eventType.uri
       );
 
+      logDebug('Existing mapping search result:', { 
+        found: !!existingMapping, 
+        existingMapping,
+        searchUri: eventType.uri,
+        allMappingUris: eventMappings.map(m => m.calendly_event_type_id)
+      });
+
       if (existingMapping) {
+        logDebug('Updating existing mapping:', existingMapping.id);
+        
         // Update existing mapping
-        const { error } = await supabase
+        const { data: updateData, error: updateError } = await supabase
           .from('calendly_event_mappings')
           .update({ 
             is_active: isActive,
             event_type_name: eventType.name,
             updated_at: new Date().toISOString()
           })
-          .eq('id', existingMapping.id);
+          .eq('id', existingMapping.id)
+          .select();
 
-        if (error) throw error;
+        logDebug('Update result:', { updateData, updateError });
+
+        if (updateError) {
+          logDebug('Update failed:', updateError);
+          throw new Error(`Update failed: ${updateError.message}`);
+        }
+
+        logDebug('Update successful');
       } else {
         // Only create new mapping if activating
         if (isActive) {
-          const { error } = await supabase
-            .from('calendly_event_mappings')
-            .insert({
-              project_id: projectId,
-              calendly_event_type_id: eventType.uri,
-              event_type_name: eventType.name,
-              is_active: true,
-            });
+          logDebug('Creating new mapping');
+          
+          const insertData = {
+            project_id: projectId,
+            calendly_event_type_id: eventType.uri,
+            event_type_name: eventType.name,
+            is_active: true,
+          };
 
-          if (error) throw error;
+          logDebug('Insert data:', insertData);
+
+          const { data: insertResult, error: insertError } = await supabase
+            .from('calendly_event_mappings')
+            .insert(insertData)
+            .select();
+
+          logDebug('Insert result:', { insertResult, insertError });
+
+          if (insertError) {
+            logDebug('Insert failed:', insertError);
+            
+            // Check if it's a unique constraint violation
+            if (insertError.message?.includes('unique') || insertError.message?.includes('duplicate')) {
+              logDebug('Unique constraint violation detected, reloading mappings');
+              await loadEventMappings();
+              toast({
+                title: "Event Already Tracked",
+                description: `${eventType.name} is already being tracked`,
+                variant: "destructive",
+              });
+              return;
+            }
+            
+            throw new Error(`Insert failed: ${insertError.message}`);
+          }
+
+          logDebug('Insert successful');
+        } else {
+          logDebug('Deactivating non-existent mapping - no action needed');
         }
       }
 
-      // Update local state immediately for better UX
-      if (existingMapping) {
-        setEventMappings(prev => 
-          prev.map(mapping => 
-            mapping.id === existingMapping.id 
-              ? { ...mapping, is_active: isActive, event_type_name: eventType.name }
-              : mapping
-          )
-        );
-      } else if (isActive) {
-        // Add temporary mapping to local state
-        setEventMappings(prev => [...prev, {
-          id: 'temp-' + Date.now(),
-          project_id: projectId,
-          calendly_event_type_id: eventType.uri,
-          event_type_name: eventType.name,
-          is_active: true
-        }]);
-      }
+      // Reload mappings to get accurate data
+      logDebug('Reloading mappings after toggle');
+      await loadEventMappings();
       
       toast({
         title: isActive ? "Event Added" : "Event Removed",
         description: `${eventType.name} ${isActive ? 'will now be' : 'will no longer be'} tracked`,
       });
 
-      // Reload mappings to get accurate data
-      setTimeout(() => loadEventMappings(), 500);
-
       // Auto-sync events when enabling
       if (isActive) {
+        logDebug('Triggering auto-sync for enabled event');
         setTimeout(async () => {
           try {
             await supabase.functions.invoke('calendly-sync-gaps', {
@@ -257,27 +318,32 @@ export const CalendlyConnector = ({
                 projectId
               }
             });
+            logDebug('Auto-sync triggered successfully');
           } catch (error) {
+            logDebug('Auto-sync failed:', error);
             console.error('Auto-sync failed:', error);
           }
         }, 1000);
       }
       
     } catch (error) {
+      logDebug('Toggle event mapping error:', error);
       console.error('Toggle event mapping error:', error);
       toast({
         title: "Error",
-        description: `Failed to update event tracking for ${eventType.name}`,
+        description: `Failed to update event tracking for ${eventType.name}: ${error.message || 'Unknown error'}`,
         variant: "destructive",
       });
     }
   };
 
   const isEventMapped = (eventTypeUri: string) => {
-    return eventMappings.some(mapping => 
+    const mapped = eventMappings.some(mapping => 
       mapping.calendly_event_type_id === eventTypeUri && 
       mapping.is_active === true
     );
+    logDebug(`Event ${eventTypeUri} mapped:`, mapped);
+    return mapped;
   };
 
   const handleDisconnect = async () => {
@@ -332,9 +398,40 @@ export const CalendlyConnector = ({
         <CardTitle className="flex items-center gap-2">
           <Calendar className="h-5 w-5" />
           Calendly Integration
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setDebugMode(!debugMode)}
+            className="ml-auto"
+          >
+            Debug: {debugMode ? 'ON' : 'OFF'}
+          </Button>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {debugMode && (
+          <div className="p-4 bg-gray-50 rounded-lg text-sm">
+            <h4 className="font-medium mb-2">Debug Info:</h4>
+            <div className="space-y-1">
+              <div>Project ID: {projectId}</div>
+              <div>Connected: {isConnected ? 'Yes' : 'No'}</div>
+              <div>Event Types: {eventTypes.length}</div>
+              <div>Event Mappings: {eventMappings.length}</div>
+              <div>Loading: {loading ? 'Yes' : 'No'}</div>
+            </div>
+            {eventMappings.length > 0 && (
+              <div className="mt-2">
+                <div className="font-medium">Current Mappings:</div>
+                {eventMappings.map(mapping => (
+                  <div key={mapping.id} className="text-xs">
+                    {mapping.event_type_name} ({mapping.is_active ? 'Active' : 'Inactive'})
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {!isConnected ? (
           <div className="text-center space-y-4">
             <p className="text-gray-600">
@@ -385,15 +482,21 @@ export const CalendlyConnector = ({
                           <div className="flex items-center space-x-3">
                             <Checkbox
                               checked={isMapped}
-                              onCheckedChange={(checked) => 
-                                toggleEventMapping(eventType, checked === true)
-                              }
+                              onCheckedChange={(checked) => {
+                                logDebug('Checkbox changed:', { eventType: eventType.name, checked });
+                                toggleEventMapping(eventType, checked === true);
+                              }}
                             />
                             <div>
                               <p className="font-medium">{eventType.name}</p>
                               <p className="text-sm text-gray-500">
                                 {eventType.duration} minutes
                               </p>
+                              {debugMode && (
+                                <p className="text-xs text-gray-400">
+                                  URI: {eventType.uri}
+                                </p>
+                              )}
                             </div>
                           </div>
                           {isMapped && (
