@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -265,6 +266,14 @@ export const CalendlyConnector = ({
       // Debug project ownership before attempting the operation
       await debugProjectOwnership();
       
+      // Check if user is authenticated
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw new Error('User not authenticated');
+      }
+      
+      logDebug('User authenticated:', { userId: user.id });
+      
       // First, reload the current mappings to get the most up-to-date state
       await loadEventMappings();
       
@@ -306,7 +315,7 @@ export const CalendlyConnector = ({
         // Only create new mapping if activating and no existing mapping found
         logDebug('Creating new mapping');
         
-        // Use upsert with the unique constraint to handle any race conditions
+        // Prepare insert data - ensure we're providing the project_id correctly
         const insertData = {
           project_id: projectId,
           calendly_event_type_id: eventType.uri,
@@ -316,23 +325,40 @@ export const CalendlyConnector = ({
 
         logDebug('Insert data prepared:', insertData);
 
-        // Use upsert to handle the unique constraint properly
+        // Insert new mapping
         const { data: insertResult, error: insertError } = await supabase
           .from('calendly_event_mappings')
-          .upsert(insertData, { 
-            onConflict: 'calendly_event_type_id',
-            ignoreDuplicates: false 
-          })
+          .insert(insertData)
           .select();
 
-        logDebug('Upsert result:', { insertResult, insertError });
+        logDebug('Insert result:', { insertResult, insertError });
 
         if (insertError) {
-          logDebug('Upsert failed:', insertError);
-          throw new Error(`Insert failed: ${insertError.message}`);
+          logDebug('Insert failed:', insertError);
+          
+          // If it's a unique constraint violation, try to update instead
+          if (insertError.code === '23505') {
+            logDebug('Unique constraint violation, trying upsert...');
+            
+            const { data: upsertResult, error: upsertError } = await supabase
+              .from('calendly_event_mappings')
+              .upsert(insertData, { 
+                onConflict: 'calendly_event_type_id',
+                ignoreDuplicates: false 
+              })
+              .select();
+
+            logDebug('Upsert result:', { upsertResult, upsertError });
+
+            if (upsertError) {
+              throw new Error(`Upsert failed: ${upsertError.message}`);
+            }
+          } else {
+            throw new Error(`Insert failed: ${insertError.message}`);
+          }
         }
 
-        logDebug('Upsert successful');
+        logDebug('Insert/Upsert successful');
       } else {
         logDebug('Deactivating non-existent mapping - no action needed');
       }
