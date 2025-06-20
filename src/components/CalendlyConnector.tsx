@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -314,7 +315,7 @@ export const CalendlyConnector = ({
   const toggleEventMapping = async (eventType: EventType, isActive: boolean) => {
     if (!projectId) return;
 
-    console.log('🎯 Attempting to toggle event mapping:', {
+    console.log('🎯 Toggling event mapping:', {
       eventName: eventType.name,
       eventUri: eventType.uri,
       isActive,
@@ -323,7 +324,7 @@ export const CalendlyConnector = ({
 
     try {
       if (isActive) {
-        // Check if mapping already exists (active or inactive)
+        // Check if ANY mapping exists (active or inactive)
         console.log('🔍 Checking for existing mapping...');
         const { data: existingMappings, error: checkError } = await supabase
           .from('calendly_event_mappings')
@@ -382,18 +383,32 @@ export const CalendlyConnector = ({
             
             // Handle specific constraint errors
             if (insertError.code === '23505') { // unique constraint violation
-              throw new Error('This event type is already mapped. Please refresh the page and try again.');
+              // Try to update the existing mapping instead
+              console.log('🔄 Constraint violation, trying to update existing mapping...');
+              const { error: updateError } = await supabase
+                .from('calendly_event_mappings')
+                .update({ 
+                  is_active: true,
+                  event_type_name: eventType.name,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('project_id', projectId)
+                .eq('calendly_event_type_id', eventType.uri);
+
+              if (updateError) {
+                throw new Error('Failed to update existing mapping after constraint violation');
+              }
+            } else {
+              throw new Error(`Failed to create mapping: ${insertError.message}`);
             }
-            
-            throw new Error(`Failed to create mapping: ${insertError.message}`);
+          } else {
+            console.log('✅ Successfully created new mapping:', insertedData);
           }
-          
-          console.log('✅ Successfully created new mapping:', insertedData);
         }
         
         // Auto-sync historical events when first event type is added
-        const currentMappings = eventMappings.filter(m => m.is_active);
-        if (currentMappings.length === 0) {
+        const currentActiveMappings = eventMappings.filter(m => m.is_active);
+        if (currentActiveMappings.length === 0) {
           console.log('🔄 Triggering auto-sync for first event mapping');
           setTimeout(() => manualResyncEvents(), 1000);
         }
@@ -439,7 +454,7 @@ export const CalendlyConnector = ({
   const isEventMapped = (eventTypeUri: string) => {
     const mapped = eventMappings.some(mapping => 
       mapping.calendly_event_type_id === eventTypeUri && 
-      mapping.is_active
+      mapping.is_active === true
     );
     console.log('🔍 Checking if event is mapped:', eventTypeUri, 'Result:', mapped);
     return mapped;
