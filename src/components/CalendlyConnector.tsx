@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ExternalLink, RefreshCw, Calendar, CheckCircle, AlertCircle, Bug, Settings, Trash2, Search } from "lucide-react";
+import { ExternalLink, RefreshCw, Calendar, CheckCircle, AlertCircle, Bug, Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -28,19 +27,6 @@ interface EventMapping {
   is_active: boolean;
 }
 
-interface CalendlyIntegrationData {
-  access_token?: string;
-  refresh_token?: string;
-  expires_at?: string;
-  organization?: string;
-  webhook_id?: string;
-  signing_key?: string;
-  user_uri?: string;
-  webhook_status?: string;
-  webhook_message?: string;
-  webhook_url?: string;
-}
-
 export const CalendlyConnector = ({ 
   projectId, 
   isConnected, 
@@ -53,10 +39,6 @@ export const CalendlyConnector = ({
   const [syncing, setSyncing] = useState(false);
   const [debugging, setDebugging] = useState(false);
   const [debugMode, setDebugMode] = useState(false);
-  const [cleaningWebhooks, setCleaningWebhooks] = useState(false);
-  const [listingWebhooks, setListingWebhooks] = useState(false);
-  const [webhookStatus, setWebhookStatus] = useState<'unknown' | 'registered' | 'failed' | 'polling'>('unknown');
-  const [webhookMessage, setWebhookMessage] = useState<string>('');
   const { toast } = useToast();
 
   const handleConnect = async () => {
@@ -173,29 +155,7 @@ export const CalendlyConnector = ({
       if (!integration) {
         console.log('No connected integration found in database');
         onConnectionChange(false);
-        setWebhookStatus('unknown');
         return;
-      }
-
-      // Check webhook status from integration data
-      const { data: integrationData } = await supabase
-        .from('project_integration_data')
-        .select('data')
-        .eq('project_id', projectId)
-        .eq('platform', 'calendly')
-        .order('synced_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (integrationData?.data) {
-        const data = integrationData.data as CalendlyIntegrationData;
-        const status = data.webhook_status || 'unknown';
-        const message = data.webhook_message || '';
-        
-        setWebhookStatus(status === 'registered' ? 'registered' : status === 'failed' ? 'polling' : 'unknown');
-        setWebhookMessage(message);
-        
-        console.log('📊 Webhook status:', status, '-', message);
       }
 
       // Try to fetch event types to verify the connection is still valid
@@ -210,7 +170,6 @@ export const CalendlyConnector = ({
         if (error.message?.includes('authorization') || error.message?.includes('expired') || error.message?.includes('not connected')) {
           console.log('Marking integration as disconnected due to auth error');
           onConnectionChange(false);
-          setWebhookStatus('unknown');
         } else {
           // For other errors, keep the connection status as is but show a warning
           console.warn('Connection check failed but keeping status:', error.message);
@@ -229,20 +188,10 @@ export const CalendlyConnector = ({
       
       if (!connecting) {
         console.log('Connection verified successfully');
-        
-        // Show status-appropriate toast
-        if (webhookStatus === 'registered') {
-          toast({
-            title: "Real-time Updates Active",
-            description: "Webhooks are configured for instant event notifications.",
-          });
-        } else if (webhookStatus === 'polling') {
-          toast({
-            title: "Connection Active (Polling Mode)",
-            description: webhookMessage || "Connected successfully. Using polling for updates.",
-            variant: "default",
-          });
-        }
+        toast({
+          title: "Connected Successfully",
+          description: "Calendly integration is active and ready.",
+        });
       }
 
       await loadEventMappings();
@@ -279,87 +228,6 @@ export const CalendlyConnector = ({
       setEventMappings(data || []);
     } catch (error) {
       console.error('Failed to load event mappings:', error);
-    }
-  };
-
-  const listWebhooks = async () => {
-    if (!projectId) return;
-
-    setListingWebhooks(true);
-    
-    try {
-      console.log('🔍 Listing Calendly webhooks...');
-      
-      const { data, error } = await supabase.functions.invoke('calendly-oauth', {
-        body: { 
-          action: 'list_webhooks',
-          projectId
-        }
-      });
-
-      if (error) {
-        console.error('List webhooks error:', error);
-        throw new Error(error.message || 'Failed to list webhooks');
-      }
-
-      console.log('📋 Existing webhooks:', data.webhooks);
-
-      toast({
-        title: "Webhooks Listed",
-        description: `Found ${data.webhooks.length} existing webhooks. Check console for details.`,
-      });
-
-    } catch (error) {
-      console.error('List webhooks failed:', error);
-      toast({
-        title: "List Webhooks Failed", 
-        description: error.message || "Failed to list webhooks",
-        variant: "destructive"
-      });
-    } finally {
-      setListingWebhooks(false);
-    }
-  };
-
-  const cleanupWebhooks = async () => {
-    if (!projectId) return;
-
-    setCleaningWebhooks(true);
-    
-    try {
-      console.log('🧹 Cleaning up duplicate Calendly webhooks...');
-      
-      const { data, error } = await supabase.functions.invoke('calendly-oauth', {
-        body: { 
-          action: 'cleanup_webhooks',
-          projectId
-        }
-      });
-
-      if (error) {
-        console.error('Cleanup webhooks error:', error);
-        throw new Error(error.message || 'Failed to cleanup webhooks');
-      }
-
-      console.log('🧹 Webhook cleanup result:', data);
-
-      toast({
-        title: "Webhooks Cleaned",
-        description: `Removed ${data.cleaned_count} duplicate webhooks out of ${data.found_count} found.`,
-      });
-
-      // Refresh connection status after cleanup
-      setTimeout(() => checkConnectionStatus(), 1000);
-
-    } catch (error) {
-      console.error('Webhook cleanup failed:', error);
-      toast({
-        title: "Webhook Cleanup Failed", 
-        description: error.message || "Failed to cleanup webhooks",
-        variant: "destructive"
-      });
-    } finally {
-      setCleaningWebhooks(false);
     }
   };
 
@@ -591,13 +459,11 @@ export const CalendlyConnector = ({
 
       setEventTypes([]);
       setEventMappings([]);
-      setWebhookStatus('unknown');
-      setWebhookMessage('');
       onConnectionChange(false);
       
       toast({
         title: "Disconnected",
-        description: "Calendly account has been disconnected and webhooks removed",
+        description: "Calendly account has been disconnected",
       });
     } catch (error) {
       console.error('Disconnect error:', error);
@@ -668,43 +534,13 @@ export const CalendlyConnector = ({
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="text-green-600 border-green-600">
                   <CheckCircle className="h-3 w-3 mr-1" />
-                  Connected
+                  Connected (API Polling)
                 </Badge>
-                {webhookStatus === 'registered' && (
-                  <Badge variant="outline" className="text-blue-600 border-blue-600">
-                    Real-time Active
-                  </Badge>
-                )}
-                {webhookStatus === 'polling' && (
-                  <Badge variant="outline" className="text-yellow-600 border-yellow-600">
-                    Polling Mode
-                  </Badge>
-                )}
                 <Button variant="ghost" size="sm" onClick={checkConnectionStatus} disabled={loading}>
                   <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                 </Button>
               </div>
               <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={listWebhooks}
-                  disabled={listingWebhooks}
-                  className="bg-blue-50 hover:bg-blue-100 border-blue-200"
-                >
-                  <Search className={`h-4 w-4 mr-1 ${listingWebhooks ? 'animate-spin' : ''}`} />
-                  List Webhooks
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={cleanupWebhooks}
-                  disabled={cleaningWebhooks}
-                  className="bg-red-50 hover:bg-red-100 border-red-200"
-                >
-                  <Trash2 className={`h-4 w-4 mr-1 ${cleaningWebhooks ? 'animate-spin' : ''}`} />
-                  Clean Webhooks
-                </Button>
                 <Button 
                   variant="outline" 
                   size="sm" 
@@ -730,38 +566,15 @@ export const CalendlyConnector = ({
               </div>
             </div>
 
-            {webhookStatus === 'registered' && (
-              <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                <p className="text-sm text-green-800">
-                  <CheckCircle className="h-4 w-4 inline mr-2" />
-                  Real-time webhooks are active! You'll get instant notifications for new bookings and cancellations.
-                </p>
-                {webhookMessage && (
-                  <p className="text-xs text-green-600 mt-1">
-                    {webhookMessage}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {webhookStatus === 'polling' && (
-              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <p className="text-sm text-yellow-800">
-                  <AlertCircle className="h-4 w-4 inline mr-2" />
-                  Using polling mode for updates. Events will be synced via API polling (may have delays).
-                </p>
-                {webhookMessage && (
-                  <p className="text-xs text-yellow-600 mt-1">
-                    {webhookMessage}
-                  </p>
-                )}
-                <div className="mt-2">
-                  <p className="text-xs text-yellow-700">
-                    💡 Use "Clean Webhooks" to remove duplicates, then reconnect for real-time updates.
-                  </p>
-                </div>
-              </div>
-            )}
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800">
+                <CheckCircle className="h-4 w-4 inline mr-2" />
+                API polling is active! Events are synced regularly via API calls.
+              </p>
+              <p className="text-xs text-blue-600 mt-1">
+                Use "Re-sync Events" to manually fetch the latest events from Calendly.
+              </p>
+            </div>
 
             <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
               <Settings className="h-4 w-4 text-gray-500" />
@@ -774,22 +587,18 @@ export const CalendlyConnector = ({
               </label>
             </div>
 
-            {(syncing || debugging || cleaningWebhooks || listingWebhooks) && (
+            {(syncing || debugging) && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                 <div className="flex items-center gap-2 text-blue-700">
                   <RefreshCw className="h-4 w-4 animate-spin" />
                   <span className="text-sm">
                     {debugging && 'Running debug sync with enhanced logging...'}
-                    {syncing && 'Re-syncing events...'}
-                    {cleaningWebhooks && 'Cleaning up duplicate webhooks...'}
-                    {listingWebhooks && 'Listing existing webhooks...'}
+                    {syncing && 'Re-syncing events via API...'}
                   </span>
                 </div>
                 <p className="text-xs text-blue-600 mt-1">
                   {debugging && 'Check browser console for detailed debug information.'}
-                  {syncing && 'This may take a moment...'}
-                  {cleaningWebhooks && 'Removing duplicate webhooks to enable real-time updates.'}
-                  {listingWebhooks && 'Checking for existing webhook configurations.'}
+                  {syncing && 'Fetching latest events from Calendly API...'}
                 </p>
               </div>
             )}
@@ -835,10 +644,7 @@ export const CalendlyConnector = ({
                       {eventMappings.filter(m => m.is_active).length} event type(s) are being tracked
                     </p>
                     <p className="text-xs text-green-600 mt-1">
-                      {webhookStatus === 'registered' 
-                        ? 'Real-time webhook updates are active.'
-                        : 'Events are synced via API polling. Use "Clean Webhooks" and reconnect for real-time updates.'
-                      }
+                      Events are synced via API polling. Use "Re-sync Events" to fetch the latest data.
                     </p>
                   </div>
                 )}

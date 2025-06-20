@@ -1,4 +1,3 @@
-
 import { useCalendlyData } from "@/hooks/useCalendlyData";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
@@ -127,25 +126,18 @@ export const BookCallFunnel = ({ projectId, dateRange }: BookCallFunnelProps) =>
       }
     };
 
-    // Trigger sync immediately and then every 30 seconds for the first 2 minutes
+    // Trigger sync immediately and then periodically
     triggerManualSync();
     
     const syncInterval = setInterval(() => {
       console.log('🔄 Periodic sync check...');
       triggerManualSync();
-    }, 30000);
-
-    // Clear interval after 2 minutes
-    const clearSyncTimeout = setTimeout(() => {
-      clearInterval(syncInterval);
-      console.log('🛑 Stopping periodic sync - switching to real-time only');
-    }, 2 * 60 * 1000);
+    }, 5 * 60 * 1000); // Every 5 minutes
 
     return () => {
       console.log('🎧 Cleaning up real-time listener and sync intervals...');
       supabase.removeChannel(channel);
       clearInterval(syncInterval);
-      clearTimeout(clearSyncTimeout);
     };
   }, [projectId, refetch, toast]);
 
