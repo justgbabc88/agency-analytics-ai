@@ -292,30 +292,23 @@ export const CalendlyConnector = ({
       
       logDebug('Project ownership verified:', { userId: user.id, projectId, ownsProject });
       
-      // Check if a mapping already exists for this event type (across all projects)
-      const { data: existingMapping, error: fetchError } = await supabase
+      // First check if a mapping exists for this event type and current project
+      const { data: currentProjectMapping, error: currentProjectError } = await supabase
         .from('calendly_event_mappings')
         .select('*')
         .eq('calendly_event_type_id', eventType.uri)
+        .eq('project_id', projectId)
         .maybeSingle();
 
-      if (fetchError) {
-        throw new Error(`Failed to check event mapping: ${fetchError.message}`);
+      if (currentProjectError) {
+        throw new Error(`Failed to check current project mapping: ${currentProjectError.message}`);
       }
 
-      logDebug('Existing mapping check:', { existingMapping, eventTypeUri: eventType.uri });
+      logDebug('Current project mapping check:', { currentProjectMapping, eventTypeUri: eventType.uri });
 
-      if (existingMapping) {
-        // A mapping exists for this event type
-        if (existingMapping.project_id !== projectId) {
-          // The mapping belongs to another project
-          throw new Error(
-            'This event type is already mapped to another project. Each Calendly event type can only be tracked by one project at a time.'
-          );
-        }
-
-        // The mapping belongs to the current project - update it
-        logDebug('Updating existing mapping for current project:', { mappingId: existingMapping.id, newActiveState: isActive });
+      if (currentProjectMapping) {
+        // A mapping exists for this event type in the current project - update it
+        logDebug('Updating existing mapping for current project:', { mappingId: currentProjectMapping.id, newActiveState: isActive });
         
         const { error: updateError } = await supabase
           .from('calendly_event_mappings')
@@ -324,7 +317,7 @@ export const CalendlyConnector = ({
             event_type_name: eventType.name,
             updated_at: new Date().toISOString()
           })
-          .eq('id', existingMapping.id);
+          .eq('id', currentProjectMapping.id);
 
         if (updateError) {
           throw new Error(`Update failed: ${updateError.message}`);
@@ -332,9 +325,29 @@ export const CalendlyConnector = ({
         
         logDebug('Successfully updated existing mapping');
       } else {
-        // No mapping exists for this event type
+        // No mapping exists for this event type in current project
+        // Check if any other project has this event type mapped
+        const { data: otherProjectMapping, error: otherProjectError } = await supabase
+          .from('calendly_event_mappings')
+          .select('*')
+          .eq('calendly_event_type_id', eventType.uri)
+          .maybeSingle();
+
+        if (otherProjectError) {
+          throw new Error(`Failed to check other project mappings: ${otherProjectError.message}`);
+        }
+
+        logDebug('Other project mapping check:', { otherProjectMapping, eventTypeUri: eventType.uri });
+
+        if (otherProjectMapping) {
+          // Another project owns this event type
+          throw new Error(
+            'This event type is already mapped to another project. Each Calendly event type can only be tracked by one project at a time.'
+          );
+        }
+
         if (isActive) {
-          // User wants to activate - create new mapping
+          // User wants to activate and no mapping exists anywhere - create new mapping
           logDebug('Creating new mapping for event type');
           
           const insertData = {
