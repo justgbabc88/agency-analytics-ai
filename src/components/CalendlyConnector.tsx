@@ -55,6 +55,11 @@ export const CalendlyConnector = ({
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       logDebug('Current user:', { user: user?.id, userError });
       
+      if (!user) {
+        logDebug('❌ No authenticated user found');
+        return;
+      }
+      
       // Check if user owns project using the function
       const { data: ownsProject, error: ownershipError } = await supabase
         .rpc('user_owns_project', { project_uuid: projectId });
@@ -263,21 +268,34 @@ export const CalendlyConnector = ({
     });
 
     try {
-      // Debug project ownership before attempting the operation
-      await debugProjectOwnership();
-      
-      // Check if user is authenticated
+      // Check if user is authenticated first
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) {
-        throw new Error('User not authenticated');
+        throw new Error('User not authenticated. Please log in and try again.');
       }
       
       logDebug('User authenticated:', { userId: user.id });
       
-      // First, reload the current mappings to get the most up-to-date state
+      // Verify project ownership before attempting any operations
+      const { data: ownsProject, error: ownershipError } = await supabase
+        .rpc('user_owns_project', { project_uuid: projectId });
+      
+      if (ownershipError) {
+        logDebug('Project ownership check failed:', ownershipError);
+        throw new Error(`Failed to verify project ownership: ${ownershipError.message}`);
+      }
+      
+      if (!ownsProject) {
+        logDebug('User does not own project:', { userId: user.id, projectId });
+        throw new Error('You do not have permission to modify this project');
+      }
+      
+      logDebug('Project ownership verified:', { userId: user.id, projectId, ownsProject });
+      
+      // Reload the current mappings to get the most up-to-date state
       await loadEventMappings();
       
-      // Now find existing mapping with fresh data
+      // Find existing mapping with fresh data
       const existingMapping = eventMappings.find(m => 
         m.calendly_event_type_id === eventType.uri
       );
@@ -307,7 +325,7 @@ export const CalendlyConnector = ({
 
         if (updateError) {
           logDebug('Update failed:', updateError);
-          throw new Error(`Update failed: ${updateError.message}`);
+          throw new Error(`Failed to update event mapping: ${updateError.message}`);
         }
 
         logDebug('Update successful');
@@ -315,7 +333,7 @@ export const CalendlyConnector = ({
         // Only create new mapping if activating and no existing mapping found
         logDebug('Creating new mapping');
         
-        // Prepare insert data - ensure we're providing the project_id correctly
+        // Prepare insert data with explicit user context
         const insertData = {
           project_id: projectId,
           calendly_event_type_id: eventType.uri,
@@ -325,40 +343,67 @@ export const CalendlyConnector = ({
 
         logDebug('Insert data prepared:', insertData);
 
-        // Insert new mapping
+        // Use a more direct insert approach with better error handling
         const { data: insertResult, error: insertError } = await supabase
           .from('calendly_event_mappings')
           .insert(insertData)
-          .select();
+          .select()
+          .single();
 
         logDebug('Insert result:', { insertResult, insertError });
 
         if (insertError) {
           logDebug('Insert failed:', insertError);
           
-          // If it's a unique constraint violation, try to update instead
+          // Check if it's a unique constraint violation
           if (insertError.code === '23505') {
-            logDebug('Unique constraint violation, trying upsert...');
+            logDebug('Unique constraint violation detected, attempting update instead...');
             
-            const { data: upsertResult, error: upsertError } = await supabase
+            // Try to find and update the existing record
+            const { data: existingRecord, error: findError } = await supabase
               .from('calendly_event_mappings')
-              .upsert(insertData, { 
-                onConflict: 'calendly_event_type_id',
-                ignoreDuplicates: false 
-              })
-              .select();
-
-            logDebug('Upsert result:', { upsertResult, upsertError });
-
-            if (upsertError) {
-              throw new Error(`Upsert failed: ${upsertError.message}`);
+              .select('*')
+              .eq('calendly_event_type_id', eventType.uri)
+              .maybeSingle();
+            
+            if (findError) {
+              logDebug('Failed to find existing record:', findError);
+              throw new Error(`Database error: ${findError.message}`);
             }
+            
+            if (existingRecord) {
+              logDebug('Found existing record, updating it:', existingRecord);
+              
+              const { data: updateResult, error: updateError } = await supabase
+                .from('calendly_event_mappings')
+                .update({
+                  project_id: projectId,
+                  is_active: isActive,
+                  event_type_name: eventType.name,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', existingRecord.id)
+                .select();
+              
+              if (updateError) {
+                logDebug('Fallback update failed:', updateError);
+                throw new Error(`Failed to update existing mapping: ${updateError.message}`);
+              }
+              
+              logDebug('Fallback update successful:', updateResult);
+            } else {
+              throw new Error('Unique constraint violation but no existing record found');
+            }
+          } else if (insertError.code === '42501') {
+            // RLS policy violation
+            await debugProjectOwnership();
+            throw new Error(`Permission denied: Unable to create event mapping. Please check that you have access to this project.`);
           } else {
-            throw new Error(`Insert failed: ${insertError.message}`);
+            throw new Error(`Database error: ${insertError.message || 'Unknown error'}`);
           }
+        } else {
+          logDebug('Insert successful:', insertResult);
         }
-
-        logDebug('Insert/Upsert successful');
       } else {
         logDebug('Deactivating non-existent mapping - no action needed');
       }
@@ -394,9 +439,17 @@ export const CalendlyConnector = ({
     } catch (error) {
       logDebug('Toggle event mapping error:', error);
       console.error('Toggle event mapping error:', error);
+      
+      let errorMessage = 'Unknown error occurred';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      
       toast({
         title: "Error",
-        description: `Failed to update event tracking for ${eventType.name}: ${error.message || 'Unknown error'}`,
+        description: `Failed to update event tracking for ${eventType.name}: ${errorMessage}`,
         variant: "destructive",
       });
       
