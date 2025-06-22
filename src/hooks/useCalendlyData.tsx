@@ -1,4 +1,3 @@
-
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -7,6 +6,8 @@ export const useCalendlyData = (projectId?: string) => {
     queryKey: ['calendly-events', projectId],
     queryFn: async () => {
       if (!projectId) return [];
+
+      console.log('🔍 [useCalendlyData] Fetching events for project:', projectId);
 
       const { data: allEvents, error: eventsError } = await supabase
         .from('calendly_events')
@@ -18,9 +19,21 @@ export const useCalendlyData = (projectId?: string) => {
         throw eventsError;
       }
 
+      console.log('📊 [useCalendlyData] Raw Calendly events found:', allEvents?.length || 0);
+      if (allEvents && allEvents.length > 0) {
+        console.log('📋 [useCalendlyData] Sample raw events:', allEvents.slice(0, 3).map(e => ({
+          id: e.calendly_event_id,
+          event_type_id: e.calendly_event_type_id,
+          event_type_name: e.event_type_name,
+          status: e.status,
+          created_at: e.created_at,
+          scheduled_at: e.scheduled_at
+        })));
+      }
+
       const { data: mappings, error: mappingsError } = await supabase
         .from('calendly_event_mappings')
-        .select('calendly_event_type_id')
+        .select('calendly_event_type_id, is_active, event_type_name')
         .eq('project_id', projectId)
         .eq('is_active', true);
 
@@ -29,10 +42,47 @@ export const useCalendlyData = (projectId?: string) => {
         throw mappingsError;
       }
 
-      const activeIds = new Set(mappings.map(m => m.calendly_event_type_id));
-      const filteredEvents = (allEvents || []).filter(e =>
-        activeIds.has(e.calendly_event_type_id)
-      );
+      console.log('🎯 [useCalendlyData] Active mappings found:', mappings?.length || 0);
+      if (mappings && mappings.length > 0) {
+        console.log('📋 [useCalendlyData] Active mappings:', mappings.map(m => ({
+          event_type_id: m.calendly_event_type_id,
+          event_type_name: m.event_type_name,
+          is_active: m.is_active
+        })));
+      }
+
+      const activeIds = new Set(mappings?.map(m => m.calendly_event_type_id) || []);
+      console.log('🔍 [useCalendlyData] Active event type IDs to filter by:', Array.from(activeIds));
+
+      // Filter events based on active mappings
+      const filteredEvents = (allEvents || []).filter(e => {
+        const isIncluded = activeIds.has(e.calendly_event_type_id);
+        if (!isIncluded && allEvents && allEvents.length > 0) {
+          console.log('⚠️ [useCalendlyData] Event filtered out:', {
+            event_id: e.calendly_event_id,
+            event_type_id: e.calendly_event_type_id,
+            event_type_name: e.event_type_name,
+            reason: 'Not in active mappings'
+          });
+        }
+        return isIncluded;
+      });
+
+      console.log('✅ [useCalendlyData] Final filtered events:', filteredEvents.length);
+      if (filteredEvents.length > 0) {
+        console.log('📋 [useCalendlyData] Sample filtered events:', filteredEvents.slice(0, 3).map(e => ({
+          id: e.calendly_event_id,
+          event_type_id: e.calendly_event_type_id,
+          event_type_name: e.event_type_name,
+          status: e.status,
+          created_at: e.created_at,
+          scheduled_at: e.scheduled_at
+        })));
+      } else if (allEvents && allEvents.length > 0 && mappings && mappings.length > 0) {
+        console.warn('⚠️ [useCalendlyData] No events match active mappings!');
+        console.warn('Raw event type IDs:', allEvents.map(e => e.calendly_event_type_id));
+        console.warn('Active mapping IDs:', mappings.map(m => m.calendly_event_type_id));
+      }
 
       return filteredEvents;
     },

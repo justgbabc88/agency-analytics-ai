@@ -93,6 +93,47 @@ export const CalendlyConnector = ({
     }
   };
 
+  // Debug function to check existing events and mappings
+  const debugEventsAndMappings = async () => {
+    if (!projectId) return;
+    
+    try {
+      logDebug('🔍 Debugging events and mappings...', { projectId });
+      
+      // Check calendly events
+      const { data: events, error: eventsError } = await supabase
+        .from('calendly_events')
+        .select('*')
+        .eq('project_id', projectId);
+        
+      logDebug('Calendly events in database:', { count: events?.length, events: events?.slice(0, 3), eventsError });
+      
+      // Check event mappings
+      const { data: mappings, error: mappingsError } = await supabase
+        .from('calendly_event_mappings')
+        .select('*')
+        .eq('project_id', projectId);
+        
+      logDebug('Event mappings in database:', { count: mappings?.length, mappings, mappingsError });
+      
+      if (events && events.length > 0 && mappings && mappings.length > 0) {
+        const eventTypeIds = events.map(e => e.calendly_event_type_id);
+        const mappingIds = mappings.map(m => m.calendly_event_type_id);
+        const activeMappingIds = mappings.filter(m => m.is_active).map(m => m.calendly_event_type_id);
+        
+        logDebug('Event type ID comparison:', {
+          eventTypeIds,
+          mappingIds,
+          activeMappingIds,
+          intersection: eventTypeIds.filter(id => activeMappingIds.includes(id))
+        });
+      }
+      
+    } catch (error) {
+      logDebug('Events and mappings debug failed:', error);
+    }
+  };
+
   const handleConnect = async () => {
     if (!projectId) {
       toast({
@@ -445,13 +486,20 @@ export const CalendlyConnector = ({
                 ))}
               </div>
             )}
-            <div className="mt-2">
+            <div className="mt-2 space-x-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={debugProjectOwnership}
               >
                 🔍 Debug Project Ownership
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={debugEventsAndMappings}
+              >
+                🔍 Debug Events & Mappings
               </Button>
             </div>
           </div>
