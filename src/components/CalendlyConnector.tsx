@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -296,6 +295,19 @@ export const CalendlyConnector = ({
 
           if (updateError) throw new Error(`Update failed: ${updateError.message}`);
         } else {
+          // Double check no other project has claimed this event type
+          const { data: latestMapping, error: latestError } = await supabase
+            .from("calendly_event_mappings")
+            .select("project_id")
+            .eq("calendly_event_type_id", eventType.uri)
+            .maybeSingle();
+
+          if (latestError) throw new Error(`Recheck failed: ${latestError.message}`);
+
+          if (latestMapping && latestMapping.project_id !== projectId) {
+            throw new Error("This event type is now mapped to another project. Try again.");
+          }
+
           // Insert new mapping
           const insertData = {
             project_id: projectId,
