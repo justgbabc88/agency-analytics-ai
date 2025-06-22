@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,103 +37,8 @@ export const CalendlyConnector = ({
   const [eventMappings, setEventMappings] = useState<EventMapping[]>([]);
   const [loading, setLoading] = useState(false);
   const [connecting, setConnecting] = useState(false);
-  const [debugMode, setDebugMode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
-
-  const logDebug = (message: string, data?: any) => {
-    console.log(`🔍 [CalendlyConnector] ${message}`, data || '');
-  };
-
-  // Debug function to check project ownership
-  const debugProjectOwnership = async () => {
-    if (!projectId) return;
-    
-    try {
-      logDebug('🔍 Debugging project ownership...', { projectId });
-      
-      // Check current user
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      logDebug('Current user:', { user: user?.id, userError });
-      
-      if (!user) {
-        logDebug('❌ No authenticated user found');
-        return;
-      }
-      
-      // Check if user owns project using the function
-      const { data: ownsProject, error: ownershipError } = await supabase
-        .rpc('user_owns_project', { project_uuid: projectId });
-      
-      logDebug('Project ownership check:', { 
-        projectId, 
-        userId: user?.id, 
-        ownsProject, 
-        ownershipError 
-      });
-      
-      // Also check the projects table directly
-      const { data: projects, error: projectsError } = await supabase
-        .from('projects')
-        .select(`
-          id,
-          name,
-          agency_id,
-          agencies(
-            id,
-            user_id,
-            name
-          )
-        `)
-        .eq('id', projectId);
-        
-      logDebug('Direct project query:', { projects, projectsError });
-      
-    } catch (error) {
-      logDebug('Project ownership debug failed:', error);
-    }
-  };
-
-  // Debug function to check existing events and mappings
-  const debugEventsAndMappings = async () => {
-    if (!projectId) return;
-    
-    try {
-      logDebug('🔍 Debugging events and mappings...', { projectId });
-      
-      // Check calendly events
-      const { data: events, error: eventsError } = await supabase
-        .from('calendly_events')
-        .select('*')
-        .eq('project_id', projectId);
-        
-      logDebug('Calendly events in database:', { count: events?.length, events: events?.slice(0, 3), eventsError });
-      
-      // Check event mappings
-      const { data: mappings, error: mappingsError } = await supabase
-        .from('calendly_event_mappings')
-        .select('*')
-        .eq('project_id', projectId);
-        
-      logDebug('Event mappings in database:', { count: mappings?.length, mappings, mappingsError });
-      
-      if (events && events.length > 0 && mappings && mappings.length > 0) {
-        const eventTypeIds = events.map(e => e.calendly_event_type_id);
-        const mappingIds = mappings.map(m => m.calendly_event_type_id);
-        const activeMappingIds = mappings.filter(m => m.is_active).map(m => m.calendly_event_type_id);
-        
-        logDebug('Event type ID comparison:', {
-          eventTypeIds,
-          mappingIds,
-          activeMappingIds,
-          intersection: eventTypeIds.filter(id => activeMappingIds.includes(id))
-        });
-      }
-      
-    } catch (error) {
-      logDebug('Events and mappings debug failed:', error);
-    }
-  };
 
   const handleConnect = async () => {
     if (!projectId) {
@@ -215,7 +121,6 @@ export const CalendlyConnector = ({
     if (!projectId) return;
 
     setLoading(true);
-    logDebug('Checking connection status for project:', projectId);
 
     try {
       const { data: integration, error: integrationError } = await supabase
@@ -226,10 +131,7 @@ export const CalendlyConnector = ({
         .eq('is_connected', true)
         .maybeSingle();
 
-      logDebug('Integration check result:', { integration, integrationError });
-
       if (integrationError || !integration) {
-        logDebug('No integration found or error occurred');
         onConnectionChange(false);
         return;
       }
@@ -238,10 +140,7 @@ export const CalendlyConnector = ({
         body: { action: 'get_event_types', projectId }
       });
 
-      logDebug('Event types fetch result:', { data, error });
-
       if (error) {
-        logDebug('Event types fetch failed:', error);
         if (error.message?.includes('authorization') || error.message?.includes('expired') || error.message?.includes('not connected')) {
           onConnectionChange(false);
         }
@@ -261,7 +160,7 @@ export const CalendlyConnector = ({
       await loadEventMappings();
       
     } catch (error) {
-      logDebug('Connection check failed:', error);
+      console.error('Connection check failed:', error);
     } finally {
       setLoading(false);
       setConnecting(false);
@@ -271,25 +170,18 @@ export const CalendlyConnector = ({
   const loadEventMappings = async () => {
     if (!projectId) return;
 
-    logDebug('Loading event mappings for project:', projectId);
-
     try {
       const { data, error } = await supabase
         .from('calendly_event_mappings')
         .select('*')
         .eq('project_id', projectId);
 
-      logDebug('Event mappings query result:', { data, error, count: data?.length });
-
       if (error) {
-        logDebug('Event mappings query failed:', error);
         throw error;
       }
       
       setEventMappings(data || []);
-      logDebug('Event mappings loaded successfully:', data?.length || 0);
     } catch (error) {
-      logDebug('Failed to load event mappings:', error);
       console.error('Failed to load event mappings:', error);
     }
   };
@@ -394,12 +286,10 @@ export const CalendlyConnector = ({
   };
 
   const isEventMapped = (eventTypeUri: string) => {
-    const mapped = eventMappings.some(mapping => 
+    return eventMappings.some(mapping => 
       mapping.calendly_event_type_id === eventTypeUri && 
       mapping.is_active === true
     );
-    logDebug(`Event ${eventTypeUri} mapped:`, mapped);
-    return mapped;
   };
 
   const handleDisconnect = async () => {
@@ -454,57 +344,9 @@ export const CalendlyConnector = ({
         <CardTitle className="flex items-center gap-2">
           <Calendar className="h-5 w-5" />
           Calendly Integration
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setDebugMode(!debugMode)}
-            className="ml-auto"
-          >
-            Debug: {debugMode ? 'ON' : 'OFF'}
-          </Button>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {debugMode && (
-          <div className="p-4 bg-gray-50 rounded-lg text-sm">
-            <h4 className="font-medium mb-2">Debug Info:</h4>
-            <div className="space-y-1">
-              <div>Project ID: {projectId}</div>
-              <div>Connected: {isConnected ? 'Yes' : 'No'}</div>
-              <div>Event Types: {eventTypes.length}</div>
-              <div>Event Mappings: {eventMappings.length}</div>
-              <div>Loading: {loading ? 'Yes' : 'No'}</div>
-              <div>Saving: {isSaving ? 'Yes' : 'No'}</div>
-            </div>
-            {eventMappings.length > 0 && (
-              <div className="mt-2">
-                <div className="font-medium">Current Mappings:</div>
-                {eventMappings.map(mapping => (
-                  <div key={mapping.id} className="text-xs">
-                    {mapping.event_type_name} ({mapping.is_active ? 'Active' : 'Inactive'}) - URI: {mapping.calendly_event_type_id}
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className="mt-2 space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={debugProjectOwnership}
-              >
-                🔍 Debug Project Ownership
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={debugEventsAndMappings}
-              >
-                🔍 Debug Events & Mappings
-              </Button>
-            </div>
-          </div>
-        )}
-
         {!isConnected ? (
           <div className="text-center space-y-4">
             <p className="text-gray-600">
@@ -557,7 +399,6 @@ export const CalendlyConnector = ({
                               checked={isMapped}
                               disabled={isSaving}
                               onCheckedChange={(checked) => {
-                                logDebug('Checkbox changed:', { eventType: eventType.name, checked });
                                 toggleEventMapping(eventType, checked === true);
                               }}
                             />
@@ -566,11 +407,6 @@ export const CalendlyConnector = ({
                               <p className="text-sm text-gray-500">
                                 {eventType.duration} minutes
                               </p>
-                              {debugMode && (
-                                <p className="text-xs text-gray-400">
-                                  URI: {eventType.uri}
-                                </p>
-                              )}
                             </div>
                           </div>
                           {isMapped && (
