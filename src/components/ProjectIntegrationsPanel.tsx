@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
@@ -9,8 +8,7 @@ import { GoogleSheetsConnector } from "./GoogleSheetsConnector";
 import { FacebookConnector } from "./FacebookConnector";
 import { ClickFunnelsOAuthConnector } from "./ClickFunnelsOAuthConnector";
 import { CalendlyConnector } from "./CalendlyConnector";
-import { CalendlyDebugPanel } from "./CalendlyDebugPanel";
-import { Settings, CheckCircle, XCircle, RefreshCw, FileSpreadsheet, BarChart3, ChevronDown, ChevronRight, Target, Calendar, Bug } from "lucide-react";
+import { Settings, CheckCircle, XCircle, RefreshCw, FileSpreadsheet, BarChart3, ChevronDown, ChevronRight, Target, Calendar } from "lucide-react";
 import { useState } from "react";
 
 const integrationPlatforms = [
@@ -147,19 +145,15 @@ export const ProjectIntegrationsPanel = ({ projectId }: ProjectIntegrationsPanel
         );
       case 'calendly':
         return (
-          <div className="space-y-4">
-            <CalendlyConnector
-              projectId={projectId}
-              isConnected={isConnected}
-              onConnectionChange={(connected) => {
-                if (connected) {
-                  handleToggleIntegration(platform.id, true);
-                }
-              }}
-            />
-            {/* Add debug panel for Calendly */}
-            <CalendlyDebugPanel projectId={projectId} />
-          </div>
+          <CalendlyConnector
+            projectId={projectId}
+            isConnected={isConnected}
+            onConnectionChange={(connected) => {
+              if (connected) {
+                handleToggleIntegration(platform.id, true);
+              }
+            }}
+          />
         );
       default:
         return null;
