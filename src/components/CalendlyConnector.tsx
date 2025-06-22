@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -291,25 +292,23 @@ export const CalendlyConnector = ({
       
       logDebug('Project ownership verified:', { userId: user.id, projectId, ownsProject });
       
-      // Query for existing mapping first
+      // Check if a mapping already exists for this event type (across all projects due to unique constraint)
       logDebug('Checking for existing mapping...');
-      const { data: existingMappings, error: queryError } = await supabase
+      const { data: existingMapping, error: queryError } = await supabase
         .from('calendly_event_mappings')
         .select('*')
-        .eq('project_id', projectId)
-        .eq('calendly_event_type_id', eventType.uri);
+        .eq('calendly_event_type_id', eventType.uri)
+        .maybeSingle();
 
       if (queryError) {
         logDebug('Query for existing mapping failed:', queryError);
         throw new Error(`Failed to check existing mappings: ${queryError.message}`);
       }
 
-      logDebug('Existing mappings query result:', { 
-        found: existingMappings?.length || 0, 
-        mappings: existingMappings 
+      logDebug('Existing mapping query result:', { 
+        found: !!existingMapping, 
+        mapping: existingMapping 
       });
-
-      const existingMapping = existingMappings?.[0];
 
       if (existingMapping) {
         // Record exists - update it
@@ -319,6 +318,7 @@ export const CalendlyConnector = ({
           .from('calendly_event_mappings')
           .update({ 
             is_active: isActive,
+            project_id: projectId, // Update to current project
             event_type_name: eventType.name,
             updated_at: new Date().toISOString()
           })
