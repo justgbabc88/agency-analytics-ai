@@ -7,22 +7,34 @@ export const useCalendlyData = (projectId?: string) => {
     queryKey: ['calendly-events', projectId],
     queryFn: async () => {
       if (!projectId) return [];
-      
-      console.log('🔄 Fetching Calendly events for project:', projectId);
-      
-      const { data, error } = await supabase
+
+      const { data: allEvents, error: eventsError } = await supabase
         .from('calendly_events')
         .select('*')
-        .eq('project_id', projectId)
-        .order('scheduled_at', { ascending: false });
+        .eq('project_id', projectId);
 
-      if (error) {
-        console.error('❌ Error fetching Calendly events:', error);
-        throw error;
+      if (eventsError) {
+        console.error('❌ Error fetching Calendly events:', eventsError);
+        throw eventsError;
       }
-      
-      console.log('✅ Fetched Calendly events:', data?.length || 0);
-      return data || [];
+
+      const { data: mappings, error: mappingsError } = await supabase
+        .from('calendly_event_mappings')
+        .select('calendly_event_type_id')
+        .eq('project_id', projectId)
+        .eq('is_active', true);
+
+      if (mappingsError) {
+        console.error('❌ Error fetching Calendly event mappings:', mappingsError);
+        throw mappingsError;
+      }
+
+      const activeIds = new Set(mappings.map(m => m.calendly_event_type_id));
+      const filteredEvents = (allEvents || []).filter(e =>
+        activeIds.has(e.calendly_event_type_id)
+      );
+
+      return filteredEvents;
     },
     enabled: !!projectId,
     staleTime: 30000, // 30 seconds
