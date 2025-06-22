@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -292,25 +291,30 @@ export const CalendlyConnector = ({
       
       logDebug('Project ownership verified:', { userId: user.id, projectId, ownsProject });
       
-      // Reload the current mappings to get the most up-to-date state
-      await loadEventMappings();
-      
-      // Find existing mapping with fresh data
-      const existingMapping = eventMappings.find(m => 
-        m.calendly_event_type_id === eventType.uri
-      );
+      // Query for existing mapping first
+      logDebug('Checking for existing mapping...');
+      const { data: existingMappings, error: queryError } = await supabase
+        .from('calendly_event_mappings')
+        .select('*')
+        .eq('project_id', projectId)
+        .eq('calendly_event_type_id', eventType.uri);
 
-      logDebug('Existing mapping search result:', { 
-        found: !!existingMapping, 
-        existingMapping,
-        searchUri: eventType.uri,
-        allMappingUris: eventMappings.map(m => m.calendly_event_type_id)
+      if (queryError) {
+        logDebug('Query for existing mapping failed:', queryError);
+        throw new Error(`Failed to check existing mappings: ${queryError.message}`);
+      }
+
+      logDebug('Existing mappings query result:', { 
+        found: existingMappings?.length || 0, 
+        mappings: existingMappings 
       });
 
+      const existingMapping = existingMappings?.[0];
+
       if (existingMapping) {
+        // Record exists - update it
         logDebug('Updating existing mapping:', existingMapping.id);
         
-        // Update existing mapping
         const { data: updateData, error: updateError } = await supabase
           .from('calendly_event_mappings')
           .update({ 
@@ -330,10 +334,9 @@ export const CalendlyConnector = ({
 
         logDebug('Update successful');
       } else if (isActive) {
-        // Only create new mapping if activating and no existing mapping found
+        // Record doesn't exist and we want to activate - create new one
         logDebug('Creating new mapping');
         
-        // Prepare insert data with explicit user context
         const insertData = {
           project_id: projectId,
           calendly_event_type_id: eventType.uri,
@@ -343,7 +346,6 @@ export const CalendlyConnector = ({
 
         logDebug('Insert data prepared:', insertData);
 
-        // Use a more direct insert approach with better error handling
         const { data: insertResult, error: insertError } = await supabase
           .from('calendly_event_mappings')
           .insert(insertData)
@@ -355,46 +357,7 @@ export const CalendlyConnector = ({
         if (insertError) {
           logDebug('Insert failed:', insertError);
           
-          // Check if it's a unique constraint violation
-          if (insertError.code === '23505') {
-            logDebug('Unique constraint violation detected, attempting update instead...');
-            
-            // Try to find and update the existing record
-            const { data: existingRecord, error: findError } = await supabase
-              .from('calendly_event_mappings')
-              .select('*')
-              .eq('calendly_event_type_id', eventType.uri)
-              .maybeSingle();
-            
-            if (findError) {
-              logDebug('Failed to find existing record:', findError);
-              throw new Error(`Database error: ${findError.message}`);
-            }
-            
-            if (existingRecord) {
-              logDebug('Found existing record, updating it:', existingRecord);
-              
-              const { data: updateResult, error: updateError } = await supabase
-                .from('calendly_event_mappings')
-                .update({
-                  project_id: projectId,
-                  is_active: isActive,
-                  event_type_name: eventType.name,
-                  updated_at: new Date().toISOString()
-                })
-                .eq('id', existingRecord.id)
-                .select();
-              
-              if (updateError) {
-                logDebug('Fallback update failed:', updateError);
-                throw new Error(`Failed to update existing mapping: ${updateError.message}`);
-              }
-              
-              logDebug('Fallback update successful:', updateResult);
-            } else {
-              throw new Error('Unique constraint violation but no existing record found');
-            }
-          } else if (insertError.code === '42501') {
+          if (insertError.code === '42501') {
             // RLS policy violation
             await debugProjectOwnership();
             throw new Error(`Permission denied: Unable to create event mapping. Please check that you have access to this project.`);
