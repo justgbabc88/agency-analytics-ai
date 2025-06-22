@@ -318,7 +318,7 @@ export const CalendlyConnector = ({
 
           const { error: upsertError } = await supabase
             .from("calendly_event_mappings")
-            .upsert(insertData, { onConflict: 'project_id,calendly_event_type_id' });
+            .upsert(insertData, { onConflict: ['project_id', 'calendly_event_type_id'] });
 
           if (upsertError) {
             throw new Error(`Upsert failed: ${upsertError.message}`);
