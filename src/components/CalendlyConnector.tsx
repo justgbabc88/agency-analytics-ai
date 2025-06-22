@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,6 +38,7 @@ export const CalendlyConnector = ({
   const [loading, setLoading] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [debugMode, setDebugMode] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
   const logDebug = (message: string, data?: any) => {
@@ -254,168 +256,85 @@ export const CalendlyConnector = ({
 
   const toggleEventMapping = async (eventType: EventType, isActive: boolean) => {
     if (!projectId) {
-      logDebug('No project ID available for toggle');
-      return;
+      throw new Error("No project selected.");
     }
 
-    logDebug('Toggle event mapping called', {
-      eventType: eventType.uri,
-      eventName: eventType.name,
-      isActive,
-      projectId,
-      currentMappings: eventMappings.length
-    });
+    setIsSaving(true);
 
     try {
-      // Check if user is authenticated first
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) {
-        throw new Error('User not authenticated. Please log in and try again.');
-      }
-      
-      logDebug('User authenticated:', { userId: user.id });
-      
-      // Verify project ownership before attempting any operations
-      const { data: ownsProject, error: ownershipError } = await supabase
-        .rpc('user_owns_project', { project_uuid: projectId });
-      
-      if (ownershipError) {
-        logDebug('Project ownership check failed:', ownershipError);
-        throw new Error(`Failed to verify project ownership: ${ownershipError.message}`);
-      }
-      
-      if (!ownsProject) {
-        logDebug('User does not own project:', { userId: user.id, projectId });
-        throw new Error('You do not have permission to modify this project');
-      }
-      
-      logDebug('Project ownership verified:', { userId: user.id, projectId, ownsProject });
-      
-      // Check if a mapping exists for this event type and current project
-      const { data: currentProjectMapping, error: currentProjectError } = await supabase
-        .from('calendly_event_mappings')
-        .select('*')
-        .eq('calendly_event_type_id', eventType.uri)
-        .eq('project_id', projectId)
+      // 1. Check if any mapping exists for this event type
+      const { data: anyMapping, error: anyMappingError } = await supabase
+        .from("calendly_event_mappings")
+        .select("*")
+        .eq("calendly_event_type_id", eventType.uri)
         .maybeSingle();
 
-      if (currentProjectError) {
-        throw new Error(`Failed to check current project mapping: ${currentProjectError.message}`);
+      if (anyMappingError) throw new Error(`Failed to check mappings: ${anyMappingError.message}`);
+
+      // 2. If it exists for another project, block it
+      if (anyMapping && anyMapping.project_id !== projectId) {
+        throw new Error("This event type is already mapped to another project. Each Calendly event type can only be tracked by one project at a time.");
       }
 
-      logDebug('Current project mapping check:', { currentProjectMapping, eventTypeUri: eventType.uri });
+      // 3. Check if this project already has a mapping
+      const { data: projectMapping, error: projectMappingError } = await supabase
+        .from("calendly_event_mappings")
+        .select("*")
+        .eq("project_id", projectId)
+        .eq("calendly_event_type_id", eventType.uri)
+        .maybeSingle();
 
-      if (currentProjectMapping) {
-        // A mapping exists for this event type in the current project - update it
-        logDebug('Updating existing mapping for current project:', { mappingId: currentProjectMapping.id, newActiveState: isActive });
-        
-        const { error: updateError } = await supabase
-          .from('calendly_event_mappings')
-          .update({ 
-            is_active: isActive,
+      if (projectMappingError) throw new Error(`Failed to check current project mapping: ${projectMappingError.message}`);
+
+      if (isActive) {
+        if (projectMapping) {
+          // Update if already exists
+          const { error: updateError } = await supabase
+            .from("calendly_event_mappings")
+            .update({ is_active: true })
+            .eq("id", projectMapping.id);
+
+          if (updateError) throw new Error(`Update failed: ${updateError.message}`);
+        } else {
+          // Insert new mapping
+          const insertData = {
+            project_id: projectId,
+            calendly_event_type_id: eventType.uri,
             event_type_name: eventType.name,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', currentProjectMapping.id);
+            is_active: true,
+          };
 
-        if (updateError) {
-          throw new Error(`Update failed: ${updateError.message}`);
+          const { error: insertError } = await supabase
+            .from("calendly_event_mappings")
+            .insert(insertData);
+
+          if (insertError) throw new Error(`Insert failed: ${insertError.message}`);
         }
-        
-        logDebug('Successfully updated existing mapping');
-      } else if (isActive) {
-        // No mapping exists for this event type in current project and user wants to activate
-        // Check if any other project has this event type mapped
-        const { data: otherProjectMapping, error: otherProjectError } = await supabase
-          .from('calendly_event_mappings')
-          .select('*')
-          .eq('calendly_event_type_id', eventType.uri)
-          .maybeSingle();
-
-        if (otherProjectError) {
-          throw new Error(`Failed to check other project mappings: ${otherProjectError.message}`);
-        }
-
-        logDebug('Other project mapping check:', { otherProjectMapping, eventTypeUri: eventType.uri });
-
-        if (otherProjectMapping) {
-          // Another project owns this event type
-          throw new Error(
-            'This event type is already mapped to another project. Each Calendly event type can only be tracked by one project at a time.'
-          );
-        }
-
-        // User wants to activate and no mapping exists anywhere - create new mapping
-        logDebug('Creating new mapping for event type');
-        
-        const insertData = {
-          project_id: projectId,
-          calendly_event_type_id: eventType.uri,
-          event_type_name: eventType.name,
-          is_active: true,
-        };
-
-        const { error: insertError } = await supabase
-          .from('calendly_event_mappings')
-          .insert(insertData);
-
-        if (insertError) {
-          throw new Error(`Insert failed: ${insertError.message}`);
-        }
-        
-        logDebug('Successfully created new mapping');
       } else {
-        // User wants to deactivate but no mapping exists for current project - nothing to do
-        logDebug('No mapping to deactivate for current project - skipping');
+        // Deactivate
+        if (projectMapping) {
+          const { error: deactivateError } = await supabase
+            .from("calendly_event_mappings")
+            .update({ is_active: false })
+            .eq("id", projectMapping.id);
+
+          if (deactivateError) throw new Error(`Deactivation failed: ${deactivateError.message}`);
+        }
       }
 
-      // Reload mappings to get accurate data
-      logDebug('Reloading mappings after toggle');
+      // ✅ Refresh UI
       await loadEventMappings();
-      
+
       toast({
         title: isActive ? "Event Added" : "Event Removed",
-        description: `${eventType.name} ${isActive ? 'will now be' : 'will no longer be'} tracked`,
+        description: `${eventType.name} ${isActive ? "will now be" : "will no longer be"} tracked.`,
       });
 
-      // Auto-sync events when enabling
-      if (isActive) {
-        logDebug('Triggering auto-sync for enabled event');
-        setTimeout(async () => {
-          try {
-            await supabase.functions.invoke('calendly-sync-gaps', {
-              body: { 
-                triggerReason: 'event_enabled',
-                projectId
-              }
-            });
-            logDebug('Auto-sync triggered successfully');
-          } catch (error) {
-            logDebug('Auto-sync failed:', error);
-            console.error('Auto-sync failed:', error);
-          }
-        }, 1000);
-      }
-      
     } catch (error) {
-      logDebug('Toggle event mapping error:', error);
-      console.error('Toggle event mapping error:', error);
-      
-      let errorMessage = 'Unknown error occurred';
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      } else if (typeof error === 'string') {
-        errorMessage = error;
-      }
-      
-      toast({
-        title: "Error",
-        description: `Failed to update event tracking for ${eventType.name}: ${errorMessage}`,
-        variant: "destructive",
-      });
-      
-      // Reload mappings even on error to ensure UI is in sync
-      await loadEventMappings();
+      toast({ title: "Error", description: String(error) });
+      console.error("Toggle mapping failed:", error);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -500,6 +419,7 @@ export const CalendlyConnector = ({
               <div>Event Types: {eventTypes.length}</div>
               <div>Event Mappings: {eventMappings.length}</div>
               <div>Loading: {loading ? 'Yes' : 'No'}</div>
+              <div>Saving: {isSaving ? 'Yes' : 'No'}</div>
             </div>
             {eventMappings.length > 0 && (
               <div className="mt-2">
@@ -573,6 +493,7 @@ export const CalendlyConnector = ({
                           <div className="flex items-center space-x-3">
                             <Checkbox
                               checked={isMapped}
+                              disabled={isSaving}
                               onCheckedChange={(checked) => {
                                 logDebug('Checkbox changed:', { eventType: eventType.name, checked });
                                 toggleEventMapping(eventType, checked === true);
