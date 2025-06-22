@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -292,51 +291,33 @@ export const CalendlyConnector = ({
       
       logDebug('Project ownership verified:', { userId: user.id, projectId, ownsProject });
       
-      // Check if a mapping already exists for this specific project_id and calendly_event_type_id combination
-      logDebug('Checking for existing mapping for project and event type...');
-      const { data: existingMapping, error: queryError } = await supabase
+      // Check if a mapping already exists for this event type
+      const { data: existingMapping, error: fetchError } = await supabase
         .from('calendly_event_mappings')
         .select('*')
-        .eq('project_id', projectId)
         .eq('calendly_event_type_id', eventType.uri)
         .maybeSingle();
 
-      if (queryError) {
-        logDebug('Query for existing mapping failed:', queryError);
-        throw new Error(`Failed to check existing mappings: ${queryError.message}`);
+      if (fetchError) {
+        throw new Error(`Failed to check event mapping: ${fetchError.message}`);
       }
 
-      logDebug('Existing mapping query result:', { 
-        found: !!existingMapping, 
-        mapping: existingMapping 
-      });
-
       if (existingMapping) {
-        // Record exists for this project - update it
-        logDebug('Updating existing mapping:', existingMapping.id);
-        
-        const { data: updateData, error: updateError } = await supabase
-          .from('calendly_event_mappings')
-          .update({ 
-            is_active: isActive,
-            event_type_name: eventType.name,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', existingMapping.id)
-          .select();
-
-        logDebug('Update result:', { updateData, updateError });
-
-        if (updateError) {
-          logDebug('Update failed:', updateError);
-          throw new Error(`Failed to update event mapping: ${updateError.message}`);
+        if (existingMapping.project_id !== projectId) {
+          throw new Error(
+            'This event type is already mapped to another project. Each Calendly event type can only be tracked by one project at a time.'
+          );
         }
 
-        logDebug('Update successful');
-      } else if (isActive) {
-        // No record exists for this project and we want to activate - create new one
-        logDebug('Creating new mapping for project');
-        
+        const { error: updateError } = await supabase
+          .from('calendly_event_mappings')
+          .update({ is_active: true })
+          .eq('id', existingMapping.id);
+
+        if (updateError) {
+          throw new Error(`Update failed: ${updateError.message}`);
+        }
+      } else {
         const insertData = {
           project_id: projectId,
           calendly_event_type_id: eventType.uri,
@@ -344,34 +325,13 @@ export const CalendlyConnector = ({
           is_active: true,
         };
 
-        logDebug('Insert data prepared:', insertData);
-
-        const { data: insertResult, error: insertError } = await supabase
+        const { error: insertError } = await supabase
           .from('calendly_event_mappings')
-          .insert(insertData)
-          .select()
-          .single();
-
-        logDebug('Insert result:', { insertResult, insertError });
+          .insert(insertData);
 
         if (insertError) {
-          logDebug('Insert failed:', insertError);
-          
-          if (insertError.code === '42501') {
-            // RLS policy violation
-            await debugProjectOwnership();
-            throw new Error(`Permission denied: Unable to create event mapping. Please check that you have access to this project.`);
-          } else if (insertError.code === '23505') {
-            // Unique constraint violation - this means another project already has this event type mapped
-            throw new Error(`This event type is already mapped to another project. Each Calendly event type can only be tracked by one project at a time.`);
-          } else {
-            throw new Error(`Database error: ${insertError.message || 'Unknown error'}`);
-          }
-        } else {
-          logDebug('Insert successful:', insertResult);
+          throw new Error(`Insert failed: ${insertError.message}`);
         }
-      } else {
-        logDebug('Deactivating non-existent mapping - no action needed');
       }
 
       // Reload mappings to get accurate data
