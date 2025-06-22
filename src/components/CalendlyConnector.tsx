@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -292,7 +291,7 @@ export const CalendlyConnector = ({
       
       logDebug('Project ownership verified:', { userId: user.id, projectId, ownsProject });
       
-      // First check if a mapping exists for this event type and current project
+      // Check if a mapping exists for this event type and current project
       const { data: currentProjectMapping, error: currentProjectError } = await supabase
         .from('calendly_event_mappings')
         .select('*')
@@ -324,8 +323,8 @@ export const CalendlyConnector = ({
         }
         
         logDebug('Successfully updated existing mapping');
-      } else {
-        // No mapping exists for this event type in current project
+      } else if (isActive) {
+        // No mapping exists for this event type in current project and user wants to activate
         // Check if any other project has this event type mapped
         const { data: otherProjectMapping, error: otherProjectError } = await supabase
           .from('calendly_event_mappings')
@@ -346,30 +345,28 @@ export const CalendlyConnector = ({
           );
         }
 
-        if (isActive) {
-          // User wants to activate and no mapping exists anywhere - create new mapping
-          logDebug('Creating new mapping for event type');
-          
-          const insertData = {
-            project_id: projectId,
-            calendly_event_type_id: eventType.uri,
-            event_type_name: eventType.name,
-            is_active: true,
-          };
+        // User wants to activate and no mapping exists anywhere - create new mapping
+        logDebug('Creating new mapping for event type');
+        
+        const insertData = {
+          project_id: projectId,
+          calendly_event_type_id: eventType.uri,
+          event_type_name: eventType.name,
+          is_active: true,
+        };
 
-          const { error: insertError } = await supabase
-            .from('calendly_event_mappings')
-            .insert(insertData);
+        const { error: insertError } = await supabase
+          .from('calendly_event_mappings')
+          .insert(insertData);
 
-          if (insertError) {
-            throw new Error(`Insert failed: ${insertError.message}`);
-          }
-          
-          logDebug('Successfully created new mapping');
-        } else {
-          // User wants to deactivate but no mapping exists - nothing to do
-          logDebug('No mapping to deactivate - skipping');
+        if (insertError) {
+          throw new Error(`Insert failed: ${insertError.message}`);
         }
+        
+        logDebug('Successfully created new mapping');
+      } else {
+        // User wants to deactivate but no mapping exists for current project - nothing to do
+        logDebug('No mapping to deactivate for current project - skipping');
       }
 
       // Reload mappings to get accurate data
