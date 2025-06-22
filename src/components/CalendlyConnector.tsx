@@ -292,11 +292,12 @@ export const CalendlyConnector = ({
       
       logDebug('Project ownership verified:', { userId: user.id, projectId, ownsProject });
       
-      // Check if a mapping already exists for this event type (across all projects due to unique constraint)
-      logDebug('Checking for existing mapping...');
+      // Check if a mapping already exists for this specific project_id and calendly_event_type_id combination
+      logDebug('Checking for existing mapping for project and event type...');
       const { data: existingMapping, error: queryError } = await supabase
         .from('calendly_event_mappings')
         .select('*')
+        .eq('project_id', projectId)
         .eq('calendly_event_type_id', eventType.uri)
         .maybeSingle();
 
@@ -311,14 +312,13 @@ export const CalendlyConnector = ({
       });
 
       if (existingMapping) {
-        // Record exists - update it
+        // Record exists for this project - update it
         logDebug('Updating existing mapping:', existingMapping.id);
         
         const { data: updateData, error: updateError } = await supabase
           .from('calendly_event_mappings')
           .update({ 
             is_active: isActive,
-            project_id: projectId, // Update to current project
             event_type_name: eventType.name,
             updated_at: new Date().toISOString()
           })
@@ -334,8 +334,8 @@ export const CalendlyConnector = ({
 
         logDebug('Update successful');
       } else if (isActive) {
-        // Record doesn't exist and we want to activate - create new one
-        logDebug('Creating new mapping');
+        // No record exists for this project and we want to activate - create new one
+        logDebug('Creating new mapping for project');
         
         const insertData = {
           project_id: projectId,
@@ -361,6 +361,9 @@ export const CalendlyConnector = ({
             // RLS policy violation
             await debugProjectOwnership();
             throw new Error(`Permission denied: Unable to create event mapping. Please check that you have access to this project.`);
+          } else if (insertError.code === '23505') {
+            // Unique constraint violation - this means another project already has this event type mapped
+            throw new Error(`This event type is already mapped to another project. Each Calendly event type can only be tracked by one project at a time.`);
           } else {
             throw new Error(`Database error: ${insertError.message || 'Unknown error'}`);
           }
