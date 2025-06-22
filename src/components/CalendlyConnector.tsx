@@ -308,7 +308,7 @@ export const CalendlyConnector = ({
             throw new Error("This event type is now mapped to another project. Try again.");
           }
 
-          // Insert new mapping
+          // Insert new mapping using upsert to prevent duplicate constraint violations
           const insertData = {
             project_id: projectId,
             calendly_event_type_id: eventType.uri,
@@ -316,11 +316,13 @@ export const CalendlyConnector = ({
             is_active: true,
           };
 
-          const { error: insertError } = await supabase
+          const { error: upsertError } = await supabase
             .from("calendly_event_mappings")
-            .insert(insertData);
+            .upsert(insertData, { onConflict: ['project_id', 'calendly_event_type_id'] });
 
-          if (insertError) throw new Error(`Insert failed: ${insertError.message}`);
+          if (upsertError) {
+            throw new Error(`Upsert failed: ${upsertError.message}`);
+          }
         }
       } else {
         // Deactivate
