@@ -51,20 +51,25 @@ export const useCalendlyData = (projectId?: string) => {
         })));
       }
 
-      const activeIds = new Set(mappings?.map(m => m.calendly_event_type_id) || []);
+      // If no active mappings, return all events (they wouldn't be in DB if not mapped)
+      if (!mappings || mappings.length === 0) {
+        console.log('⚠️ [useCalendlyData] No active mappings found, returning all events');
+        return allEvents || [];
+      }
+
+      const activeIds = new Set(mappings.map(m => m.calendly_event_type_id));
       console.log('🔍 [useCalendlyData] Active event type IDs to filter by:', Array.from(activeIds));
 
       // Filter events based on active mappings
       const filteredEvents = (allEvents || []).filter(e => {
         const isIncluded = activeIds.has(e.calendly_event_type_id);
-        if (!isIncluded && allEvents && allEvents.length > 0) {
-          console.log('⚠️ [useCalendlyData] Event filtered out:', {
-            event_id: e.calendly_event_id,
-            event_type_id: e.calendly_event_type_id,
-            event_type_name: e.event_type_name,
-            reason: 'Not in active mappings'
-          });
-        }
+        console.log(`🔍 [useCalendlyData] Event check:`, {
+          event_id: e.calendly_event_id,
+          event_type_id: e.calendly_event_type_id,
+          event_type_name: e.event_type_name,
+          is_included: isIncluded,
+          active_ids: Array.from(activeIds)
+        });
         return isIncluded;
       });
 
@@ -78,10 +83,14 @@ export const useCalendlyData = (projectId?: string) => {
           created_at: e.created_at,
           scheduled_at: e.scheduled_at
         })));
-      } else if (allEvents && allEvents.length > 0 && mappings && mappings.length > 0) {
+      } else if (allEvents && allEvents.length > 0) {
         console.warn('⚠️ [useCalendlyData] No events match active mappings!');
-        console.warn('Raw event type IDs:', allEvents.map(e => e.calendly_event_type_id));
-        console.warn('Active mapping IDs:', mappings.map(m => m.calendly_event_type_id));
+        console.warn('Event type IDs in database:', allEvents.map(e => e.calendly_event_type_id));
+        console.warn('Active mapping IDs:', Array.from(activeIds));
+        
+        // For debugging: return all events if no filtering match
+        console.warn('🔧 [useCalendlyData] Returning all events for debugging');
+        return allEvents;
       }
 
       return filteredEvents;
