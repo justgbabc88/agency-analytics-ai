@@ -133,7 +133,6 @@ serve(async (req) => {
       console.log('  To:', syncTo.toISOString())
       console.log('  Hours back:', hoursBack)
 
-      // FIXED: Use start_time instead of created_at for sorting
       const calendlyUrl = `https://api.calendly.com/scheduled_events?user=${encodeURIComponent(userUri)}&min_start_time=${syncFrom.toISOString()}&max_start_time=${syncTo.toISOString()}&count=100&sort=start_time:desc`
       
       console.log('🌐 Calendly API URL (by scheduled time):', calendlyUrl)
@@ -157,9 +156,35 @@ serve(async (req) => {
         
         console.log('📊 Total events from Calendly API:', events.length)
 
-        // Filter events by active event type mappings
+        // Log first few events to see their structure
+        if (events.length > 0) {
+          console.log('📋 Sample events from API:')
+          events.slice(0, 3).forEach((event, idx) => {
+            console.log(`  Event ${idx + 1}:`)
+            console.log(`    - Name: ${event.name}`)
+            console.log(`    - Status: ${event.status}`)
+            console.log(`    - Event Type URI: ${event.event_type?.uri}`)
+            console.log(`    - Start Time: ${event.start_time}`)
+          })
+        }
+
+        // Create set of active event type IDs for filtering
         const activeEventTypeIds = new Set(mappings.map(m => m.calendly_event_type_id))
-        const filteredEvents = events.filter(event => activeEventTypeIds.has(event.event_type.uri))
+        console.log('🎯 Active event type IDs for filtering:', Array.from(activeEventTypeIds))
+
+        // Filter events by active event type mappings
+        const filteredEvents = events.filter(event => {
+          const eventTypeUri = event.event_type?.uri
+          const isMatched = activeEventTypeIds.has(eventTypeUri)
+          
+          if (!isMatched) {
+            console.log(`⚠️ Event NOT matched - Name: ${event.name}, Event Type: ${eventTypeUri}`)
+          } else {
+            console.log(`✅ Event MATCHED - Name: ${event.name}, Event Type: ${eventTypeUri}`)
+          }
+          
+          return isMatched
+        })
         
         console.log('🎯 Events matching active mappings:', filteredEvents.length)
 
