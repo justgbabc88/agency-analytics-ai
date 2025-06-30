@@ -156,32 +156,43 @@ serve(async (req) => {
         
         console.log('📊 Total events from Calendly API:', events.length)
 
-        // Log first few events to see their structure
+        // Log the complete structure of first event to understand the API response
         if (events.length > 0) {
-          console.log('📋 Sample events from API:')
-          events.slice(0, 3).forEach((event, idx) => {
-            console.log(`  Event ${idx + 1}:`)
-            console.log(`    - Name: ${event.name}`)
-            console.log(`    - Status: ${event.status}`)
-            console.log(`    - Event Type URI: ${event.event_type?.uri}`)
-            console.log(`    - Start Time: ${event.start_time}`)
-          })
+          console.log('🔍 FULL EVENT STRUCTURE ANALYSIS:')
+          console.log('Raw event object keys:', Object.keys(events[0]))
+          console.log('Full first event:', JSON.stringify(events[0], null, 2))
+          
+          // Check different possible event type properties
+          const firstEvent = events[0]
+          console.log('🧪 Testing event type properties:')
+          console.log('  - event.event_type:', firstEvent.event_type)
+          console.log('  - event.event_type_uri:', firstEvent.event_type_uri)
+          console.log('  - event.event_type_id:', firstEvent.event_type_id)
+          console.log('  - event.type:', firstEvent.type)
+          console.log('  - event.uri itself:', firstEvent.uri)
         }
 
         // Create set of active event type IDs for filtering
         const activeEventTypeIds = new Set(mappings.map(m => m.calendly_event_type_id))
         console.log('🎯 Active event type IDs for filtering:', Array.from(activeEventTypeIds))
 
-        // Filter events by active event type mappings
+        // Try different properties to find the event type identifier
         const filteredEvents = events.filter(event => {
-          const eventTypeUri = event.event_type?.uri
+          // Try multiple possible properties for event type URI
+          const eventTypeUri = event.event_type?.uri || 
+                              event.event_type_uri || 
+                              event.event_type_id ||
+                              event.event_type
+
           const isMatched = activeEventTypeIds.has(eventTypeUri)
           
-          if (!isMatched) {
-            console.log(`⚠️ Event NOT matched - Name: ${event.name}, Event Type: ${eventTypeUri}`)
-          } else {
-            console.log(`✅ Event MATCHED - Name: ${event.name}, Event Type: ${eventTypeUri}`)
-          }
+          console.log(`🔍 Event filtering - Name: ${event.name}`)
+          console.log(`    - Trying event_type?.uri: ${event.event_type?.uri}`)
+          console.log(`    - Trying event_type_uri: ${event.event_type_uri}`)
+          console.log(`    - Trying event_type_id: ${event.event_type_id}`)
+          console.log(`    - Trying event_type: ${event.event_type}`)
+          console.log(`    - Final eventTypeUri used: ${eventTypeUri}`)
+          console.log(`    - Match result: ${isMatched}`)
           
           return isMatched
         })
@@ -236,9 +247,15 @@ serve(async (req) => {
               }
             }
 
+            // Get the event type URI using the same logic as filtering
+            const eventTypeUri = event.event_type?.uri || 
+                               event.event_type_uri || 
+                               event.event_type_id ||
+                               event.event_type
+
             // Find the event type name from our mappings
-            const mapping = mappings.find(m => m.calendly_event_type_id === event.event_type.uri)
-            const eventTypeName = mapping?.event_type_name || event.event_type.name || 'Unknown Event Type'
+            const mapping = mappings.find(m => m.calendly_event_type_id === eventTypeUri)
+            const eventTypeName = mapping?.event_type_name || event.event_type?.name || event.name || 'Unknown Event Type'
 
             // Insert the event
             const { error: insertError } = await supabaseClient
@@ -246,7 +263,7 @@ serve(async (req) => {
               .insert({
                 project_id: integration.project_id,
                 calendly_event_id: event.uri,
-                calendly_event_type_id: event.event_type.uri,
+                calendly_event_type_id: eventTypeUri,
                 event_type_name: eventTypeName,
                 scheduled_at: event.start_time,
                 invitee_name: inviteeName,
@@ -264,7 +281,8 @@ serve(async (req) => {
               id: event.uri,
               name: eventTypeName,
               status: event.status,
-              scheduled_at: event.start_time
+              scheduled_at: event.start_time,
+              event_type_uri: eventTypeUri
             })
 
           } catch (eventError) {
