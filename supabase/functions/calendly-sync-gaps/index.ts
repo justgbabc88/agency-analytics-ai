@@ -122,9 +122,9 @@ serve(async (req) => {
         continue
       }
 
-      // Set sync window (extended to 7 days back to catch all recent events)
+      // Set sync window (extended to 30 days back to catch all recent events)
       const now = new Date()
-      const hoursBack = 168 // 7 days = 168 hours
+      const hoursBack = 720 // 30 days = 720 hours
       const syncFrom = new Date(now.getTime() - (hoursBack * 60 * 60 * 1000))
       const syncTo = new Date(now.getTime() + (24 * 60 * 60 * 1000)) // Include future events
 
