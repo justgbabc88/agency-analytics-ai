@@ -114,22 +114,22 @@ export const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { f
       })));
     }
     
-    // Use consistent logic: all metrics based on events created on this day for better accuracy
-    // Total bookings = all events created this day (regardless of current status)
+    // Total bookings = events created this day (when people booked)
     const callsBooked = eventsCreatedThisDay.length;
     
-    // Calls taken = events created this day that have status 'active', 'completed', or 'scheduled'
-    const callsTaken = eventsCreatedThisDay.filter(event => 
+    // Calls taken = events scheduled this day with successful status
+    const callsTaken = eventsScheduledThisDay.filter(event => 
       event.status === 'active' || event.status === 'completed' || event.status === 'scheduled'
     ).length;
     
-    // Cancelled = events created this day that are now cancelled (both spellings)
-    const cancelled = eventsCreatedThisDay.filter(event => 
+    // Cancelled = events scheduled this day that were cancelled
+    const cancelled = eventsScheduledThisDay.filter(event => 
       event.status === 'cancelled' || event.status === 'canceled'
     ).length;
     
-    // Show up rate = (calls taken / total bookings) * 100 for consistency
-    const showUpRate = callsBooked > 0 ? Math.round((callsTaken / callsBooked) * 100) : 0;
+    // Show up rate = (calls taken / total scheduled calls) * 100
+    const totalScheduledCalls = callsTaken + cancelled;
+    const showUpRate = totalScheduledCalls > 0 ? Math.round((callsTaken / totalScheduledCalls) * 100) : 0;
     
     const pageViews = Math.floor(Math.random() * 300) + 150;
     
