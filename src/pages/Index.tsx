@@ -30,11 +30,11 @@ interface FunnelProductConfig {
 }
 
 const Index = () => {
-  // Initialize dateRange to last 30 days (matching BookCallFunnel's previous default)
+  // Initialize dateRange to last 7 days including today
   const [dateRange, setDateRange] = useState(() => {
     const today = new Date();
     return {
-      from: startOfDay(subDays(today, 29)),
+      from: startOfDay(subDays(today, 6)), // 6 days ago + today = 7 days total
       to: endOfDay(today)
     };
   });
