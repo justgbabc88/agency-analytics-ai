@@ -114,28 +114,22 @@ export const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { f
       })));
     }
     
-    // Use created events for booking metrics (when people booked), excluding cancelled events from creation day
-    const activeEventsCreatedThisDay = eventsCreatedThisDay.filter(event => 
-      event.status !== 'canceled' && event.status !== 'cancelled'
-    );
-    const callsBooked = activeEventsCreatedThisDay.length;
+    // Use consistent logic: all metrics based on events created on this day for better accuracy
+    // Total bookings = all events created this day (regardless of current status)
+    const callsBooked = eventsCreatedThisDay.length;
     
-    // Count cancellations that happened on this day specifically
-    const cancelled = eventsCancelledThisDay.length;
-    
-    const noShows = eventsCreatedThisDay.filter(event => event.status === 'no_show').length;
-    const scheduled = eventsCreatedThisDay.filter(event => 
-      event.status === 'active' || event.status === 'scheduled'
+    // Calls taken = events created this day that have status 'active', 'completed', or 'scheduled'
+    const callsTaken = eventsCreatedThisDay.filter(event => 
+      event.status === 'active' || event.status === 'completed' || event.status === 'scheduled'
     ).length;
     
-    // For calls taken, we should look at scheduled events to see what actually happened
-    const scheduledCallsThisDay = eventsScheduledThisDay.filter(event => 
-      event.status === 'active' || event.status === 'scheduled'
+    // Cancelled = events created this day that are now cancelled (both spellings)
+    const cancelled = eventsCreatedThisDay.filter(event => 
+      event.status === 'cancelled' || event.status === 'canceled'
     ).length;
-    const noShowsThisDay = eventsScheduledThisDay.filter(event => event.status === 'no_show').length;
-    const callsTaken = Math.max(0, scheduledCallsThisDay - noShowsThisDay);
     
-    const showUpRate = scheduledCallsThisDay > 0 ? ((callsTaken / scheduledCallsThisDay) * 100) : 0;
+    // Show up rate = (calls taken / total bookings) * 100 for consistency
+    const showUpRate = callsBooked > 0 ? Math.round((callsTaken / callsBooked) * 100) : 0;
     
     const pageViews = Math.floor(Math.random() * 300) + 150;
     
