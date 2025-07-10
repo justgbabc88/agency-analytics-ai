@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ExternalLink, RefreshCw, Calendar, CheckCircle, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { ManualSyncButton } from "./ManualSyncButton";
 
 interface CalendlyConnectorProps {
   projectId?: string;
@@ -378,9 +379,12 @@ export const CalendlyConnector = ({
                 <CheckCircle className="h-3 w-3 mr-1" />
                 Connected
               </Badge>
-              <Button variant="outline" size="sm" onClick={handleDisconnect}>
-                Disconnect
-              </Button>
+              <div className="flex gap-2">
+                <ManualSyncButton />
+                <Button variant="outline" size="sm" onClick={handleDisconnect}>
+                  Disconnect
+                </Button>
+              </div>
             </div>
 
             {eventTypes.length > 0 && (
