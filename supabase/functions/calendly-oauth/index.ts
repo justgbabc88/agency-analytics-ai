@@ -275,13 +275,13 @@ serve(async (req) => {
         }
 
         const accessToken = tokenDataForTypes.data.access_token;
-        const eventTypesUserUri = tokenDataForTypes.data.user_uri;
+        const organizationUri = tokenDataForTypes.data.organization_uri;
         
-        console.log('👤 Using user URI for event types:', eventTypesUserUri);
+        console.log('🏢 Using organization URI for event types:', organizationUri);
         console.log('🔑 Access token available:', !!accessToken);
         
-        const eventTypesUrl = `https://api.calendly.com/event_types?user=${encodeURIComponent(eventTypesUserUri)}`;
-        console.log('🌐 Fetching event types from URL:', eventTypesUrl);
+        const eventTypesUrl = `https://api.calendly.com/event_types?organization=${encodeURIComponent(organizationUri)}`;
+        console.log('🌐 Fetching event types from URL (organization-wide):', eventTypesUrl);
 
         const eventTypesResponse = await fetch(eventTypesUrl, {
           headers: {
