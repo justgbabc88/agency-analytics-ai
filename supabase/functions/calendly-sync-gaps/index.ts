@@ -95,8 +95,8 @@ serve(async (req) => {
       }
 
       const userData = await userResponse.json()
-      const userUri = userData.resource.uri
-      console.log('👤 User URI:', userUri)
+      const organizationUri = userData.resource.current_organization
+      console.log('🏢 Organization URI:', organizationUri)
 
       // Get active event type mappings for this project
       const { data: mappings, error: mappingsError } = await supabaseClient
@@ -133,9 +133,9 @@ serve(async (req) => {
       console.log('  To:', syncTo.toISOString())
       console.log('  Hours back:', hoursBack)
 
-      const calendlyUrl = `https://api.calendly.com/scheduled_events?user=${encodeURIComponent(userUri)}&min_start_time=${syncFrom.toISOString()}&max_start_time=${syncTo.toISOString()}&count=100&sort=start_time:desc`
+      const calendlyUrl = `https://api.calendly.com/scheduled_events?organization=${encodeURIComponent(organizationUri)}&min_start_time=${syncFrom.toISOString()}&max_start_time=${syncTo.toISOString()}&count=100&sort=start_time:desc`
       
-      console.log('🌐 Calendly API URL (by scheduled time):', calendlyUrl)
+      console.log('🌐 Calendly API URL (organization-wide):', calendlyUrl)
 
       try {
         const eventsResponse = await fetch(calendlyUrl, {
