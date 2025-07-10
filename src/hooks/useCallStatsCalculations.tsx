@@ -9,6 +9,7 @@ interface CalendlyEvent {
   event_type_name: string;
   scheduled_at: string;
   created_at: string;
+  updated_at?: string;
   invitee_name?: string;
   invitee_email?: string;
   status: string;
@@ -97,10 +98,16 @@ export const useCallStatsCalculations = (
       event.status === 'active' || event.status === 'completed' || event.status === 'scheduled'
     ).length;
 
-    // Cancelled calls = events scheduled in range with 'cancelled' status (both spellings)
-    const cancelled = eventsScheduledInRange.filter(event => 
-      event.status === 'cancelled' || event.status === 'canceled'
-    ).length;
+    // Cancelled calls = events that were cancelled within the date range (using updated_at)
+    const eventsCancelledInRange = uniqueEvents.filter(event => {
+      if (event.status !== 'cancelled' && event.status !== 'canceled') return false;
+      const updatedAt = new Date(event.updated_at || event.created_at); // fallback to created_at if no updated_at
+      return isWithinInterval(updatedAt, {
+        start: startOfDay(dateRange.from),
+        end: endOfDay(dateRange.to)
+      });
+    });
+    const cancelled = eventsCancelledInRange.length;
 
     // Show up rate = (calls taken / total scheduled calls) * 100
     const totalScheduledCalls = callsTaken + cancelled;
@@ -138,9 +145,15 @@ export const useCallStatsCalculations = (
     const previousCallsTaken = previousPeriodEventsScheduled.filter(event => 
       event.status === 'active' || event.status === 'completed' || event.status === 'scheduled'
     ).length;
-    const previousCancelled = previousPeriodEventsScheduled.filter(event => 
-      event.status === 'cancelled' || event.status === 'canceled'
-    ).length;
+    const previousPeriodEventsCancelled = uniqueEvents.filter(event => {
+      if (event.status !== 'cancelled' && event.status !== 'canceled') return false;
+      const updatedAt = new Date(event.updated_at || event.created_at); // fallback to created_at if no updated_at
+      return isWithinInterval(updatedAt, {
+        start: startOfDay(previousPeriodStart),
+        end: endOfDay(previousPeriodEnd)
+      });
+    });
+    const previousCancelled = previousPeriodEventsCancelled.length;
 
     const previousTotalScheduledCalls = previousCallsTaken + previousCancelled;
     const previousShowUpRate = previousTotalScheduledCalls > 0 ? 

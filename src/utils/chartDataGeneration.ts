@@ -78,14 +78,25 @@ export const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { f
       isEventScheduledOnDate(event.scheduled_at, currentDate, timezone)
     );
     
-    // Cancelled = events scheduled this day that have cancelled status (same logic as stats)
-    const cancelled = eventsScheduledThisDay.filter(event => 
-      event.status === 'cancelled' || event.status === 'canceled'
-    ).length;
+    // Cancelled = events that were cancelled on this day (using updated_at)
+    const eventsCancelledThisDay = calendlyEvents.filter(event => 
+      (event.status === 'cancelled' || event.status === 'canceled') &&
+      isEventCreatedOnDate(event.updated_at, currentDate, timezone)
+    );
+    const cancelled = eventsCancelledThisDay.length;
     
     console.log(`Events created on ${currentDateStr}: ${eventsCreatedThisDay.length}`);
     console.log(`Events scheduled on ${currentDateStr}: ${eventsScheduledThisDay.length}`);
     console.log(`Events cancelled on ${currentDateStr}: ${cancelled}`);
+    
+    if (eventsCancelledThisDay.length > 0) {
+      console.log('Sample events cancelled this day:', eventsCancelledThisDay.slice(0, 2).map(e => ({
+        updated_at: e.updated_at,
+        cancelled_in_timezone: formatInTimeZone(new Date(e.updated_at), timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
+        scheduled_at: e.scheduled_at,
+        status: e.status
+      })));
+    }
     
     if (eventsCreatedThisDay.length > 0) {
       console.log('Sample events created this day:', eventsCreatedThisDay.slice(0, 2).map(e => ({
