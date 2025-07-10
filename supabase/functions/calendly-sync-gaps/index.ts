@@ -122,48 +122,78 @@ serve(async (req) => {
         continue
       }
 
-      // Set sync window (extended to 30 days back to catch all recent events)
+      // Set sync window (31 days back to catch all recent events)
       const now = new Date()
-      const hoursBack = 720 // 30 days = 720 hours
+      const daysBack = 31
+      const hoursBack = daysBack * 24 // 31 days = 744 hours
       const syncFrom = new Date(now.getTime() - (hoursBack * 60 * 60 * 1000))
-      const syncTo = new Date(now.getTime() + (24 * 60 * 60 * 1000)) // Include future events
+      const syncTo = new Date(now.getTime() + (7 * 24 * 60 * 60 * 1000)) // Include future events up to 7 days
 
       console.log('📅 Sync date range:')
       console.log('  From:', syncFrom.toISOString())
       console.log('  To:', syncTo.toISOString())
+      console.log('  Days back:', daysBack)
       console.log('  Hours back:', hoursBack)
 
-      const calendlyUrl = `https://api.calendly.com/scheduled_events?organization=${encodeURIComponent(organizationUri)}&min_start_time=${syncFrom.toISOString()}&max_start_time=${syncTo.toISOString()}&count=100&sort=start_time:desc`
-      
-      console.log('🌐 Calendly API URL (organization-wide):', calendlyUrl)
+      // Use pagination to get all events (Calendly API has a limit of 100 events per request)
+      let allEvents = []
+      let nextPageToken = null
+      let pageCount = 0
+      const maxPages = 10 // Safety limit to prevent infinite loops
 
-      try {
-        const eventsResponse = await fetch(calendlyUrl, {
-          headers: {
-            'Authorization': `Bearer ${tokenData.access_token}`,
-            'Content-Type': 'application/json'
-          }
-        })
-
-        if (!eventsResponse.ok) {
-          const errorText = await eventsResponse.text()
-          console.error(`❌ Calendly API error: ${eventsResponse.status} ${errorText}`)
-          continue
-        }
-
-        const eventsData = await eventsResponse.json()
-        const events = eventsData.collection || []
+      do {
+        pageCount++
+        let calendlyUrl = `https://api.calendly.com/scheduled_events?organization=${encodeURIComponent(organizationUri)}&min_start_time=${syncFrom.toISOString()}&max_start_time=${syncTo.toISOString()}&count=100&sort=start_time:desc`
         
-        console.log('📊 Total events from Calendly API:', events.length)
+        if (nextPageToken) {
+          calendlyUrl += `&page_token=${nextPageToken}`
+        }
+        
+        console.log(`🌐 Calendly API URL (page ${pageCount}):`, calendlyUrl)
 
-        // Log the complete structure of first event to understand the API response
-        if (events.length > 0) {
+        try {
+          const eventsResponse = await fetch(calendlyUrl, {
+            headers: {
+              'Authorization': `Bearer ${tokenData.access_token}`,
+              'Content-Type': 'application/json'
+            }
+          })
+
+          if (!eventsResponse.ok) {
+            const errorText = await eventsResponse.text()
+            console.error(`❌ Calendly API error: ${eventsResponse.status} ${errorText}`)
+            break
+          }
+
+          const eventsData = await eventsResponse.json()
+          const events = eventsData.collection || []
+          
+          console.log(`📊 Events from page ${pageCount}:`, events.length)
+          
+          // Add events to our collection
+          allEvents.push(...events)
+          
+          // Check if there's a next page
+          nextPageToken = eventsData.pagination?.next_page_token
+          console.log('🔄 Next page token:', nextPageToken)
+          
+        } catch (fetchError) {
+          console.error('❌ Error fetching events from Calendly:', fetchError)
+          break
+        }
+        
+      } while (nextPageToken && pageCount < maxPages)
+      
+      console.log(`📊 Total events collected across ${pageCount} pages:`, allEvents.length)
+
+      // Log the complete structure of first event to understand the API response
+      if (allEvents.length > 0) {
           console.log('🔍 FULL EVENT STRUCTURE ANALYSIS:')
-          console.log('Raw event object keys:', Object.keys(events[0]))
-          console.log('Full first event:', JSON.stringify(events[0], null, 2))
+          console.log('Raw event object keys:', Object.keys(allEvents[0]))
+          console.log('Full first event:', JSON.stringify(allEvents[0], null, 2))
           
           // Check different possible event type properties
-          const firstEvent = events[0]
+          const firstEvent = allEvents[0]
           console.log('🧪 Testing event type properties:')
           console.log('  - event.event_type:', firstEvent.event_type)
           console.log('  - event.event_type_uri:', firstEvent.event_type_uri)
@@ -177,7 +207,7 @@ serve(async (req) => {
         console.log('🎯 Active event type IDs for filtering:', Array.from(activeEventTypeIds))
 
         // Try different properties to find the event type identifier
-        const filteredEvents = events.filter(event => {
+        const filteredEvents = allEvents.filter(event => {
           // Try multiple possible properties for event type URI
           const eventTypeUri = event.event_type?.uri || 
                               event.event_type_uri || 
@@ -303,11 +333,6 @@ serve(async (req) => {
         if (updateError) {
           console.error('❌ Error updating last sync:', updateError)
         }
-
-      } catch (fetchError) {
-        console.error('❌ Error fetching events from Calendly:', fetchError)
-        continue
-      }
     }
 
     console.log('\n🎉 === FINAL SYNC RESULTS ===')
