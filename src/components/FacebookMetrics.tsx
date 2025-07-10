@@ -1,17 +1,20 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useFacebookData } from "@/hooks/useFacebookData";
+import { useCalendlyData } from "@/hooks/useCalendlyData";
 import { ConversionChart } from "./ConversionChart";
 import { FacebookAIInsights } from "./FacebookAIInsights";
-import { BarChart3, TrendingUp, Users, DollarSign, MousePointer, Eye, ArrowUpRight, ArrowDownRight } from "lucide-react";
-import { format, eachDayOfInterval, subDays } from "date-fns";
+import { BarChart3, TrendingUp, Users, DollarSign, MousePointer, Eye, ArrowUpRight, ArrowDownRight, Calendar } from "lucide-react";
+import { format, eachDayOfInterval, subDays, isWithinInterval } from "date-fns";
 
 interface FacebookMetricsProps {
   dateRange?: { from: Date; to: Date };
+  projectId?: string;
 }
 
-export const FacebookMetrics = ({ dateRange }: FacebookMetricsProps) => {
+export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) => {
   const { facebookData, isLoading, insights, campaigns, metrics } = useFacebookData({ dateRange });
+  const { calendlyEvents } = useCalendlyData(projectId);
 
   console.log('FacebookMetrics - Data received:', {
     facebookData,
@@ -70,6 +73,16 @@ export const FacebookMetrics = ({ dateRange }: FacebookMetricsProps) => {
   // Calculate Frequency - estimated based on reach vs impressions
   const frequency = insights.reach && insights.reach > 0 ? insights.impressions / insights.reach : 1.2;
 
+  // Calculate total bookings for the date range
+  const totalBookings = calendlyEvents.filter(event => {
+    if (!dateRange) return true;
+    const eventDate = new Date(event.scheduled_at);
+    return isWithinInterval(eventDate, { start: dateRange.from, end: dateRange.to });
+  }).length;
+
+  // Calculate cost per booked call
+  const costPerBookedCall = totalBookings > 0 ? (insights.spend || 0) / totalBookings : 0;
+
   // Mock previous period data for comparison (typically would come from API with different date range)
   const previousPeriodData = {
     spend: (insights.spend || 0) * (0.85 + Math.random() * 0.3), // Random variation for demo
@@ -77,7 +90,8 @@ export const FacebookMetrics = ({ dateRange }: FacebookMetricsProps) => {
     ctr: (insights.ctr || 0) * (0.95 + Math.random() * 0.1),
     ctrLink: ctrLink * (0.92 + Math.random() * 0.16),
     cpm: insights.spend && insights.impressions ? ((insights.spend / insights.impressions) * 1000) * (1.1 + Math.random() * 0.2) : 0,
-    frequency: frequency * (0.88 + Math.random() * 0.24)
+    frequency: frequency * (0.88 + Math.random() * 0.24),
+    costPerBookedCall: costPerBookedCall * (1.15 + Math.random() * 0.3)
   };
 
   const calculatePercentageChange = (current: number, previous: number) => {
@@ -151,6 +165,7 @@ export const FacebookMetrics = ({ dateRange }: FacebookMetricsProps) => {
     previousPeriodData.cpm
   );
   const frequencyChange = calculatePercentageChange(frequency, previousPeriodData.frequency);
+  const costPerBookedCallChange = calculatePercentageChange(costPerBookedCall, previousPeriodData.costPerBookedCall);
 
   return (
     <div className="space-y-6">
@@ -165,7 +180,7 @@ export const FacebookMetrics = ({ dateRange }: FacebookMetricsProps) => {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
             {/* Spend Metric */}
             <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-lg p-3 border border-gray-100">
               <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
@@ -253,6 +268,24 @@ export const FacebookMetrics = ({ dateRange }: FacebookMetricsProps) => {
               <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(frequencyChange)}`}>
                 {getChangeIcon(frequencyChange)}
                 <span>{frequencyChange > 0 ? '+' : ''}{frequencyChange.toFixed(1)}%</span>
+              </div>
+            </div>
+
+            {/* Cost Per Booked Call Metric */}
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 rounded-lg p-3 border border-blue-100">
+              <div className="flex items-center gap-2 text-xs text-blue-600 mb-1">
+                <Calendar className="h-3 w-3" />
+                Cost per Call
+              </div>
+              <div className="text-lg font-bold text-blue-800">
+                {totalBookings > 0 ? formatCurrency(costPerBookedCall) : 'N/A'}
+              </div>
+              <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(costPerBookedCallChange)}`}>
+                {getChangeIcon(costPerBookedCallChange)}
+                <span>{costPerBookedCallChange > 0 ? '+' : ''}{costPerBookedCallChange.toFixed(1)}%</span>
+              </div>
+              <div className="text-xs text-blue-600 mt-1">
+                {totalBookings} bookings
               </div>
             </div>
           </div>

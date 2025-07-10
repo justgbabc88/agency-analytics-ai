@@ -242,7 +242,7 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="facebook" className="space-y-6">
-            <FacebookMetrics dateRange={dateRange} />
+            <FacebookMetrics dateRange={dateRange} projectId={selectedProjectId} />
           </TabsContent>
 
           <TabsContent value="tracking" className="space-y-6">
