@@ -137,54 +137,67 @@ serve(async (req) => {
 
       // Use pagination to get all events (Calendly API has a limit of 100 events per request)
       let allEvents = []
-      let nextPageToken = null
-      let pageCount = 0
-      const maxPages = 10 // Safety limit to prevent infinite loops
+      
+      // Fetch active/scheduled events
+      await fetchEventsWithStatus(allEvents, organizationUri, syncFrom, syncTo, tokenData.access_token, 'active')
+      
+      // Fetch canceled events  
+      await fetchEventsWithStatus(allEvents, organizationUri, syncFrom, syncTo, tokenData.access_token, 'canceled')
+      
+      console.log(`📊 Total events collected from all statuses:`, allEvents.length)
 
-      do {
-        pageCount++
-        let calendlyUrl = `https://api.calendly.com/scheduled_events?organization=${encodeURIComponent(organizationUri)}&min_start_time=${syncFrom.toISOString()}&max_start_time=${syncTo.toISOString()}&count=100&sort=start_time:desc`
+      async function fetchEventsWithStatus(eventsList, orgUri, fromDate, toDate, accessToken, status) {
+        let nextPageToken = null
+        let pageCount = 0
+        const maxPages = 10
         
-        if (nextPageToken) {
-          calendlyUrl += `&page_token=${nextPageToken}`
-        }
+        console.log(`🔄 Fetching events with status: ${status}`)
         
-        console.log(`🌐 Calendly API URL (page ${pageCount}):`, calendlyUrl)
+        do {
+          pageCount++
+          let calendlyUrl = `https://api.calendly.com/scheduled_events?organization=${encodeURIComponent(orgUri)}&min_start_time=${fromDate.toISOString()}&max_start_time=${toDate.toISOString()}&count=100&sort=start_time:desc&status=${status}`
+          
+          if (nextPageToken) {
+            calendlyUrl += `&page_token=${nextPageToken}`
+          }
+          
+          console.log(`🌐 ${status} events - Page ${pageCount}:`, calendlyUrl)
 
-        try {
-          const eventsResponse = await fetch(calendlyUrl, {
-            headers: {
-              'Authorization': `Bearer ${tokenData.access_token}`,
-              'Content-Type': 'application/json'
+          try {
+            const eventsResponse = await fetch(calendlyUrl, {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              }
+            })
+
+            if (!eventsResponse.ok) {
+              const errorText = await eventsResponse.text()
+              console.error(`❌ Calendly API error for ${status} events: ${eventsResponse.status} ${errorText}`)
+              break
             }
-          })
 
-          if (!eventsResponse.ok) {
-            const errorText = await eventsResponse.text()
-            console.error(`❌ Calendly API error: ${eventsResponse.status} ${errorText}`)
+            const eventsData = await eventsResponse.json()
+            const events = eventsData.collection || []
+            
+            console.log(`📊 ${status} events from page ${pageCount}:`, events.length)
+            
+            // Add events to our collection
+            eventsList.push(...events)
+            
+            // Check if there's a next page
+            nextPageToken = eventsData.pagination?.next_page_token
+            console.log(`🔄 ${status} next page token:`, nextPageToken)
+            
+          } catch (fetchError) {
+            console.error(`❌ Error fetching ${status} events from Calendly:`, fetchError)
             break
           }
-
-          const eventsData = await eventsResponse.json()
-          const events = eventsData.collection || []
           
-          console.log(`📊 Events from page ${pageCount}:`, events.length)
-          
-          // Add events to our collection
-          allEvents.push(...events)
-          
-          // Check if there's a next page
-          nextPageToken = eventsData.pagination?.next_page_token
-          console.log('🔄 Next page token:', nextPageToken)
-          
-        } catch (fetchError) {
-          console.error('❌ Error fetching events from Calendly:', fetchError)
-          break
-        }
+        } while (nextPageToken && pageCount < maxPages)
         
-      } while (nextPageToken && pageCount < maxPages)
-      
-      console.log(`📊 Total events collected across ${pageCount} pages:`, allEvents.length)
+        console.log(`📊 Total ${status} events collected across ${pageCount} pages:`, eventsList.length)
+      }
 
       // Log the complete structure of first event to understand the API response
       if (allEvents.length > 0) {
