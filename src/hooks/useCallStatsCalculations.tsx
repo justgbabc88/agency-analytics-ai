@@ -60,13 +60,26 @@ export const useCallStatsCalculations = (
           created_at: event.created_at,
           status: event.status
         });
-      } else {
-        console.log('❌ Event NOT created in range:', {
+      }
+      
+      return isInRange;
+    });
+
+    // Filter events scheduled within the selected date range
+    const eventsScheduledInRange = uniqueEvents.filter(event => {
+      const scheduledAt = new Date(event.scheduled_at);
+      const isInRange = isWithinInterval(scheduledAt, {
+        start: startOfDay(dateRange.from),
+        end: endOfDay(dateRange.to)
+      });
+      
+      if (isInRange) {
+        console.log('✅ Event scheduled in range:', {
           event_id: event.calendly_event_id,
+          event_type: event.event_type_name,
           scheduled_at: event.scheduled_at,
           created_at: event.created_at,
-          dateRangeStart: startOfDay(dateRange.from).toISOString(),
-          dateRangeEnd: endOfDay(dateRange.to).toISOString()
+          status: event.status
         });
       }
       
@@ -74,23 +87,24 @@ export const useCallStatsCalculations = (
     });
 
     console.log('📊 Events created in date range:', eventsCreatedInRange.length);
+    console.log('📊 Events scheduled in date range:', eventsScheduledInRange.length);
 
     // Total bookings = all unique events created in the date range (regardless of status)
     const totalBookings = eventsCreatedInRange.length;
 
-    // Calls taken = events with 'active' or 'completed' status
-    const callsTaken = eventsCreatedInRange.filter(event => 
+    // Calls taken = events scheduled in range with 'active' or 'completed' status
+    const callsTaken = eventsScheduledInRange.filter(event => 
       event.status === 'active' || event.status === 'completed'
     ).length;
 
-    // Cancelled calls = events with 'cancelled' status
-    const cancelled = eventsCreatedInRange.filter(event => 
+    // Cancelled calls = events scheduled in range with 'cancelled' status
+    const cancelled = eventsScheduledInRange.filter(event => 
       event.status === 'cancelled' || event.status === 'canceled'
     ).length;
 
     // Show up rate = (calls taken / total scheduled calls) * 100
-    // Exclude cancelled calls from the denominator as they were never scheduled to happen
-    const scheduledCalls = totalBookings - cancelled;
+    // Total scheduled calls = calls taken + cancelled calls (both from scheduled range)
+    const scheduledCalls = callsTaken + cancelled;
     const showUpRate = scheduledCalls > 0 ? Math.round((callsTaken / scheduledCalls) * 100) : 0;
 
     console.log('📈 Current period stats:', {
@@ -106,7 +120,7 @@ export const useCallStatsCalculations = (
     const previousPeriodStart = subDays(dateRange.from, daysDifference);
     const previousPeriodEnd = subDays(dateRange.to, daysDifference);
 
-    const previousPeriodEvents = uniqueEvents.filter(event => {
+    const previousPeriodEventsCreated = uniqueEvents.filter(event => {
       const createdAt = new Date(event.created_at);
       return isWithinInterval(createdAt, {
         start: startOfDay(previousPeriodStart),
@@ -114,15 +128,23 @@ export const useCallStatsCalculations = (
       });
     });
 
-    const previousTotalBookings = previousPeriodEvents.length;
-    const previousCallsTaken = previousPeriodEvents.filter(event => 
+    const previousPeriodEventsScheduled = uniqueEvents.filter(event => {
+      const scheduledAt = new Date(event.scheduled_at);
+      return isWithinInterval(scheduledAt, {
+        start: startOfDay(previousPeriodStart),
+        end: endOfDay(previousPeriodEnd)
+      });
+    });
+
+    const previousTotalBookings = previousPeriodEventsCreated.length;
+    const previousCallsTaken = previousPeriodEventsScheduled.filter(event => 
       event.status === 'active' || event.status === 'completed'
     ).length;
-    const previousCancelled = previousPeriodEvents.filter(event => 
+    const previousCancelled = previousPeriodEventsScheduled.filter(event => 
       event.status === 'cancelled' || event.status === 'canceled'
     ).length;
 
-    const previousScheduledCalls = previousTotalBookings - previousCancelled;
+    const previousScheduledCalls = previousCallsTaken + previousCancelled;
     const previousShowUpRate = previousScheduledCalls > 0 ? 
       Math.round((previousCallsTaken / previousScheduledCalls) * 100) : 0;
 
