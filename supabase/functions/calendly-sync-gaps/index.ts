@@ -257,7 +257,7 @@ serve(async (req) => {
             const mapping = mappings.find(m => m.calendly_event_type_id === eventTypeUri)
             const eventTypeName = mapping?.event_type_name || event.event_type?.name || event.name || 'Unknown Event Type'
 
-            // Insert the event
+            // Insert the event using original Calendly creation date
             const { error: insertError } = await supabaseClient
               .from('calendly_events')
               .insert({
@@ -268,7 +268,9 @@ serve(async (req) => {
                 scheduled_at: event.start_time,
                 invitee_name: inviteeName,
                 invitee_email: inviteeEmail,
-                status: event.status || 'scheduled'
+                status: event.status || 'scheduled',
+                created_at: event.created_at, // Use original Calendly creation date
+                updated_at: event.updated_at || event.created_at // Use updated date or fall back to created
               })
 
             if (insertError) {
