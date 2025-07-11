@@ -53,15 +53,34 @@ export const ManualSyncButton = () => {
   };
 
   return (
-    <Button 
-      onClick={handleManualSync}
-      disabled={isLoading}
-      variant="outline"
-      size="sm"
-      className="flex items-center gap-2"
-    >
-      <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-      {isLoading ? 'Syncing...' : 'Manual Sync'}
-    </Button>
+    <div className="flex gap-2">
+      <Button 
+        onClick={handleManualSync}
+        disabled={isLoading}
+        variant="outline"
+        size="sm"
+        className="flex items-center gap-2"
+      >
+        <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+        {isLoading ? 'Syncing...' : 'Manual Sync'}
+      </Button>
+      <Button 
+        onClick={async () => {
+          const { data, error } = await supabase.functions.invoke('test-calendly-api');
+          if (error) {
+            console.error('Test error:', error);
+            toast.error('Test failed');
+          } else {
+            console.log('Test results:', data);
+            toast.success(`Found ${data.propertyAdvantageCallEvents} events. Check console for details.`);
+          }
+        }}
+        variant="outline"
+        size="sm"
+        className="flex items-center gap-2"
+      >
+        Test API
+      </Button>
+    </div>
   );
 };
