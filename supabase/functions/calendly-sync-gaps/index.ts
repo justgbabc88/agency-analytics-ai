@@ -202,6 +202,15 @@ serve(async (req) => {
 
             if (!eventsResponse.ok) {
               const errorText = await eventsResponse.text()
+              
+              // Handle rate limiting specifically
+              if (eventsResponse.status === 429) {
+                const retryAfter = eventsResponse.headers.get('Retry-After') || '60'
+                console.log(`⏰ Rate limited for ${status} events. Retry after: ${retryAfter} seconds`)
+                // For now, log the rate limit and continue - in production you'd want to implement proper retry
+                return
+              }
+              
               console.error(`❌ Calendly API error (${status}): ${eventsResponse.status} ${errorText}`)
               break
             }
@@ -218,6 +227,10 @@ serve(async (req) => {
             nextPageToken = eventsData.pagination?.next_page_token
             console.log(`🔄 ${status} next page token:`, nextPageToken)
             
+            // Add small delay between requests to be respectful to API
+            if (nextPageToken) {
+              await new Promise(resolve => setTimeout(resolve, 200))
+            }
           } catch (fetchError) {
             console.error(`❌ Error fetching ${status} events from Calendly:`, fetchError)
             break
