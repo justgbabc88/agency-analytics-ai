@@ -66,7 +66,9 @@ export const ManualSyncButton = () => {
       </Button>
       <Button 
         onClick={async () => {
-          console.log('🔍 Checking current database status...');
+          console.log('🔍 Running comprehensive diagnostics...');
+          
+          // Check current DB count
           const { count: dbCount } = await supabase
             .from('calendly_events')
             .select('*', { count: 'exact', head: true })
@@ -75,11 +77,28 @@ export const ManualSyncButton = () => {
             .gte('scheduled_at', '2025-07-01T00:00:00.000Z')
             .lte('scheduled_at', '2025-07-11T23:59:59.999Z');
           
+          // Check by status
+          const { data: byStatus } = await supabase
+            .from('calendly_events')
+            .select('status')
+            .eq('project_id', '382c6666-c24d-4de1-b449-3858a46fbed3')
+            .eq('event_type_name', 'Property Advantage Call')
+            .gte('scheduled_at', '2025-07-01T00:00:00.000Z')
+            .lte('scheduled_at', '2025-07-11T23:59:59.999Z');
+          
+          // Get status breakdown
+          const statusCounts = byStatus?.reduce((acc, event) => {
+            acc[event.status] = (acc[event.status] || 0) + 1;
+            return acc;
+          }, {} as Record<string, number>) || {};
+          
           console.log(`📊 Current DB count for July 1-11: ${dbCount}`);
+          console.log(`📈 Status breakdown:`, statusCounts);
           console.log(`🎯 Target: 254 events (131 created + 123 completed)`);
           console.log(`📉 Missing: ${254 - (dbCount || 0)} events`);
           
-          toast.success(`DB: ${dbCount || 0}/254 events. Check console for details.`);
+          const statusText = Object.entries(statusCounts).map(([status, count]) => `${status}: ${count}`).join(', ');
+          toast.success(`DB: ${dbCount || 0}/254 events. Status: ${statusText || 'none'}`);
         }}
         variant="outline"
         size="sm"
