@@ -66,20 +66,20 @@ export const ManualSyncButton = () => {
       </Button>
       <Button 
         onClick={async () => {
-          const { data, error } = await supabase.functions.invoke('test-calendly-api');
+          const { data, error } = await supabase.functions.invoke('calendly-diagnostic');
           if (error) {
-            console.error('Test error:', error);
-            toast.error('Test failed');
+            console.error('Diagnostic error:', error);
+            toast.error('Diagnostic failed');
           } else {
-            console.log('Test results:', data);
-            toast.success(`Found ${data.propertyAdvantageCallEvents} events. Check console for details.`);
+            console.log('📊 DIAGNOSTIC RESULTS:', data);
+            toast.success(`Found ${data.summary.propertyAdvantageCallFromAPI}/${data.summary.expectedTotal} events. Check console for full analysis.`);
           }
         }}
         variant="outline"
         size="sm"
         className="flex items-center gap-2"
       >
-        Test API
+        Full Diagnostic
       </Button>
     </div>
   );
