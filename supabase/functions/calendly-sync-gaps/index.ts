@@ -122,12 +122,12 @@ serve(async (req) => {
         continue
       }
 
-      // Set sync window (31 days back to catch all recent events)
+      // Set sync window (extended to 90 days back to catch all historical events)
       const now = new Date()
-      const daysBack = 31
-      const hoursBack = daysBack * 24 // 31 days = 744 hours
+      const daysBack = 90  // Extended from 31 to 90 days
+      const hoursBack = daysBack * 24
       const syncFrom = new Date(now.getTime() - (hoursBack * 60 * 60 * 1000))
-      const syncTo = new Date(now.getTime() + (7 * 24 * 60 * 60 * 1000)) // Include future events up to 7 days
+      const syncTo = new Date(now.getTime() + (30 * 24 * 60 * 60 * 1000)) // Include future events up to 30 days
 
       console.log('📅 Sync date range:')
       console.log('  From:', syncFrom.toISOString())
