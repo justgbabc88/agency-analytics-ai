@@ -162,18 +162,14 @@ serve(async (req) => {
         continue
       }
 
-      // Set sync window to capture ALL historical events (remove date restrictions for comprehensive sync)
-      const now = new Date()
-      const daysBack = 1825  // 5 years back to ensure we get EVERYTHING
-      const hoursBack = daysBack * 24
-      const syncFrom = new Date(now.getTime() - (hoursBack * 60 * 60 * 1000))
-      const syncTo = new Date(now.getTime() + (365 * 24 * 60 * 60 * 1000)) // Include future events up to 1 year
+      // Focus on July 1-11, 2025 to get the missing 254 events
+      const syncFrom = new Date('2025-07-01T00:00:00.000Z')
+      const syncTo = new Date('2025-07-11T23:59:59.999Z')
 
       console.log('📅 Sync date range:')
       console.log('  From:', syncFrom.toISOString())
       console.log('  To:', syncTo.toISOString())
-      console.log('  Days back:', daysBack)
-      console.log('  Hours back:', hoursBack)
+      console.log('  Target period: July 1-11, 2025')
 
       // Use pagination to get all events (Calendly API has a limit of 100 events per request)
       let allEvents = []
@@ -182,7 +178,7 @@ serve(async (req) => {
       async function fetchAllEvents(eventsList, orgUri, fromDate, toDate, accessToken) {
         let nextPageToken = null
         let pageCount = 0
-        const maxPages = 20  // Increased to handle more events
+        const maxPages = 50  // Increased to handle large datasets
         
         console.log(`🔄 Fetching ALL events from Calendly`)
         
