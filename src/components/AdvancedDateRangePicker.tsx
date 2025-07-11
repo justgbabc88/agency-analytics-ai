@@ -1,7 +1,8 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { CalendarIcon } from "lucide-react";
 import { format, subDays, subWeeks, subMonths, startOfWeek, startOfMonth, startOfYear, startOfDay, endOfDay } from "date-fns";
+import { toZonedTime, fromZonedTime } from "date-fns-tz";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -11,33 +12,128 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useUserProfile } from "@/hooks/useUserProfile";
 
 interface AdvancedDateRangePickerProps {
   onDateChange: (from: Date, to: Date) => void;
   className?: string;
 }
 
-const datePresets = [
-  { label: "Today", value: "today", getDates: () => ({ from: startOfDay(new Date()), to: endOfDay(new Date()) }) },
-  { label: "Yesterday", value: "yesterday", getDates: () => ({ from: startOfDay(subDays(new Date(), 1)), to: endOfDay(subDays(new Date(), 1)) }) },
-  { label: "Last 7 days", value: "7days", getDates: () => ({ from: startOfDay(subDays(new Date(), 6)), to: endOfDay(new Date()) }) },
-  { label: "Last 14 days", value: "14days", getDates: () => ({ from: startOfDay(subDays(new Date(), 13)), to: endOfDay(new Date()) }) },
-  { label: "Last 30 days", value: "30days", getDates: () => ({ from: startOfDay(subDays(new Date(), 29)), to: endOfDay(new Date()) }) },
-  { label: "This week", value: "thisweek", getDates: () => ({ from: startOfWeek(new Date()), to: endOfDay(new Date()) }) },
-  { label: "Last week", value: "lastweek", getDates: () => ({ from: startOfWeek(subWeeks(new Date(), 1)), to: endOfDay(subDays(startOfWeek(new Date()), 1)) }) },
-  { label: "This month", value: "thismonth", getDates: () => ({ from: startOfMonth(new Date()), to: endOfDay(new Date()) }) },
-  { label: "Last month", value: "lastmonth", getDates: () => ({ from: startOfMonth(subMonths(new Date(), 1)), to: endOfDay(subDays(startOfMonth(new Date()), 1)) }) },
-  { label: "This year", value: "thisyear", getDates: () => ({ from: startOfYear(new Date()), to: endOfDay(new Date()) }) },
-  { label: "Custom", value: "custom", getDates: () => ({ from: startOfDay(subDays(new Date(), 30)), to: endOfDay(new Date()) }) },
-];
-
 export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDateRangePickerProps) => {
-  const [dateRange, setDateRange] = useState({
-    from: startOfDay(subDays(new Date(), 30)),
-    to: endOfDay(new Date())
+  const { getUserTimezone } = useUserProfile();
+  const userTimezone = getUserTimezone();
+
+  // Create timezone-aware date ranges
+  const createDateRangeInUserTimezone = (fromDate: Date, toDate: Date) => {
+    // Convert to user's timezone, then back to UTC for storage
+    const fromInUserTz = toZonedTime(fromDate, userTimezone);
+    const toInUserTz = toZonedTime(toDate, userTimezone);
+    
+    // Apply start/end of day in user's timezone
+    const fromStartOfDay = startOfDay(fromInUserTz);
+    const toEndOfDay = endOfDay(toInUserTz);
+    
+    // Convert back to UTC for consistent storage and API calls
+    const fromUTC = fromZonedTime(fromStartOfDay, userTimezone);
+    const toUTC = fromZonedTime(toEndOfDay, userTimezone);
+    
+    console.log('🌍 Creating timezone-aware date range:', {
+      userTimezone,
+      original: { from: fromDate.toISOString(), to: toDate.toISOString() },
+      inUserTz: { from: fromInUserTz.toISOString(), to: toInUserTz.toISOString() },
+      withStartEnd: { from: fromStartOfDay.toISOString(), to: toEndOfDay.toISOString() },
+      finalUTC: { from: fromUTC.toISOString(), to: toUTC.toISOString() }
+    });
+    
+    return { from: fromUTC, to: toUTC };
+  };
+
+  const datePresets = [
+    { 
+      label: "Today", 
+      value: "today", 
+      getDates: () => {
+        const now = new Date();
+        return createDateRangeInUserTimezone(now, now);
+      }
+    },
+    { 
+      label: "Yesterday", 
+      value: "yesterday", 
+      getDates: () => {
+        const yesterday = subDays(new Date(), 1);
+        return createDateRangeInUserTimezone(yesterday, yesterday);
+      }
+    },
+    { 
+      label: "Last 7 days", 
+      value: "7days", 
+      getDates: () => createDateRangeInUserTimezone(subDays(new Date(), 6), new Date())
+    },
+    { 
+      label: "Last 14 days", 
+      value: "14days", 
+      getDates: () => createDateRangeInUserTimezone(subDays(new Date(), 13), new Date())
+    },
+    { 
+      label: "Last 30 days", 
+      value: "30days", 
+      getDates: () => createDateRangeInUserTimezone(subDays(new Date(), 29), new Date())
+    },
+    { 
+      label: "This week", 
+      value: "thisweek", 
+      getDates: () => createDateRangeInUserTimezone(startOfWeek(new Date()), new Date())
+    },
+    { 
+      label: "Last week", 
+      value: "lastweek", 
+      getDates: () => {
+        const lastWeekStart = startOfWeek(subWeeks(new Date(), 1));
+        const lastWeekEnd = subDays(startOfWeek(new Date()), 1);
+        return createDateRangeInUserTimezone(lastWeekStart, lastWeekEnd);
+      }
+    },
+    { 
+      label: "This month", 
+      value: "thismonth", 
+      getDates: () => createDateRangeInUserTimezone(startOfMonth(new Date()), new Date())
+    },
+    { 
+      label: "Last month", 
+      value: "lastmonth", 
+      getDates: () => {
+        const lastMonthStart = startOfMonth(subMonths(new Date(), 1));
+        const lastMonthEnd = subDays(startOfMonth(new Date()), 1);
+        return createDateRangeInUserTimezone(lastMonthStart, lastMonthEnd);
+      }
+    },
+    { 
+      label: "This year", 
+      value: "thisyear", 
+      getDates: () => createDateRangeInUserTimezone(startOfYear(new Date()), new Date())
+    },
+    { 
+      label: "Custom", 
+      value: "custom", 
+      getDates: () => createDateRangeInUserTimezone(subDays(new Date(), 30), new Date())
+    },
+  ];
+  const [dateRange, setDateRange] = useState(() => {
+    const initial = createDateRangeInUserTimezone(subDays(new Date(), 29), new Date());
+    return initial;
   });
   const [selectedPreset, setSelectedPreset] = useState("30days");
   const [isCustom, setIsCustom] = useState(false);
+
+  // Re-initialize date range when user timezone changes
+  useEffect(() => {
+    console.log('📅 User timezone changed, re-initializing date range:', userTimezone);
+    const initial = createDateRangeInUserTimezone(subDays(new Date(), 29), new Date());
+    setDateRange(initial);
+    // Notify parent of the timezone-adjusted dates
+    onDateChange(initial.from, initial.to);
+  }, [userTimezone]);
 
   const handlePresetChange = (preset: string) => {
     console.log('📅 Preset changed to:', preset);
@@ -64,24 +160,24 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
   const handleCustomDateChange = (range: any) => {
     console.log('📅 Custom date range selected:', range);
     if (range?.from && range?.to) {
-      const from = startOfDay(range.from);
-      const to = endOfDay(range.to);
-      console.log('📅 Custom dates processed:', {
-        from: format(from, 'yyyy-MM-dd HH:mm:ss'),
-        to: format(to, 'yyyy-MM-dd HH:mm:ss')
+      const dates = createDateRangeInUserTimezone(range.from, range.to);
+      console.log('📅 Custom dates processed with timezone:', {
+        from: format(dates.from, 'yyyy-MM-dd HH:mm:ss'),
+        to: format(dates.to, 'yyyy-MM-dd HH:mm:ss'),
+        timezone: userTimezone
       });
-      setDateRange({ from, to });
-      onDateChange(from, to);
+      setDateRange(dates);
+      onDateChange(dates.from, dates.to);
     } else if (range?.from && !range?.to) {
       // Single date selected, set both from and to to the same date
-      const from = startOfDay(range.from);
-      const to = endOfDay(range.from);
-      console.log('📅 Single date selected:', {
-        from: format(from, 'yyyy-MM-dd HH:mm:ss'),
-        to: format(to, 'yyyy-MM-dd HH:mm:ss')
+      const dates = createDateRangeInUserTimezone(range.from, range.from);
+      console.log('📅 Single date selected with timezone:', {
+        from: format(dates.from, 'yyyy-MM-dd HH:mm:ss'),
+        to: format(dates.to, 'yyyy-MM-dd HH:mm:ss'),
+        timezone: userTimezone
       });
-      setDateRange({ from, to });
-      onDateChange(from, to);
+      setDateRange(dates);
+      onDateChange(dates.from, dates.to);
     }
   };
 
