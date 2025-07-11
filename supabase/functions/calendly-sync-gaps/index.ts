@@ -98,7 +98,47 @@ serve(async (req) => {
       const organizationUri = userData.resource.current_organization
       console.log('🏢 Organization URI:', organizationUri)
 
-      // Get active event type mappings for this project
+      // First, fetch all available event types from Calendly and auto-create mappings
+      console.log('🔍 Fetching all event types from Calendly to ensure complete mappings...')
+      
+      const eventTypesResponse = await fetch(`https://api.calendly.com/event_types?organization=${organizationUri}&count=100`, {
+        headers: {
+          'Authorization': `Bearer ${tokenData.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (!eventTypesResponse.ok) {
+        console.error('❌ Failed to fetch event types from Calendly:', await eventTypesResponse.text())
+        continue
+      }
+      
+      const eventTypesData = await eventTypesResponse.json()
+      console.log(`📋 Found ${eventTypesData.collection.length} event types in Calendly:`, eventTypesData.collection.map(et => et.name))
+      
+      // Auto-create mappings for any missing event types
+      for (const eventType of eventTypesData.collection) {
+        if (eventType.status === 'active') {
+          const { error: mappingError } = await supabaseClient
+            .from('calendly_event_mappings')
+            .upsert({
+              project_id: integration.project_id,
+              calendly_event_type_id: eventType.uri,
+              event_type_name: eventType.name,
+              is_active: true
+            }, {
+              onConflict: 'project_id,calendly_event_type_id'
+            })
+          
+          if (mappingError) {
+            console.error('❌ Error creating event type mapping:', mappingError)
+          } else {
+            console.log(`✅ Ensured mapping exists for event type: ${eventType.name}`)
+          }
+        }
+      }
+
+      // Get active event type mappings for this project (including newly created ones)
       const { data: mappings, error: mappingsError } = await supabaseClient
         .from('calendly_event_mappings')
         .select('calendly_event_type_id, event_type_name')
