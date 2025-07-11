@@ -162,12 +162,12 @@ serve(async (req) => {
         continue
       }
 
-      // Set sync window to capture ALL historical events (1 year back)
+      // Set sync window to capture ALL historical events (remove date restrictions for comprehensive sync)
       const now = new Date()
-      const daysBack = 365  // 1 full year to capture all possible events
+      const daysBack = 1825  // 5 years back to ensure we get EVERYTHING
       const hoursBack = daysBack * 24
       const syncFrom = new Date(now.getTime() - (hoursBack * 60 * 60 * 1000))
-      const syncTo = new Date(now.getTime() + (30 * 24 * 60 * 60 * 1000)) // Include future events up to 30 days
+      const syncTo = new Date(now.getTime() + (365 * 24 * 60 * 60 * 1000)) // Include future events up to 1 year
 
       console.log('📅 Sync date range:')
       console.log('  From:', syncFrom.toISOString())
