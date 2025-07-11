@@ -178,7 +178,7 @@ serve(async (req) => {
       async function fetchAllEvents(eventsList, orgUri, fromDate, toDate, accessToken) {
         let nextPageToken = null
         let pageCount = 0
-        const maxPages = 50  // Increased to handle large datasets
+        const maxPages = 100  // Increased to handle very large datasets
         
         console.log(`🔄 Fetching ALL events from Calendly`)
         
@@ -253,23 +253,17 @@ serve(async (req) => {
         const activeEventTypeIds = new Set(mappings.map(m => m.calendly_event_type_id))
         console.log('🎯 Active event type IDs for filtering:', Array.from(activeEventTypeIds))
 
-        // Try different properties to find the event type identifier
+        // Filter events based on event type - using the correct property from API
         const filteredEvents = allEvents.filter(event => {
-          // Try multiple possible properties for event type URI
-          const eventTypeUri = event.event_type?.uri || 
-                              event.event_type_uri || 
-                              event.event_type_id ||
-                              event.event_type
-
+          // Based on our test, the correct property is event.event_type (which contains the URI)
+          const eventTypeUri = event.event_type
           const isMatched = activeEventTypeIds.has(eventTypeUri)
           
-          console.log(`🔍 Event filtering - Name: ${event.name}`)
-          console.log(`    - Trying event_type?.uri: ${event.event_type?.uri}`)
-          console.log(`    - Trying event_type_uri: ${event.event_type_uri}`)
-          console.log(`    - Trying event_type_id: ${event.event_type_id}`)
-          console.log(`    - Trying event_type: ${event.event_type}`)
-          console.log(`    - Final eventTypeUri used: ${eventTypeUri}`)
-          console.log(`    - Match result: ${isMatched}`)
+          if (!isMatched) {
+            console.log(`🔍 Skipping event: ${event.name || 'unnamed'} - type: ${eventTypeUri}`)
+          } else {
+            console.log(`✅ Including event: ${event.name || 'unnamed'} - type: ${eventTypeUri}`)
+          }
           
           return isMatched
         })
