@@ -184,7 +184,7 @@ serve(async (req) => {
         
         do {
           pageCount++
-          let calendlyUrl = `https://api.calendly.com/scheduled_events?organization=${encodeURIComponent(orgUri)}&min_start_time=${fromDate.toISOString()}&max_start_time=${toDate.toISOString()}&count=100&sort=start_time:desc`
+          let calendlyUrl = `https://api.calendly.com/scheduled_events?organization=${encodeURIComponent(orgUri)}&min_start_time=${fromDate.toISOString()}&max_start_time=${toDate.toISOString()}&count=100`
           
           if (nextPageToken) {
             calendlyUrl += `&page_token=${nextPageToken}`
@@ -225,7 +225,8 @@ serve(async (req) => {
           
         } while (nextPageToken && pageCount < maxPages)
         
-        console.log(`📊 Total events collected across ${pageCount} pages:`, eventsList.length)
+        console.log(`🏁 PAGINATION COMPLETE: ${pageCount} pages fetched, ${eventsList.length} total events`)
+        console.log(`📊 Will now filter these ${eventsList.length} events for our target event types`)
       }
       
       // Fetch all events (active, canceled, etc.)

@@ -66,20 +66,26 @@ export const ManualSyncButton = () => {
       </Button>
       <Button 
         onClick={async () => {
-          const { data, error } = await supabase.functions.invoke('calendly-diagnostic');
-          if (error) {
-            console.error('Diagnostic error:', error);
-            toast.error('Diagnostic failed');
-          } else {
-            console.log('📊 DIAGNOSTIC RESULTS:', data);
-            toast.success(`Found ${data.summary.propertyAdvantageCallFromAPI}/${data.summary.expectedTotal} events. Check console for full analysis.`);
-          }
+          console.log('🔍 Checking current database status...');
+          const { count: dbCount } = await supabase
+            .from('calendly_events')
+            .select('*', { count: 'exact', head: true })
+            .eq('project_id', '382c6666-c24d-4de1-b449-3858a46fbed3')
+            .eq('event_type_name', 'Property Advantage Call')
+            .gte('scheduled_at', '2025-07-01T00:00:00.000Z')
+            .lte('scheduled_at', '2025-07-11T23:59:59.999Z');
+          
+          console.log(`📊 Current DB count for July 1-11: ${dbCount}`);
+          console.log(`🎯 Target: 254 events (131 created + 123 completed)`);
+          console.log(`📉 Missing: ${254 - (dbCount || 0)} events`);
+          
+          toast.success(`DB: ${dbCount || 0}/254 events. Check console for details.`);
         }}
         variant="outline"
         size="sm"
         className="flex items-center gap-2"
       >
-        Full Diagnostic
+        Check Count
       </Button>
     </div>
   );
