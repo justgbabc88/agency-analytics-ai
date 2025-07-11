@@ -241,9 +241,10 @@ serve(async (req) => {
         console.log(`🏁 ${status.toUpperCase()} PAGINATION COMPLETE: ${pageCount} pages fetched`)
       }
       
-      // Fetch both active and completed events separately
+      // Fetch all event statuses separately to ensure we get everything
       await fetchEventsByStatus(allEvents, organizationUri, syncFrom, syncTo, tokenData.access_token, 'active')
       await fetchEventsByStatus(allEvents, organizationUri, syncFrom, syncTo, tokenData.access_token, 'completed')
+      await fetchEventsByStatus(allEvents, organizationUri, syncFrom, syncTo, tokenData.access_token, 'canceled')
       
       console.log(`📊 Total events collected:`, allEvents.length)
 
@@ -307,9 +308,12 @@ serve(async (req) => {
               continue
             }
 
+            let isNewEvent = !existingEvent
+            
             if (existingEvent) {
-              console.log('⚠️ Event already exists:', event.uri)
-              continue
+              console.log('🔄 Event exists, checking for status updates:', event.uri, 'Status:', event.status)
+            } else {
+              console.log('➕ New event to insert:', event.uri, 'Status:', event.status)
             }
 
             // Get invitee information
@@ -342,10 +346,10 @@ serve(async (req) => {
             const mapping = mappings.find(m => m.calendly_event_type_id === eventTypeUri)
             const eventTypeName = mapping?.event_type_name || event.event_type?.name || event.name || 'Unknown Event Type'
 
-            // Insert the event using original Calendly creation date
-            const { error: insertError } = await supabaseClient
+            // Upsert the event (insert new or update existing)
+            const { error: upsertError } = await supabaseClient
               .from('calendly_events')
-              .insert({
+              .upsert({
                 project_id: integration.project_id,
                 calendly_event_id: event.uri,
                 calendly_event_type_id: eventTypeUri,
@@ -354,17 +358,20 @@ serve(async (req) => {
                 invitee_name: inviteeName,
                 invitee_email: inviteeEmail,
                 status: event.status || 'scheduled',
-                created_at: event.created_at, // Use original Calendly creation date
-                updated_at: event.updated_at || event.created_at // Use updated date or fall back to created
+                created_at: isNewEvent ? event.created_at : undefined, // Only set created_at for new events
+                updated_at: event.updated_at || event.created_at // Always update the updated_at timestamp
+              }, {
+                onConflict: 'project_id,calendly_event_id'
               })
 
-            if (insertError) {
-              console.error('❌ Error inserting event:', insertError)
+            if (upsertError) {
+              console.error('❌ Error upserting event:', upsertError)
               continue
             }
 
             totalEvents++
-            console.log('✅ Inserted new event:', {
+            const actionText = isNewEvent ? 'Inserted new' : 'Updated existing'
+            console.log(`✅ ${actionText} event:`, {
               id: event.uri,
               name: eventTypeName,
               status: event.status,
