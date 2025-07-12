@@ -1,8 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { CalendarDays, Mail, Phone, User } from "lucide-react";
 import { format } from "date-fns";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { useState } from "react";
 
 interface Call {
   id: string;
@@ -24,6 +26,16 @@ interface CallsListProps {
 export const CallsList = ({ calls, isLoading }: CallsListProps) => {
   const { profile } = useUserProfile();
   const userTimezone = profile?.timezone || 'UTC';
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  // Filter calls based on selected status
+  const filteredCalls = calls.filter(call => {
+    if (statusFilter === 'all') return true;
+    if (statusFilter === 'scheduled') return ['scheduled', 'active'].includes(call.status.toLowerCase());
+    if (statusFilter === 'cancelled') return call.status.toLowerCase() === 'cancelled';
+    if (statusFilter === 'completed') return call.status.toLowerCase() === 'completed';
+    return true;
+  });
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -67,21 +79,51 @@ export const CallsList = ({ calls, isLoading }: CallsListProps) => {
       <CardHeader>
         <CardTitle className="text-lg font-semibold flex items-center gap-2">
           <CalendarDays className="h-5 w-5" />
-          Filtered Calls ({calls.length})
+          Filtered Calls ({filteredCalls.length})
         </CardTitle>
+        <div className="flex gap-2 mt-4">
+          <Button
+            variant={statusFilter === 'all' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setStatusFilter('all')}
+          >
+            All ({calls.length})
+          </Button>
+          <Button
+            variant={statusFilter === 'scheduled' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setStatusFilter('scheduled')}
+          >
+            Scheduled ({calls.filter(c => ['scheduled', 'active'].includes(c.status.toLowerCase())).length})
+          </Button>
+          <Button
+            variant={statusFilter === 'completed' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setStatusFilter('completed')}
+          >
+            Completed ({calls.filter(c => c.status.toLowerCase() === 'completed').length})
+          </Button>
+          <Button
+            variant={statusFilter === 'cancelled' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setStatusFilter('cancelled')}
+          >
+            Cancelled ({calls.filter(c => c.status.toLowerCase() === 'cancelled').length})
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
-        {calls.length === 0 ? (
+        {filteredCalls.length === 0 ? (
           <div className="text-center py-8">
             <CalendarDays className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="font-semibold mb-2">No Calls Found</h3>
             <p className="text-muted-foreground">
-              No calls found for the selected date range.
+              {calls.length === 0 ? "No calls found for the selected date range." : "No calls match the selected status filter."}
             </p>
           </div>
         ) : (
           <div className="space-y-3 max-h-96 overflow-y-auto">
-            {calls.map((call) => (
+            {filteredCalls.map((call) => (
               <div key={call.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
