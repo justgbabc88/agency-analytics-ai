@@ -90,48 +90,46 @@ export const useCallStatsCalculations = (
     console.log('📊 Events created in date range:', eventsCreatedInRange.length);
     console.log('📊 Events scheduled in date range:', eventsScheduledInRange.length);
 
-    // Total bookings = all unique events created in the date range (regardless of status)
-    const totalBookings = eventsCreatedInRange.length;
+    // Total bookings = all unique events scheduled in the date range (regardless of status)
+    // This should match Calendly's reporting which shows events by scheduled date
+    const totalBookings = eventsScheduledInRange.length;
 
-    // Calls taken = events scheduled in range with 'active', 'completed', or 'scheduled' status
+    // Calls taken = events scheduled in range with 'completed' status (actually completed calls)
     const callsTaken = eventsScheduledInRange.filter(event => 
-      event.status === 'active' || event.status === 'completed' || event.status === 'scheduled'
+      event.status === 'completed'
     ).length;
 
-    // Cancelled calls = events that were cancelled within the date range (using updated_at)
-    const eventsCancelledInRange = uniqueEvents.filter(event => {
-      if (event.status !== 'cancelled' && event.status !== 'canceled') return false;
-      const updatedAt = new Date(event.updated_at || event.created_at); // fallback to created_at if no updated_at
-      return isWithinInterval(updatedAt, {
-        start: startOfDay(dateRange.from),
-        end: endOfDay(dateRange.to)
-      });
-    });
-    const cancelled = eventsCancelledInRange.length;
+    // Active/scheduled calls = events scheduled in range that are still active/scheduled
+    const activeCalls = eventsScheduledInRange.filter(event => 
+      event.status === 'active' || event.status === 'scheduled'
+    ).length;
+
+    // Cancelled calls = events scheduled in range that are cancelled/canceled
+    const cancelled = eventsScheduledInRange.filter(event => 
+      event.status === 'cancelled' || event.status === 'canceled'
+    ).length;
 
     // Show up rate = (calls taken / total scheduled calls) * 100
-    const totalScheduledCalls = callsTaken + cancelled;
+    const totalScheduledCalls = callsTaken + activeCalls + cancelled;
     const showUpRate = totalScheduledCalls > 0 ? Math.round((callsTaken / totalScheduledCalls) * 100) : 0;
 
     console.log('📈 Current period stats:', {
       totalBookings,
       callsTaken,
+      activeCalls,
       cancelled,
-      showUpRate
+      showUpRate,
+      eventsScheduledInRange: eventsScheduledInRange.map(e => ({
+        name: e.event_type_name,
+        status: e.status,
+        scheduled_at: e.scheduled_at
+      }))
     });
 
     // Calculate previous period stats for comparison
     const daysDifference = Math.ceil((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24));
     const previousPeriodStart = subDays(dateRange.from, daysDifference);
     const previousPeriodEnd = subDays(dateRange.to, daysDifference);
-
-    const previousPeriodEventsCreated = uniqueEvents.filter(event => {
-      const createdAt = new Date(event.created_at);
-      return isWithinInterval(createdAt, {
-        start: startOfDay(previousPeriodStart),
-        end: endOfDay(previousPeriodEnd)
-      });
-    });
 
     const previousPeriodEventsScheduled = uniqueEvents.filter(event => {
       const scheduledAt = new Date(event.scheduled_at);
@@ -141,19 +139,13 @@ export const useCallStatsCalculations = (
       });
     });
 
-    const previousTotalBookings = previousPeriodEventsCreated.length;
+    const previousTotalBookings = previousPeriodEventsScheduled.length;
     const previousCallsTaken = previousPeriodEventsScheduled.filter(event => 
-      event.status === 'active' || event.status === 'completed' || event.status === 'scheduled'
+      event.status === 'completed'
     ).length;
-    const previousPeriodEventsCancelled = uniqueEvents.filter(event => {
-      if (event.status !== 'cancelled' && event.status !== 'canceled') return false;
-      const updatedAt = new Date(event.updated_at || event.created_at); // fallback to created_at if no updated_at
-      return isWithinInterval(updatedAt, {
-        start: startOfDay(previousPeriodStart),
-        end: endOfDay(previousPeriodEnd)
-      });
-    });
-    const previousCancelled = previousPeriodEventsCancelled.length;
+    const previousCancelled = previousPeriodEventsScheduled.filter(event => 
+      event.status === 'cancelled' || event.status === 'canceled'
+    ).length;
 
     const previousTotalScheduledCalls = previousCallsTaken + previousCancelled;
     const previousShowUpRate = previousTotalScheduledCalls > 0 ? 
