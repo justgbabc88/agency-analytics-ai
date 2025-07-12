@@ -90,35 +90,33 @@ export const useCallStatsCalculations = (
     console.log('📊 Events created in date range:', eventsCreatedInRange.length);
     console.log('📊 Events scheduled in date range:', eventsScheduledInRange.length);
 
-    // Total bookings = all unique events scheduled in the date range (regardless of status)
-    // This should match Calendly's reporting which shows events by scheduled date
-    const totalBookings = eventsScheduledInRange.length;
+    // Total bookings = all unique events created in the date range (when people actually booked)
+    const totalBookings = eventsCreatedInRange.length;
 
-    // Calls taken = events scheduled in range with 'completed' status (actually completed calls)
+    // Calls taken = events with 'completed' status (actually completed calls)
     const callsTaken = eventsScheduledInRange.filter(event => 
       event.status === 'completed'
     ).length;
 
-    // Active/scheduled calls = events scheduled in range that are still active/scheduled
-    const activeCalls = eventsScheduledInRange.filter(event => 
-      event.status === 'active' || event.status === 'scheduled'
-    ).length;
-
-    // Cancelled calls = events scheduled in range that are cancelled/canceled
+    // Cancelled calls = events that are cancelled/canceled
     const cancelled = eventsScheduledInRange.filter(event => 
       event.status === 'cancelled' || event.status === 'canceled'
     ).length;
 
     // Show up rate = (calls taken / total scheduled calls) * 100
-    const totalScheduledCalls = callsTaken + activeCalls + cancelled;
+    const totalScheduledCalls = callsTaken + cancelled;
     const showUpRate = totalScheduledCalls > 0 ? Math.round((callsTaken / totalScheduledCalls) * 100) : 0;
 
     console.log('📈 Current period stats:', {
       totalBookings,
       callsTaken,
-      activeCalls,
       cancelled,
       showUpRate,
+      eventsCreatedInRange: eventsCreatedInRange.map(e => ({
+        name: e.event_type_name,
+        status: e.status,
+        created_at: e.created_at
+      })),
       eventsScheduledInRange: eventsScheduledInRange.map(e => ({
         name: e.event_type_name,
         status: e.status,
@@ -131,6 +129,14 @@ export const useCallStatsCalculations = (
     const previousPeriodStart = subDays(dateRange.from, daysDifference);
     const previousPeriodEnd = subDays(dateRange.to, daysDifference);
 
+    const previousPeriodEventsCreated = uniqueEvents.filter(event => {
+      const createdAt = new Date(event.created_at);
+      return isWithinInterval(createdAt, {
+        start: startOfDay(previousPeriodStart),
+        end: endOfDay(previousPeriodEnd)
+      });
+    });
+
     const previousPeriodEventsScheduled = uniqueEvents.filter(event => {
       const scheduledAt = new Date(event.scheduled_at);
       return isWithinInterval(scheduledAt, {
@@ -139,7 +145,7 @@ export const useCallStatsCalculations = (
       });
     });
 
-    const previousTotalBookings = previousPeriodEventsScheduled.length;
+    const previousTotalBookings = previousPeriodEventsCreated.length;
     const previousCallsTaken = previousPeriodEventsScheduled.filter(event => 
       event.status === 'completed'
     ).length;
