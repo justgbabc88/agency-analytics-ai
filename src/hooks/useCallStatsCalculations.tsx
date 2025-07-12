@@ -93,9 +93,9 @@ export const useCallStatsCalculations = (
     // Total bookings = all unique events created in the date range (when people actually booked)
     const totalBookings = eventsCreatedInRange.length;
 
-    // Calls taken = events with 'completed' status (actually completed calls)
+    // Calls taken = events scheduled for the date range that are completed OR active/scheduled
     const callsTaken = eventsScheduledInRange.filter(event => 
-      event.status === 'completed'
+      event.status === 'completed' || event.status === 'active' || event.status === 'scheduled'
     ).length;
 
     // Cancelled calls = events that are cancelled/canceled
@@ -147,7 +147,7 @@ export const useCallStatsCalculations = (
 
     const previousTotalBookings = previousPeriodEventsCreated.length;
     const previousCallsTaken = previousPeriodEventsScheduled.filter(event => 
-      event.status === 'completed'
+      event.status === 'completed' || event.status === 'active' || event.status === 'scheduled'
     ).length;
     const previousCancelled = previousPeriodEventsScheduled.filter(event => 
       event.status === 'cancelled' || event.status === 'canceled'
