@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from "react";
-import { CalendarIcon } from "lucide-react";
-import { format, subDays, subWeeks, subMonths, startOfWeek, startOfMonth, startOfYear, startOfDay, endOfDay } from "date-fns";
+import { CalendarIcon, X } from "lucide-react";
+import { format, subDays, subWeeks, subMonths, startOfWeek, startOfMonth, startOfYear, startOfDay, endOfDay, addDays } from "date-fns";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { useUserProfile } from "@/hooks/useUserProfile";
 
 interface AdvancedDateRangePickerProps {
@@ -37,18 +37,11 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
     const fromUTC = fromZonedTime(fromStartOfDay, userTimezone);
     const toUTC = fromZonedTime(toEndOfDay, userTimezone);
     
-    console.log('🌍 Creating timezone-aware date range:', {
-      userTimezone,
-      original: { from: fromDate.toISOString(), to: toDate.toISOString() },
-      inUserTz: { from: fromInUserTz.toISOString(), to: toInUserTz.toISOString() },
-      withStartEnd: { from: fromStartOfDay.toISOString(), to: toEndOfDay.toISOString() },
-      finalUTC: { from: fromUTC.toISOString(), to: toUTC.toISOString() }
-    });
-    
     return { from: fromUTC, to: toUTC };
   };
 
-  const datePresets = [
+  // Quick preset buttons for easy access
+  const quickPresets = [
     { 
       label: "Today", 
       value: "today", 
@@ -71,157 +64,116 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
       getDates: () => createDateRangeInUserTimezone(subDays(new Date(), 6), new Date())
     },
     { 
-      label: "Last 14 days", 
-      value: "14days", 
-      getDates: () => createDateRangeInUserTimezone(subDays(new Date(), 13), new Date())
-    },
-    { 
       label: "Last 30 days", 
       value: "30days", 
       getDates: () => createDateRangeInUserTimezone(subDays(new Date(), 29), new Date())
     },
-    { 
-      label: "This week", 
-      value: "thisweek", 
-      getDates: () => createDateRangeInUserTimezone(startOfWeek(new Date()), new Date())
-    },
-    { 
-      label: "Last week", 
-      value: "lastweek", 
-      getDates: () => {
-        const lastWeekStart = startOfWeek(subWeeks(new Date(), 1));
-        const lastWeekEnd = subDays(startOfWeek(new Date()), 1);
-        return createDateRangeInUserTimezone(lastWeekStart, lastWeekEnd);
-      }
-    },
-    { 
-      label: "This month", 
-      value: "thismonth", 
-      getDates: () => createDateRangeInUserTimezone(startOfMonth(new Date()), new Date())
-    },
-    { 
-      label: "Last month", 
-      value: "lastmonth", 
-      getDates: () => {
-        const lastMonthStart = startOfMonth(subMonths(new Date(), 1));
-        const lastMonthEnd = subDays(startOfMonth(new Date()), 1);
-        return createDateRangeInUserTimezone(lastMonthStart, lastMonthEnd);
-      }
-    },
-    { 
-      label: "This year", 
-      value: "thisyear", 
-      getDates: () => createDateRangeInUserTimezone(startOfYear(new Date()), new Date())
-    },
-    { 
-      label: "Custom", 
-      value: "custom", 
-      getDates: () => createDateRangeInUserTimezone(subDays(new Date(), 30), new Date())
-    },
   ];
+
   const [dateRange, setDateRange] = useState(() => {
     const initial = createDateRangeInUserTimezone(subDays(new Date(), 29), new Date());
     return initial;
   });
   const [selectedPreset, setSelectedPreset] = useState("30days");
-  const [isCustom, setIsCustom] = useState(false);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
   // Re-initialize date range when user timezone changes
   useEffect(() => {
     console.log('📅 User timezone changed, re-initializing date range:', userTimezone);
     const initial = createDateRangeInUserTimezone(subDays(new Date(), 29), new Date());
     setDateRange(initial);
-    // Notify parent of the timezone-adjusted dates
     onDateChange(initial.from, initial.to);
   }, [userTimezone]);
 
-  const handlePresetChange = (preset: string) => {
-    console.log('📅 Preset changed to:', preset);
-    setSelectedPreset(preset);
-    if (preset === "custom") {
-      setIsCustom(true);
-      return;
-    }
-    
-    setIsCustom(false);
-    const presetConfig = datePresets.find(p => p.value === preset);
-    if (presetConfig) {
-      const dates = presetConfig.getDates();
-      console.log('📅 New dates from preset:', {
-        from: format(dates.from, 'yyyy-MM-dd HH:mm:ss'),
-        to: format(dates.to, 'yyyy-MM-dd HH:mm:ss'),
-        preset
-      });
-      setDateRange(dates);
-      onDateChange(dates.from, dates.to);
-    }
+  const handlePresetClick = (preset: any) => {
+    console.log('📅 Preset clicked:', preset.label);
+    setSelectedPreset(preset.value);
+    const dates = preset.getDates();
+    setDateRange(dates);
+    onDateChange(dates.from, dates.to);
   };
 
   const handleCustomDateChange = (range: any) => {
     console.log('📅 Custom date range selected:', range);
-    if (range?.from && range?.to) {
-      const dates = createDateRangeInUserTimezone(range.from, range.to);
-      console.log('📅 Custom dates processed with timezone:', {
-        from: format(dates.from, 'yyyy-MM-dd HH:mm:ss'),
-        to: format(dates.to, 'yyyy-MM-dd HH:mm:ss'),
-        timezone: userTimezone
-      });
+    
+    if (range?.from) {
+      // If only from date is selected or both dates are the same, create single day range
+      const toDate = range.to || range.from;
+      const dates = createDateRangeInUserTimezone(range.from, toDate);
+      
       setDateRange(dates);
       onDateChange(dates.from, dates.to);
-    } else if (range?.from && !range?.to) {
-      // Single date selected, set both from and to to the same date
-      const dates = createDateRangeInUserTimezone(range.from, range.from);
-      console.log('📅 Single date selected with timezone:', {
-        from: format(dates.from, 'yyyy-MM-dd HH:mm:ss'),
-        to: format(dates.to, 'yyyy-MM-dd HH:mm:ss'),
-        timezone: userTimezone
-      });
-      setDateRange(dates);
-      onDateChange(dates.from, dates.to);
+      setSelectedPreset("custom");
+      
+      // Close calendar if we have a complete selection
+      if (range.to || !range.to) {
+        setIsCalendarOpen(false);
+      }
     }
   };
 
-  return (
-    <div className={cn("flex gap-2", className)}>
-      <Select value={selectedPreset} onValueChange={handlePresetChange}>
-        <SelectTrigger className="w-[200px]">
-          <SelectValue placeholder="Select date range" />
-        </SelectTrigger>
-        <SelectContent>
-          {datePresets.map((preset) => (
-            <SelectItem key={preset.value} value={preset.value}>
-              {preset.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+  const formatDateRange = () => {
+    if (!dateRange.from) return "Select date range";
+    
+    const fromFormatted = format(toZonedTime(dateRange.from, userTimezone), "MMM d");
+    const toFormatted = format(toZonedTime(dateRange.to, userTimezone), "MMM d, yyyy");
+    
+    // Check if it's the same day
+    const isSameDay = format(toZonedTime(dateRange.from, userTimezone), "yyyy-MM-dd") === 
+                     format(toZonedTime(dateRange.to, userTimezone), "yyyy-MM-dd");
+    
+    if (isSameDay) {
+      return format(toZonedTime(dateRange.from, userTimezone), "MMM d, yyyy");
+    }
+    
+    return `${fromFormatted} - ${toFormatted}`;
+  };
 
-      {isCustom && (
-        <Popover>
+  const clearSelection = () => {
+    const initial = createDateRangeInUserTimezone(subDays(new Date(), 29), new Date());
+    setDateRange(initial);
+    setSelectedPreset("30days");
+    onDateChange(initial.from, initial.to);
+  };
+
+  return (
+    <div className={cn("flex flex-col gap-3", className)}>
+      {/* Quick preset buttons */}
+      <div className="flex flex-wrap gap-2">
+        {quickPresets.map((preset) => (
+          <Badge
+            key={preset.value}
+            variant={selectedPreset === preset.value ? "default" : "outline"}
+            className="cursor-pointer hover:bg-accent"
+            onClick={() => handlePresetClick(preset)}
+          >
+            {preset.label}
+          </Badge>
+        ))}
+      </div>
+
+      {/* Custom date picker and current selection */}
+      <div className="flex items-center gap-2">
+        <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
           <PopoverTrigger asChild>
             <Button
               variant="outline"
               className={cn(
-                "w-[280px] justify-start text-left font-normal",
+                "justify-start text-left font-normal min-w-[250px]",
                 !dateRange && "text-muted-foreground"
               )}
             >
               <CalendarIcon className="mr-2 h-4 w-4" />
-              {dateRange?.from ? (
-                dateRange.to ? (
-                  <>
-                    {format(dateRange.from, "LLL dd, y")} -{" "}
-                    {format(dateRange.to, "LLL dd, y")}
-                  </>
-                ) : (
-                  format(dateRange.from, "LLL dd, y")
-                )
-              ) : (
-                <span>Pick a date range</span>
-              )}
+              {formatDateRange()}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
+            <div className="p-4 border-b">
+              <h4 className="font-medium text-sm mb-2">Select Date Range</h4>
+              <p className="text-xs text-muted-foreground">
+                Click one date for single day, or click and drag for range
+              </p>
+            </div>
             <Calendar
               initialFocus
               mode="range"
@@ -236,7 +188,23 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
             />
           </PopoverContent>
         </Popover>
-      )}
+
+        {selectedPreset === "custom" && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearSelection}
+            className="p-1 h-8 w-8"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
+
+      {/* Timezone indicator */}
+      <div className="text-xs text-muted-foreground">
+        Timezone: {userTimezone}
+      </div>
     </div>
   );
 };
