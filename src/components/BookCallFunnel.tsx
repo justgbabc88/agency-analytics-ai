@@ -3,7 +3,7 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { LandingPageMetrics } from "./LandingPageMetrics";
 import { CallStatsMetrics } from "./CallStatsMetrics";
-import { SalesConversionMetrics } from "./SalesConversionMetrics";
+import { CallsList } from "./CallsList";
 import { useState, useEffect, useMemo } from "react";
 import { generateCallDataFromEvents } from "@/utils/chartDataGeneration";
 import { useCallStatsCalculations } from "@/hooks/useCallStatsCalculations";
@@ -245,9 +245,9 @@ export const BookCallFunnel = ({ projectId, dateRange }: BookCallFunnelProps) =>
         chartKey={chartKey}
       />
 
-      <SalesConversionMetrics
-        chartData={chartData}
-        chartKey={chartKey}
+      <CallsList
+        calls={calendlyEvents}
+        isLoading={false}
       />
     </div>
   );

@@ -8,7 +8,7 @@ import { AlertSystem } from "@/components/AlertSystem";
 import { PredictiveAnalytics } from "@/components/PredictiveAnalytics";
 import { AIChatPanel } from "@/components/AIChatPanel";
 import { FacebookMetrics } from "@/components/FacebookMetrics";
-import { GoogleSheetsMetrics } from "@/components/GoogleSheetsMetrics";
+
 import { PixelSetupWizard } from '@/components/PixelSetupWizard';
 import { TrackingPixelManager } from '@/components/TrackingPixelManager';
 import { AttributionDashboard } from '@/components/AttributionDashboard';
@@ -237,8 +237,6 @@ const Index = () => {
 
           <TabsContent value="funnel" className="space-y-6">
             {renderFunnelContent()}
-            {/* Add Google Sheets metrics to funnel tab */}
-            <GoogleSheetsMetrics dateRange={dateRange} />
           </TabsContent>
 
           <TabsContent value="facebook" className="space-y-6">
