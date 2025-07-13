@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CalendarDays, Mail, Phone, User } from "lucide-react";
 import { format } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useState } from "react";
 
@@ -144,9 +145,9 @@ export const CallsList = ({ calls, isLoading }: CallsListProps) => {
                   <div className="space-y-1 text-sm text-muted-foreground">
                     <div className="flex items-center gap-2">
                       <CalendarDays className="h-4 w-4" />
-                      <span>
-                        {format(new Date(call.scheduled_at), 'MMM d, yyyy h:mm a')} {userTimezone}
-                      </span>
+                       <span>
+                         {formatInTimeZone(new Date(call.scheduled_at), userTimezone, 'MMM d, yyyy h:mm a')}
+                       </span>
                     </div>
                     
                     {call.invitee_name && (
@@ -167,7 +168,7 @@ export const CallsList = ({ calls, isLoading }: CallsListProps) => {
                 
                 <div className="text-right text-sm text-muted-foreground">
                   <div>Booked</div>
-                  <div>{format(new Date(call.created_at), 'MMM d, h:mm a')}</div>
+                  <div>{formatInTimeZone(new Date(call.created_at), userTimezone, 'MMM d, h:mm a')}</div>
                 </div>
               </div>
             ))}
