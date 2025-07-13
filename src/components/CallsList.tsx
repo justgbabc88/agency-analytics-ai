@@ -27,15 +27,13 @@ interface CallsListProps {
 export const CallsList = ({ calls, isLoading }: CallsListProps) => {
   const { profile } = useUserProfile();
   const userTimezone = profile?.timezone || 'UTC';
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('total_bookings');
 
   // Filter calls based on selected status
   const filteredCalls = calls.filter(call => {
-    if (statusFilter === 'all') return true;
     if (statusFilter === 'total_bookings') return true; // Show all bookings created in date range
-    if (statusFilter === 'scheduled') return ['scheduled', 'active'].includes(call.status.toLowerCase());
-    if (statusFilter === 'cancelled') return call.status.toLowerCase() === 'cancelled';
-    if (statusFilter === 'completed') return call.status.toLowerCase() === 'completed';
+    if (statusFilter === 'calls_taken') return ['scheduled', 'active', 'completed'].includes(call.status.toLowerCase());
+    if (statusFilter === 'calls_cancelled') return call.status.toLowerCase() === 'cancelled';
     return true;
   });
 
@@ -85,13 +83,6 @@ export const CallsList = ({ calls, isLoading }: CallsListProps) => {
         </CardTitle>
         <div className="flex gap-2 mt-4">
           <Button
-            variant={statusFilter === 'all' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setStatusFilter('all')}
-          >
-            All ({calls.length})
-          </Button>
-          <Button
             variant={statusFilter === 'total_bookings' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setStatusFilter('total_bookings')}
@@ -99,25 +90,18 @@ export const CallsList = ({ calls, isLoading }: CallsListProps) => {
             Total Bookings ({calls.length})
           </Button>
           <Button
-            variant={statusFilter === 'scheduled' ? 'default' : 'outline'}
+            variant={statusFilter === 'calls_taken' ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setStatusFilter('scheduled')}
+            onClick={() => setStatusFilter('calls_taken')}
           >
-            Scheduled ({calls.filter(c => ['scheduled', 'active'].includes(c.status.toLowerCase())).length})
+            Calls Taken ({calls.filter(c => ['scheduled', 'active', 'completed'].includes(c.status.toLowerCase())).length})
           </Button>
           <Button
-            variant={statusFilter === 'completed' ? 'default' : 'outline'}
+            variant={statusFilter === 'calls_cancelled' ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setStatusFilter('completed')}
+            onClick={() => setStatusFilter('calls_cancelled')}
           >
-            Completed ({calls.filter(c => c.status.toLowerCase() === 'completed').length})
-          </Button>
-          <Button
-            variant={statusFilter === 'cancelled' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setStatusFilter('cancelled')}
-          >
-            Cancelled ({calls.filter(c => c.status.toLowerCase() === 'cancelled').length})
+            Calls Cancelled ({calls.filter(c => c.status.toLowerCase() === 'cancelled').length})
           </Button>
         </div>
       </CardHeader>
