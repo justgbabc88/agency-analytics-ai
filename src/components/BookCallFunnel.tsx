@@ -264,6 +264,7 @@ export const BookCallFunnel = ({ projectId, dateRange }: BookCallFunnelProps) =>
           return eventDate >= fromDate && eventDate <= toDate;
         })}
         isLoading={false}
+        dateRange={dateRange}
       />
     </div>
   );

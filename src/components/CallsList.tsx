@@ -2,8 +2,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CalendarDays, Mail, Phone, User } from "lucide-react";
-import { format } from "date-fns";
-import { formatInTimeZone } from "date-fns-tz";
+import { format, startOfDay } from "date-fns";
+import { formatInTimeZone, toZonedTime } from "date-fns-tz";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useState } from "react";
 
@@ -22,17 +22,35 @@ interface Call {
 interface CallsListProps {
   calls: Call[];
   isLoading?: boolean;
+  dateRange?: { from: Date; to: Date };
 }
 
-export const CallsList = ({ calls, isLoading }: CallsListProps) => {
+export const CallsList = ({ calls, isLoading, dateRange }: CallsListProps) => {
   const { profile } = useUserProfile();
   const userTimezone = profile?.timezone || 'UTC';
   const [statusFilter, setStatusFilter] = useState<string>('total_bookings');
 
+  // Helper function to check if a call is scheduled within the date range
+  const isCallScheduledInDateRange = (call: Call): boolean => {
+    if (!dateRange) return true;
+    
+    // Convert the call's scheduled_at to user's timezone for comparison
+    const callScheduledInUserTz = toZonedTime(new Date(call.scheduled_at), userTimezone);
+    const selectedFromDate = toZonedTime(dateRange.from, userTimezone);
+    const selectedToDate = toZonedTime(dateRange.to, userTimezone);
+    
+    // Get the date part only (year, month, day) for comparison
+    const callDate = startOfDay(callScheduledInUserTz);
+    const fromDate = startOfDay(selectedFromDate);
+    const toDate = startOfDay(selectedToDate);
+    
+    return callDate >= fromDate && callDate <= toDate;
+  };
+
   // Filter calls based on selected status
   const filteredCalls = calls.filter(call => {
     if (statusFilter === 'total_bookings') return true; // Show all bookings created in date range
-    if (statusFilter === 'calls_taken') return ['scheduled', 'active', 'completed'].includes(call.status.toLowerCase());
+    if (statusFilter === 'calls_taken') return isCallScheduledInDateRange(call);
     if (statusFilter === 'calls_cancelled') return call.status.toLowerCase() === 'cancelled';
     return true;
   });
@@ -94,7 +112,7 @@ export const CallsList = ({ calls, isLoading }: CallsListProps) => {
             size="sm"
             onClick={() => setStatusFilter('calls_taken')}
           >
-            Calls Taken ({calls.filter(c => ['scheduled', 'active', 'completed'].includes(c.status.toLowerCase())).length})
+            Calls Taken ({calls.filter(call => isCallScheduledInDateRange(call)).length})
           </Button>
           <Button
             variant={statusFilter === 'calls_cancelled' ? 'default' : 'outline'}
