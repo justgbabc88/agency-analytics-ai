@@ -247,7 +247,7 @@ export const BookCallFunnel = ({ projectId, dateRange }: BookCallFunnelProps) =>
 
       <CallsList
         calls={calendlyEvents.filter(event => {
-          const eventDate = new Date(event.scheduled_at);
+          const eventDate = new Date(event.created_at);
           return eventDate >= startOfDay(dateRange.from) && eventDate <= endOfDay(dateRange.to);
         })}
         isLoading={false}
