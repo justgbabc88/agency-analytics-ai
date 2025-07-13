@@ -31,6 +31,7 @@ export const CallsList = ({ calls, isLoading }: CallsListProps) => {
   // Filter calls based on selected status
   const filteredCalls = calls.filter(call => {
     if (statusFilter === 'all') return true;
+    if (statusFilter === 'total_bookings') return true; // Show all bookings created in date range
     if (statusFilter === 'scheduled') return ['scheduled', 'active'].includes(call.status.toLowerCase());
     if (statusFilter === 'cancelled') return call.status.toLowerCase() === 'cancelled';
     if (statusFilter === 'completed') return call.status.toLowerCase() === 'completed';
@@ -88,6 +89,13 @@ export const CallsList = ({ calls, isLoading }: CallsListProps) => {
             onClick={() => setStatusFilter('all')}
           >
             All ({calls.length})
+          </Button>
+          <Button
+            variant={statusFilter === 'total_bookings' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setStatusFilter('total_bookings')}
+          >
+            Total Bookings ({calls.length})
           </Button>
           <Button
             variant={statusFilter === 'scheduled' ? 'default' : 'outline'}
