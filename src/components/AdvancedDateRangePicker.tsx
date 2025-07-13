@@ -25,9 +25,10 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
 
   // Create timezone-aware date ranges
   const createDateRangeInUserTimezone = (fromDate: Date, toDate: Date) => {
-    // The calendar returns dates in local time
-    // We need to create the start/end of day in the user's actual timezone
-    // First, get the date components (year, month, day) from the selected dates
+    // Convert the selected calendar dates to the user's profile timezone
+    // The calendar gives us dates in local time, but we want to interpret them in the user's profile timezone
+    
+    // Get the date components from the calendar selection
     const fromYear = fromDate.getFullYear();
     const fromMonth = fromDate.getMonth();
     const fromDay = fromDate.getDate();
@@ -36,9 +37,13 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
     const toMonth = toDate.getMonth();
     const toDay = toDate.getDate();
     
-    // Create new Date objects for start/end of day in user's timezone
-    const fromStartOfDay = new Date(fromYear, fromMonth, fromDay, 0, 0, 0, 0);
-    const toEndOfDay = new Date(toYear, toMonth, toDay, 23, 59, 59, 999);
+    // Create date strings in YYYY-MM-DD format
+    const fromDateStr = `${fromYear}-${String(fromMonth + 1).padStart(2, '0')}-${String(fromDay).padStart(2, '0')}`;
+    const toDateStr = `${toYear}-${String(toMonth + 1).padStart(2, '0')}-${String(toDay).padStart(2, '0')}`;
+    
+    // Create start/end of day in the user's profile timezone
+    const fromStartOfDay = fromZonedTime(`${fromDateStr} 00:00:00`, userTimezone);
+    const toEndOfDay = fromZonedTime(`${toDateStr} 23:59:59`, userTimezone);
     
     return { from: fromStartOfDay, to: toEndOfDay };
   };
@@ -49,32 +54,45 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
       label: "Today", 
       value: "today", 
       getDates: () => {
-        const now = new Date();
-        return createDateRangeInUserTimezone(now, now);
+        // Get today in the user's profile timezone
+        const nowInUserTz = toZonedTime(new Date(), userTimezone);
+        return createDateRangeInUserTimezone(nowInUserTz, nowInUserTz);
       }
     },
     { 
       label: "Yesterday", 
       value: "yesterday", 
       getDates: () => {
-        const yesterday = subDays(new Date(), 1);
-        return createDateRangeInUserTimezone(yesterday, yesterday);
+        // Get yesterday in the user's profile timezone
+        const nowInUserTz = toZonedTime(new Date(), userTimezone);
+        const yesterdayInUserTz = subDays(nowInUserTz, 1);
+        return createDateRangeInUserTimezone(yesterdayInUserTz, yesterdayInUserTz);
       }
     },
     { 
       label: "Last 7 days", 
       value: "7days", 
-      getDates: () => createDateRangeInUserTimezone(subDays(new Date(), 6), new Date())
+      getDates: () => {
+        const nowInUserTz = toZonedTime(new Date(), userTimezone);
+        const sevenDaysAgoInUserTz = subDays(nowInUserTz, 6);
+        return createDateRangeInUserTimezone(sevenDaysAgoInUserTz, nowInUserTz);
+      }
     },
     { 
       label: "Last 30 days", 
       value: "30days", 
-      getDates: () => createDateRangeInUserTimezone(subDays(new Date(), 29), new Date())
+      getDates: () => {
+        const nowInUserTz = toZonedTime(new Date(), userTimezone);
+        const thirtyDaysAgoInUserTz = subDays(nowInUserTz, 29);
+        return createDateRangeInUserTimezone(thirtyDaysAgoInUserTz, nowInUserTz);
+      }
     },
   ];
 
   const [dateRange, setDateRange] = useState(() => {
-    const initial = createDateRangeInUserTimezone(subDays(new Date(), 29), new Date());
+    const nowInUserTz = toZonedTime(new Date(), userTimezone);
+    const thirtyDaysAgoInUserTz = subDays(nowInUserTz, 29);
+    const initial = createDateRangeInUserTimezone(thirtyDaysAgoInUserTz, nowInUserTz);
     return initial;
   });
   const [selectedPreset, setSelectedPreset] = useState("30days");
@@ -83,7 +101,9 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
   // Re-initialize date range when user timezone changes
   useEffect(() => {
     console.log('📅 User timezone changed, re-initializing date range:', userTimezone);
-    const initial = createDateRangeInUserTimezone(subDays(new Date(), 29), new Date());
+    const nowInUserTz = toZonedTime(new Date(), userTimezone);
+    const thirtyDaysAgoInUserTz = subDays(nowInUserTz, 29);
+    const initial = createDateRangeInUserTimezone(thirtyDaysAgoInUserTz, nowInUserTz);
     setDateRange(initial);
     onDateChange(initial.from, initial.to);
   }, [userTimezone]);
@@ -133,7 +153,9 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
   };
 
   const clearSelection = () => {
-    const initial = createDateRangeInUserTimezone(subDays(new Date(), 29), new Date());
+    const nowInUserTz = toZonedTime(new Date(), userTimezone);
+    const thirtyDaysAgoInUserTz = subDays(nowInUserTz, 29);
+    const initial = createDateRangeInUserTimezone(thirtyDaysAgoInUserTz, nowInUserTz);
     setDateRange(initial);
     setSelectedPreset("30days");
     onDateChange(initial.from, initial.to);
