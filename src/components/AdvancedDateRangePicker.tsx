@@ -25,16 +25,22 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
 
   // Create timezone-aware date ranges
   const createDateRangeInUserTimezone = (fromDate: Date, toDate: Date) => {
-    // The dates from the calendar are already in local time
-    // Apply start/end of day in local time
-    const fromStartOfDay = startOfDay(fromDate);
-    const toEndOfDay = endOfDay(toDate);
+    // The calendar returns dates in local time
+    // We need to create the start/end of day in the user's actual timezone
+    // First, get the date components (year, month, day) from the selected dates
+    const fromYear = fromDate.getFullYear();
+    const fromMonth = fromDate.getMonth();
+    const fromDay = fromDate.getDate();
     
-    // Convert to UTC for storage, using the user's timezone
-    const fromUTC = fromZonedTime(fromStartOfDay, userTimezone);
-    const toUTC = fromZonedTime(toEndOfDay, userTimezone);
+    const toYear = toDate.getFullYear();
+    const toMonth = toDate.getMonth();
+    const toDay = toDate.getDate();
     
-    return { from: fromUTC, to: toUTC };
+    // Create new Date objects for start/end of day in user's timezone
+    const fromStartOfDay = new Date(fromYear, fromMonth, fromDay, 0, 0, 0, 0);
+    const toEndOfDay = new Date(toYear, toMonth, toDay, 23, 59, 59, 999);
+    
+    return { from: fromStartOfDay, to: toEndOfDay };
   };
 
   // Quick preset buttons for easy access
