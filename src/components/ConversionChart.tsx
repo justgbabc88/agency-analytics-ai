@@ -64,7 +64,7 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     ctrAll: '#3B82F6',
     ctrLink: '#10B981',
     cpm: '#F59E0B',
-    frequency: '#8B5CF6',
+    cpc: '#06B6D4',
     optinRate: '#8B5CF6',
     mainOfferRate: '#10B981',
     bumpRate: '#3B82F6',
@@ -146,7 +146,7 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     
     // For currency/spend metrics, start from 0
     const isCurrencyMetric = metrics.some(m => 
-      m.includes('spend') || m.includes('revenue') || m.includes('cost') || m.includes('cpm')
+      m.includes('spend') || m.includes('revenue') || m.includes('cost') || m.includes('cpm') || m.includes('cpc')
     );
     
     if (isCurrencyMetric) {
@@ -165,7 +165,7 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     if (name.includes('Rate') || name.includes('CTR') || name.includes('showUp') || name.includes('ctr')) {
       return `${value.toFixed(2)}%`;
     }
-    if (name.includes('Revenue') || name.includes('Cost') || name.includes('CPC') || name.includes('Spend') || name.includes('CPM') || name.includes('spend') || name.includes('cpm')) {
+    if (name.includes('Revenue') || name.includes('Cost') || name.includes('CPC') || name.includes('Spend') || name.includes('CPM') || name.includes('spend') || name.includes('cpm') || name.includes('cpc')) {
       return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
     if (name.includes('ROAS') || name.includes('frequency')) {
@@ -185,7 +185,7 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     }
     
     const isCurrencyMetric = metrics.some(m => 
-      m.includes('Revenue') || m.includes('Cost') || m.includes('Spend') || m.includes('spend') || m.includes('cpm')
+      m.includes('Revenue') || m.includes('Cost') || m.includes('Spend') || m.includes('spend') || m.includes('cpm') || m.includes('cpc')
     );
     
     if (isCurrencyMetric) {
@@ -231,6 +231,7 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
       ctrAll: 'CTR (All)',
       ctrLink: 'CTR (Link)',
       cpm: 'CPM',
+      cpc: 'CPC',
       frequency: 'Frequency',
       totalBookings: 'Total Bookings',
       callsTaken: 'Calls Taken',
