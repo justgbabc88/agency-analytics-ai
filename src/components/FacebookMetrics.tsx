@@ -73,9 +73,8 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
   // Calculate CTR (Link) - typically 70-80% of overall CTR
   const ctrLink = insights.ctr ? insights.ctr * 0.75 : 0;
   
-  // Calculate CPC (Cost Per Click)
-  const totalClicks = insights.clicks || 0;
-  const cpc = totalClicks > 0 ? (insights.spend || 0) / totalClicks : 0;
+  // Use real CPC from Facebook data instead of calculating it
+  const cpc = insights.cpc || 0;
   
   // Calculate Frequency - estimated based on reach vs impressions
   const frequency = insights.reach && insights.reach > 0 ? insights.impressions / insights.reach : 1.2;
