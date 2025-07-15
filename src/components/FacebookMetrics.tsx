@@ -211,7 +211,7 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             {/* Spend Metric */}
             <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-lg p-3 border border-gray-100">
               <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
@@ -316,22 +316,27 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
 
       {/* Cost Per Call Chart - Full Width Row with Integrated Metrics */}
       <Card>
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm">Cost Per Call Trend</CardTitle>
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <div className="text-lg font-bold text-blue-800">
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <CardTitle className="text-lg font-semibold mb-1">Cost Per Call Analysis</CardTitle>
+              <p className="text-sm text-muted-foreground">Track your advertising efficiency over time</p>
+            </div>
+            <div className="flex items-center gap-6">
+              <div className="text-center p-3 bg-gradient-to-br from-blue-50 to-blue-100/50 rounded-lg border border-blue-100">
+                <div className="text-xs text-blue-600 mb-1 font-medium">Current Cost Per Call</div>
+                <div className="text-2xl font-bold text-blue-800">
                   {totalBookings > 0 ? formatCurrency(costPerBookedCall) : 'N/A'}
                 </div>
-                <div className={`flex items-center gap-1 text-xs ${getChangeColor(costPerBookedCallChange)}`}>
+                <div className={`flex items-center justify-center gap-1 text-xs mt-1 ${getChangeColor(costPerBookedCallChange)}`}>
                   {getChangeIcon(costPerBookedCallChange)}
                   <span>{costPerBookedCallChange > 0 ? '+' : ''}{costPerBookedCallChange.toFixed(1)}%</span>
                 </div>
               </div>
-              <div className="text-right text-xs text-muted-foreground">
-                <div>Current Period</div>
-                <div>{totalBookings} bookings</div>
+              <div className="text-center p-3 bg-gradient-to-br from-green-50 to-green-100/50 rounded-lg border border-green-100">
+                <div className="text-xs text-green-600 mb-1 font-medium">Total Bookings</div>
+                <div className="text-2xl font-bold text-green-800">{totalBookings}</div>
+                <div className="text-xs text-green-600 mt-1">in selected period</div>
               </div>
             </div>
           </div>
@@ -346,7 +351,7 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
       </Card>
 
       {/* Other Facebook Performance Charts */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">Spend</CardTitle>
