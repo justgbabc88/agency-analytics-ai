@@ -244,18 +244,12 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
                   from: dateRange?.from ? toZonedTime(dateRange.from, userTimezone) : undefined,
                   to: dateRange?.to ? toZonedTime(dateRange.to, userTimezone) : undefined,
                 }}
-                onSelect={(range) => {
-                  // Convert range selection back to individual date clicks
-                  if (range?.from && !range?.to && selectionStep === 'start') {
-                    // First click - set start date
-                    handleCustomDateChange(range.from);
-                  } else if (range?.from && range?.to && selectionStep === 'end') {
-                    // Second click - set end date (use the to date)
-                    handleCustomDateChange(range.to);
-                  } else if (range?.from && range?.to && selectionStep === 'start') {
-                    // Range was dragged - treat the 'to' date as the start
-                    handleCustomDateChange(range.to);
-                  }
+                onDayClick={(day) => {
+                  handleCustomDateChange(day);
+                }}
+                onSelect={() => {
+                  // Disable the default range selection behavior
+                  // We handle all clicks through onDayClick
                 }}
                 defaultMonth={dateRange?.from ? toZonedTime(dateRange.from, userTimezone) : undefined}
                 numberOfMonths={2}
