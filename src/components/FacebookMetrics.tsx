@@ -4,7 +4,6 @@ import { useFacebookData } from "@/hooks/useFacebookData";
 import { useCalendlyData } from "@/hooks/useCalendlyData";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { ConversionChart } from "./ConversionChart";
-import { FacebookAIInsights } from "./FacebookAIInsights";
 import { BarChart3, TrendingUp, Users, DollarSign, MousePointer, Eye, ArrowUpRight, ArrowDownRight, Calendar } from "lucide-react";
 import { format, eachDayOfInterval, subDays, isWithinInterval, startOfDay } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
@@ -404,9 +403,6 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
           </CardContent>
         </Card>
       </div>
-
-      {/* AI Insights Section - Now moved below stats and charts */}
-      <FacebookAIInsights dateRange={dateRange} />
     </div>
   );
 };

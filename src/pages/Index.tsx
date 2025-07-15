@@ -6,7 +6,7 @@ import { BookCallFunnel } from "@/components/BookCallFunnel";
 import { ProjectIntegrationsPanel } from "@/components/ProjectIntegrationsPanel";
 import { AlertSystem } from "@/components/AlertSystem";
 import { PredictiveAnalytics } from "@/components/PredictiveAnalytics";
-import { AIChatPanel } from "@/components/AIChatPanel";
+import { FacebookAIInsights } from "@/components/FacebookAIInsights";
 import { FacebookMetrics } from "@/components/FacebookMetrics";
 
 import { PixelSetupWizard } from '@/components/PixelSetupWizard';
@@ -405,7 +405,7 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="assistant" className="space-y-6">
-            <AIChatPanel />
+            <FacebookAIInsights dateRange={dateRange} />
           </TabsContent>
 
           <TabsContent value="alerts" className="space-y-6">
