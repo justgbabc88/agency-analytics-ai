@@ -2,10 +2,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useFacebookData } from "@/hooks/useFacebookData";
 import { useCalendlyData } from "@/hooks/useCalendlyData";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { ConversionChart } from "./ConversionChart";
 import { FacebookAIInsights } from "./FacebookAIInsights";
 import { BarChart3, TrendingUp, Users, DollarSign, MousePointer, Eye, ArrowUpRight, ArrowDownRight, Calendar } from "lucide-react";
-import { format, eachDayOfInterval, subDays, isWithinInterval } from "date-fns";
+import { format, eachDayOfInterval, subDays, isWithinInterval, startOfDay } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
 
 interface FacebookMetricsProps {
   dateRange?: { from: Date; to: Date };
@@ -15,6 +17,8 @@ interface FacebookMetricsProps {
 export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) => {
   const { facebookData, isLoading, insights, campaigns, metrics } = useFacebookData({ dateRange });
   const { calendlyEvents } = useCalendlyData(projectId);
+  const { profile } = useUserProfile();
+  const userTimezone = profile?.timezone || 'UTC';
 
   console.log('FacebookMetrics - Data received:', {
     facebookData,
@@ -73,11 +77,20 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
   // Calculate Frequency - estimated based on reach vs impressions
   const frequency = insights.reach && insights.reach > 0 ? insights.impressions / insights.reach : 1.2;
 
-  // Calculate total bookings for the date range
+  // Calculate total bookings for the date range (based on creation date, not scheduled date)
   const totalBookings = calendlyEvents.filter(event => {
     if (!dateRange) return true;
-    const eventDate = new Date(event.scheduled_at);
-    return isWithinInterval(eventDate, { start: dateRange.from, end: dateRange.to });
+    
+    // Use creation date (created_at) instead of scheduled date for "Total Bookings"
+    const eventCreatedInUserTz = toZonedTime(new Date(event.created_at), userTimezone);
+    const selectedFromDate = toZonedTime(dateRange.from, userTimezone);
+    const selectedToDate = toZonedTime(dateRange.to, userTimezone);
+    
+    const eventDate = startOfDay(eventCreatedInUserTz);
+    const fromDate = startOfDay(selectedFromDate);
+    const toDate = startOfDay(selectedToDate);
+    
+    return eventDate >= fromDate && eventDate <= toDate;
   }).length;
 
   // Calculate cost per booked call
