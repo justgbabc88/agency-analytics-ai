@@ -4,8 +4,6 @@ import { Navbar } from "@/components/Navbar";
 import { LowTicketFunnel } from "@/components/LowTicketFunnel";
 import { BookCallFunnel } from "@/components/BookCallFunnel";
 import { ProjectIntegrationsPanel } from "@/components/ProjectIntegrationsPanel";
-import { AlertSystem } from "@/components/AlertSystem";
-import { PredictiveAnalytics } from "@/components/PredictiveAnalytics";
 import { FacebookAIInsights } from "@/components/FacebookAIInsights";
 import { FacebookMetrics } from "@/components/FacebookMetrics";
 
@@ -203,7 +201,7 @@ const Index = () => {
         <Tabs defaultValue="funnel" className="space-y-6">
           {/* Navigation tabs */}
           <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <TabsList className="grid w-full grid-cols-7 h-12">
+            <TabsList className="grid w-full grid-cols-5 h-12">
               <TabsTrigger value="funnel" className="flex items-center justify-center gap-2 h-10">
                 <BarChart3 className="h-4 w-4" />
                 <span className="hidden sm:inline">Funnel</span>
@@ -216,17 +214,9 @@ const Index = () => {
                 <Target className="h-4 w-4" />
                 <span className="hidden sm:inline">Tracking</span>
               </TabsTrigger>
-              <TabsTrigger value="predictions" className="flex items-center justify-center gap-2 h-10">
-                <Activity className="h-4 w-4" />
-                <span className="hidden sm:inline">Predictions</span>
-              </TabsTrigger>
               <TabsTrigger value="assistant" className="flex items-center justify-center gap-2 h-10">
                 <MessageSquare className="h-4 w-4" />
                 <span className="hidden sm:inline">Assistant</span>
-              </TabsTrigger>
-              <TabsTrigger value="alerts" className="flex items-center justify-center gap-2 h-10">
-                <TrendingUp className="h-4 w-4" />
-                <span className="hidden sm:inline">Alerts</span>
               </TabsTrigger>
               <TabsTrigger value="settings" className="flex items-center justify-center gap-2 h-10">
                 <Settings className="h-4 w-4" />
@@ -400,16 +390,8 @@ const Index = () => {
             )}
           </TabsContent>
 
-          <TabsContent value="predictions" className="space-y-6">
-            <PredictiveAnalytics />
-          </TabsContent>
-
           <TabsContent value="assistant" className="space-y-6">
             <FacebookAIInsights dateRange={dateRange} />
-          </TabsContent>
-
-          <TabsContent value="alerts" className="space-y-6">
-            <AlertSystem />
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-6">
