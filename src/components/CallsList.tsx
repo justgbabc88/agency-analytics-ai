@@ -47,11 +47,28 @@ export const CallsList = ({ calls, isLoading, dateRange }: CallsListProps) => {
     return callDate >= fromDate && callDate <= toDate;
   };
 
+  // Helper function to check if a call was created within the date range  
+  const isCallCreatedInDateRange = (call: Call): boolean => {
+    if (!dateRange) return true;
+    
+    // Convert the call's created_at to user's timezone for comparison
+    const callCreatedInUserTz = toZonedTime(new Date(call.created_at), userTimezone);
+    const selectedFromDate = toZonedTime(dateRange.from, userTimezone);
+    const selectedToDate = toZonedTime(dateRange.to, userTimezone);
+    
+    // Get the date part only (year, month, day) for comparison
+    const callDate = startOfDay(callCreatedInUserTz);
+    const fromDate = startOfDay(selectedFromDate);
+    const toDate = startOfDay(selectedToDate);
+    
+    return callDate >= fromDate && callDate <= toDate;
+  };
+
   // Filter calls based on selected status
   const filteredCalls = calls.filter(call => {
-    if (statusFilter === 'total_bookings') return true; // Show all bookings created in date range
-    if (statusFilter === 'calls_taken') return isCallScheduledInDateRange(call);
-    if (statusFilter === 'calls_cancelled') return call.status.toLowerCase() === 'cancelled';
+    if (statusFilter === 'total_bookings') return isCallCreatedInDateRange(call); // Show bookings created in date range
+    if (statusFilter === 'calls_taken') return isCallScheduledInDateRange(call); // Show calls scheduled in date range
+    if (statusFilter === 'calls_cancelled') return call.status.toLowerCase() === 'cancelled' && isCallScheduledInDateRange(call); // Show cancelled calls scheduled in date range
     return true;
   });
 
@@ -105,7 +122,7 @@ export const CallsList = ({ calls, isLoading, dateRange }: CallsListProps) => {
             size="sm"
             onClick={() => setStatusFilter('total_bookings')}
           >
-            Total Bookings ({calls.length})
+            Total Bookings ({calls.filter(call => isCallCreatedInDateRange(call)).length})
           </Button>
           <Button
             variant={statusFilter === 'calls_taken' ? 'default' : 'outline'}
@@ -119,7 +136,7 @@ export const CallsList = ({ calls, isLoading, dateRange }: CallsListProps) => {
             size="sm"
             onClick={() => setStatusFilter('calls_cancelled')}
           >
-            Calls Cancelled ({calls.filter(c => c.status.toLowerCase() === 'cancelled').length})
+            Calls Cancelled ({calls.filter(c => c.status.toLowerCase() === 'cancelled' && isCallScheduledInDateRange(c)).length})
           </Button>
         </div>
       </CardHeader>

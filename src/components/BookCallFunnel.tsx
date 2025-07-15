@@ -246,23 +246,8 @@ export const BookCallFunnel = ({ projectId, dateRange }: BookCallFunnelProps) =>
         chartKey={chartKey}
       />
 
-      <CallsList
-        calls={calendlyEvents.filter(event => {
-          // Convert the event's created_at to user's timezone
-          const eventDateInUserTz = toZonedTime(new Date(event.created_at), userTimezone);
-          
-          // Create start and end of selected dates in user's timezone
-          const selectedFromDate = toZonedTime(dateRange.from, userTimezone);
-          const selectedToDate = toZonedTime(dateRange.to, userTimezone);
-          
-          // Get the date part only (year, month, day) for comparison
-          const eventDate = startOfDay(eventDateInUserTz);
-          const fromDate = startOfDay(selectedFromDate);
-          const toDate = startOfDay(selectedToDate);
-          
-          // Check if event date falls within the selected date range
-          return eventDate >= fromDate && eventDate <= toDate;
-        })}
+      <CallsList 
+        calls={calendlyEvents}
         isLoading={false}
         dateRange={dateRange}
       />
