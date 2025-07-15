@@ -331,8 +331,22 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
         </CardContent>
       </Card>
 
-      {/* Facebook Performance Charts - Cost Per Call and Others */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+      {/* Cost Per Call Chart - Full Width Row */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Cost Per Call Trend</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ConversionChart 
+            data={chartData}
+            title=""
+            metrics={['costPerCall']}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Other Facebook Performance Charts */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">Spend</CardTitle>
@@ -381,19 +395,6 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
               data={chartData}
               title=""
               metrics={['frequency']}
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Cost Per Call</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ConversionChart 
-              data={chartData}
-              title=""
-              metrics={['costPerCall']}
             />
           </CardContent>
         </Card>
