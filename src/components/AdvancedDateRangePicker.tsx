@@ -120,17 +120,21 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
     console.log('📅 Custom date range selected:', range);
     
     if (range?.from) {
-      // If only from date is selected or both dates are the same, create single day range
-      const toDate = range.to || range.from;
-      const dates = createDateRangeInUserTimezone(range.from, toDate);
-      
-      setDateRange(dates);
-      onDateChange(dates.from, dates.to);
-      setSelectedPreset("custom");
-      
-      // Close calendar if we have a complete selection
-      if (range.to || !range.to) {
+      // If we have both from and to dates, create the range
+      if (range.to) {
+        const dates = createDateRangeInUserTimezone(range.from, range.to);
+        setDateRange(dates);
+        onDateChange(dates.from, dates.to);
+        setSelectedPreset("custom");
+        // Close calendar only when we have a complete range
         setIsCalendarOpen(false);
+      } else {
+        // If only from date is selected, create single day range for preview
+        const dates = createDateRangeInUserTimezone(range.from, range.from);
+        setDateRange(dates);
+        onDateChange(dates.from, dates.to);
+        setSelectedPreset("custom");
+        // Don't close calendar yet - user might want to select end date
       }
     }
   };
@@ -196,21 +200,36 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
             <div className="p-4 border-b">
               <h4 className="font-medium text-sm mb-2">Select Date Range</h4>
               <p className="text-xs text-muted-foreground">
-                Click one date for single day, or click and drag for range
+                Click start date, then click end date. Click same date twice for single day.
               </p>
             </div>
-            <Calendar
-              initialFocus
-              mode="range"
-              defaultMonth={dateRange?.from}
-              selected={{
-                from: dateRange?.from,
-                to: dateRange?.to,
-              }}
-              onSelect={handleCustomDateChange}
-              numberOfMonths={2}
-              className="p-3 pointer-events-auto"
-            />
+            <div className="p-3">
+              <Calendar
+                initialFocus
+                mode="range"
+                defaultMonth={dateRange?.from}
+                selected={{
+                  from: dateRange?.from,
+                  to: dateRange?.to,
+                }}
+                onSelect={handleCustomDateChange}
+                numberOfMonths={1}
+                className="pointer-events-auto"
+                fixedWeeks
+              />
+            </div>
+            <div className="p-3 border-t flex justify-between items-center">
+              <p className="text-xs text-muted-foreground">
+                Selected: {formatDateRange()}
+              </p>
+              <Button 
+                size="sm" 
+                onClick={() => setIsCalendarOpen(false)}
+                variant="outline"
+              >
+                Done
+              </Button>
+            </div>
           </PopoverContent>
         </Popover>
 
