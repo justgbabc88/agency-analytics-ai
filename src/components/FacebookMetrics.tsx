@@ -127,10 +127,42 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
     return "text-gray-500";
   };
 
-  // Generate chart data based on the actual date range
+  // Generate chart data using real Facebook daily insights or fall back to mock data
   const generateChartData = () => {
+    // Check if we have real daily insights data from Facebook
+    const dailyInsights = (facebookData as any)?.daily_insights;
+    
+    if (dailyInsights && dailyInsights.length > 0) {
+      return dailyInsights.map((day: any) => {
+        // Find bookings for this specific day
+        const dayDate = new Date(day.date);
+        const dayStart = startOfDay(toZonedTime(dayDate, userTimezone));
+        
+        const dailyBookings = calendlyEvents.filter(event => {
+          const eventCreatedInUserTz = toZonedTime(new Date(event.created_at), userTimezone);
+          const eventDate = startOfDay(eventCreatedInUserTz);
+          return eventDate.getTime() === dayStart.getTime();
+        }).length;
+        
+        // Calculate cost per call for this day
+        const costPerCall = dailyBookings > 0 ? day.spend / dailyBookings : 0;
+        
+        return {
+          date: format(dayDate, 'MMM dd'),
+          spend: day.spend,
+          ctrAll: day.ctr,
+          ctrLink: day.ctr * 0.75, // Estimate link CTR as 75% of all CTR
+          cpm: day.cpm,
+          cpc: day.cpc,
+          frequency: day.frequency,
+          costPerCall: costPerCall,
+          dailyBookings: dailyBookings,
+        };
+      });
+    }
+    
+    // Fallback to mock data generation if no real data available
     if (!dateRange) {
-      // Fallback to last 7 days if no date range provided
       const endDate = new Date();
       const startDate = subDays(endDate, 6);
       return generateDataForRange(startDate, endDate);
@@ -157,7 +189,6 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
       
       // Calculate daily bookings for this specific day
       const dayStart = startOfDay(toZonedTime(date, userTimezone));
-      const dayEnd = startOfDay(toZonedTime(new Date(date.getTime() + 24 * 60 * 60 * 1000), userTimezone));
       
       const dailyBookings = calendlyEvents.filter(event => {
         const eventCreatedInUserTz = toZonedTime(new Date(event.created_at), userTimezone);

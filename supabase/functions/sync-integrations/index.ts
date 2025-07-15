@@ -138,10 +138,10 @@ async function syncFacebook(apiKeys: Record<string, string>) {
     
     const campaignsData = await campaignsResponse.json()
 
-    // Fetch ad insights with date range
+    // Fetch ad insights with date range - get daily breakdown instead of account level
     const insightsUrl = date_range?.since && date_range?.until 
-      ? `https://graph.facebook.com/v18.0/${adAccountId}/insights?access_token=${access_token}&fields=impressions,clicks,spend,reach,frequency,ctr,cpm,cpp,cpc,conversions,conversion_values${sinceParam}${untilParam}&level=account`
-      : `https://graph.facebook.com/v18.0/${adAccountId}/insights?access_token=${access_token}&fields=impressions,clicks,spend,reach,frequency,ctr,cpm,cpp,cpc,conversions,conversion_values${datePreset}&level=account`
+      ? `https://graph.facebook.com/v18.0/${adAccountId}/insights?access_token=${access_token}&fields=impressions,clicks,spend,reach,frequency,ctr,cpm,cpp,cpc,conversions,conversion_values,date_start,date_stop${sinceParam}${untilParam}&level=account&time_increment=1`
+      : `https://graph.facebook.com/v18.0/${adAccountId}/insights?access_token=${access_token}&fields=impressions,clicks,spend,reach,frequency,ctr,cpm,cpp,cpc,conversions,conversion_values,date_start,date_stop${datePreset}&level=account&time_increment=1`
     
     const insightsResponse = await fetch(insightsUrl)
     
@@ -151,7 +151,26 @@ async function syncFacebook(apiKeys: Record<string, string>) {
     
     const insightsData = await insightsResponse.json()
 
-    const insights = insightsData.data?.[0] || {}
+    // Process daily insights data
+    const dailyInsights = insightsData.data || []
+    
+    // Calculate aggregated totals from daily data
+    const insights = dailyInsights.reduce((totals: any, day: any) => {
+      return {
+        impressions: (totals.impressions || 0) + parseInt(day.impressions || '0'),
+        clicks: (totals.clicks || 0) + parseInt(day.clicks || '0'),
+        spend: (totals.spend || 0) + parseFloat(day.spend || '0'),
+        reach: Math.max(totals.reach || 0, parseInt(day.reach || '0')), // Reach is unique, take max
+        conversions: (totals.conversions || 0) + parseInt(day.conversions || '0'),
+        conversion_values: (totals.conversion_values || 0) + parseFloat(day.conversion_values || '0')
+      }
+    }, {})
+    
+    // Calculate derived metrics from aggregated data
+    insights.frequency = insights.reach > 0 ? insights.impressions / insights.reach : 0
+    insights.ctr = insights.impressions > 0 ? (insights.clicks / insights.impressions) * 100 : 0
+    insights.cpm = insights.impressions > 0 ? (insights.spend / insights.impressions) * 1000 : 0
+    insights.cpc = insights.clicks > 0 ? insights.spend / insights.clicks : 0
 
     console.log(`Facebook sync successful - ${campaignsData.data?.length || 0} campaigns, insights fetched for date range: ${date_range?.since || 'last 30 days'} to ${date_range?.until || 'today'}`)
 
@@ -169,6 +188,19 @@ async function syncFacebook(apiKeys: Record<string, string>) {
         conversions: parseInt(insights.conversions || '0'),
         conversion_values: parseFloat(insights.conversion_values || '0')
       },
+      daily_insights: dailyInsights.map((day: any) => ({
+        date: day.date_start,
+        impressions: parseInt(day.impressions || '0'),
+        clicks: parseInt(day.clicks || '0'),
+        spend: parseFloat(day.spend || '0'),
+        reach: parseInt(day.reach || '0'),
+        frequency: parseFloat(day.frequency || '0'),
+        ctr: parseFloat(day.ctr || '0'),
+        cpm: parseFloat(day.cpm || '0'),
+        cpc: parseFloat(day.cpc || '0'),
+        conversions: parseInt(day.conversions || '0'),
+        conversion_values: parseFloat(day.conversion_values || '0')
+      })),
       aggregated_metrics: {
         total_campaigns: campaignsData.data?.length || 0,
         total_impressions: parseInt(insights.impressions || '0'),
