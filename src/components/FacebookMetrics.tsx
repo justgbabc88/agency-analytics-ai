@@ -149,13 +149,31 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
       const dailyVariation = 0.7 + Math.random() * 0.6; // 70% to 130% of average
       const trendFactor = 1 + (index / days.length) * 0.2; // Slight upward trend
       
+      // Calculate daily spend
+      const dailySpend = (baseSpend / days.length) * dailyVariation * trendFactor;
+      
+      // Calculate daily bookings for this specific day
+      const dayStart = startOfDay(toZonedTime(date, userTimezone));
+      const dayEnd = startOfDay(toZonedTime(new Date(date.getTime() + 24 * 60 * 60 * 1000), userTimezone));
+      
+      const dailyBookings = calendlyEvents.filter(event => {
+        const eventCreatedInUserTz = toZonedTime(new Date(event.created_at), userTimezone);
+        const eventDate = startOfDay(eventCreatedInUserTz);
+        return eventDate.getTime() === dayStart.getTime();
+      }).length;
+      
+      // Calculate cost per call for this day
+      const costPerCall = dailyBookings > 0 ? dailySpend / dailyBookings : 0;
+      
       return {
         date: format(date, 'MMM dd'),
-        spend: (baseSpend / days.length) * dailyVariation * trendFactor,
+        spend: dailySpend,
         ctrAll: baseCtr * (0.8 + Math.random() * 0.4),
         ctrLink: ctrLink * (0.8 + Math.random() * 0.4),
         cpm: baseCpm * (0.85 + Math.random() * 0.3),
         frequency: frequency * (0.9 + Math.random() * 0.2),
+        costPerCall: costPerCall,
+        dailyBookings: dailyBookings,
       };
     });
   };
@@ -313,8 +331,8 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
         </CardContent>
       </Card>
 
-      {/* Facebook Performance Charts - All in One Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* Facebook Performance Charts - Cost Per Call and Others */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">Spend</CardTitle>
@@ -363,6 +381,19 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
               data={chartData}
               title=""
               metrics={['frequency']}
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Cost Per Call</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ConversionChart 
+              data={chartData}
+              title=""
+              metrics={['costPerCall']}
             />
           </CardContent>
         </Card>
