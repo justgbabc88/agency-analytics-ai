@@ -73,6 +73,10 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
   // Calculate CTR (Link) - typically 70-80% of overall CTR
   const ctrLink = insights.ctr ? insights.ctr * 0.75 : 0;
   
+  // Calculate CPC (Cost Per Click)
+  const totalClicks = insights.clicks || 0;
+  const cpc = totalClicks > 0 ? (insights.spend || 0) / totalClicks : 0;
+  
   // Calculate Frequency - estimated based on reach vs impressions
   const frequency = insights.reach && insights.reach > 0 ? insights.impressions / insights.reach : 1.2;
 
@@ -102,6 +106,7 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
     ctr: (insights.ctr || 0) * (0.95 + Math.random() * 0.1),
     ctrLink: ctrLink * (0.92 + Math.random() * 0.16),
     cpm: insights.spend && insights.impressions ? ((insights.spend / insights.impressions) * 1000) * (1.1 + Math.random() * 0.2) : 0,
+    cpc: cpc * (1.05 + Math.random() * 0.2),
     frequency: frequency * (0.88 + Math.random() * 0.24),
     costPerBookedCall: costPerBookedCall * (1.15 + Math.random() * 0.3)
   };
@@ -170,6 +175,7 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
         ctrAll: baseCtr * (0.8 + Math.random() * 0.4),
         ctrLink: ctrLink * (0.8 + Math.random() * 0.4),
         cpm: baseCpm * (0.85 + Math.random() * 0.3),
+        cpc: cpc * (0.8 + Math.random() * 0.4),
         frequency: frequency * (0.9 + Math.random() * 0.2),
         costPerCall: costPerCall,
         dailyBookings: dailyBookings,
@@ -194,6 +200,7 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
     insights.spend && insights.impressions ? (insights.spend / insights.impressions) * 1000 : 0, 
     previousPeriodData.cpm
   );
+  const cpcChange = calculatePercentageChange(cpc, previousPeriodData.cpc);
   const frequencyChange = calculatePercentageChange(frequency, previousPeriodData.frequency);
   const costPerBookedCallChange = calculatePercentageChange(costPerBookedCall, previousPeriodData.costPerBookedCall);
 
@@ -210,7 +217,7 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
             {/* Spend Metric */}
             <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-lg p-3 border border-gray-100">
               <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
@@ -298,6 +305,21 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
               <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(frequencyChange)}`}>
                 {getChangeIcon(frequencyChange)}
                 <span>{frequencyChange > 0 ? '+' : ''}{frequencyChange.toFixed(1)}%</span>
+              </div>
+            </div>
+
+            {/* CPC Metric */}
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 rounded-lg p-3 border border-blue-100">
+              <div className="flex items-center gap-2 text-xs text-blue-600 mb-1">
+                <MousePointer className="h-3 w-3" />
+                CPC
+              </div>
+              <div className="text-lg font-bold text-blue-800">
+                {formatCurrency(cpc)}
+              </div>
+              <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(cpcChange)}`}>
+                {getChangeIcon(cpcChange)}
+                <span>{cpcChange > 0 ? '+' : ''}{cpcChange.toFixed(1)}%</span>
               </div>
             </div>
 
@@ -392,13 +414,13 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Frequency</CardTitle>
+            <CardTitle className="text-sm">CPC</CardTitle>
           </CardHeader>
           <CardContent>
             <ConversionChart 
               data={chartData}
               title=""
-              metrics={['frequency']}
+              metrics={['cpc']}
             />
           </CardContent>
         </Card>
