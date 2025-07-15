@@ -151,23 +151,40 @@ export const BookCallFunnel = ({ projectId, dateRange }: BookCallFunnelProps) =>
     return `${fromISO}-${toISO}-${profileTimezone}-${effectiveTimezone}-${calendlyEvents.length}`;
   }, [dateRange.from, dateRange.to, userTimezone, profile?.timezone, calendlyEvents.length]);
   
+  // Filter events to match the date range filtering used in CallsList
+  const filteredEvents = useMemo(() => {
+    return calendlyEvents.filter(event => {
+      // Convert the event's created_at to user's timezone for comparison
+      const eventCreatedInUserTz = toZonedTime(new Date(event.created_at), userTimezone);
+      const selectedFromDate = toZonedTime(dateRange.from, userTimezone);
+      const selectedToDate = toZonedTime(dateRange.to, userTimezone);
+      
+      // Get the date part only (year, month, day) for comparison
+      const eventDate = startOfDay(eventCreatedInUserTz);
+      const fromDate = startOfDay(selectedFromDate);
+      const toDate = startOfDay(selectedToDate);
+      
+      return eventDate >= fromDate && eventDate <= toDate;
+    });
+  }, [calendlyEvents, dateRange, userTimezone]);
+  
   const chartData = useMemo(() => {
     console.log('🔄 Recalculating chart data due to dependency change');
     console.log('🔄 Date range key:', dateRangeKey);
-    console.log('🔄 Events available:', calendlyEvents.length);
+    console.log('🔄 Events available:', filteredEvents.length);
     console.log('🔄 Using timezone:', userTimezone);
     console.log('🔄 Profile loaded:', !!profile);
     
-    if (calendlyEvents.length === 0) {
+    if (filteredEvents.length === 0) {
       console.log('⚠️ No events available for chart generation');
       return [];
     }
     
-    const data = generateCallDataFromEvents(calendlyEvents, dateRange, userTimezone);
+    const data = generateCallDataFromEvents(filteredEvents, dateRange, userTimezone);
     console.log('🎯 Generated chart data:', data);
     return data;
-  }, [calendlyEvents, dateRangeKey, userTimezone]);
-  
+  }, [filteredEvents, dateRangeKey, userTimezone]);
+
   const {
     callStats,
     previousStats,
@@ -175,7 +192,7 @@ export const BookCallFunnel = ({ projectId, dateRange }: BookCallFunnelProps) =>
     showUpRate,
     previousCallsTaken,
     previousShowUpRate,
-  } = useCallStatsCalculations(calendlyEvents, dateRange, userTimezone);
+  } = useCallStatsCalculations(filteredEvents, dateRange, userTimezone);
   
   useEffect(() => {
     console.log('🔄 BookCallFunnel dependencies changed:', {
