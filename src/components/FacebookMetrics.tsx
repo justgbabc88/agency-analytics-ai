@@ -302,23 +302,6 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
               </div>
             </div>
 
-            {/* Cost Per Booked Call Metric */}
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 rounded-lg p-3 border border-blue-100">
-              <div className="flex items-center gap-2 text-xs text-blue-600 mb-1">
-                <Calendar className="h-3 w-3" />
-                Cost per Call
-              </div>
-              <div className="text-lg font-bold text-blue-800">
-                {totalBookings > 0 ? formatCurrency(costPerBookedCall) : 'N/A'}
-              </div>
-              <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(costPerBookedCallChange)}`}>
-                {getChangeIcon(costPerBookedCallChange)}
-                <span>{costPerBookedCallChange > 0 ? '+' : ''}{costPerBookedCallChange.toFixed(1)}%</span>
-              </div>
-              <div className="text-xs text-blue-600 mt-1">
-                {totalBookings} bookings
-              </div>
-            </div>
           </div>
 
           {facebookData.last_updated && (
@@ -331,10 +314,27 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
         </CardContent>
       </Card>
 
-      {/* Cost Per Call Chart - Full Width Row */}
+      {/* Cost Per Call Chart - Full Width Row with Integrated Metrics */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Cost Per Call Trend</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm">Cost Per Call Trend</CardTitle>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <div className="text-lg font-bold text-blue-800">
+                  {totalBookings > 0 ? formatCurrency(costPerBookedCall) : 'N/A'}
+                </div>
+                <div className={`flex items-center gap-1 text-xs ${getChangeColor(costPerBookedCallChange)}`}>
+                  {getChangeIcon(costPerBookedCallChange)}
+                  <span>{costPerBookedCallChange > 0 ? '+' : ''}{costPerBookedCallChange.toFixed(1)}%</span>
+                </div>
+              </div>
+              <div className="text-right text-xs text-muted-foreground">
+                <div>Current Period</div>
+                <div>{totalBookings} bookings</div>
+              </div>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <ConversionChart 
