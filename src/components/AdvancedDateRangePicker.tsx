@@ -97,6 +97,7 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
   });
   const [selectedPreset, setSelectedPreset] = useState("30days");
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [selectionStep, setSelectionStep] = useState<'start' | 'end'>('start');
 
   // Re-initialize date range when user timezone changes
   useEffect(() => {
@@ -111,31 +112,57 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
   const handlePresetClick = (preset: any) => {
     console.log('📅 Preset clicked:', preset.label);
     setSelectedPreset(preset.value);
+    setSelectionStep('start'); // Reset selection step
     const dates = preset.getDates();
     setDateRange(dates);
     onDateChange(dates.from, dates.to);
   };
 
-  const handleCustomDateChange = (range: any) => {
-    console.log('📅 Custom date range selected:', range);
+  const handleCustomDateChange = (selectedDate: Date | undefined) => {
+    if (!selectedDate) return;
     
-    if (range?.from) {
-      // If we have both from and to dates, create the range
-      if (range.to) {
-        const dates = createDateRangeInUserTimezone(range.from, range.to);
-        setDateRange(dates);
-        onDateChange(dates.from, dates.to);
-        setSelectedPreset("custom");
-        // Close calendar only when we have a complete range
-        setIsCalendarOpen(false);
-      } else {
-        // If only from date is selected, create single day range for preview
-        const dates = createDateRangeInUserTimezone(range.from, range.from);
-        setDateRange(dates);
-        onDateChange(dates.from, dates.to);
-        setSelectedPreset("custom");
-        // Don't close calendar yet - user might want to select end date
+    console.log('📅 Date clicked:', selectedDate, 'Current step:', selectionStep);
+    
+    if (selectionStep === 'start') {
+      // First click - set start date, clear end date, wait for end date
+      const startDate = createDateRangeInUserTimezone(selectedDate, selectedDate);
+      setDateRange({ from: startDate.from, to: undefined });
+      setSelectionStep('end');
+      setSelectedPreset("custom");
+      console.log('📅 Start date set:', selectedDate);
+    } else {
+      // Second click - set end date and complete the range
+      const currentStart = dateRange.from;
+      if (!currentStart) {
+        // Fallback: if somehow we don't have a start date, treat this as start
+        const startDate = createDateRangeInUserTimezone(selectedDate, selectedDate);
+        setDateRange({ from: startDate.from, to: undefined });
+        setSelectionStep('end');
+        return;
       }
+      
+      // Determine which date should be start and which should be end
+      const tempStartInUserTz = toZonedTime(currentStart, userTimezone);
+      const startOfTempStart = startOfDay(tempStartInUserTz);
+      const startOfSelected = startOfDay(selectedDate);
+      
+      let finalStartDate, finalEndDate;
+      if (startOfSelected >= startOfTempStart) {
+        // Selected date is after or same as current start - normal order
+        finalStartDate = tempStartInUserTz;
+        finalEndDate = selectedDate;
+      } else {
+        // Selected date is before current start - swap them
+        finalStartDate = selectedDate;
+        finalEndDate = tempStartInUserTz;
+      }
+      
+      const finalRange = createDateRangeInUserTimezone(finalStartDate, finalEndDate);
+      setDateRange(finalRange);
+      onDateChange(finalRange.from, finalRange.to);
+      setSelectionStep('start'); // Reset for next selection
+      setIsCalendarOpen(false); // Close after complete selection
+      console.log('📅 Range completed:', finalStartDate, 'to', finalEndDate);
     }
   };
 
@@ -162,6 +189,7 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
     const initial = createDateRangeInUserTimezone(thirtyDaysAgoInUserTz, nowInUserTz);
     setDateRange(initial);
     setSelectedPreset("30days");
+    setSelectionStep('start'); // Reset selection step
     onDateChange(initial.from, initial.to);
   };
 
@@ -200,34 +228,37 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
             <div className="p-4 border-b">
               <h4 className="font-medium text-sm mb-2">Select Date Range</h4>
               <p className="text-xs text-muted-foreground">
-                Click start date, then click end date. Click same date twice for single day.
+                {selectionStep === 'start' ? 'Click to select start date' : 'Click to select end date'}
               </p>
             </div>
             <div className="p-3">
               <Calendar
                 initialFocus
-                mode="range"
-                defaultMonth={dateRange?.from}
-                selected={{
-                  from: dateRange?.from,
-                  to: dateRange?.to,
-                }}
+                mode="single"
+                selected={selectionStep === 'start' ? (dateRange?.from ? toZonedTime(dateRange.from, userTimezone) : undefined) : (dateRange?.to ? toZonedTime(dateRange.to, userTimezone) : undefined)}
                 onSelect={handleCustomDateChange}
-                numberOfMonths={1}
+                defaultMonth={dateRange?.from ? toZonedTime(dateRange.from, userTimezone) : undefined}
+                numberOfMonths={2}
                 className="pointer-events-auto"
                 fixedWeeks
               />
             </div>
             <div className="p-3 border-t flex justify-between items-center">
-              <p className="text-xs text-muted-foreground">
-                Selected: {formatDateRange()}
-              </p>
+              <div className="text-xs text-muted-foreground">
+                <div>Selected: {formatDateRange()}</div>
+                <div className="mt-1">
+                  {selectionStep === 'start' ? '1. Choose start date' : '2. Choose end date'}
+                </div>
+              </div>
               <Button 
                 size="sm" 
-                onClick={() => setIsCalendarOpen(false)}
+                onClick={() => {
+                  setIsCalendarOpen(false);
+                  setSelectionStep('start'); // Reset for next time
+                }}
                 variant="outline"
               >
-                Done
+                Cancel
               </Button>
             </div>
           </PopoverContent>
