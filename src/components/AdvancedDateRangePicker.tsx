@@ -169,6 +169,11 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
   const formatDateRange = () => {
     if (!dateRange.from) return "Select date range";
     
+    // If we only have a start date (during selection), show it
+    if (!dateRange.to) {
+      return format(toZonedTime(dateRange.from, userTimezone), "MMM d, yyyy") + " - Select end date";
+    }
+    
     const fromFormatted = format(toZonedTime(dateRange.from, userTimezone), "MMM d");
     const toFormatted = format(toZonedTime(dateRange.to, userTimezone), "MMM d, yyyy");
     
