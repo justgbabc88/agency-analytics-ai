@@ -67,7 +67,7 @@ export const CallsList = ({ calls, isLoading, dateRange }: CallsListProps) => {
   // Filter calls based on selected status
   const filteredCalls = calls.filter(call => {
     if (statusFilter === 'total_bookings') return isCallCreatedInDateRange(call); // Show bookings created in date range
-    if (statusFilter === 'calls_taken') return isCallScheduledInDateRange(call); // Show calls scheduled in date range
+    if (statusFilter === 'calls_taken') return isCallScheduledInDateRange(call) && call.status.toLowerCase() !== 'cancelled'; // Show non-cancelled calls scheduled in date range
     if (statusFilter === 'calls_cancelled') return call.status.toLowerCase() === 'cancelled' && isCallScheduledInDateRange(call); // Show cancelled calls scheduled in date range
     return true;
   });
@@ -129,7 +129,7 @@ export const CallsList = ({ calls, isLoading, dateRange }: CallsListProps) => {
             size="sm"
             onClick={() => setStatusFilter('calls_taken')}
           >
-            Calls Taken ({calls.filter(call => isCallScheduledInDateRange(call)).length})
+            Calls Taken ({calls.filter(call => isCallScheduledInDateRange(call) && call.status.toLowerCase() !== 'cancelled').length})
           </Button>
           <Button
             variant={statusFilter === 'calls_cancelled' ? 'default' : 'outline'}

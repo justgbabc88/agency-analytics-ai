@@ -219,7 +219,9 @@ export const BookCallFunnel = ({ projectId, dateRange }: BookCallFunnelProps) =>
 
     // Calculate the exact same numbers as CallsList filter buttons
     const totalBookings = calendlyEvents.filter(call => isCallCreatedInDateRange(call)).length;
-    const callsTaken = calendlyEvents.filter(call => isCallScheduledInDateRange(call)).length;
+    const callsTaken = calendlyEvents.filter(call => 
+      isCallScheduledInDateRange(call) && call.status.toLowerCase() !== 'cancelled'
+    ).length;
     const callsCancelled = calendlyEvents.filter(c => 
       c.status.toLowerCase() === 'cancelled' && isCallScheduledInDateRange(c)
     ).length;
