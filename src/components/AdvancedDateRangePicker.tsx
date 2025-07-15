@@ -239,9 +239,24 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
             <div className="p-3">
               <Calendar
                 initialFocus
-                mode="single"
-                selected={selectionStep === 'start' ? (dateRange?.from ? toZonedTime(dateRange.from, userTimezone) : undefined) : (dateRange?.to ? toZonedTime(dateRange.to, userTimezone) : undefined)}
-                onSelect={handleCustomDateChange}
+                mode="range"
+                selected={{
+                  from: dateRange?.from ? toZonedTime(dateRange.from, userTimezone) : undefined,
+                  to: dateRange?.to ? toZonedTime(dateRange.to, userTimezone) : undefined,
+                }}
+                onSelect={(range) => {
+                  // Convert range selection back to individual date clicks
+                  if (range?.from && !range?.to && selectionStep === 'start') {
+                    // First click - set start date
+                    handleCustomDateChange(range.from);
+                  } else if (range?.from && range?.to && selectionStep === 'end') {
+                    // Second click - set end date (use the to date)
+                    handleCustomDateChange(range.to);
+                  } else if (range?.from && range?.to && selectionStep === 'start') {
+                    // Range was dragged - treat the 'to' date as the start
+                    handleCustomDateChange(range.to);
+                  }
+                }}
                 defaultMonth={dateRange?.from ? toZonedTime(dateRange.from, userTimezone) : undefined}
                 numberOfMonths={2}
                 className="pointer-events-auto"
