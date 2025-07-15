@@ -189,9 +189,13 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     );
     
     if (isCurrencyMetric) {
+      // Special handling for small currency values like CPC
+      if (value < 1) {
+        return `$${value.toFixed(2)}`;
+      }
       if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
       if (value >= 1000) return `$${(value / 1000).toFixed(1)}K`;
-      return `$${value.toFixed(0)}`;
+      return `$${value.toFixed(2)}`;
     }
     
     if (metrics.some(m => m.includes('frequency') || m.includes('ROAS'))) {
