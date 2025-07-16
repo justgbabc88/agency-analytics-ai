@@ -138,8 +138,14 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
 
   // Generate chart data using real Facebook daily insights or fall back to mock data
   const generateChartData = () => {
+    console.log('Facebook Chart Data Generation:', {
+      dateRange,
+      hasDailyInsights: !!dailyInsights,
+      dailyInsightsLength: dailyInsights?.length || 0,
+      dailyInsightsData: dailyInsights
+    });
+
     // Check if we have real daily insights data from Facebook (already filtered by date and campaigns)
-    
     if (dailyInsights && dailyInsights.length > 0) {
       // Filter daily insights by the selected date range
       let filteredData = dailyInsights;
@@ -155,9 +161,22 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
           fromDate.setHours(0, 0, 0, 0);
           toDate.setHours(0, 0, 0, 0);
           
+          console.log('Date filtering:', {
+            dayDate: dayDate.toISOString(),
+            fromDate: fromDate.toISOString(),
+            toDate: toDate.toISOString(),
+            inRange: dayDate >= fromDate && dayDate <= toDate
+          });
+          
           return dayDate >= fromDate && dayDate <= toDate;
         });
       }
+      
+      console.log('Filtered daily insights:', {
+        originalCount: dailyInsights.length,
+        filteredCount: filteredData.length,
+        filteredData
+      });
       
       // Map the filtered data to chart format
       const chartData = filteredData.map((day: any) => {
@@ -187,24 +206,20 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
         };
       });
       
+      console.log('Final chart data:', chartData);
       return chartData;
     }
     
-    // Fallback to mock data generation if no real data available
+    // If no real data and no date range, show default recent data
     if (!dateRange) {
+      console.log('No date range provided, using default range');
       const endDate = new Date();
       const startDate = subDays(endDate, 6);
       return generateDataForRange(startDate, endDate);
     }
 
-    // Check if it's a single day selection
-    const isSingleDay = format(dateRange.from, 'yyyy-MM-dd') === format(dateRange.to, 'yyyy-MM-dd');
-    
-    if (isSingleDay) {
-      // Return only one data point for single day selection
-      return generateDataForRange(dateRange.from, dateRange.from);
-    }
-
+    // Generate data for the selected date range when no real data is available
+    console.log('No real data available, generating mock data for date range');
     return generateDataForRange(dateRange.from, dateRange.to);
   };
 
