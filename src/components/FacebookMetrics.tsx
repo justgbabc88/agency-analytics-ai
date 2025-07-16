@@ -141,7 +141,10 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
     // Check if we have real daily insights data from Facebook (already filtered by date and campaigns)
     
     if (dailyInsights && dailyInsights.length > 0) {
-      return dailyInsights.map((day: any) => {
+      // Check if we're filtering to a single day
+      const isSingleDay = dateRange && format(dateRange.from, 'yyyy-MM-dd') === format(dateRange.to, 'yyyy-MM-dd');
+      
+      let filteredData = dailyInsights.map((day: any) => {
         // Find bookings for this specific day
         const dayDate = new Date(day.date);
         const dayStart = startOfDay(toZonedTime(dayDate, userTimezone));
@@ -167,6 +170,28 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
           dailyBookings: dailyBookings,
         };
       });
+      
+      // If single day selection, ensure we only return one data point
+      if (isSingleDay && dateRange) {
+        const targetDate = format(dateRange.from, 'MMM dd');
+        filteredData = filteredData.filter(item => item.date === targetDate);
+        // If no data for the exact date, create a single point with zero values
+        if (filteredData.length === 0) {
+          filteredData = [{
+            date: targetDate,
+            spend: 0,
+            ctrAll: 0,
+            ctrLink: 0,
+            cpm: 0,
+            cpc: 0,
+            frequency: 0,
+            costPerCall: 0,
+            dailyBookings: 0,
+          }];
+        }
+      }
+      
+      return filteredData;
     }
     
     // Fallback to mock data generation if no real data available
@@ -188,7 +213,9 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
   };
 
   const generateDataForRange = (startDate: Date, endDate: Date) => {
-    const days = eachDayOfInterval({ start: startDate, end: endDate });
+    // For single day, create only one data point
+    const isSingleDay = format(startDate, 'yyyy-MM-dd') === format(endDate, 'yyyy-MM-dd');
+    const days = isSingleDay ? [startDate] : eachDayOfInterval({ start: startDate, end: endDate });
     
     // Use actual data as baseline with realistic daily variations
     const baseSpend = insights.spend || 100;
