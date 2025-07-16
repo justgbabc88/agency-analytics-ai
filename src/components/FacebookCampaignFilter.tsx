@@ -39,7 +39,8 @@ export const FacebookCampaignFilter = ({
     }
   };
 
-  const handleCampaignToggle = (campaignId: string) => {
+  const handleCampaignToggle = (campaignId: string, event?: React.MouseEvent) => {
+    event?.stopPropagation(); // Prevent event bubbling
     if (selectedCampaignIds.includes(campaignId)) {
       onCampaignChange(selectedCampaignIds.filter(id => id !== campaignId));
     } else {
@@ -121,15 +122,16 @@ export const FacebookCampaignFilter = ({
             {campaigns.map((campaign) => (
               <div
                 key={campaign.id}
-                className="flex items-center gap-3 p-3 hover:bg-muted/50 cursor-pointer border-b border-border/50"
-                onClick={() => handleCampaignToggle(campaign.id)}
+                className="flex items-center gap-3 p-3 hover:bg-muted/50 border-b border-border/50"
               >
                 <Checkbox
                   checked={selectedCampaignIds.includes(campaign.id)}
-                  onChange={() => handleCampaignToggle(campaign.id)}
-                  className="pointer-events-none"
+                  onCheckedChange={() => handleCampaignToggle(campaign.id)}
                 />
-                <div className="flex-1 min-w-0">
+                <div 
+                  className="flex-1 min-w-0 cursor-pointer"
+                  onClick={(e) => handleCampaignToggle(campaign.id, e)}
+                >
                   <div className="flex items-center justify-between">
                     <span className="truncate text-sm font-medium">
                       {campaign.name}
