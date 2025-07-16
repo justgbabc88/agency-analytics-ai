@@ -141,10 +141,26 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
     // Check if we have real daily insights data from Facebook (already filtered by date and campaigns)
     
     if (dailyInsights && dailyInsights.length > 0) {
-      // Check if we're filtering to a single day
-      const isSingleDay = dateRange && format(dateRange.from, 'yyyy-MM-dd') === format(dateRange.to, 'yyyy-MM-dd');
+      // Filter daily insights by the selected date range
+      let filteredData = dailyInsights;
       
-      let filteredData = dailyInsights.map((day: any) => {
+      if (dateRange) {
+        filteredData = dailyInsights.filter((day: any) => {
+          const dayDate = new Date(day.date);
+          const fromDate = new Date(dateRange.from);
+          const toDate = new Date(dateRange.to);
+          
+          // Set all dates to start of day for accurate comparison
+          dayDate.setHours(0, 0, 0, 0);
+          fromDate.setHours(0, 0, 0, 0);
+          toDate.setHours(0, 0, 0, 0);
+          
+          return dayDate >= fromDate && dayDate <= toDate;
+        });
+      }
+      
+      // Map the filtered data to chart format
+      const chartData = filteredData.map((day: any) => {
         // Find bookings for this specific day
         const dayDate = new Date(day.date);
         const dayStart = startOfDay(toZonedTime(dayDate, userTimezone));
@@ -160,38 +176,18 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
         
         return {
           date: format(dayDate, 'MMM dd'),
-          spend: day.spend,
-          ctrAll: day.ctr,
-          ctrLink: day.ctr * 0.75, // Estimate link CTR as 75% of all CTR
-          cpm: day.cpm,
-          cpc: day.cpc,
-          frequency: day.frequency,
+          spend: day.spend || 0,
+          ctrAll: day.ctr || 0,
+          ctrLink: (day.ctr || 0) * 0.75, // Estimate link CTR as 75% of all CTR
+          cpm: day.cpm || 0,
+          cpc: day.cpc || 0,
+          frequency: day.frequency || 0,
           costPerCall: costPerCall,
           dailyBookings: dailyBookings,
         };
       });
       
-      // If single day selection, ensure we only return one data point
-      if (isSingleDay && dateRange) {
-        const targetDate = format(dateRange.from, 'MMM dd');
-        filteredData = filteredData.filter(item => item.date === targetDate);
-        // If no data for the exact date, create a single point with zero values
-        if (filteredData.length === 0) {
-          filteredData = [{
-            date: targetDate,
-            spend: 0,
-            ctrAll: 0,
-            ctrLink: 0,
-            cpm: 0,
-            cpc: 0,
-            frequency: 0,
-            costPerCall: 0,
-            dailyBookings: 0,
-          }];
-        }
-      }
-      
-      return filteredData;
+      return chartData;
     }
     
     // Fallback to mock data generation if no real data available
