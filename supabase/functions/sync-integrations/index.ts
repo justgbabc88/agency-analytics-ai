@@ -220,94 +220,31 @@ async function syncFacebook(apiKeys: Record<string, string>) {
 
   } catch (error) {
     console.error('Facebook API error:', error)
-    
-    // Generate realistic mock data with unique daily variations for demo purposes
-    const generateDailyInsights = (days: number = 30) => {
-      const dailyInsights = [];
-      const endDate = new Date();
-      
-      for (let i = days - 1; i >= 0; i--) {
-        const date = new Date(endDate);
-        date.setDate(date.getDate() - i);
-        const dateStr = date.toISOString().split('T')[0];
-        
-        // Create realistic variations for each day
-        const baseSpend = 45 + (i * 1.2); // Gradually increasing spend over time
-        const weekdayMultiplier = [0.8, 1.0, 1.1, 1.2, 1.3, 0.9, 0.7][date.getDay()]; // Lower on weekends
-        const seasonalVariation = Math.sin((i / days) * Math.PI * 2) * 15; // Seasonal pattern
-        const randomFactor = (Math.random() - 0.5) * 20; // Daily randomness
-        
-        const dailySpend = Math.max(25, baseSpend * weekdayMultiplier + seasonalVariation + randomFactor);
-        const dailyImpressions = Math.floor(dailySpend * (3500 + Math.random() * 2500));
-        const dailyClicks = Math.floor(dailyImpressions * (0.02 + Math.random() * 0.025));
-        const dailyReach = Math.floor(dailyImpressions * (0.65 + Math.random() * 0.25));
-        const dailyConversions = Math.floor(Math.random() * 4); // 0-3 conversions per day
-        const dailyRevenue = dailyConversions * (50 + Math.random() * 150); // $50-200 per conversion
-        
-        dailyInsights.push({
-          date: dateStr,
-          impressions: dailyImpressions,
-          clicks: dailyClicks,
-          spend: Math.round(dailySpend * 100) / 100,
-          reach: dailyReach,
-          frequency: Math.round((dailyImpressions / dailyReach) * 100) / 100,
-          ctr: Math.round((dailyClicks / dailyImpressions) * 10000) / 100,
-          cpm: Math.round((dailySpend / dailyImpressions) * 100000) / 100,
-          cpc: Math.round((dailySpend / dailyClicks) * 100) / 100,
-          conversions: dailyConversions,
-          conversion_values: Math.round(dailyRevenue * 100) / 100
-        });
-      }
-      
-      return dailyInsights;
-    };
-
-    const dailyInsights = generateDailyInsights(30);
-    
-    // Calculate totals from daily data
-    const totalSpend = dailyInsights.reduce((sum, day) => sum + day.spend, 0);
-    const totalImpressions = dailyInsights.reduce((sum, day) => sum + day.impressions, 0);
-    const totalClicks = dailyInsights.reduce((sum, day) => sum + day.clicks, 0);
-    const totalReach = Math.max(...dailyInsights.map(day => day.reach));
-    const totalConversions = dailyInsights.reduce((sum, day) => sum + day.conversions, 0);
-    const totalRevenue = dailyInsights.reduce((sum, day) => sum + day.conversion_values, 0);
-    
-    const overallCtr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
-    const overallCpc = totalClicks > 0 ? totalSpend / totalClicks : 0;
-    const overallCpm = totalImpressions > 0 ? (totalSpend / totalImpressions) * 1000 : 0;
-    
-    // Return mock data with realistic daily variations
+    // Return mock data for demo purposes if API fails
     return {
-      campaigns: [
-        { id: '120227108478400223', name: 'VR | Jack Henderson | TOF 1 (FB & IG)', status: 'ACTIVE', objective: 'OUTCOME_TRAFFIC', created_time: '2025-06-11T09:29:00+1000' },
-        { id: '120226149869450223', name: 'VR | Jack Henderson | TOF 2 (FB & IG) RT', status: 'ACTIVE', objective: 'OUTCOME_TRAFFIC', created_time: '2025-05-26T14:40:24+1000' },
-        { id: '120220061598790223', name: 'VR | Course | Submit App', status: 'PAUSED', objective: 'OUTCOME_LEADS', created_time: '2025-03-26T10:58:49+1100' },
-        { id: '120219899679800223', name: 'VR | Course | CR', status: 'ACTIVE', objective: 'OUTCOME_LEADS', created_time: '2025-03-24T15:44:42+1100' },
-        { id: '120218484242050223', name: '[4] VR | VR x Henderson | Scaling - 2', status: 'ACTIVE', objective: 'OUTCOME_LEADS', created_time: '2025-03-06T15:34:29+1100' }
-      ],
+      campaigns: [],
       insights: {
-        impressions: Math.round(totalImpressions),
-        clicks: Math.round(totalClicks),
-        spend: Math.round(totalSpend * 100) / 100,
-        reach: Math.round(totalReach),
-        frequency: Math.round((totalImpressions / totalReach) * 100) / 100,
-        ctr: Math.round(overallCtr * 100) / 100,
-        cpm: Math.round(overallCpm * 100) / 100,
-        cpc: Math.round(overallCpc * 100) / 100,
-        conversions: totalConversions,
-        conversion_values: Math.round(totalRevenue * 100) / 100
+        impressions: 150000,
+        clicks: 3200,
+        spend: 2450.75,
+        reach: 125000,
+        frequency: 1.2,
+        ctr: 2.13,
+        cpm: 16.34,
+        cpc: 0.77,
+        conversions: 145,
+        conversion_values: 7250.50
       },
-      daily_insights: dailyInsights,
       aggregated_metrics: {
         total_campaigns: 5,
-        total_impressions: Math.round(totalImpressions),
-        total_clicks: Math.round(totalClicks),
-        total_spend: Math.round(totalSpend * 100) / 100,
-        total_conversions: totalConversions,
-        total_revenue: Math.round(totalRevenue * 100) / 100,
-        overall_ctr: Math.round(overallCtr * 100) / 100,
-        overall_cpm: Math.round(overallCpm * 100) / 100,
-        overall_cpc: Math.round(overallCpc * 100) / 100
+        total_impressions: 150000,
+        total_clicks: 3200,
+        total_spend: 2450.75,
+        total_conversions: 145,
+        total_revenue: 7250.50,
+        overall_ctr: 2.13,
+        overall_cpm: 16.34,
+        overall_cpc: 0.77
       },
       account_id: adAccountId,
       date_range: date_range || { since: 'last_30d', until: 'today' },
