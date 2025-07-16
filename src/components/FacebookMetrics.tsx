@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { useFacebookData } from "@/hooks/useFacebookData";
 import { useCalendlyData } from "@/hooks/useCalendlyData";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { useGHLFormSubmissions } from "@/hooks/useGHLFormSubmissions";
 import { ConversionChart } from "./ConversionChart";
 import { FacebookCampaignFilter } from "./FacebookCampaignFilter";
 import { BarChart3, TrendingUp, Users, DollarSign, MousePointer, Eye, ArrowUpRight, ArrowDownRight, Calendar } from "lucide-react";
@@ -25,6 +26,7 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
   // Extract the filtered daily insights properly
   const dailyInsights = facebookData?.daily_insights;
   const { calendlyEvents } = useCalendlyData(projectId);
+  const { metrics: formSubmissions } = useGHLFormSubmissions(projectId || '', dateRange);
   const { profile } = useUserProfile();
   const userTimezone = profile?.timezone || 'UTC';
 
@@ -103,6 +105,12 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
     
     return eventDate >= fromDate && eventDate <= toDate;
   }).length;
+
+  // Calculate total form submissions for the date range
+  const totalSubmissions = formSubmissions.totalSubmissions;
+
+  // Calculate cost per lead (form submission)
+  const costPerLead = totalSubmissions > 0 ? (insights.spend || 0) / totalSubmissions : 0;
 
   // Calculate cost per booked call
   const costPerBookedCall = totalBookings > 0 ? (insights.spend || 0) / totalBookings : 0;
@@ -259,6 +267,12 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
       // Calculate cost per call for this day
       const costPerCall = dailyBookings > 0 ? dailySpend / dailyBookings : 0;
       
+      // Calculate daily form submissions for this specific day
+      const dailySubmissions = formSubmissions.submissionsByDay[format(date, 'yyyy-MM-dd')] || 0;
+      
+      // Calculate cost per lead for this day
+      const costPerLead = dailySubmissions > 0 ? dailySpend / dailySubmissions : 0;
+      
       return {
         date: format(date, 'MMM dd'),
         spend: dailySpend,
@@ -268,7 +282,9 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
         cpc: cpc * (0.8 + Math.random() * 0.4),
         frequency: frequency * (0.9 + Math.random() * 0.2),
         costPerCall: costPerCall,
+        costPerLead: costPerLead,
         dailyBookings: dailyBookings,
+        dailySubmissions: dailySubmissions,
       };
     });
   };
@@ -430,41 +446,76 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
         </CardContent>
       </Card>
 
-      {/* Cost Per Call Chart - Full Width Row with Integrated Metrics */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <CardTitle className="text-lg font-semibold mb-1">Cost Per Call Analysis</CardTitle>
-              <p className="text-sm text-muted-foreground">Track your advertising efficiency over time</p>
-            </div>
-            <div className="flex items-center gap-6">
-              <div className="text-center p-3 bg-gradient-to-br from-blue-50 to-blue-100/50 rounded-lg border border-blue-100">
-                <div className="text-xs text-blue-600 mb-1 font-medium">Current Cost Per Call</div>
-                <div className="text-2xl font-bold text-blue-800">
-                  {totalBookings > 0 ? formatCurrency(costPerBookedCall) : 'N/A'}
+      {/* Cost Per Lead and Cost Per Call Analysis - Side by Side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Cost Per Lead Chart */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <CardTitle className="text-lg font-semibold mb-1">Cost Per Lead Analysis</CardTitle>
+                <p className="text-sm text-muted-foreground">Track your lead generation efficiency</p>
+              </div>
+              <div className="flex flex-col items-center gap-3">
+                <div className="text-center p-3 bg-gradient-to-br from-purple-50 to-purple-100/50 rounded-lg border border-purple-100">
+                  <div className="text-xs text-purple-600 mb-1 font-medium">Current Cost Per Lead</div>
+                  <div className="text-2xl font-bold text-purple-800">
+                    {totalSubmissions > 0 ? formatCurrency(costPerLead) : 'N/A'}
+                  </div>
                 </div>
-                <div className={`flex items-center justify-center gap-1 text-xs mt-1 ${getChangeColor(costPerBookedCallChange)}`}>
-                  {getChangeIcon(costPerBookedCallChange)}
-                  <span>{costPerBookedCallChange > 0 ? '+' : ''}{costPerBookedCallChange.toFixed(1)}%</span>
+                <div className="text-center p-3 bg-gradient-to-br from-orange-50 to-orange-100/50 rounded-lg border border-orange-100">
+                  <div className="text-xs text-orange-600 mb-1 font-medium">Total Leads</div>
+                  <div className="text-2xl font-bold text-orange-800">{totalSubmissions}</div>
+                  <div className="text-xs text-orange-600 mt-1">in selected period</div>
                 </div>
               </div>
-              <div className="text-center p-3 bg-gradient-to-br from-green-50 to-green-100/50 rounded-lg border border-green-100">
-                <div className="text-xs text-green-600 mb-1 font-medium">Total Bookings</div>
-                <div className="text-2xl font-bold text-green-800">{totalBookings}</div>
-                <div className="text-xs text-green-600 mt-1">in selected period</div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <ConversionChart 
+              data={chartData}
+              title=""
+              metrics={['costPerLead']}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Cost Per Call Chart */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <CardTitle className="text-lg font-semibold mb-1">Cost Per Call Analysis</CardTitle>
+                <p className="text-sm text-muted-foreground">Track your booking efficiency</p>
+              </div>
+              <div className="flex flex-col items-center gap-3">
+                <div className="text-center p-3 bg-gradient-to-br from-blue-50 to-blue-100/50 rounded-lg border border-blue-100">
+                  <div className="text-xs text-blue-600 mb-1 font-medium">Current Cost Per Call</div>
+                  <div className="text-2xl font-bold text-blue-800">
+                    {totalBookings > 0 ? formatCurrency(costPerBookedCall) : 'N/A'}
+                  </div>
+                  <div className={`flex items-center justify-center gap-1 text-xs mt-1 ${getChangeColor(costPerBookedCallChange)}`}>
+                    {getChangeIcon(costPerBookedCallChange)}
+                    <span>{costPerBookedCallChange > 0 ? '+' : ''}{costPerBookedCallChange.toFixed(1)}%</span>
+                  </div>
+                </div>
+                <div className="text-center p-3 bg-gradient-to-br from-green-50 to-green-100/50 rounded-lg border border-green-100">
+                  <div className="text-xs text-green-600 mb-1 font-medium">Total Bookings</div>
+                  <div className="text-2xl font-bold text-green-800">{totalBookings}</div>
+                  <div className="text-xs text-green-600 mt-1">in selected period</div>
+                </div>
               </div>
             </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <ConversionChart 
-            data={chartData}
-            title=""
-            metrics={['costPerCall']}
-          />
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent>
+            <ConversionChart 
+              data={chartData}
+              title=""
+              metrics={['costPerCall']}
+            />
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Other Facebook Performance Charts */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
