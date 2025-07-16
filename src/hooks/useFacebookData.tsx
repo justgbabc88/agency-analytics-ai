@@ -12,6 +12,7 @@ interface FacebookInsights {
   reach: number;
   ctr: number;
   cpc: number;
+  frequency: number;
   conversions: number;
   conversion_values: number;
 }
@@ -133,6 +134,7 @@ export const useFacebookData = ({ dateRange }: UseFacebookDataProps = {}) => {
             reach: fbData.insights?.reach || 0,
             ctr: fbData.insights?.ctr || fbData.aggregated_metrics?.overall_ctr || 0,
             cpc: fbData.insights?.cpc || fbData.aggregated_metrics?.overall_cpc || 0,
+            frequency: fbData.insights?.frequency || 0,
             conversions: fbData.insights?.conversions || fbData.aggregated_metrics?.total_conversions || 0,
             conversion_values: fbData.insights?.conversion_values || fbData.aggregated_metrics?.total_revenue || 0,
           },
@@ -155,6 +157,7 @@ export const useFacebookData = ({ dateRange }: UseFacebookDataProps = {}) => {
     reach: 0,
     ctr: 0,
     cpc: 0,
+    frequency: 0,
     conversions: 0,
     conversion_values: 0,
   };
