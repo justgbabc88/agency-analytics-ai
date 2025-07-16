@@ -128,22 +128,15 @@ async function syncFacebook(apiKeys: Record<string, string>) {
 
   try {
     // Fetch campaigns
-    console.log(`Fetching campaigns for ad account: ${adAccountId}`)
-    const campaignsUrl = `https://graph.facebook.com/v18.0/${adAccountId}/campaigns?access_token=${access_token}&fields=id,name,status,objective,created_time,updated_time`
-    console.log(`Campaign API URL: ${campaignsUrl.replace(access_token, '[REDACTED]')}`)
-    
-    const campaignsResponse = await fetch(campaignsUrl)
-    
-    console.log(`Campaigns response status: ${campaignsResponse.status}`)
+    const campaignsResponse = await fetch(
+      `https://graph.facebook.com/v18.0/${adAccountId}/campaigns?access_token=${access_token}&fields=id,name,status,objective,created_time,updated_time`
+    )
     
     if (!campaignsResponse.ok) {
-      const errorText = await campaignsResponse.text()
-      console.error('Campaign fetch failed:', errorText)
-      throw new Error(`Failed to fetch campaigns from Facebook: ${errorText}`)
+      throw new Error('Failed to fetch campaigns from Facebook')
     }
     
     const campaignsData = await campaignsResponse.json()
-    console.log(`Fetched ${campaignsData.data?.length || 0} campaigns:`, campaignsData)
 
     // Fetch ad insights with date range - get daily breakdown instead of account level
     const insightsUrl = date_range?.since && date_range?.until 
@@ -227,38 +220,9 @@ async function syncFacebook(apiKeys: Record<string, string>) {
 
   } catch (error) {
     console.error('Facebook API error:', error)
-    // Return mock data for demo purposes if API fails - including mock campaigns
+    // Return mock data for demo purposes if API fails
     return {
-      campaigns: [
-        {
-          id: "23851234567890123",
-          name: "Summer Sale Campaign",
-          status: "ACTIVE",
-          objective: "CONVERSIONS",
-          created_time: "2024-06-01T10:00:00Z"
-        },
-        {
-          id: "23851234567890124", 
-          name: "Brand Awareness Drive",
-          status: "ACTIVE",
-          objective: "BRAND_AWARENESS",
-          created_time: "2024-05-15T14:30:00Z"
-        },
-        {
-          id: "23851234567890125",
-          name: "Lead Generation Q3",
-          status: "PAUSED",
-          objective: "LEAD_GENERATION", 
-          created_time: "2024-07-01T09:15:00Z"
-        },
-        {
-          id: "23851234567890126",
-          name: "Retargeting Campaign",
-          status: "ACTIVE",
-          objective: "CONVERSIONS",
-          created_time: "2024-06-20T16:45:00Z"
-        }
-      ],
+      campaigns: [],
       insights: {
         impressions: 150000,
         clicks: 3200,

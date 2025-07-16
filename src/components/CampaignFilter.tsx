@@ -24,16 +24,10 @@ export const CampaignFilter = ({
 }: CampaignFilterProps) => {
   const [isOpen, setIsOpen] = useState(false);
 
-  const isAllSelected = selectedCampaigns.length === campaigns.length && campaigns.length > 0;
+  const isAllSelected = selectedCampaigns.length === campaigns.length;
   const selectedCount = selectedCampaigns.length;
 
   const handleSelectAll = () => {
-    console.log('handleSelectAll called - current state:', { 
-      isAllSelected, 
-      selectedCount, 
-      totalCampaigns: campaigns.length 
-    });
-    
     if (isAllSelected) {
       onSelectionChange([]);
     } else {
@@ -42,8 +36,6 @@ export const CampaignFilter = ({
   };
 
   const handleCampaignToggle = (campaignId: string) => {
-    console.log('Campaign toggle:', { campaignId, currentSelected: selectedCampaigns });
-    
     if (selectedCampaigns.includes(campaignId)) {
       onSelectionChange(selectedCampaigns.filter(id => id !== campaignId));
     } else {
@@ -55,24 +47,7 @@ export const CampaignFilter = ({
     onSelectionChange(campaigns.map(c => c.id));
   };
 
-  if (campaigns.length === 0) {
-    return (
-      <div className="flex items-center gap-2">
-        <Button 
-          variant="outline" 
-          size="sm" 
-          className="h-8 gap-2 text-sm opacity-50 cursor-not-allowed"
-          disabled
-        >
-          <Filter className="h-3 w-3" />
-          Campaigns
-          <Badge variant="secondary" className="h-4 px-1 text-xs">
-            0
-          </Badge>
-        </Button>
-      </div>
-    );
-  }
+  if (campaigns.length === 0) return null;
 
   return (
     <div className="flex items-center gap-2">
