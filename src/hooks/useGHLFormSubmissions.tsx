@@ -111,8 +111,8 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
     // Filter by date range if provided
     if (dateRange) {
       console.log('🔍 [useGHLFormSubmissions] Filtering submissions with date range:', {
-        from: dateRange.from,
-        to: dateRange.to,
+        from: dateRange.from.toISOString(),
+        to: dateRange.to.toISOString(),
         userTimezone,
         totalSubmissions: submissions.length
       });
@@ -122,27 +122,34 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
         const submissionDateUTC = parseISO(submission.submitted_at);
         const submissionDateInUserTz = toZonedTime(submissionDateUTC, userTimezone);
         
-        const isIncluded = isWithinInterval(submissionDateInUserTz, {
+        // Check if submission date falls within the selected date range
+        const isWithinRange = isWithinInterval(submissionDateInUserTz, {
           start: startOfDay(dateRange.from),
           end: endOfDay(dateRange.to)
         });
         
-        if (isIncluded) {
-          console.log('🔍 [useGHLFormSubmissions] Including submission:', {
+        // Log first few submissions for debugging
+        if (submissions.indexOf(submission) < 5) {
+          console.log('🔍 [useGHLFormSubmissions] Submission check:', {
             id: submission.id.substring(0, 8),
             submitted_at_utc: submission.submitted_at,
             submitted_at_user_tz: submissionDateInUserTz.toISOString(),
             date_range_start: startOfDay(dateRange.from).toISOString(),
-            date_range_end: endOfDay(dateRange.to).toISOString()
+            date_range_end: endOfDay(dateRange.to).toISOString(),
+            isWithinRange
           });
         }
         
-        return isIncluded;
+        return isWithinRange;
       });
       
-      console.log('🔍 [useGHLFormSubmissions] After filtering:', {
+      console.log('🔍 [useGHLFormSubmissions] Filtering results:', {
+        originalCount: submissions.length,
         filteredCount: filteredSubmissions.length,
-        originalCount: submissions.length
+        dateRange: {
+          from: dateRange.from.toISOString(),
+          to: dateRange.to.toISOString()
+        }
       });
     }
 
