@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfDay, endOfDay, isWithinInterval, parseISO } from 'date-fns';
+import { toZonedTime } from 'date-fns-tz';
+import { useUserProfile } from './useUserProfile';
 
 export interface GHLFormSubmission {
   id: string;
@@ -45,6 +47,9 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
   const [forms, setForms] = useState<GHLForm[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { getUserTimezone } = useUserProfile();
+  
+  const userTimezone = getUserTimezone();
 
   // Fetch forms and submissions
   useEffect(() => {
@@ -97,8 +102,11 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
     // Filter by date range if provided
     if (dateRange) {
       filteredSubmissions = submissions.filter(submission => {
-        const submissionDate = parseISO(submission.submitted_at);
-        return isWithinInterval(submissionDate, {
+        // Convert UTC timestamp to user's timezone for comparison
+        const submissionDateUTC = parseISO(submission.submitted_at);
+        const submissionDateInUserTz = toZonedTime(submissionDateUTC, userTimezone);
+        
+        return isWithinInterval(submissionDateInUserTz, {
           start: startOfDay(dateRange.from),
           end: endOfDay(dateRange.to)
         });
@@ -111,10 +119,12 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
       submissionsByForm[submission.form_id] = (submissionsByForm[submission.form_id] || 0) + 1;
     });
 
-    // Group submissions by day
+    // Group submissions by day (in user's timezone)
     const submissionsByDay: Record<string, number> = {};
     filteredSubmissions.forEach(submission => {
-      const day = startOfDay(parseISO(submission.submitted_at)).toISOString().split('T')[0];
+      const submissionDateUTC = parseISO(submission.submitted_at);
+      const submissionDateInUserTz = toZonedTime(submissionDateUTC, userTimezone);
+      const day = startOfDay(submissionDateInUserTz).toISOString().split('T')[0];
       submissionsByDay[day] = (submissionsByDay[day] || 0) + 1;
     });
 
@@ -139,7 +149,7 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
       recentSubmissions: filteredSubmissions.slice(0, 10),
       topPerformingForms
     };
-  }, [submissions, forms, dateRange]);
+  }, [submissions, forms, dateRange, userTimezone]);
 
   // Refetch data function
   const refetch = async () => {
