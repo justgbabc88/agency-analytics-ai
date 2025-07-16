@@ -137,11 +137,9 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
         // Parse the submission timestamp (it's in UTC)
         const submissionDateUTC = parseISO(submission.submitted_at);
         
-        // Convert to user's timezone for comparison
-        const submissionDateInUserTz = toZonedTime(submissionDateUTC, userTimezone);
-        
-        // Use the date range directly - it's already properly bounded by the date picker
-        const isWithinRange = isWithinInterval(submissionDateInUserTz, {
+        // Compare UTC submission date against UTC date range
+        // The date range from the picker is already in UTC representing the day boundaries in user timezone
+        const isWithinRange = isWithinInterval(submissionDateUTC, {
           start: dateRange.from,
           end: dateRange.to
         });
@@ -152,7 +150,7 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
             id: submission.id.substring(0, 8),
             submitted_at: submission.submitted_at,
             submissionDateUTC: submissionDateUTC.toISOString(),
-            submissionDateInUserTz: submissionDateInUserTz.toISOString(),
+            submissionDateInUserTz: toZonedTime(submissionDateUTC, userTimezone).toISOString(),
             dateRangeStart: dateRange.from.toISOString(),
             dateRangeEnd: dateRange.to.toISOString(),
             isWithinRange
