@@ -98,6 +98,10 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
           firstSubmission: submissionsData?.[0]?.submitted_at,
           lastSubmission: submissionsData?.[submissionsData.length - 1]?.submitted_at
         });
+        
+        // Additional debugging
+        console.warn('DEBUG: Total submissions loaded:', submissionsData?.length);
+        alert(`DEBUG: Loaded ${submissionsData?.length} submissions from database`);
 
         setForms(formsData || []);
         setSubmissions(submissionsData || []);
