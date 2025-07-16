@@ -160,6 +160,8 @@ async function syncForms(supabase: any, projectId: string, accessToken: string, 
           form_name: form.name,
           form_url: form.url || null,
           is_active: true,
+        }, {
+          onConflict: 'project_id,form_id'
         });
 
       if (!error) {
@@ -170,6 +172,7 @@ async function syncForms(supabase: any, projectId: string, accessToken: string, 
       }
     }
 
+    console.log(`📋 Total forms synced: ${syncedCount}`);
     return syncedCount;
   } catch (error) {
     console.error('❌ Forms sync error:', error);
