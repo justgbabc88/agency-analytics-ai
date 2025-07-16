@@ -80,16 +80,24 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
           throw new Error(`Failed to fetch forms: ${formsError.message}`);
         }
 
-        // Fetch submissions
+        // Fetch submissions with explicit high limit
         const { data: submissionsData, error: submissionsError } = await supabase
           .from('ghl_form_submissions')
           .select('*')
           .eq('project_id', projectId)
-          .order('submitted_at', { ascending: false });
+          .order('submitted_at', { ascending: false })
+          .limit(5000); // Explicitly set high limit
 
         if (submissionsError) {
           throw new Error(`Failed to fetch submissions: ${submissionsError.message}`);
         }
+
+        console.log('🔍 [useGHLFormSubmissions] Raw data fetched:', {
+          formsCount: formsData?.length || 0,
+          submissionsCount: submissionsData?.length || 0,
+          firstSubmission: submissionsData?.[0]?.submitted_at,
+          lastSubmission: submissionsData?.[submissionsData.length - 1]?.submitted_at
+        });
 
         setForms(formsData || []);
         setSubmissions(submissionsData || []);
