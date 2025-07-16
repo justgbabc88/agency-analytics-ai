@@ -143,7 +143,7 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
       return [];
     }
 
-    // If we have real daily insights data, filter it by the selected date range
+    // If we have real daily insights data, filter and aggregate it by date
     if (dailyInsights && dailyInsights.length > 0) {
       const filteredData = dailyInsights.filter((day: any) => {
         const dayDate = new Date(day.date);
@@ -156,35 +156,76 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
         toDate.setHours(0, 0, 0, 0);
         
         return dayDate >= fromDate && dayDate <= toDate;
-      }).map((day: any) => {
-        const dayDate = new Date(day.date);
+      });
+
+      // Group data by date and aggregate metrics
+      const groupedByDate = filteredData.reduce((acc: any, day: any) => {
+        const dateKey = format(new Date(day.date), 'yyyy-MM-dd');
+        
+        if (!acc[dateKey]) {
+          acc[dateKey] = {
+            date: day.date,
+            spend: 0,
+            impressions: 0,
+            clicks: 0,
+            reach: 0,
+            conversions: 0,
+            conversion_values: 0,
+            frequency: 0,
+            campaignCount: 0
+          };
+        }
+        
+        // Aggregate metrics
+        acc[dateKey].spend += day.spend || 0;
+        acc[dateKey].impressions += day.impressions || 0;
+        acc[dateKey].clicks += day.clicks || 0;
+        acc[dateKey].reach = Math.max(acc[dateKey].reach, day.reach || 0); // Reach is unique
+        acc[dateKey].conversions += day.conversions || 0;
+        acc[dateKey].conversion_values += day.conversion_values || 0;
+        acc[dateKey].frequency += day.frequency || 0;
+        acc[dateKey].campaignCount += 1;
+        
+        return acc;
+      }, {});
+
+      // Convert grouped data to chart format
+      const chartData = Object.values(groupedByDate).map((dayData: any) => {
+        const dayDate = new Date(dayData.date);
         const dayStart = startOfDay(toZonedTime(dayDate, userTimezone));
         
+        // Calculate derived metrics
+        const ctr = dayData.impressions > 0 ? (dayData.clicks / dayData.impressions) * 100 : 0;
+        const cpm = dayData.impressions > 0 ? (dayData.spend / dayData.impressions) * 1000 : 0;
+        const cpc = dayData.clicks > 0 ? dayData.spend / dayData.clicks : 0;
+        const avgFrequency = dayData.campaignCount > 0 ? dayData.frequency / dayData.campaignCount : 0;
+        
+        // Find bookings for this specific day
         const dailyBookings = calendlyEvents.filter(event => {
           const eventCreatedInUserTz = toZonedTime(new Date(event.created_at), userTimezone);
           const eventDate = startOfDay(eventCreatedInUserTz);
           return eventDate.getTime() === dayStart.getTime();
         }).length;
         
-        const costPerCall = dailyBookings > 0 ? (day.spend || 0) / dailyBookings : 0;
+        const costPerCall = dailyBookings > 0 ? dayData.spend / dailyBookings : 0;
         
         return {
           date: format(dayDate, 'MMM dd'),
-          spend: day.spend || 0,
-          ctrAll: day.ctr || 0,
-          ctrLink: (day.ctr || 0) * 0.75,
-          cpm: day.cpm || 0,
-          cpc: day.cpc || 0,
-          frequency: day.frequency || 0,
+          spend: dayData.spend,
+          ctrAll: ctr,
+          ctrLink: ctr * 0.75, // Estimate link CTR as 75% of all CTR
+          cpm: cpm,
+          cpc: cpc,
+          frequency: avgFrequency,
           costPerCall: costPerCall,
           dailyBookings: dailyBookings,
         };
-      });
+      }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       
-      return filteredData;
+      return chartData;
     }
 
-    // If no real data available, return empty array (no fallback data)
+    // If no real data available, return empty array
     return [];
   };
 
