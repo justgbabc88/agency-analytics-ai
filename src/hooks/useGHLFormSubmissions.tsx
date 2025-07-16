@@ -80,31 +80,47 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
           throw new Error(`Failed to fetch forms: ${formsError.message}`);
         }
 
-        // Fetch submissions with explicit high limit
-        const { data: submissionsData, error: submissionsError } = await supabase
-          .from('ghl_form_submissions')
-          .select('*')
-          .eq('project_id', projectId)
-          .order('submitted_at', { ascending: false })
-          .limit(5000); // Explicitly set high limit
+        // Fetch submissions with pagination to get all data
+        const allSubmissions: any[] = [];
+        let page = 0;
+        const pageSize = 1000;
+        let hasMore = true;
+        
+        while (hasMore) {
+          const { data: submissionsData, error: submissionsError } = await supabase
+            .from('ghl_form_submissions')
+            .select('*')
+            .eq('project_id', projectId)
+            .order('submitted_at', { ascending: false })
+            .range(page * pageSize, (page + 1) * pageSize - 1);
 
-        if (submissionsError) {
-          throw new Error(`Failed to fetch submissions: ${submissionsError.message}`);
+          if (submissionsError) {
+            throw new Error(`Failed to fetch submissions: ${submissionsError.message}`);
+          }
+
+          if (submissionsData && submissionsData.length > 0) {
+            allSubmissions.push(...submissionsData);
+            hasMore = submissionsData.length === pageSize; // Continue if we got a full page
+            page++;
+          } else {
+            hasMore = false;
+          }
         }
 
         console.log('🔍 [useGHLFormSubmissions] Raw data fetched:', {
           formsCount: formsData?.length || 0,
-          submissionsCount: submissionsData?.length || 0,
-          firstSubmission: submissionsData?.[0]?.submitted_at,
-          lastSubmission: submissionsData?.[submissionsData.length - 1]?.submitted_at
+          submissionsCount: allSubmissions.length,
+          firstSubmission: allSubmissions[0]?.submitted_at,
+          lastSubmission: allSubmissions[allSubmissions.length - 1]?.submitted_at,
+          pagesLoaded: page
         });
         
         // Additional debugging
-        console.warn('DEBUG: Total submissions loaded:', submissionsData?.length);
-        alert(`DEBUG: Loaded ${submissionsData?.length} submissions from database`);
+        console.warn('DEBUG: Total submissions loaded:', allSubmissions.length);
+        alert(`DEBUG: Loaded ${allSubmissions.length} submissions from database (${page} pages)`);
 
         setForms(formsData || []);
-        setSubmissions(submissionsData || []);
+        setSubmissions(allSubmissions || []);
       } catch (err) {
         console.error('Error fetching GHL data:', err);
         setError(err instanceof Error ? err.message : 'An error occurred');
