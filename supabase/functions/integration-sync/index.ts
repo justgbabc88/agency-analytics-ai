@@ -182,26 +182,62 @@ async function syncForms(supabase: any, projectId: string, accessToken: string, 
 
 async function syncSubmissions(supabase: any, projectId: string, accessToken: string, locationId: string): Promise<number> {
   try {
-    // Fetch all submissions from GHL API (we'll filter by form after)
-    const response = await fetch(`https://services.leadconnectorhq.com/forms/submissions?locationId=${locationId}&limit=100`, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Version': '2021-07-28',
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ GHL Submissions API error:', response.status, errorText);
-      return 0;
-    }
-
-    const data = await response.json();
-    console.log('📝 GHL Submissions API response:', JSON.stringify(data, null, 2));
+    // Calculate date range for last 2 weeks
+    const twoWeeksAgo = new Date();
+    twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+    const startDate = twoWeeksAgo.toISOString();
     
-    const submissions = data.submissions || [];
-    console.log(`📝 Found ${submissions.length} total submissions`);
+    console.log(`📝 Fetching submissions from ${startDate} to now`);
+    
+    // Fetch all submissions using pagination
+    let allSubmissions: any[] = [];
+    let offset = 0;
+    const limit = 100;
+    let hasMore = true;
+    
+    while (hasMore) {
+      console.log(`📝 Fetching page ${Math.floor(offset / limit) + 1} (offset: ${offset})`);
+      
+      const response = await fetch(`https://services.leadconnectorhq.com/forms/submissions?locationId=${locationId}&limit=${limit}&offset=${offset}&startDate=${startDate}`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Version': '2021-07-28',
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ GHL Submissions API error:', response.status, errorText);
+        break;
+      }
+
+      const data = await response.json();
+      const submissions = data.submissions || [];
+      console.log(`📝 Page ${Math.floor(offset / limit) + 1}: Found ${submissions.length} submissions`);
+      
+      if (submissions.length === 0) {
+        hasMore = false;
+        break;
+      }
+      
+      allSubmissions = [...allSubmissions, ...submissions];
+      
+      // If we got less than the limit, we've reached the end
+      if (submissions.length < limit) {
+        hasMore = false;
+      } else {
+        offset += limit;
+      }
+      
+      // Safety check to prevent infinite loops
+      if (offset > 10000) {
+        console.log('📝 Reached safety limit, stopping pagination');
+        break;
+      }
+    }
+    
+    console.log(`📝 Total submissions fetched: ${allSubmissions.length}`);
 
     // Get all tracked forms for this project
     const { data: trackedForms, error: formsError } = await supabase
@@ -221,7 +257,7 @@ async function syncSubmissions(supabase: any, projectId: string, accessToken: st
     console.log('📝 Tracked form IDs:', trackedFormIds);
     
     // Filter submissions for tracked forms only
-    const relevantSubmissions = submissions.filter((s: any) => 
+    const relevantSubmissions = allSubmissions.filter((s: any) => 
       trackedFormIds.includes(s.formId)
     );
 
