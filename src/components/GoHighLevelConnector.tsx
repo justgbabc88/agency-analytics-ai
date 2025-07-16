@@ -157,13 +157,25 @@ export const GoHighLevelConnector = ({
   };
 
   const handleSync = async (syncType: 'forms' | 'submissions' | 'both' = 'both') => {
-    if (!projectId) return;
+    if (!projectId) {
+      console.error('❌ No project ID provided for sync');
+      return;
+    }
 
     console.log('🔄 Starting sync with:', { projectId, syncType });
     setSyncing(true);
 
     try {
       console.log('📞 Calling integration-sync function...');
+      console.log('📞 Function call details:', {
+        functionName: 'integration-sync',
+        body: {
+          projectId,
+          platform: 'ghl',
+          syncType
+        }
+      });
+
       const { data, error } = await supabase.functions.invoke('integration-sync', {
         body: {
           projectId,
@@ -172,10 +184,16 @@ export const GoHighLevelConnector = ({
         }
       });
 
-      console.log('📨 Sync response:', { data, error });
+      console.log('📨 Full sync response:', { data, error, status: 'completed' });
 
       if (error) {
-        console.error('❌ Sync error:', error);
+        console.error('❌ Sync error details:', {
+          error,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
         throw error;
       }
 
@@ -190,13 +208,14 @@ export const GoHighLevelConnector = ({
       });
 
     } catch (error) {
-      console.error('❌ Sync failed:', error);
+      console.error('❌ Sync failed with error:', error);
       toast({
         title: "Error",
-        description: "Failed to sync data",
+        description: `Failed to sync data: ${error.message || 'Unknown error'}`,
         variant: "destructive",
       });
     } finally {
+      console.log('🔄 Sync operation completed, setting syncing to false');
       setSyncing(false);
     }
   };
