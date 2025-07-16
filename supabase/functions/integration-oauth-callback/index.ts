@@ -149,6 +149,8 @@ Deno.serve(async (req) => {
           expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
         },
         synced_at: new Date().toISOString(),
+      }, {
+        onConflict: 'project_id,platform'
       });
 
     if (dbError) {
@@ -177,6 +179,8 @@ Deno.serve(async (req) => {
         platform: platform,
         is_connected: true,
         last_sync: new Date().toISOString(),
+      }, {
+        onConflict: 'project_id,platform'
       });
 
     if (integrationError) {
