@@ -21,6 +21,9 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
     dateRange, 
     campaignIds: selectedCampaignIds 
   });
+  
+  // Extract the filtered daily insights properly
+  const dailyInsights = facebookData?.daily_insights;
   const { calendlyEvents } = useCalendlyData(projectId);
   const { profile } = useUserProfile();
   const userTimezone = profile?.timezone || 'UTC';
@@ -135,8 +138,7 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
 
   // Generate chart data using real Facebook daily insights or fall back to mock data
   const generateChartData = () => {
-    // Check if we have real daily insights data from Facebook
-    const dailyInsights = (facebookData as any)?.daily_insights;
+    // Check if we have real daily insights data from Facebook (already filtered by date and campaigns)
     
     if (dailyInsights && dailyInsights.length > 0) {
       return dailyInsights.map((day: any) => {
