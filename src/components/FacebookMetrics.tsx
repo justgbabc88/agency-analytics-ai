@@ -19,7 +19,7 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
   const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
   const { facebookData, isLoading, insights, campaigns, metrics } = useFacebookData({ 
     dateRange, 
-    campaignIds: selectedCampaigns.length > 0 ? selectedCampaigns : undefined 
+    campaignIds: selectedCampaigns 
   });
   const { calendlyEvents } = useCalendlyData(projectId);
   const { profile } = useUserProfile();

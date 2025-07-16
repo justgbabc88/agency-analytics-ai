@@ -136,13 +136,14 @@ export const useFacebookData = ({ dateRange, campaignIds }: UseFacebookDataProps
         
         // Filter campaigns by selected IDs if provided
         let filteredCampaigns = fbData.campaigns || [];
-        if (campaignIds && campaignIds.length > 0) {
+        if (campaignIds !== undefined) {
           filteredCampaigns = filteredCampaigns.filter((campaign: any) => 
             campaignIds.includes(campaign.id)
           );
           console.log('useFacebookData - Filtered campaigns:', {
             original: (fbData.campaigns || []).length,
-            filtered: filteredCampaigns.length
+            filtered: filteredCampaigns.length,
+            selectedIds: campaignIds
           });
         }
         
@@ -162,7 +163,7 @@ export const useFacebookData = ({ dateRange, campaignIds }: UseFacebookDataProps
           });
           
           // If campaign filtering is applied and we have campaign-level daily insights, filter by campaigns too
-          if (campaignIds && campaignIds.length > 0 && fbData.campaign_daily_insights) {
+          if (campaignIds !== undefined && fbData.campaign_daily_insights) {
             // Filter and aggregate campaign-specific daily insights
             const campaignSpecificInsights = fbData.campaign_daily_insights
               .filter((insight: any) => campaignIds.includes(insight.campaign_id))
@@ -253,9 +254,30 @@ export const useFacebookData = ({ dateRange, campaignIds }: UseFacebookDataProps
           } as FacebookData;
         }
         
-        // If only campaign filtering (no date range), filter the aggregated data
-        if (campaignIds && campaignIds.length > 0 && campaignIds.length < (fbData.campaigns || []).length) {
+        // If campaign filtering is applied (no date range), filter the aggregated data
+        if (campaignIds !== undefined) {
           console.log('useFacebookData - Applying campaign-only filter');
+          
+          // If no campaigns selected, return zero data
+          if (campaignIds.length === 0) {
+            const zeroInsights = {
+              impressions: 0,
+              clicks: 0,
+              spend: 0,
+              reach: 0,
+              ctr: 0,
+              cpc: 0,
+              conversions: 0,
+              conversion_values: 0,
+            };
+            
+            return {
+              insights: zeroInsights,
+              campaigns: filteredCampaigns,
+              daily_insights: [],
+              last_updated: syncedData.synced_at,
+            } as FacebookData;
+          }
           
           // For demo purposes, we'll use proportional scaling since we don't have campaign-specific aggregated data
           // In a real implementation, you'd fetch campaign-specific metrics from Facebook API
