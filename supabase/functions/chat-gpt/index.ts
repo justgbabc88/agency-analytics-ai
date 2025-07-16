@@ -35,20 +35,30 @@ serve(async (req) => {
     // Create Supabase client for data access
     const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
 
-    // Gather relevant context based on the user's question
+    // Gather relevant context based on the user's question and project type
     const userQuestion = messages[messages.length - 1]?.content?.toLowerCase() || '';
     let enhancedContext = { ...context };
 
     if (projectId && supabaseUrl && supabaseServiceKey) {
-      // Determine what data to fetch based on the question
-      const needsFacebookData = userQuestion.includes('facebook') || userQuestion.includes('ads') || 
+      // Get project information to determine funnel type
+      const { data: projectData } = await supabase
+        .from('projects')
+        .select('funnel_type')
+        .eq('id', projectId)
+        .single();
+
+      const isBookCallFunnel = projectData?.funnel_type === 'book_call';
+      
+      // For book call funnels, always fetch comprehensive data
+      // For other questions, determine based on keywords
+      const needsFacebookData = isBookCallFunnel || userQuestion.includes('facebook') || userQuestion.includes('ads') || 
                                userQuestion.includes('campaign') || userQuestion.includes('cpc') || 
                                userQuestion.includes('cpm') || userQuestion.includes('roas');
       
-      const needsCalendlyData = userQuestion.includes('booking') || userQuestion.includes('call') || 
+      const needsCalendlyData = isBookCallFunnel || userQuestion.includes('booking') || userQuestion.includes('call') || 
                                userQuestion.includes('calendly') || userQuestion.includes('appointment');
       
-      const needsFormData = userQuestion.includes('lead') || userQuestion.includes('form') || 
+      const needsFormData = isBookCallFunnel || userQuestion.includes('lead') || userQuestion.includes('form') || 
                            userQuestion.includes('submission') || userQuestion.includes('conversion');
       
       const needsTrackingData = userQuestion.includes('event') || userQuestion.includes('tracking') || 
@@ -139,7 +149,21 @@ serve(async (req) => {
     }
 
     // Create intelligent system message based on available context
-    let systemMessage = `You are an expert marketing analytics AI assistant. You help marketers analyze their campaign data, optimize performance, and provide actionable insights.
+    const isBookCallFunnel = enhancedContext.calendlyData && enhancedContext.facebookData;
+    
+    let systemMessage = isBookCallFunnel ? 
+      `You are an expert Book Call Funnel marketing analytics AI assistant. You specialize in analyzing Facebook ad campaigns that drive leads to book sales calls, understanding the complete funnel from ad impression to booked call to closed deal.
+
+Book Call Funnel Expertise:
+- Facebook Ads optimization for lead generation
+- Landing page conversion optimization  
+- Call booking rates and appointment setting
+- Lead quality assessment and cost analysis
+- Sales call show-up rates and closing metrics
+- Cost per lead, cost per call, and ROI calculations
+
+Available Data Context:` :
+      `You are an expert marketing analytics AI assistant. You help marketers analyze their campaign data, optimize performance, and provide actionable insights.
 
 Available Data Context:`;
 

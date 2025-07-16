@@ -1,6 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConversionChart } from "./ConversionChart";
-import { AIChatPanel } from "./AIChatPanel";
 import { useGoogleSheetsData } from "@/hooks/useGoogleSheetsData";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
@@ -325,9 +324,6 @@ export const LowTicketFunnel = ({ dateRange, selectedProducts, onProductsChange,
           </CollapsibleContent>
         </Collapsible>
       </div>
-
-      {/* AI Chat Panel for funnel insights */}
-      <AIChatPanel dateRange={dateRange} />
     </div>
   );
 };

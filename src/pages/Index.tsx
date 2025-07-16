@@ -5,6 +5,7 @@ import { LowTicketFunnel } from "@/components/LowTicketFunnel";
 import { BookCallFunnel } from "@/components/BookCallFunnel";
 import { ProjectIntegrationsPanel } from "@/components/ProjectIntegrationsPanel";
 import { FacebookAIInsights } from "@/components/FacebookAIInsights";
+import { BookCallAIAssistant } from "@/components/BookCallAIAssistant";
 import { FacebookMetrics } from "@/components/FacebookMetrics";
 
 import { PixelSetupWizard } from '@/components/PixelSetupWizard';
@@ -404,7 +405,15 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="assistant" className="space-y-6">
-            <FacebookAIInsights dateRange={dateRange} />
+            {selectedProject?.funnel_type === "book_call" ? (
+              <BookCallAIAssistant 
+                projectId={selectedProjectId} 
+                dateRange={dateRange} 
+                selectedCampaignIds={selectedCampaignIds}
+              />
+            ) : (
+              <FacebookAIInsights dateRange={dateRange} />
+            )}
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-6">

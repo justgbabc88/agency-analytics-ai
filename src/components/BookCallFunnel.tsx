@@ -5,7 +5,6 @@ import { fromZonedTime, toZonedTime } from "date-fns-tz";
 import { LandingPageMetrics } from "./LandingPageMetrics";
 import { CallStatsMetrics } from "./CallStatsMetrics";
 import { CallsList } from "./CallsList";
-import { AIChatPanel } from "./AIChatPanel";
 import { useState, useEffect, useMemo } from "react";
 import { generateCallDataFromEvents } from "@/utils/chartDataGeneration";
 import { useCallStatsCalculations } from "@/hooks/useCallStatsCalculations";
@@ -323,9 +322,6 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [] 
         isLoading={false}
         dateRange={dateRange}
       />
-
-      {/* AI Chat Panel for funnel insights */}
-      <AIChatPanel dateRange={dateRange} />
     </div>
   );
 };
