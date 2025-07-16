@@ -101,15 +101,39 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
 
     // Filter by date range if provided
     if (dateRange) {
+      console.log('🔍 [useGHLFormSubmissions] Filtering submissions with date range:', {
+        from: dateRange.from,
+        to: dateRange.to,
+        userTimezone,
+        totalSubmissions: submissions.length
+      });
+      
       filteredSubmissions = submissions.filter(submission => {
         // Convert UTC timestamp to user's timezone for comparison
         const submissionDateUTC = parseISO(submission.submitted_at);
         const submissionDateInUserTz = toZonedTime(submissionDateUTC, userTimezone);
         
-        return isWithinInterval(submissionDateInUserTz, {
+        const isIncluded = isWithinInterval(submissionDateInUserTz, {
           start: startOfDay(dateRange.from),
           end: endOfDay(dateRange.to)
         });
+        
+        if (isIncluded) {
+          console.log('🔍 [useGHLFormSubmissions] Including submission:', {
+            id: submission.id.substring(0, 8),
+            submitted_at_utc: submission.submitted_at,
+            submitted_at_user_tz: submissionDateInUserTz.toISOString(),
+            date_range_start: startOfDay(dateRange.from).toISOString(),
+            date_range_end: endOfDay(dateRange.to).toISOString()
+          });
+        }
+        
+        return isIncluded;
+      });
+      
+      console.log('🔍 [useGHLFormSubmissions] After filtering:', {
+        filteredCount: filteredSubmissions.length,
+        originalCount: submissions.length
       });
     }
 
