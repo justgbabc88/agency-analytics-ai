@@ -55,7 +55,24 @@ export const CampaignFilter = ({
     onSelectionChange(campaigns.map(c => c.id));
   };
 
-  if (campaigns.length === 0) return null;
+  if (campaigns.length === 0) {
+    return (
+      <div className="flex items-center gap-2">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="h-8 gap-2 text-sm opacity-50 cursor-not-allowed"
+          disabled
+        >
+          <Filter className="h-3 w-3" />
+          Campaigns
+          <Badge variant="secondary" className="h-4 px-1 text-xs">
+            0
+          </Badge>
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center gap-2">
