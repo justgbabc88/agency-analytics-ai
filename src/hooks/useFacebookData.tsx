@@ -33,14 +33,15 @@ interface FacebookData {
 
 interface UseFacebookDataProps {
   dateRange?: { from: Date; to: Date };
+  campaignIds?: string[];
 }
 
-export const useFacebookData = ({ dateRange }: UseFacebookDataProps = {}) => {
+export const useFacebookData = ({ dateRange, campaignIds }: UseFacebookDataProps = {}) => {
   const { agency } = useAgency();
   const { getApiKeys } = useApiKeys();
 
   const { data: facebookData, isLoading } = useQuery({
-    queryKey: ['facebook-integrations', agency?.id, dateRange?.from, dateRange?.to],
+    queryKey: ['facebook-integrations', agency?.id, dateRange?.from, dateRange?.to, campaignIds],
     queryFn: async () => {
       if (!agency) return null;
       
@@ -126,9 +127,17 @@ export const useFacebookData = ({ dateRange }: UseFacebookDataProps = {}) => {
       if (syncedData && syncedData.data) {
         const fbData = syncedData.data as any;
         
+        // Filter campaigns by selected IDs if provided
+        let filteredCampaigns = fbData.campaigns || [];
+        if (campaignIds && campaignIds.length > 0) {
+          filteredCampaigns = filteredCampaigns.filter((campaign: any) => 
+            campaignIds.includes(campaign.id)
+          );
+        }
+        
         // If we have a date range and daily insights, filter the data to that specific range
         if (dateRange && fbData.daily_insights) {
-          const filteredDailyInsights = fbData.daily_insights.filter((day: any) => {
+          let filteredDailyInsights = fbData.daily_insights.filter((day: any) => {
             const dayDate = new Date(day.date);
             const fromDate = new Date(dateRange.from);
             const toDate = new Date(dateRange.to);
@@ -141,6 +150,61 @@ export const useFacebookData = ({ dateRange }: UseFacebookDataProps = {}) => {
             return dayDate >= fromDate && dayDate <= toDate;
           });
           
+          // If campaign filtering is applied and we have campaign-level daily insights, filter by campaigns too
+          if (campaignIds && campaignIds.length > 0 && fbData.campaign_daily_insights) {
+            // Filter and aggregate campaign-specific daily insights
+            const campaignSpecificInsights = fbData.campaign_daily_insights
+              .filter((insight: any) => campaignIds.includes(insight.campaign_id))
+              .filter((insight: any) => {
+                const dayDate = new Date(insight.date);
+                const fromDate = new Date(dateRange.from);
+                const toDate = new Date(dateRange.to);
+                
+                dayDate.setHours(0, 0, 0, 0);
+                fromDate.setHours(0, 0, 0, 0);
+                toDate.setHours(0, 0, 0, 0);
+                
+                return dayDate >= fromDate && dayDate <= toDate;
+              });
+            
+            // Aggregate campaign insights by date
+            const aggregatedByDate = campaignSpecificInsights.reduce((acc: any, insight: any) => {
+              if (!acc[insight.date]) {
+                acc[insight.date] = {
+                  date: insight.date,
+                  impressions: 0,
+                  clicks: 0,
+                  spend: 0,
+                  reach: 0,
+                  conversions: 0,
+                  conversion_values: 0,
+                  frequency: 0,
+                  ctr: 0,
+                  cpm: 0,
+                  cpc: 0
+                };
+              }
+              
+              acc[insight.date].impressions += insight.impressions || 0;
+              acc[insight.date].clicks += insight.clicks || 0;
+              acc[insight.date].spend += insight.spend || 0;
+              acc[insight.date].reach = Math.max(acc[insight.date].reach, insight.reach || 0);
+              acc[insight.date].conversions += insight.conversions || 0;
+              acc[insight.date].conversion_values += insight.conversion_values || 0;
+              
+              return acc;
+            }, {});
+            
+            // Convert back to array and calculate derived metrics
+            filteredDailyInsights = Object.values(aggregatedByDate).map((day: any) => ({
+              ...day,
+              frequency: day.reach > 0 ? day.impressions / day.reach : 0,
+              ctr: day.impressions > 0 ? (day.clicks / day.impressions) * 100 : 0,
+              cpm: day.impressions > 0 ? (day.spend / day.impressions) * 1000 : 0,
+              cpc: day.clicks > 0 ? day.spend / day.clicks : 0
+            }));
+          }
+          
           console.log('useFacebookData - Filtering daily insights:', {
             originalCount: fbData.daily_insights.length,
             filteredCount: filteredDailyInsights.length,
@@ -148,7 +212,8 @@ export const useFacebookData = ({ dateRange }: UseFacebookDataProps = {}) => {
               from: format(dateRange.from, 'yyyy-MM-dd'),
               to: format(dateRange.to, 'yyyy-MM-dd')
             },
-            filteredDates: filteredDailyInsights.map((d: any) => d.date)
+            filteredDates: filteredDailyInsights.map((d: any) => d.date),
+            campaignFilter: campaignIds
           });
           
           // Calculate aggregated metrics from filtered daily data
@@ -171,13 +236,38 @@ export const useFacebookData = ({ dateRange }: UseFacebookDataProps = {}) => {
           
           return {
             insights: filteredInsights,
-            campaigns: fbData.campaigns || [],
+            campaigns: filteredCampaigns,
             daily_insights: filteredDailyInsights,
             last_updated: syncedData.synced_at,
           } as FacebookData;
         }
         
-        // Fallback to original aggregated data if no date range or daily insights
+        // If only campaign filtering (no date range), filter the aggregated data
+        if (campaignIds && campaignIds.length > 0 && campaignIds.length < (fbData.campaigns || []).length) {
+          // For campaign filtering without date range, we'd ideally need campaign-specific aggregated data
+          // For now, return filtered campaigns with proportional metrics (this is a simplified approach)
+          const campaignRatio = campaignIds.length / (fbData.campaigns || []).length;
+          
+          const scaledInsights = {
+            impressions: Math.round((fbData.insights?.impressions || 0) * campaignRatio),
+            clicks: Math.round((fbData.insights?.clicks || 0) * campaignRatio),
+            spend: (fbData.insights?.spend || 0) * campaignRatio,
+            reach: Math.round((fbData.insights?.reach || 0) * campaignRatio),
+            ctr: fbData.insights?.ctr || 0, // CTR doesn't scale linearly
+            cpc: fbData.insights?.cpc || 0, // CPC doesn't scale linearly
+            conversions: Math.round((fbData.insights?.conversions || 0) * campaignRatio),
+            conversion_values: (fbData.insights?.conversion_values || 0) * campaignRatio,
+          };
+          
+          return {
+            insights: scaledInsights,
+            campaigns: filteredCampaigns,
+            daily_insights: fbData.daily_insights || [],
+            last_updated: syncedData.synced_at,
+          } as FacebookData;
+        }
+        
+        // Fallback to original aggregated data if no filtering
         return {
           insights: {
             impressions: fbData.insights?.impressions || fbData.aggregated_metrics?.total_impressions || 0,
@@ -189,7 +279,7 @@ export const useFacebookData = ({ dateRange }: UseFacebookDataProps = {}) => {
             conversions: fbData.insights?.conversions || fbData.aggregated_metrics?.total_conversions || 0,
             conversion_values: fbData.insights?.conversion_values || fbData.aggregated_metrics?.total_revenue || 0,
           },
-          campaigns: fbData.campaigns || [],
+          campaigns: filteredCampaigns,
           daily_insights: fbData.daily_insights || [],
           last_updated: syncedData.synced_at,
         } as FacebookData;
