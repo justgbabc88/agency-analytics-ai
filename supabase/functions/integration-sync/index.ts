@@ -125,7 +125,7 @@ Deno.serve(async (req) => {
 async function syncForms(supabase: any, projectId: string, accessToken: string, locationId: string): Promise<number> {
   try {
     // Fetch forms from GHL API
-    const response = await fetch(`https://services.leadconnectorhq.com/locations/${locationId}/forms`, {
+    const response = await fetch(`https://services.leadconnectorhq.com/forms/?locationId=${locationId}`, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Version': '2021-07-28',
@@ -173,6 +173,26 @@ async function syncForms(supabase: any, projectId: string, accessToken: string, 
 
 async function syncSubmissions(supabase: any, projectId: string, accessToken: string, locationId: string): Promise<number> {
   try {
+    // Fetch all submissions from GHL API (we'll filter by form after)
+    const response = await fetch(`https://services.leadconnectorhq.com/forms/submissions?locationId=${locationId}`, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Version': '2021-07-28',
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ GHL Submissions API error:', response.status, errorText);
+      return 0;
+    }
+
+    const data = await response.json();
+    const submissions = data.submissions || [];
+
+    console.log(`📝 Found ${submissions.length} total submissions`);
+
     // Get all tracked forms for this project
     const { data: trackedForms, error: formsError } = await supabase
       .from('ghl_forms')
@@ -185,56 +205,36 @@ async function syncSubmissions(supabase: any, projectId: string, accessToken: st
       return 0;
     }
 
+    const trackedFormIds = trackedForms.map(f => f.form_id);
+    
+    // Filter submissions for tracked forms only
+    const relevantSubmissions = submissions.filter((s: any) => 
+      trackedFormIds.includes(s.formId)
+    );
+
+    console.log(`📝 Found ${relevantSubmissions.length} relevant submissions for tracked forms`);
+
     let totalSynced = 0;
 
-    // Sync submissions for each form
-    for (const form of trackedForms) {
-      try {
-        const response = await fetch(`https://services.leadconnectorhq.com/locations/${locationId}/forms/submissions`, {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Version': '2021-07-28',
-            'Content-Type': 'application/json',
-          },
+    // Store submissions in database
+    for (const submission of relevantSubmissions) {
+      const { error } = await supabase
+        .from('ghl_form_submissions')
+        .upsert({
+          project_id: projectId,
+          form_id: submission.formId,
+          submission_id: submission.id,
+          contact_name: submission.name || null,
+          contact_email: submission.email || null,
+          contact_phone: submission.phone || null,
+          form_data: submission.others || null,
+          submitted_at: submission.createdAt || new Date().toISOString(),
         });
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`❌ GHL Submissions API error for form ${form.form_id}:`, response.status, errorText);
-          continue;
-        }
-
-        const data = await response.json();
-        const submissions = data.submissions || [];
-
-        // Filter submissions for this specific form
-        const formSubmissions = submissions.filter((s: any) => s.formId === form.form_id);
-
-        console.log(`📝 Found ${formSubmissions.length} submissions for form ${form.form_id}`);
-
-        // Store submissions in database
-        for (const submission of formSubmissions) {
-          const { error } = await supabase
-            .from('ghl_form_submissions')
-            .upsert({
-              project_id: projectId,
-              form_id: form.form_id,
-              submission_id: submission.id,
-              contact_name: submission.name || null,
-              contact_email: submission.email || null,
-              contact_phone: submission.phone || null,
-              form_data: submission.others || null,
-              submitted_at: submission.createdAt || new Date().toISOString(),
-            });
-
-          if (!error) {
-            totalSynced++;
-          } else {
-            console.error('❌ Error syncing submission:', error);
-          }
-        }
-      } catch (error) {
-        console.error(`❌ Error syncing submissions for form ${form.form_id}:`, error);
+      if (!error) {
+        totalSynced++;
+      } else {
+        console.error('❌ Error syncing submission:', error);
       }
     }
 
