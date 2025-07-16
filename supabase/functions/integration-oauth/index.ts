@@ -17,7 +17,14 @@ Deno.serve(async (req) => {
   }
 
   try {
+    console.log('🚀 OAuth initiation started');
     const { projectId, platform }: RequestBody = await req.json();
+    
+    console.log(`🎯 Initiating OAuth for platform: ${platform}, project: ${projectId}`);
+    console.log('📋 Environment check:', {
+      hasClientId: !!Deno.env.get('GHL_CLIENT_ID'),
+      hasClientSecret: !!Deno.env.get('GHL_CLIENT_SECRET')
+    });
     
     console.log(`🎯 Initiating OAuth for platform: ${platform}, project: ${projectId}`);
 
