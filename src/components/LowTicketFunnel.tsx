@@ -33,9 +33,10 @@ interface LowTicketFunnelProps {
   dateRange: { from: Date; to: Date };
   selectedProducts: FunnelProductConfig[];
   onProductsChange: (products: FunnelProductConfig[]) => void;
+  selectedCampaignIds?: string[];
 }
 
-export const LowTicketFunnel = ({ dateRange, selectedProducts, onProductsChange }: LowTicketFunnelProps) => {
+export const LowTicketFunnel = ({ dateRange, selectedProducts, onProductsChange, selectedCampaignIds = [] }: LowTicketFunnelProps) => {
   const { syncedData, calculateMetricsFromSyncedData } = useGoogleSheetsData();
   const [isFunnelOpen, setIsFunnelOpen] = useState(true);
   const [isCustomizerExpanded, setIsCustomizerExpanded] = useState(false);

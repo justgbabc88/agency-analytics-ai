@@ -37,6 +37,9 @@ const Index = () => {
     };
   });
   
+  // Add Facebook campaign filter state
+  const [selectedCampaignIds, setSelectedCampaignIds] = useState<string[]>([]);
+  
   const [selectedProducts, setSelectedProducts] = useState<FunnelProductConfig[]>([
     { id: 'mainProduct', label: 'Main Product Rate', visible: true, color: '#10B981' },
     { id: 'bump', label: 'Bump Rate', visible: true, color: '#3B82F6' },
@@ -171,7 +174,11 @@ const Index = () => {
 
     switch (selectedProject.funnel_type) {
       case "book_call":
-        return <BookCallFunnel projectId={selectedProjectId} dateRange={dateRange} />;
+        return <BookCallFunnel 
+          projectId={selectedProjectId} 
+          dateRange={dateRange} 
+          selectedCampaignIds={selectedCampaignIds}
+        />;
       case "high_ticket":
       case "webinar":
         return (
@@ -188,6 +195,7 @@ const Index = () => {
             dateRange={dateRange} 
             selectedProducts={selectedProducts}
             onProductsChange={handleProductsChange}
+            selectedCampaignIds={selectedCampaignIds}
           />
         );
     }
@@ -230,7 +238,12 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="facebook" className="space-y-6">
-            <FacebookMetrics dateRange={dateRange} projectId={selectedProjectId} />
+            <FacebookMetrics 
+              dateRange={dateRange} 
+              projectId={selectedProjectId} 
+              selectedCampaignIds={selectedCampaignIds}
+              onCampaignChange={setSelectedCampaignIds}
+            />
           </TabsContent>
 
           <TabsContent value="tracking" className="space-y-6">

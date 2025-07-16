@@ -16,14 +16,15 @@ import { useFacebookData } from "@/hooks/useFacebookData";
 interface BookCallFunnelProps {
   projectId: string;
   dateRange: { from: Date; to: Date };
+  selectedCampaignIds?: string[];
 }
 
-export const BookCallFunnel = ({ projectId, dateRange }: BookCallFunnelProps) => {
+export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [] }: BookCallFunnelProps) => {
   const { calendlyEvents, getRecentBookings, getMonthlyComparison, refetch } = useCalendlyData(projectId);
   const { getUserTimezone, profile } = useUserProfile();
   const { toast } = useToast();
   const { metrics: formSubmissions, loading: formSubmissionsLoading } = useGHLFormSubmissions(projectId, dateRange);
-  const { facebookData } = useFacebookData({ dateRange });
+  const { facebookData } = useFacebookData({ dateRange, campaignIds: selectedCampaignIds });
   
   const userTimezone = getUserTimezone();
   

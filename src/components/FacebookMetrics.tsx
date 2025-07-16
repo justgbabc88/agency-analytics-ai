@@ -14,13 +14,20 @@ import { toZonedTime } from "date-fns-tz";
 interface FacebookMetricsProps {
   dateRange?: { from: Date; to: Date };
   projectId?: string;
+  selectedCampaignIds?: string[];
+  onCampaignChange?: (campaignIds: string[]) => void;
 }
 
-export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) => {
-  const [selectedCampaignIds, setSelectedCampaignIds] = useState<string[]>([]);
+export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onCampaignChange }: FacebookMetricsProps) => {
+  const [internalSelectedCampaignIds, setInternalSelectedCampaignIds] = useState<string[]>(selectedCampaignIds || []);
+  
+  // Use external campaign IDs if provided, otherwise use internal state
+  const activeCampaignIds = selectedCampaignIds || internalSelectedCampaignIds;
+  const handleCampaignChange = onCampaignChange || setInternalSelectedCampaignIds;
+  
   const { facebookData, isLoading, insights, campaigns, allCampaigns, metrics } = useFacebookData({ 
     dateRange, 
-    campaignIds: selectedCampaignIds 
+    campaignIds: activeCampaignIds 
   });
   
   // Extract the filtered daily insights properly
@@ -322,8 +329,8 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
             </CardTitle>
             <FacebookCampaignFilter 
               campaigns={allCampaigns} 
-              selectedCampaignIds={selectedCampaignIds}
-              onCampaignChange={setSelectedCampaignIds}
+              selectedCampaignIds={activeCampaignIds}
+              onCampaignChange={handleCampaignChange}
             />
           </div>
         </CardHeader>
