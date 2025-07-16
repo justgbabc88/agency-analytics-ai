@@ -138,49 +138,25 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
 
   // Generate chart data using real Facebook daily insights or fall back to mock data
   const generateChartData = () => {
-    console.log('Facebook Chart Data Generation:', {
-      dateRange,
-      hasDailyInsights: !!dailyInsights,
-      dailyInsightsLength: dailyInsights?.length || 0,
-      dailyInsightsData: dailyInsights
-    });
+    // If no date range is selected, don't show any data
+    if (!dateRange) {
+      return [];
+    }
 
-    // Check if we have real daily insights data from Facebook (already filtered by date and campaigns)
+    // If we have real daily insights data, filter it by the selected date range
     if (dailyInsights && dailyInsights.length > 0) {
-      // Filter daily insights by the selected date range
-      let filteredData = dailyInsights;
-      
-      if (dateRange) {
-        filteredData = dailyInsights.filter((day: any) => {
-          const dayDate = new Date(day.date);
-          const fromDate = new Date(dateRange.from);
-          const toDate = new Date(dateRange.to);
-          
-          // Set all dates to start of day for accurate comparison
-          dayDate.setHours(0, 0, 0, 0);
-          fromDate.setHours(0, 0, 0, 0);
-          toDate.setHours(0, 0, 0, 0);
-          
-          console.log('Date filtering:', {
-            dayDate: dayDate.toISOString(),
-            fromDate: fromDate.toISOString(),
-            toDate: toDate.toISOString(),
-            inRange: dayDate >= fromDate && dayDate <= toDate
-          });
-          
-          return dayDate >= fromDate && dayDate <= toDate;
-        });
-      }
-      
-      console.log('Filtered daily insights:', {
-        originalCount: dailyInsights.length,
-        filteredCount: filteredData.length,
-        filteredData
-      });
-      
-      // Map the filtered data to chart format
-      const chartData = filteredData.map((day: any) => {
-        // Find bookings for this specific day
+      const filteredData = dailyInsights.filter((day: any) => {
+        const dayDate = new Date(day.date);
+        const fromDate = new Date(dateRange.from);
+        const toDate = new Date(dateRange.to);
+        
+        // Set all dates to start of day for accurate comparison
+        dayDate.setHours(0, 0, 0, 0);
+        fromDate.setHours(0, 0, 0, 0);
+        toDate.setHours(0, 0, 0, 0);
+        
+        return dayDate >= fromDate && dayDate <= toDate;
+      }).map((day: any) => {
         const dayDate = new Date(day.date);
         const dayStart = startOfDay(toZonedTime(dayDate, userTimezone));
         
@@ -190,14 +166,13 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
           return eventDate.getTime() === dayStart.getTime();
         }).length;
         
-        // Calculate cost per call for this day
-        const costPerCall = dailyBookings > 0 ? day.spend / dailyBookings : 0;
+        const costPerCall = dailyBookings > 0 ? (day.spend || 0) / dailyBookings : 0;
         
         return {
           date: format(dayDate, 'MMM dd'),
           spend: day.spend || 0,
           ctrAll: day.ctr || 0,
-          ctrLink: (day.ctr || 0) * 0.75, // Estimate link CTR as 75% of all CTR
+          ctrLink: (day.ctr || 0) * 0.75,
           cpm: day.cpm || 0,
           cpc: day.cpc || 0,
           frequency: day.frequency || 0,
@@ -206,21 +181,11 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
         };
       });
       
-      console.log('Final chart data:', chartData);
-      return chartData;
-    }
-    
-    // If no real data and no date range, show default recent data
-    if (!dateRange) {
-      console.log('No date range provided, using default range');
-      const endDate = new Date();
-      const startDate = subDays(endDate, 6);
-      return generateDataForRange(startDate, endDate);
+      return filteredData;
     }
 
-    // Generate data for the selected date range when no real data is available
-    console.log('No real data available, generating mock data for date range');
-    return generateDataForRange(dateRange.from, dateRange.to);
+    // If no real data available, return empty array (no fallback data)
+    return [];
   };
 
   const generateDataForRange = (startDate: Date, endDate: Date) => {
