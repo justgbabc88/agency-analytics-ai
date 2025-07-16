@@ -121,7 +121,13 @@ export const useFacebookData = ({ dateRange }: UseFacebookDataProps = {}) => {
         throw syncError;
       }
 
-      console.log('useFacebookData - Synced data retrieved:', syncedData);
+      console.log('useFacebookData - Synced data retrieved:', {
+        hasData: !!syncedData,
+        dataKeys: syncedData?.data ? Object.keys(syncedData.data as any) : 'no data',
+        insights: (syncedData?.data as any)?.insights,
+        aggregatedMetrics: (syncedData?.data as any)?.aggregated_metrics,
+        campaignsCount: (syncedData?.data as any)?.campaigns?.length || 0
+      });
 
       if (syncedData && syncedData.data) {
         const fbData = syncedData.data as any;
