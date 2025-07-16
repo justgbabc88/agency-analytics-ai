@@ -54,6 +54,15 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
   // Fetch forms and submissions
   useEffect(() => {
     if (!projectId) return;
+    
+    console.log('🔍 [useGHLFormSubmissions] useEffect triggered with:', {
+      projectId,
+      dateRange: dateRange ? {
+        from: dateRange.from.toISOString(),
+        to: dateRange.to.toISOString()
+      } : null,
+      userTimezone
+    });
 
     const fetchData = async () => {
       setLoading(true);

@@ -270,6 +270,20 @@ export const BookCallFunnel = ({ projectId, dateRange }: BookCallFunnelProps) =>
     );
   }
 
+  // Debug logging
+  console.log('🔍 [BookCallFunnel] Passing to LandingPageMetrics:', {
+    dateRange: {
+      from: dateRange.from.toISOString(),
+      to: dateRange.to.toISOString()
+    },
+    formSubmissions: formSubmissions ? {
+      totalSubmissions: formSubmissions.totalSubmissions,
+      totalForms: formSubmissions.totalForms,
+      recentSubmissions: formSubmissions.recentSubmissions?.length
+    } : null,
+    formSubmissionsLoading
+  });
+
   return (
     <div className="space-y-6">
       {/* Header without date picker */}
