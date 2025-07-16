@@ -400,7 +400,7 @@ IMPORTANT: Return ONLY a JSON array with this exact structure, no other text:
           <CardTitle className="flex items-center gap-2 text-lg">
             <MessageSquare className="h-5 w-5 text-blue-600" />
             AI Analysis Chat
-            <Badge className="bg-blue-100 text-blue-700 text-xs">GPT-4o Mini</Badge>
+            <Badge className="bg-blue-100 text-blue-700 text-xs">GPT-4.1</Badge>
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-0">
