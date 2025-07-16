@@ -159,9 +159,11 @@ export const GoHighLevelConnector = ({
   const handleSync = async (syncType: 'forms' | 'submissions' | 'both' = 'both') => {
     if (!projectId) return;
 
+    console.log('🔄 Starting sync with:', { projectId, syncType });
     setSyncing(true);
 
     try {
+      console.log('📞 Calling integration-sync function...');
       const { data, error } = await supabase.functions.invoke('integration-sync', {
         body: {
           projectId,
@@ -170,18 +172,25 @@ export const GoHighLevelConnector = ({
         }
       });
 
-      if (error) throw error;
+      console.log('📨 Sync response:', { data, error });
 
+      if (error) {
+        console.error('❌ Sync error:', error);
+        throw error;
+      }
+
+      console.log('✅ Sync successful, reloading data...');
       await loadForms();
       await loadSubmissions();
       await loadLastSync();
 
       toast({
         title: "Sync Complete",
-        description: data.message || "Data synchronized successfully",
+        description: data?.message || "Data synchronized successfully",
       });
 
     } catch (error) {
+      console.error('❌ Sync failed:', error);
       toast({
         title: "Error",
         description: "Failed to sync data",
