@@ -294,32 +294,41 @@ async function syncSubmissions(supabase: any, projectId: string, accessToken: st
 
     console.log(`📝 Found ${relevantSubmissions.length} relevant submissions for tracked forms within last 2 weeks`);
 
+    // Process submissions in batches to avoid timeouts
+    const batchSize = 50;
     let totalSynced = 0;
-
-    // Store submissions in database
-    for (const submission of relevantSubmissions) {
-      console.log('📝 Syncing submission:', JSON.stringify(submission, null, 2));
+    
+    console.log(`📝 Processing ${relevantSubmissions.length} submissions in batches of ${batchSize}`);
+    
+    for (let i = 0; i < relevantSubmissions.length; i += batchSize) {
+      const batch = relevantSubmissions.slice(i, i + batchSize);
+      console.log(`📝 Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(relevantSubmissions.length/batchSize)} (${batch.length} submissions)`);
       
-      const { error } = await supabase
+      // Prepare batch data
+      const batchData = batch.map(submission => ({
+        project_id: projectId,
+        form_id: submission.formId,
+        submission_id: submission.id,
+        contact_name: submission.name || null,
+        contact_email: submission.email || null,
+        contact_phone: submission.phone || null,
+        form_data: submission.others || submission,
+        submitted_at: submission.createdAt || submission.created_at || new Date().toISOString(),
+      }));
+      
+      // Batch upsert
+      const { error, count } = await supabase
         .from('ghl_form_submissions')
-        .upsert({
-          project_id: projectId,
-          form_id: submission.formId,
-          submission_id: submission.id,
-          contact_name: submission.name || null,
-          contact_email: submission.email || null,
-          contact_phone: submission.phone || null,
-          form_data: submission.others || submission,
-          submitted_at: submission.createdAt || submission.created_at || new Date().toISOString(),
-        }, {
+        .upsert(batchData, {
           onConflict: 'project_id,submission_id'
         });
 
       if (!error) {
-        totalSynced++;
-        console.log(`✅ Synced submission: ${submission.id}`);
+        totalSynced += batch.length;
+        console.log(`✅ Synced batch: ${batch.length} submissions`);
       } else {
-        console.error('❌ Error syncing submission:', error);
+        console.error('❌ Error syncing batch:', error);
+        // Continue with next batch even if one fails
       }
     }
 
