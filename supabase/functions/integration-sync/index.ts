@@ -198,7 +198,18 @@ async function syncSubmissions(supabase: any, projectId: string, accessToken: st
     while (hasMore) {
       console.log(`📝 Fetching page ${Math.floor(offset / limit) + 1} (offset: ${offset})`);
       
-      const response = await fetch(`https://services.leadconnectorhq.com/forms/submissions?locationId=${locationId}&limit=${limit}&offset=${offset}&startDate=${startDate}`, {
+      // Build query parameters based on what GHL API accepts
+      const params = new URLSearchParams({
+        locationId,
+        limit: limit.toString(),
+      });
+      
+      // Add pagination if not first page
+      if (offset > 0) {
+        params.append('skip', offset.toString());
+      }
+      
+      const response = await fetch(`https://services.leadconnectorhq.com/forms/submissions?${params}`, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Version': '2021-07-28',
