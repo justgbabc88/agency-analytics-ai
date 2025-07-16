@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useFacebookData } from "@/hooks/useFacebookData";
 import { useCalendlyData } from "@/hooks/useCalendlyData";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { ConversionChart } from "./ConversionChart";
+import { FacebookCampaignFilter } from "./FacebookCampaignFilter";
 import { BarChart3, TrendingUp, Users, DollarSign, MousePointer, Eye, ArrowUpRight, ArrowDownRight, Calendar } from "lucide-react";
 import { format, eachDayOfInterval, subDays, isWithinInterval, startOfDay } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
@@ -14,7 +16,11 @@ interface FacebookMetricsProps {
 }
 
 export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) => {
-  const { facebookData, isLoading, insights, campaigns, metrics } = useFacebookData({ dateRange });
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string | undefined>();
+  const { facebookData, isLoading, insights, campaigns, metrics } = useFacebookData({ 
+    dateRange, 
+    campaignId: selectedCampaignId 
+  });
   const { calendlyEvents } = useCalendlyData(projectId);
   const { profile } = useUserProfile();
   const userTimezone = profile?.timezone || 'UTC';
@@ -244,6 +250,11 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
               <BarChart3 className="h-5 w-5 text-blue-600" />
               Facebook Ads Performance
             </CardTitle>
+            <FacebookCampaignFilter 
+              campaigns={campaigns}
+              selectedCampaignId={selectedCampaignId}
+              onCampaignChange={setSelectedCampaignId}
+            />
           </div>
         </CardHeader>
         <CardContent>
