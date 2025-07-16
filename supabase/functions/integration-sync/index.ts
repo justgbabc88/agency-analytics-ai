@@ -18,7 +18,11 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { projectId, platform, syncType = 'both' }: RequestBody = await req.json();
+    console.log('🚀 Sync function called');
+    const requestBody = await req.text();
+    console.log('📨 Request body:', requestBody);
+    
+    const { projectId, platform, syncType = 'both' }: RequestBody = JSON.parse(requestBody);
     
     console.log(`🔄 Starting sync for project: ${projectId}, platform: ${platform}, type: ${syncType}`);
 
