@@ -188,66 +188,32 @@ async function syncSubmissions(supabase: any, projectId: string, accessToken: st
     
     console.log(`📝 Syncing submissions from ${twoWeeksAgo.toISOString()} to now`);
     
-    // Fetch all submissions using pagination
-    let allSubmissions: any[] = [];
-    let offset = 0;
-    const limit = 100;
-    let hasMore = true;
+    // Since GHL API has limited pagination, we'll fetch the most recent submissions
+    // and filter them client-side for the last 2 weeks
+    console.log('📝 Fetching submissions from GHL API...');
     
-    while (hasMore) {
-      console.log(`📝 Fetching page ${Math.floor(offset / limit) + 1} (offset: ${offset})`);
-      
-      // Build query parameters based on what GHL API accepts
-      const params = new URLSearchParams({
-        locationId,
-        limit: limit.toString(),
-      });
-      
-      // Add pagination if not first page
-      if (offset > 0) {
-        params.append('skip', offset.toString());
-      }
-      
-      const response = await fetch(`https://services.leadconnectorhq.com/forms/submissions?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Version': '2021-07-28',
-          'Content-Type': 'application/json',
-        },
-      });
+    const response = await fetch(`https://services.leadconnectorhq.com/forms/submissions?locationId=${locationId}`, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Version': '2021-07-28',
+        'Content-Type': 'application/json',
+      },
+    });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ GHL Submissions API error:', response.status, errorText);
-        break;
-      }
-
-      const data = await response.json();
-      const submissions = data.submissions || [];
-      console.log(`📝 Page ${Math.floor(offset / limit) + 1}: Found ${submissions.length} submissions`);
-      
-      if (submissions.length === 0) {
-        hasMore = false;
-        break;
-      }
-      
-      allSubmissions = [...allSubmissions, ...submissions];
-      
-      // If we got less than the limit, we've reached the end
-      if (submissions.length < limit) {
-        hasMore = false;
-      } else {
-        offset += limit;
-      }
-      
-      // Safety check to prevent infinite loops
-      if (offset > 10000) {
-        console.log('📝 Reached safety limit, stopping pagination');
-        break;
-      }
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ GHL Submissions API error:', response.status, errorText);
+      return 0;
     }
+
+    const data = await response.json();
+    const allSubmissions = data.submissions || [];
+    console.log(`📝 Total submissions fetched from API: ${allSubmissions.length}`);
     
-    console.log(`📝 Total submissions fetched: ${allSubmissions.length}`);
+    // Log first few submissions to understand the data structure
+    if (allSubmissions.length > 0) {
+      console.log('📝 Sample submission structure:', JSON.stringify(allSubmissions[0], null, 2));
+    }
 
     // Get all tracked forms for this project
     const { data: trackedForms, error: formsError } = await supabase
