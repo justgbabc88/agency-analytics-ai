@@ -135,60 +135,53 @@ export const useFacebookData = ({ dateRange, campaignId }: UseFacebookDataProps 
           campaignId
         });
         
-        // Filter data by date range and campaign
-        let filteredDailyInsights = fbData.daily_insights || [];
+        // Filter data by campaign and date range
         let filteredCampaigns = fbData.campaigns || [];
-        let filteredInsights = fbData.insights || fbData.aggregated_metrics || {};
+        let filteredInsights = fbData.insights || {};
+        let filteredDailyInsights = fbData.daily_insights || [];
 
-        // Filter campaigns first
+        // Filter by campaign if provided
         if (campaignId) {
           filteredCampaigns = fbData.campaigns?.filter((campaign: any) => campaign.id === campaignId) || [];
+          
+          // Get specific campaign insights from campaign_insights array
+          const selectedCampaignInsight = fbData.campaign_insights?.find((insight: any) => insight.campaign_id === campaignId);
+          
+          if (selectedCampaignInsight) {
+            filteredInsights = {
+              impressions: selectedCampaignInsight.impressions || 0,
+              clicks: selectedCampaignInsight.clicks || 0,
+              spend: selectedCampaignInsight.spend || 0,
+              reach: selectedCampaignInsight.reach || 0,
+              ctr: selectedCampaignInsight.ctr || 0,
+              cpc: selectedCampaignInsight.cpc || 0,
+              conversions: selectedCampaignInsight.conversions || 0,
+              conversion_values: selectedCampaignInsight.conversion_values || 0,
+            };
+          } else {
+            // Fallback if no campaign insights found
+            filteredInsights = {
+              impressions: 0,
+              clicks: 0,
+              spend: 0,
+              reach: 0,
+              ctr: 0,
+              cpc: 0,
+              conversions: 0,
+              conversion_values: 0,
+            };
+          }
+          
+          // Filter daily insights by campaign
+          filteredDailyInsights = fbData.daily_insights?.filter((day: any) => day.campaign_id === campaignId) || [];
+          
           console.log('useFacebookData - Campaign filtering:', {
             campaignId,
-            totalCampaigns: fbData.campaigns?.length || 0,
-            filteredCampaigns: filteredCampaigns.length,
-            selectedCampaign: filteredCampaigns[0]?.name
+            selectedCampaignName: selectedCampaignInsight?.campaign_name,
+            campaignInsights: selectedCampaignInsight,
+            dailyInsightsCount: filteredDailyInsights.length,
+            filteredInsights
           });
-          
-          // For campaign filtering, we need to calculate metrics based on the selected campaign
-          // Since Facebook data structure may not have per-campaign daily insights,
-          // we'll apply a proportional filter based on campaign spend/impressions
-          if (filteredCampaigns.length > 0 && fbData.campaigns && fbData.campaigns.length > 1) {
-            const selectedCampaign = filteredCampaigns[0];
-            const totalCampaigns = fbData.campaigns.length;
-            
-            // Apply proportional filtering (simplified approach)
-            // In a real implementation, you'd have per-campaign metrics from Facebook API
-            const campaignWeight = 1 / totalCampaigns; // Equal weight for demo
-            
-            filteredInsights = {
-              impressions: Math.round((filteredInsights.total_impressions || filteredInsights.impressions || 0) * campaignWeight),
-              clicks: Math.round((filteredInsights.total_clicks || filteredInsights.clicks || 0) * campaignWeight),
-              spend: Math.round((filteredInsights.total_spend || filteredInsights.spend || 0) * campaignWeight * 100) / 100,
-              reach: Math.round((filteredInsights.reach || 0) * campaignWeight),
-              conversions: Math.round((filteredInsights.total_conversions || filteredInsights.conversions || 0) * campaignWeight),
-              conversion_values: Math.round((filteredInsights.total_revenue || filteredInsights.conversion_values || 0) * campaignWeight * 100) / 100,
-            };
-            
-            // Recalculate derived metrics
-            filteredInsights.ctr = filteredInsights.impressions > 0 ? (filteredInsights.clicks / filteredInsights.impressions) * 100 : 0;
-            filteredInsights.cpm = filteredInsights.impressions > 0 ? (filteredInsights.spend / filteredInsights.impressions) * 1000 : 0;
-            filteredInsights.cpc = filteredInsights.clicks > 0 ? filteredInsights.spend / filteredInsights.clicks : 0;
-            
-            // Filter daily insights proportionally as well
-            filteredDailyInsights = filteredDailyInsights.map((day: any) => ({
-              ...day,
-              impressions: Math.round(day.impressions * campaignWeight),
-              clicks: Math.round(day.clicks * campaignWeight),
-              spend: Math.round(day.spend * campaignWeight * 100) / 100,
-              reach: Math.round(day.reach * campaignWeight),
-              conversions: Math.round(day.conversions * campaignWeight),
-              conversion_values: Math.round(day.conversion_values * campaignWeight * 100) / 100,
-              ctr: day.impressions > 0 ? (day.clicks * campaignWeight / (day.impressions * campaignWeight)) * 100 : 0,
-              cpm: day.impressions > 0 ? (day.spend * campaignWeight / (day.impressions * campaignWeight)) * 1000 : 0,
-              cpc: day.clicks > 0 ? (day.spend * campaignWeight) / (day.clicks * campaignWeight) : 0,
-            }));
-          }
         } else {
           // Use original aggregated data for all campaigns
           filteredInsights = {
@@ -244,7 +237,11 @@ export const useFacebookData = ({ dateRange, campaignId }: UseFacebookDataProps 
           insights: filteredInsights,
           campaignsCount: filteredCampaigns.length,
           dailyInsightsCount: filteredDailyInsights.length,
-          campaignId
+          campaignId,
+          dateRange: dateRange ? {
+            from: format(dateRange.from, 'yyyy-MM-dd'),
+            to: format(dateRange.to, 'yyyy-MM-dd')
+          } : null
         });
 
         return {
