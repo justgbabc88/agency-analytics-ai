@@ -36,6 +36,16 @@ export const LandingPageMetrics = ({
   const costPerCall = totalBookings > 0 ? totalSpend / totalBookings : 0;
   const previousCostPerCall = costPerCall * 1.1;
 
+  console.log('🔍 [LandingPageMetrics] Leads calculation:', {
+    totalSubmissions: formSubmissions?.totalSubmissions,
+    leads,
+    formSubmissions: formSubmissions ? {
+      totalSubmissions: formSubmissions.totalSubmissions,
+      totalForms: formSubmissions.totalForms,
+      recentSubmissions: formSubmissions.recentSubmissions?.length
+    } : null
+  });
+
   return (
     <Card>
       <CardHeader>
