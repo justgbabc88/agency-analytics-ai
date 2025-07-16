@@ -28,9 +28,19 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
   // Initialize selected campaigns when campaigns data is loaded
   useEffect(() => {
     if (campaigns && campaigns.length > 0 && selectedCampaigns.length === 0) {
+      console.log('FacebookMetrics - Initializing selected campaigns:', campaigns.length);
       setSelectedCampaigns(campaigns.map(c => c.id));
     }
   }, [campaigns, selectedCampaigns.length]);
+
+  const handleCampaignSelectionChange = (newSelection: string[]) => {
+    console.log('FacebookMetrics - Campaign selection changed:', {
+      from: selectedCampaigns.length,
+      to: newSelection.length,
+      newSelection
+    });
+    setSelectedCampaigns(newSelection);
+  };
 
   console.log('FacebookMetrics - Data received:', {
     facebookData,
@@ -260,7 +270,7 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
             <CampaignFilter
               campaigns={campaigns}
               selectedCampaigns={selectedCampaigns}
-              onSelectionChange={setSelectedCampaigns}
+              onSelectionChange={handleCampaignSelectionChange}
             />
           </div>
         </CardHeader>

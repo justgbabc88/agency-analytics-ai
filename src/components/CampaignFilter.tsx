@@ -24,10 +24,16 @@ export const CampaignFilter = ({
 }: CampaignFilterProps) => {
   const [isOpen, setIsOpen] = useState(false);
 
-  const isAllSelected = selectedCampaigns.length === campaigns.length;
+  const isAllSelected = selectedCampaigns.length === campaigns.length && campaigns.length > 0;
   const selectedCount = selectedCampaigns.length;
 
   const handleSelectAll = () => {
+    console.log('handleSelectAll called - current state:', { 
+      isAllSelected, 
+      selectedCount, 
+      totalCampaigns: campaigns.length 
+    });
+    
     if (isAllSelected) {
       onSelectionChange([]);
     } else {
@@ -36,6 +42,8 @@ export const CampaignFilter = ({
   };
 
   const handleCampaignToggle = (campaignId: string) => {
+    console.log('Campaign toggle:', { campaignId, currentSelected: selectedCampaigns });
+    
     if (selectedCampaigns.includes(campaignId)) {
       onSelectionChange(selectedCampaigns.filter(id => id !== campaignId));
     } else {

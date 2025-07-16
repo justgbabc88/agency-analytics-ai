@@ -127,12 +127,23 @@ export const useFacebookData = ({ dateRange, campaignIds }: UseFacebookDataProps
       if (syncedData && syncedData.data) {
         const fbData = syncedData.data as any;
         
+        console.log('useFacebookData - Processing data with filters:', {
+          hasCampaignFilter: !!campaignIds,
+          campaignIds,
+          totalCampaigns: (fbData.campaigns || []).length,
+          hasDateRange: !!dateRange
+        });
+        
         // Filter campaigns by selected IDs if provided
         let filteredCampaigns = fbData.campaigns || [];
         if (campaignIds && campaignIds.length > 0) {
           filteredCampaigns = filteredCampaigns.filter((campaign: any) => 
             campaignIds.includes(campaign.id)
           );
+          console.log('useFacebookData - Filtered campaigns:', {
+            original: (fbData.campaigns || []).length,
+            filtered: filteredCampaigns.length
+          });
         }
         
         // If we have a date range and daily insights, filter the data to that specific range
@@ -244,20 +255,28 @@ export const useFacebookData = ({ dateRange, campaignIds }: UseFacebookDataProps
         
         // If only campaign filtering (no date range), filter the aggregated data
         if (campaignIds && campaignIds.length > 0 && campaignIds.length < (fbData.campaigns || []).length) {
-          // For campaign filtering without date range, we'd ideally need campaign-specific aggregated data
-          // For now, return filtered campaigns with proportional metrics (this is a simplified approach)
-          const campaignRatio = campaignIds.length / (fbData.campaigns || []).length;
+          console.log('useFacebookData - Applying campaign-only filter');
+          
+          // For demo purposes, we'll use proportional scaling since we don't have campaign-specific aggregated data
+          // In a real implementation, you'd fetch campaign-specific metrics from Facebook API
+          const campaignRatio = campaignIds.length / Math.max((fbData.campaigns || []).length, 1);
           
           const scaledInsights = {
-            impressions: Math.round((fbData.insights?.impressions || 0) * campaignRatio),
-            clicks: Math.round((fbData.insights?.clicks || 0) * campaignRatio),
-            spend: (fbData.insights?.spend || 0) * campaignRatio,
+            impressions: Math.round((fbData.insights?.impressions || fbData.aggregated_metrics?.total_impressions || 0) * campaignRatio),
+            clicks: Math.round((fbData.insights?.clicks || fbData.aggregated_metrics?.total_clicks || 0) * campaignRatio),
+            spend: (fbData.insights?.spend || fbData.aggregated_metrics?.total_spend || 0) * campaignRatio,
             reach: Math.round((fbData.insights?.reach || 0) * campaignRatio),
-            ctr: fbData.insights?.ctr || 0, // CTR doesn't scale linearly
-            cpc: fbData.insights?.cpc || 0, // CPC doesn't scale linearly
-            conversions: Math.round((fbData.insights?.conversions || 0) * campaignRatio),
-            conversion_values: (fbData.insights?.conversion_values || 0) * campaignRatio,
+            ctr: fbData.insights?.ctr || fbData.aggregated_metrics?.overall_ctr || 0, // CTR doesn't scale linearly
+            cpc: fbData.insights?.cpc || fbData.aggregated_metrics?.overall_cpc || 0, // CPC doesn't scale linearly
+            conversions: Math.round((fbData.insights?.conversions || fbData.aggregated_metrics?.total_conversions || 0) * campaignRatio),
+            conversion_values: (fbData.insights?.conversion_values || fbData.aggregated_metrics?.total_revenue || 0) * campaignRatio,
           };
+          
+          console.log('useFacebookData - Campaign filtered insights:', {
+            campaignRatio,
+            originalSpend: fbData.insights?.spend || fbData.aggregated_metrics?.total_spend || 0,
+            filteredSpend: scaledInsights.spend
+          });
           
           return {
             insights: scaledInsights,
