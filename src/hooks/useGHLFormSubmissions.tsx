@@ -121,27 +121,21 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
         totalSubmissions: submissions.length
       });
       
-      // Sample first few submissions to debug
-      const sampleSubmissions = submissions.slice(0, 5);
-      console.log('🔍 [useGHLFormSubmissions] Sample submissions for debugging:', 
-        sampleSubmissions.map(s => ({
-          id: s.id.substring(0, 8),
-          submitted_at: s.submitted_at,
-          submitted_at_utc: parseISO(s.submitted_at).toISOString(),
-          submitted_at_user_tz: toZonedTime(parseISO(s.submitted_at), userTimezone).toISOString(),
-          date_only: toZonedTime(parseISO(s.submitted_at), userTimezone).toISOString().split('T')[0]
-        }))
-      );
-      
       filteredSubmissions = submissions.filter((submission, index) => {
         // Parse the submission timestamp (it's in UTC)
         const submissionDateUTC = parseISO(submission.submitted_at);
         
-        // Compare UTC submission date against UTC date range
-        // The date range from the picker is already in UTC representing the day boundaries in user timezone
-        const isWithinRange = isWithinInterval(submissionDateUTC, {
-          start: dateRange.from,
-          end: dateRange.to
+        // Convert submission date to user's timezone
+        const submissionDateInUserTz = toZonedTime(submissionDateUTC, userTimezone);
+        
+        // Convert date range boundaries to user's timezone for comparison
+        const rangeStartInUserTz = toZonedTime(dateRange.from, userTimezone);
+        const rangeEndInUserTz = toZonedTime(dateRange.to, userTimezone);
+        
+        // Check if submission date (in user timezone) falls within the range (in user timezone)
+        const isWithinRange = isWithinInterval(submissionDateInUserTz, {
+          start: rangeStartInUserTz,
+          end: rangeEndInUserTz
         });
         
         // Log first few for debugging
@@ -150,9 +144,10 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
             id: submission.id.substring(0, 8),
             submitted_at: submission.submitted_at,
             submissionDateUTC: submissionDateUTC.toISOString(),
-            submissionDateInUserTz: toZonedTime(submissionDateUTC, userTimezone).toISOString(),
-            dateRangeStart: dateRange.from.toISOString(),
-            dateRangeEnd: dateRange.to.toISOString(),
+            submissionDateInUserTz: submissionDateInUserTz.toISOString(),
+            submissionDateOnly: submissionDateInUserTz.toISOString().split('T')[0],
+            rangeStartInUserTz: rangeStartInUserTz.toISOString(),
+            rangeEndInUserTz: rangeEndInUserTz.toISOString(),
             isWithinRange
           });
         }
@@ -163,14 +158,16 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
       console.log('🔍 [useGHLFormSubmissions] Date filtering completed:', {
         originalCount: submissions.length,
         filteredCount: filteredSubmissions.length,
+        userTimezone,
         dateRangeUsed: {
           from: dateRange.from.toISOString(),
           to: dateRange.to.toISOString()
         },
-        sampleSubmissions: filteredSubmissions.slice(0, 3).map(s => ({
+        sampleFilteredSubmissions: filteredSubmissions.slice(0, 3).map(s => ({
           id: s.id.substring(0, 8),
           submitted_at: s.submitted_at,
-          submitted_at_user_tz: toZonedTime(parseISO(s.submitted_at), userTimezone).toISOString()
+          submitted_at_user_tz: toZonedTime(parseISO(s.submitted_at), userTimezone).toISOString(),
+          date_only: toZonedTime(parseISO(s.submitted_at), userTimezone).toISOString().split('T')[0]
         }))
       });
     }
