@@ -133,7 +133,7 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
         }))
       );
       
-      filteredSubmissions = submissions.filter(submission => {
+      filteredSubmissions = submissions.filter((submission, index) => {
         // Parse the submission timestamp (it's in UTC)
         const submissionDateUTC = parseISO(submission.submitted_at);
         
@@ -145,6 +145,19 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
           start: dateRange.from,
           end: dateRange.to
         });
+        
+        // Log first few for debugging
+        if (index < 10) {
+          console.log(`🔍 [useGHLFormSubmissions] Submission ${index + 1}:`, {
+            id: submission.id.substring(0, 8),
+            submitted_at: submission.submitted_at,
+            submissionDateUTC: submissionDateUTC.toISOString(),
+            submissionDateInUserTz: submissionDateInUserTz.toISOString(),
+            dateRangeStart: dateRange.from.toISOString(),
+            dateRangeEnd: dateRange.to.toISOString(),
+            isWithinRange
+          });
+        }
         
         return isWithinRange;
       });
