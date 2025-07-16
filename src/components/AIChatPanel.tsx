@@ -23,6 +23,7 @@ interface Message {
 interface AIChatPanelProps {
   className?: string;
   dateRange?: { from: Date; to: Date };
+  metrics?: any; // Comprehensive metrics from parent component
 }
 
 const quickQuestions = [
@@ -34,7 +35,7 @@ const quickQuestions = [
   "How many leads did I get this week?",
 ];
 
-export const AIChatPanel = ({ className, dateRange }: AIChatPanelProps) => {
+export const AIChatPanel = ({ className, dateRange, metrics }: AIChatPanelProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -86,7 +87,8 @@ export const AIChatPanel = ({ className, dateRange }: AIChatPanelProps) => {
           context: {
             type: 'marketing_analysis',
             hasGoogleSheets: !!syncedData,
-            currentMetrics: calculateMetricsFromSyncedData()
+            currentMetrics: calculateMetricsFromSyncedData(),
+            bookCallMetrics: metrics // Pass the comprehensive metrics
           },
           projectId: selectedProjectId,
           dateRange: defaultDateRange

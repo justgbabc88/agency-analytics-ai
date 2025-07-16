@@ -39,6 +39,12 @@ serve(async (req) => {
     const userQuestion = messages[messages.length - 1]?.content?.toLowerCase() || '';
     let enhancedContext = { ...context };
 
+    // If comprehensive metrics are provided from BookCallAIAssistant, use them directly
+    if (context.bookCallMetrics) {
+      enhancedContext.calculatedMetrics = context.bookCallMetrics;
+      console.log('Using comprehensive metrics from BookCallAIAssistant:', context.bookCallMetrics);
+    }
+
     if (projectId && supabaseUrl && supabaseServiceKey) {
       // Get project information to determine funnel type
       const { data: projectData } = await supabase
@@ -184,8 +190,8 @@ serve(async (req) => {
         }
       }
 
-      // Calculate comprehensive book call funnel metrics
-      if (isBookCallFunnel && enhancedContext.facebookData && enhancedContext.calendlyData && enhancedContext.formData) {
+      // Calculate comprehensive book call funnel metrics if not already provided
+      if (isBookCallFunnel && enhancedContext.facebookData && enhancedContext.calendlyData && enhancedContext.formData && !enhancedContext.calculatedMetrics) {
         const totalSpend = enhancedContext.facebookData.spend || 0;
         const totalLeads = enhancedContext.formData.totalSubmissions || 0;
         const totalBookings = enhancedContext.calendlyData.totalBookings || 0;

@@ -150,6 +150,7 @@ export const BookCallAIAssistant = ({ projectId, dateRange, selectedCampaignIds 
 
       <AIChatPanel 
         dateRange={dateRange}
+        metrics={metrics}
       />
     </div>
   );
