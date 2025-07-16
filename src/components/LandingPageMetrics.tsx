@@ -27,6 +27,16 @@ export const LandingPageMetrics = ({
   formSubmissions,
   totalSpend,
 }: LandingPageMetricsProps) => {
+  console.log('🔍 [LandingPageMetrics] Component rendered with data:', {
+    formSubmissions: formSubmissions ? {
+      totalSubmissions: formSubmissions.totalSubmissions,
+      totalForms: formSubmissions.totalForms,
+      recentSubmissions: formSubmissions.recentSubmissions?.length,
+      submissionsByDay: Object.keys(formSubmissions.submissionsByDay || {}).length
+    } : null,
+    formSubmissionsRaw: formSubmissions
+  });
+
   const leads = formSubmissions?.totalSubmissions || 0;
   const previousLeads = Math.floor(leads * 0.85);
   const leadConversionRate = totalPageViews > 0 ? (leads / totalPageViews) * 100 : 0;
@@ -36,14 +46,11 @@ export const LandingPageMetrics = ({
   const costPerCall = totalBookings > 0 ? totalSpend / totalBookings : 0;
   const previousCostPerCall = costPerCall * 1.1;
 
-  console.log('🔍 [LandingPageMetrics] Leads calculation:', {
-    totalSubmissions: formSubmissions?.totalSubmissions,
+  console.log('🔍 [LandingPageMetrics] Calculated leads value:', {
     leads,
-    formSubmissions: formSubmissions ? {
-      totalSubmissions: formSubmissions.totalSubmissions,
-      totalForms: formSubmissions.totalForms,
-      recentSubmissions: formSubmissions.recentSubmissions?.length
-    } : null
+    totalSubmissions: formSubmissions?.totalSubmissions,
+    isUndefined: formSubmissions?.totalSubmissions === undefined,
+    isNull: formSubmissions?.totalSubmissions === null
   });
 
   return (
