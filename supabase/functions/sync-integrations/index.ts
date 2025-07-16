@@ -160,7 +160,7 @@ async function syncFacebook(apiKeys: Record<string, string>) {
         impressions: (totals.impressions || 0) + parseInt(day.impressions || '0'),
         clicks: (totals.clicks || 0) + parseInt(day.clicks || '0'),
         spend: (totals.spend || 0) + parseFloat(day.spend || '0'),
-        reach: (totals.reach || 0) + parseInt(day.reach || '0'), // Sum reach across days for this date range
+        reach: Math.max(totals.reach || 0, parseInt(day.reach || '0')), // Reach is unique, take max
         conversions: (totals.conversions || 0) + parseInt(day.conversions || '0'),
         conversion_values: (totals.conversion_values || 0) + parseFloat(day.conversion_values || '0')
       }

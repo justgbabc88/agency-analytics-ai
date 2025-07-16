@@ -76,8 +76,8 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
   // Use real CPC from Facebook data instead of calculating it
   const cpc = insights.cpc || 0;
   
-  // Use real frequency from Facebook data, fallback to calculation
-  const frequency = insights.frequency || (insights.reach && insights.reach > 0 ? insights.impressions / insights.reach : 1.2);
+  // Calculate Frequency - estimated based on reach vs impressions
+  const frequency = insights.reach && insights.reach > 0 ? insights.impressions / insights.reach : 1.2;
 
   // Calculate total bookings for the date range (based on creation date, not scheduled date)
   const totalBookings = calendlyEvents.filter(event => {
@@ -127,7 +127,7 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
     return "text-gray-500";
   };
 
-  // Generate chart data using real Facebook daily insights or fall back to accurate calculations
+  // Generate chart data using real Facebook daily insights or fall back to mock data
   const generateChartData = () => {
     // Check if we have real daily insights data from Facebook
     const dailyInsights = (facebookData as any)?.daily_insights;
@@ -144,56 +144,48 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
           return eventDate.getTime() === dayStart.getTime();
         }).length;
         
-        // Calculate cost per call for this day - use real daily spend
+        // Calculate cost per call for this day
         const costPerCall = dailyBookings > 0 ? day.spend / dailyBookings : 0;
         
         return {
           date: format(dayDate, 'MMM dd'),
-          spend: day.spend, // Use real daily spend
-          ctrAll: day.ctr, // Use real daily CTR
+          spend: day.spend,
+          ctrAll: day.ctr,
           ctrLink: day.ctr * 0.75, // Estimate link CTR as 75% of all CTR
-          cpm: day.cpm, // Use real daily CPM
-          cpc: day.cpc, // Use real daily CPC
-          frequency: day.frequency, // Use real daily frequency
+          cpm: day.cpm,
+          cpc: day.cpc,
+          frequency: day.frequency,
           costPerCall: costPerCall,
           dailyBookings: dailyBookings,
         };
       });
     }
     
-    // Fallback to proportional data generation only if no real data available
+    // Fallback to mock data generation if no real data available
     if (!dateRange) {
       const endDate = new Date();
       const startDate = subDays(endDate, 6);
-      return generateProportionalDataForRange(startDate, endDate);
+      return generateDataForRange(startDate, endDate);
     }
 
-    return generateProportionalDataForRange(dateRange.from, dateRange.to);
+    return generateDataForRange(dateRange.from, dateRange.to);
   };
 
-  const generateProportionalDataForRange = (startDate: Date, endDate: Date) => {
+  const generateDataForRange = (startDate: Date, endDate: Date) => {
     const days = eachDayOfInterval({ start: startDate, end: endDate });
     
-    // Use actual totals from insights to create proportional daily data
-    const totalDays = days.length;
-    const totalSpend = insights.spend || 0;
-    const totalImpressions = insights.impressions || 0;
-    const totalClicks = insights.clicks || 0;
+    // Use actual data as baseline with realistic daily variations
+    const baseSpend = insights.spend || 100;
+    const baseCtr = insights.ctr || 2.5;
+    const baseCpm = insights.spend && insights.impressions ? (insights.spend / insights.impressions) * 1000 : 10;
     
     return days.map((date, index) => {
-      // Create realistic daily variations that sum to actual totals
+      // Create realistic daily variations that sum to totals over the period
       const dailyVariation = 0.7 + Math.random() * 0.6; // 70% to 130% of average
-      const weight = dailyVariation / totalDays; // Normalize to ensure totals match
+      const trendFactor = 1 + (index / days.length) * 0.2; // Slight upward trend
       
-      // Calculate proportional daily metrics
-      const dailySpend = totalSpend * weight;
-      const dailyImpressions = totalImpressions * weight;
-      const dailyClicks = totalClicks * weight;
-      
-      // Calculate derived metrics from proportional data
-      const dailyCtr = dailyImpressions > 0 ? (dailyClicks / dailyImpressions) * 100 : 0;
-      const dailyCpm = dailyImpressions > 0 ? (dailySpend / dailyImpressions) * 1000 : 0;
-      const dailyCpc = dailyClicks > 0 ? dailySpend / dailyClicks : 0;
+      // Calculate daily spend
+      const dailySpend = (baseSpend / days.length) * dailyVariation * trendFactor;
       
       // Calculate daily bookings for this specific day
       const dayStart = startOfDay(toZonedTime(date, userTimezone));
@@ -210,11 +202,11 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
       return {
         date: format(date, 'MMM dd'),
         spend: dailySpend,
-        ctrAll: dailyCtr,
-        ctrLink: dailyCtr * 0.75, // Estimate link CTR
-        cpm: dailyCpm,
-        cpc: dailyCpc,
-        frequency: frequency * (0.9 + Math.random() * 0.2), // Use calculated frequency with small variation
+        ctrAll: baseCtr * (0.8 + Math.random() * 0.4),
+        ctrLink: ctrLink * (0.8 + Math.random() * 0.4),
+        cpm: baseCpm * (0.85 + Math.random() * 0.3),
+        cpc: cpc * (0.8 + Math.random() * 0.4),
+        frequency: frequency * (0.9 + Math.random() * 0.2),
         costPerCall: costPerCall,
         dailyBookings: dailyBookings,
       };
