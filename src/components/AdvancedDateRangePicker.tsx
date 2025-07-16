@@ -25,9 +25,6 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
 
   // Create timezone-aware date ranges
   const createDateRangeInUserTimezone = (fromDate: Date, toDate: Date) => {
-    // Convert the selected calendar dates to the user's profile timezone
-    // The calendar gives us dates in local time, but we want to interpret them in the user's profile timezone
-    
     console.log('📅 [createDateRangeInUserTimezone] Input dates:', {
       fromDate: fromDate.toISOString(),
       toDate: toDate.toISOString(),
@@ -35,22 +32,28 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
       isSameDay: fromDate.toDateString() === toDate.toDateString()
     });
     
-    // Get the date components from the calendar selection
-    const fromYear = fromDate.getFullYear();
-    const fromMonth = fromDate.getMonth();
-    const fromDay = fromDate.getDate();
+    // For single day selections, ensure we get the full day in the user's timezone
+    // Convert the calendar date to user timezone and create start/end of that day
+    const fromInUserTz = toZonedTime(fromDate, userTimezone);
+    const toInUserTz = toZonedTime(toDate, userTimezone);
     
-    const toYear = toDate.getFullYear();
-    const toMonth = toDate.getMonth();
-    const toDay = toDate.getDate();
+    // Get date components in user timezone
+    const fromYear = fromInUserTz.getFullYear();
+    const fromMonth = fromInUserTz.getMonth();
+    const fromDay = fromInUserTz.getDate();
+    
+    const toYear = toInUserTz.getFullYear();
+    const toMonth = toInUserTz.getMonth();
+    const toDay = toInUserTz.getDate();
     
     // Create date strings in YYYY-MM-DD format
     const fromDateStr = `${fromYear}-${String(fromMonth + 1).padStart(2, '0')}-${String(fromDay).padStart(2, '0')}`;
     const toDateStr = `${toYear}-${String(toMonth + 1).padStart(2, '0')}-${String(toDay).padStart(2, '0')}`;
     
-    console.log('📅 [createDateRangeInUserTimezone] Date strings:', {
+    console.log('📅 [createDateRangeInUserTimezone] Date strings in user timezone:', {
       fromDateStr,
-      toDateStr
+      toDateStr,
+      userTimezone
     });
     
     // Create start/end of day in the user's profile timezone
@@ -61,7 +64,8 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
       from: fromStartOfDay.toISOString(),
       to: toEndOfDay.toISOString(),
       fromLocal: fromStartOfDay.toString(),
-      toLocal: toEndOfDay.toString()
+      toLocal: toEndOfDay.toString(),
+      spansDays: Math.ceil((toEndOfDay.getTime() - fromStartOfDay.getTime()) / (1000 * 60 * 60 * 24))
     });
     
     return { from: fromStartOfDay, to: toEndOfDay };
