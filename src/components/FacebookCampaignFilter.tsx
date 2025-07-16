@@ -1,6 +1,9 @@
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Facebook } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Facebook, ChevronDown, X } from "lucide-react";
 
 interface FacebookCampaign {
   id: string;
@@ -12,15 +15,17 @@ interface FacebookCampaign {
 
 interface FacebookCampaignFilterProps {
   campaigns: FacebookCampaign[];
-  selectedCampaignId?: string;
-  onCampaignChange: (campaignId?: string) => void;
+  selectedCampaignIds: string[];
+  onCampaignChange: (campaignIds: string[]) => void;
 }
 
 export const FacebookCampaignFilter = ({ 
   campaigns, 
-  selectedCampaignId, 
+  selectedCampaignIds, 
   onCampaignChange 
 }: FacebookCampaignFilterProps) => {
+  const [isOpen, setIsOpen] = useState(false);
+
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case 'active':
@@ -34,33 +39,146 @@ export const FacebookCampaignFilter = ({
     }
   };
 
+  const handleCampaignToggle = (campaignId: string) => {
+    if (selectedCampaignIds.includes(campaignId)) {
+      onCampaignChange(selectedCampaignIds.filter(id => id !== campaignId));
+    } else {
+      onCampaignChange([...selectedCampaignIds, campaignId]);
+    }
+  };
+
+  const handleSelectAll = () => {
+    if (selectedCampaignIds.length === campaigns.length) {
+      onCampaignChange([]);
+    } else {
+      onCampaignChange(campaigns.map(c => c.id));
+    }
+  };
+
+  const handleClearAll = () => {
+    onCampaignChange([]);
+  };
+
+  const getDisplayText = () => {
+    if (selectedCampaignIds.length === 0) {
+      return "All Campaigns";
+    } else if (selectedCampaignIds.length === 1) {
+      const campaign = campaigns.find(c => c.id === selectedCampaignIds[0]);
+      return campaign?.name || "1 Campaign";
+    } else {
+      return `${selectedCampaignIds.length} Campaigns`;
+    }
+  };
+
   return (
     <div className="flex items-center gap-3">
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Facebook className="h-4 w-4" />
-        Campaign:
+        Campaigns:
       </div>
-      <Select value={selectedCampaignId || "all"} onValueChange={(value) => onCampaignChange(value === "all" ? undefined : value)}>
-        <SelectTrigger className="w-[280px]">
-          <SelectValue placeholder="Select campaign" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Campaigns</SelectItem>
-          {campaigns.map((campaign) => (
-            <SelectItem key={campaign.id} value={campaign.id}>
-              <div className="flex items-center justify-between w-full">
-                <span className="truncate max-w-[180px]">{campaign.name}</span>
-                <Badge 
-                  variant="outline" 
-                  className={`ml-2 text-xs ${getStatusColor(campaign.status)}`}
+      
+      <Popover open={isOpen} onOpenChange={setIsOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            className="w-[280px] justify-between bg-background"
+          >
+            <span className="truncate">{getDisplayText()}</span>
+            <ChevronDown className="h-4 w-4 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent 
+          className="w-[320px] p-0 bg-background border shadow-lg z-50"
+          align="start"
+        >
+          <div className="p-3 border-b bg-background">
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-sm">Select Campaigns</span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleSelectAll}
+                  className="h-6 px-2 text-xs"
                 >
-                  {campaign.status}
-                </Badge>
+                  {selectedCampaignIds.length === campaigns.length ? 'Deselect All' : 'Select All'}
+                </Button>
+                {selectedCampaignIds.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleClearAll}
+                    className="h-6 px-2 text-xs"
+                  >
+                    Clear
+                  </Button>
+                )}
               </div>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+            </div>
+          </div>
+          
+          <div className="max-h-64 overflow-y-auto bg-background">
+            {campaigns.map((campaign) => (
+              <div
+                key={campaign.id}
+                className="flex items-center gap-3 p-3 hover:bg-muted/50 cursor-pointer border-b border-border/50"
+                onClick={() => handleCampaignToggle(campaign.id)}
+              >
+                <Checkbox
+                  checked={selectedCampaignIds.includes(campaign.id)}
+                  onChange={() => handleCampaignToggle(campaign.id)}
+                  className="pointer-events-none"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <span className="truncate text-sm font-medium">
+                      {campaign.name}
+                    </span>
+                    <Badge 
+                      variant="outline" 
+                      className={`ml-2 text-xs ${getStatusColor(campaign.status)}`}
+                    >
+                      {campaign.status}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          {selectedCampaignIds.length > 0 && (
+            <div className="p-3 border-t bg-muted/20">
+              <div className="flex flex-wrap gap-1">
+                {selectedCampaignIds.slice(0, 3).map((campaignId) => {
+                  const campaign = campaigns.find(c => c.id === campaignId);
+                  return (
+                    <Badge 
+                      key={campaignId} 
+                      variant="secondary" 
+                      className="text-xs flex items-center gap-1"
+                    >
+                      {campaign?.name?.slice(0, 15)}
+                      {campaign?.name && campaign.name.length > 15 && '...'}
+                      <X 
+                        className="h-3 w-3 cursor-pointer hover:text-destructive" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCampaignToggle(campaignId);
+                        }}
+                      />
+                    </Badge>
+                  );
+                })}
+                {selectedCampaignIds.length > 3 && (
+                  <Badge variant="outline" className="text-xs">
+                    +{selectedCampaignIds.length - 3} more
+                  </Badge>
+                )}
+              </div>
+            </div>
+          )}
+        </PopoverContent>
+      </Popover>
     </div>
   );
 };

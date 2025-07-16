@@ -16,10 +16,10 @@ interface FacebookMetricsProps {
 }
 
 export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) => {
-  const [selectedCampaignId, setSelectedCampaignId] = useState<string | undefined>();
+  const [selectedCampaignIds, setSelectedCampaignIds] = useState<string[]>([]);
   const { facebookData, isLoading, insights, campaigns, metrics } = useFacebookData({ 
     dateRange, 
-    campaignId: selectedCampaignId 
+    campaignIds: selectedCampaignIds 
   });
   const { calendlyEvents } = useCalendlyData(projectId);
   const { profile } = useUserProfile();
@@ -252,8 +252,8 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
             </CardTitle>
             <FacebookCampaignFilter 
               campaigns={campaigns}
-              selectedCampaignId={selectedCampaignId}
-              onCampaignChange={setSelectedCampaignId}
+              selectedCampaignIds={selectedCampaignIds}
+              onCampaignChange={setSelectedCampaignIds}
             />
           </div>
         </CardHeader>
