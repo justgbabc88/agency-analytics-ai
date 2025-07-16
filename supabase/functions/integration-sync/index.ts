@@ -183,7 +183,7 @@ async function syncForms(supabase: any, projectId: string, accessToken: string, 
 async function syncSubmissions(supabase: any, projectId: string, accessToken: string, locationId: string): Promise<number> {
   try {
     // Fetch all submissions from GHL API (we'll filter by form after)
-    const response = await fetch(`https://services.leadconnectorhq.com/forms/submissions?locationId=${locationId}`, {
+    const response = await fetch(`https://services.leadconnectorhq.com/forms/submissions?locationId=${locationId}&limit=100`, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Version': '2021-07-28',
