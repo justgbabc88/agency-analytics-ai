@@ -151,31 +151,43 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
     console.log('📅 Date clicked:', selectedDate, 'Current step:', selectionStep);
     
     if (selectionStep === 'start') {
-      // First click - set start date, clear end date, wait for end date
-      const startDate = createDateRangeInUserTimezone(selectedDate, selectedDate);
-      setDateRange({ from: startDate.from, to: undefined });
+      // First click - create a single-day range and complete it immediately
+      const singleDayRange = createDateRangeInUserTimezone(selectedDate, selectedDate);
+      setDateRange(singleDayRange);
+      onDateChange(singleDayRange.from, singleDayRange.to);
       setSelectionStep('end');
       setSelectedPreset("custom");
-      console.log('📅 Start date set:', selectedDate);
+      console.log('📅 Single day selected:', selectedDate);
     } else {
-      // Second click - set end date and complete the range
+      // Second click - check if it's the same day (user wants single day) or create range
       const currentStart = dateRange.from;
       if (!currentStart) {
         // Fallback: if somehow we don't have a start date, treat this as start
-        const startDate = createDateRangeInUserTimezone(selectedDate, selectedDate);
-        setDateRange({ from: startDate.from, to: undefined });
-        setSelectionStep('end');
+        const singleDayRange = createDateRangeInUserTimezone(selectedDate, selectedDate);
+        setDateRange(singleDayRange);
+        onDateChange(singleDayRange.from, singleDayRange.to);
+        setSelectionStep('start');
         return;
       }
       
-      // Determine which date should be start and which should be end
+      // Get the current start date in user timezone for comparison
       const tempStartInUserTz = toZonedTime(currentStart, userTimezone);
       const startOfTempStart = startOfDay(tempStartInUserTz);
       const startOfSelected = startOfDay(selectedDate);
       
+      // Check if user clicked the same date (wants single day)
+      if (startOfTempStart.getTime() === startOfSelected.getTime()) {
+        // Same day clicked - keep it as single day and close
+        setSelectionStep('start');
+        setIsCalendarOpen(false);
+        console.log('📅 Same day clicked - keeping single day selection');
+        return;
+      }
+      
+      // Different date - create a range
       let finalStartDate, finalEndDate;
       if (startOfSelected >= startOfTempStart) {
-        // Selected date is after or same as current start - normal order
+        // Selected date is after current start - normal order
         finalStartDate = tempStartInUserTz;
         finalEndDate = selectedDate;
       } else {
