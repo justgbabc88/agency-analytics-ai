@@ -239,8 +239,10 @@ async function syncSubmissions(supabase: any, projectId: string, accessToken: st
           contact_name: submission.name || null,
           contact_email: submission.email || null,
           contact_phone: submission.phone || null,
-          form_data: submission.others || null,
-          submitted_at: submission.createdAt || new Date().toISOString(),
+          form_data: submission.others || submission,
+          submitted_at: submission.createdAt || submission.created_at || new Date().toISOString(),
+        }, {
+          onConflict: 'project_id,submission_id'
         });
 
       if (!error) {
