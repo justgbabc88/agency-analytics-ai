@@ -121,15 +121,17 @@ Deno.serve(async (req) => {
 async function syncForms(supabase: any, projectId: string, accessToken: string, locationId: string): Promise<number> {
   try {
     // Fetch forms from GHL API
-    const response = await fetch(`https://services.leadconnectorhq.com/forms/`, {
+    const response = await fetch(`https://services.leadconnectorhq.com/locations/${locationId}/forms`, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Version': '2021-07-28',
+        'Content-Type': 'application/json',
       },
     });
 
     if (!response.ok) {
-      console.error('❌ GHL API error:', await response.text());
+      const errorText = await response.text();
+      console.error('❌ GHL Forms API error:', response.status, errorText);
       return 0;
     }
 
@@ -184,15 +186,17 @@ async function syncSubmissions(supabase: any, projectId: string, accessToken: st
     // Sync submissions for each form
     for (const form of trackedForms) {
       try {
-        const response = await fetch(`https://services.leadconnectorhq.com/forms/submissions`, {
+        const response = await fetch(`https://services.leadconnectorhq.com/locations/${locationId}/forms/submissions`, {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Version': '2021-07-28',
+            'Content-Type': 'application/json',
           },
         });
 
         if (!response.ok) {
-          console.error(`❌ GHL API error for form ${form.form_id}:`, await response.text());
+          const errorText = await response.text();
+          console.error(`❌ GHL Submissions API error for form ${form.form_id}:`, response.status, errorText);
           continue;
         }
 
