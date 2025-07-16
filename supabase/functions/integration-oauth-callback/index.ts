@@ -61,10 +61,21 @@ Deno.serve(async (req) => {
     }
 
     // Exchange authorization code for access token
+    console.log('🔄 Starting token exchange with GHL...');
+    console.log('📋 Request details:', {
+      url: 'https://services.leadconnectorhq.com/oauth/token',
+      method: 'POST',
+      clientId: clientId ? 'present' : 'missing',
+      clientSecret: clientSecret ? 'present' : 'missing',
+      code: code ? 'present' : 'missing',
+      redirectUri: redirectUri
+    });
+
     const tokenResponse = await fetch('https://services.leadconnectorhq.com/oauth/token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
       },
       body: new URLSearchParams({
         grant_type: 'authorization_code',
@@ -75,11 +86,18 @@ Deno.serve(async (req) => {
       }),
     });
 
+    console.log('📨 Token response status:', tokenResponse.status);
+    console.log('📨 Token response headers:', Object.fromEntries(tokenResponse.headers.entries()));
+
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
-      console.error('❌ Token exchange failed:', errorText);
+      console.error('❌ Token exchange failed:', {
+        status: tokenResponse.status,
+        statusText: tokenResponse.statusText,
+        body: errorText
+      });
       return new Response(
-        '<html><body><h1>OAuth Error</h1><p>Failed to exchange authorization code</p></body></html>',
+        `<html><body><h1>OAuth Error</h1><p>Failed to exchange authorization code</p><p>Status: ${tokenResponse.status}</p><p>Error: ${errorText}</p></body></html>`,
         {
           status: 500,
           headers: { 'Content-Type': 'text/html' }
@@ -88,7 +106,16 @@ Deno.serve(async (req) => {
     }
 
     const tokenData = await tokenResponse.json();
-    console.log('✅ OAuth token received');
+    console.log('✅ OAuth token received:', {
+      hasAccessToken: !!tokenData.access_token,
+      hasRefreshToken: !!tokenData.refresh_token,
+      tokenType: tokenData.token_type,
+      expiresIn: tokenData.expires_in,
+      scope: tokenData.scope,
+      locationId: tokenData.locationId,
+      userId: tokenData.userId,
+      companyId: tokenData.companyId
+    });
 
     // Store the tokens securely in the database
     const supabase = createClient(
