@@ -4,11 +4,9 @@ import { useFacebookData } from "@/hooks/useFacebookData";
 import { useCalendlyData } from "@/hooks/useCalendlyData";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { ConversionChart } from "./ConversionChart";
-import { CampaignFilter } from "./CampaignFilter";
 import { BarChart3, TrendingUp, Users, DollarSign, MousePointer, Eye, ArrowUpRight, ArrowDownRight, Calendar } from "lucide-react";
 import { format, eachDayOfInterval, subDays, isWithinInterval, startOfDay } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
-import { useState, useEffect } from "react";
 
 interface FacebookMetricsProps {
   dateRange?: { from: Date; to: Date };
@@ -16,21 +14,10 @@ interface FacebookMetricsProps {
 }
 
 export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) => {
-  const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
-  const { facebookData, isLoading, insights, campaigns, metrics } = useFacebookData({ 
-    dateRange, 
-    campaignIds: selectedCampaigns.length > 0 ? selectedCampaigns : undefined 
-  });
+  const { facebookData, isLoading, insights, campaigns, metrics } = useFacebookData({ dateRange });
   const { calendlyEvents } = useCalendlyData(projectId);
   const { profile } = useUserProfile();
   const userTimezone = profile?.timezone || 'UTC';
-
-  // Initialize selected campaigns when campaigns data is loaded
-  useEffect(() => {
-    if (campaigns && campaigns.length > 0 && selectedCampaigns.length === 0) {
-      setSelectedCampaigns(campaigns.map(c => c.id));
-    }
-  }, [campaigns, selectedCampaigns.length]);
 
   console.log('FacebookMetrics - Data received:', {
     facebookData,
@@ -257,11 +244,6 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
               <BarChart3 className="h-5 w-5 text-blue-600" />
               Facebook Ads Performance
             </CardTitle>
-            <CampaignFilter
-              campaigns={campaigns}
-              selectedCampaigns={selectedCampaigns}
-              onSelectionChange={setSelectedCampaigns}
-            />
           </div>
         </CardHeader>
         <CardContent>
