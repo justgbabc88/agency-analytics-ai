@@ -140,13 +140,16 @@ async function syncForms(supabase: any, projectId: string, accessToken: string, 
     }
 
     const data = await response.json();
+    console.log('📋 GHL Forms API response:', JSON.stringify(data, null, 2));
+    
     const forms = data.forms || [];
-
     console.log(`📋 Found ${forms.length} forms to sync`);
 
     // Store forms in database
     let syncedCount = 0;
     for (const form of forms) {
+      console.log('📋 Syncing form:', JSON.stringify(form, null, 2));
+      
       const { error } = await supabase
         .from('ghl_forms')
         .upsert({
@@ -159,6 +162,7 @@ async function syncForms(supabase: any, projectId: string, accessToken: string, 
 
       if (!error) {
         syncedCount++;
+        console.log(`✅ Synced form: ${form.name} (${form.id})`);
       } else {
         console.error('❌ Error syncing form:', error);
       }
@@ -189,8 +193,9 @@ async function syncSubmissions(supabase: any, projectId: string, accessToken: st
     }
 
     const data = await response.json();
+    console.log('📝 GHL Submissions API response:', JSON.stringify(data, null, 2));
+    
     const submissions = data.submissions || [];
-
     console.log(`📝 Found ${submissions.length} total submissions`);
 
     // Get all tracked forms for this project
@@ -200,12 +205,15 @@ async function syncSubmissions(supabase: any, projectId: string, accessToken: st
       .eq('project_id', projectId)
       .eq('is_active', true);
 
+    console.log('📝 Tracked forms query result:', { trackedForms, formsError });
+
     if (formsError || !trackedForms?.length) {
       console.log('📝 No forms to sync submissions for');
       return 0;
     }
 
     const trackedFormIds = trackedForms.map(f => f.form_id);
+    console.log('📝 Tracked form IDs:', trackedFormIds);
     
     // Filter submissions for tracked forms only
     const relevantSubmissions = submissions.filter((s: any) => 
@@ -218,6 +226,8 @@ async function syncSubmissions(supabase: any, projectId: string, accessToken: st
 
     // Store submissions in database
     for (const submission of relevantSubmissions) {
+      console.log('📝 Syncing submission:', JSON.stringify(submission, null, 2));
+      
       const { error } = await supabase
         .from('ghl_form_submissions')
         .upsert({
@@ -233,6 +243,7 @@ async function syncSubmissions(supabase: any, projectId: string, accessToken: st
 
       if (!error) {
         totalSynced++;
+        console.log(`✅ Synced submission: ${submission.id}`);
       } else {
         console.error('❌ Error syncing submission:', error);
       }
