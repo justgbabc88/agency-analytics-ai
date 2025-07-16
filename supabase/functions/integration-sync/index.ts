@@ -80,13 +80,15 @@ Deno.serve(async (req) => {
       console.log('📋 Syncing forms...');
       const formsResult = await syncForms(supabase, projectId, access_token, location_id);
       syncResults.forms = formsResult;
+      console.log(`📋 Forms sync completed: ${formsResult} forms synced`);
     }
 
-    // Sync submissions if requested
+    // Sync submissions if requested (after forms are synced)
     if (syncType === 'submissions' || syncType === 'both') {
       console.log('📝 Syncing submissions...');
       const submissionsResult = await syncSubmissions(supabase, projectId, access_token, location_id);
       syncResults.submissions = submissionsResult;
+      console.log(`📝 Submissions sync completed: ${submissionsResult} submissions synced`);
     }
 
     // Update last sync time
@@ -201,11 +203,11 @@ async function syncSubmissions(supabase: any, projectId: string, accessToken: st
     // Get all tracked forms for this project
     const { data: trackedForms, error: formsError } = await supabase
       .from('ghl_forms')
-      .select('form_id')
+      .select('form_id, form_name')
       .eq('project_id', projectId)
       .eq('is_active', true);
 
-    console.log('📝 Tracked forms query result:', { trackedForms, formsError });
+    console.log('📝 Tracked forms query result:', { trackedForms, formsError, projectId });
 
     if (formsError || !trackedForms?.length) {
       console.log('📝 No forms to sync submissions for');
