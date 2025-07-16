@@ -11,6 +11,7 @@ import { useCallStatsCalculations } from "@/hooks/useCallStatsCalculations";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useGHLFormSubmissions } from "@/hooks/useGHLFormSubmissions";
+import { useFacebookData } from "@/hooks/useFacebookData";
 
 interface BookCallFunnelProps {
   projectId: string;
@@ -22,6 +23,7 @@ export const BookCallFunnel = ({ projectId, dateRange }: BookCallFunnelProps) =>
   const { getUserTimezone, profile } = useUserProfile();
   const { toast } = useToast();
   const { metrics: formSubmissions, loading: formSubmissionsLoading } = useGHLFormSubmissions(projectId, dateRange);
+  const { facebookData } = useFacebookData({ dateRange });
   
   const userTimezone = getUserTimezone();
   
@@ -247,7 +249,8 @@ export const BookCallFunnel = ({ projectId, dateRange }: BookCallFunnelProps) =>
   const bookingRate = totalPageViews > 0 ? ((callStatsData.totalBookings / totalPageViews) * 100) : 0;
   const previousBookingRate = 0; // Simplified for now since we're focusing on current period accuracy
   
-  const costPerBooking = callStatsData.totalBookings > 0 ? (1500 / callStatsData.totalBookings) : 0;
+  const totalSpend = facebookData?.insights?.spend || 1500; // Use actual Facebook spend or fallback
+  const costPerBooking = callStatsData.totalBookings > 0 ? (totalSpend / callStatsData.totalBookings) : 0;
   const previousCostPerBooking = 0; // Simplified for now
 
   console.log('\n=== FINAL COMPONENT STATE ===');
@@ -283,6 +286,7 @@ export const BookCallFunnel = ({ projectId, dateRange }: BookCallFunnelProps) =>
         costPerBooking={costPerBooking}
         previousCostPerBooking={previousCostPerBooking}
         formSubmissions={formSubmissions}
+        totalSpend={totalSpend}
       />
 
       <CallStatsMetrics

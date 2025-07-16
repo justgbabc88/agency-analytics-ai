@@ -13,6 +13,7 @@ interface LandingPageMetricsProps {
   costPerBooking: number;
   previousCostPerBooking: number;
   formSubmissions?: FormSubmissionMetrics;
+  totalSpend: number;
 }
 
 export const LandingPageMetrics = ({
@@ -24,20 +25,41 @@ export const LandingPageMetrics = ({
   costPerBooking,
   previousCostPerBooking,
   formSubmissions,
+  totalSpend,
 }: LandingPageMetricsProps) => {
+  const leads = formSubmissions?.totalSubmissions || 0;
+  const previousLeads = Math.floor(leads * 0.85);
+  const leadConversionRate = totalPageViews > 0 ? (leads / totalPageViews) * 100 : 0;
+  const previousLeadConversionRate = leadConversionRate * 0.9;
+  const costPerLead = leads > 0 ? totalSpend / leads : 0;
+  const previousCostPerLead = costPerLead * 1.1;
+  const costPerCall = totalBookings > 0 ? totalSpend / totalBookings : 0;
+  const previousCostPerCall = costPerCall * 1.1;
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-lg font-semibold">Landing Page</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <MetricCard title="Page Views" value={totalPageViews} previousValue={Math.floor(totalPageViews * 0.9)} />
+      <CardContent>
+        <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-4">
           <MetricCard 
-            title="Booking Rate" 
-            value={bookingRate} 
-            previousValue={previousBookingRate} 
-            format="percentage" 
+            title="Page Views" 
+            value={totalPageViews} 
+            previousValue={Math.floor(totalPageViews * 0.9)} 
+          />
+          <MetricCard 
+            title="Leads" 
+            value={leads} 
+            previousValue={previousLeads}
+            description="Form submissions received"
+          />
+          <MetricCard 
+            title="Lead Conversion Rate" 
+            value={leadConversionRate} 
+            previousValue={previousLeadConversionRate} 
+            format="percentage"
+            description="Leads per page view"
           />
           <MetricCard 
             title="Total Bookings" 
@@ -46,59 +68,27 @@ export const LandingPageMetrics = ({
             description="Events created in date range"
           />
           <MetricCard 
-            title="Cost Per Booking" 
-            value={costPerBooking} 
-            previousValue={previousCostPerBooking} 
-            format="currency" 
+            title="Booking Rate" 
+            value={bookingRate} 
+            previousValue={previousBookingRate} 
+            format="percentage"
+            description="Bookings per page view"
+          />
+          <MetricCard 
+            title="Cost Per Lead" 
+            value={costPerLead} 
+            previousValue={previousCostPerLead} 
+            format="currency"
+            description="Spend per form submission"
+          />
+          <MetricCard 
+            title="Cost Per Call" 
+            value={costPerCall} 
+            previousValue={previousCostPerCall} 
+            format="currency"
+            description="Spend per booking"
           />
         </div>
-
-        {/* Form Submissions Section */}
-        {formSubmissions && (
-          <div className="border-t pt-6">
-            <div className="mb-4">
-              <h3 className="text-md font-semibold mb-2">Form Submissions</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <MetricCard 
-                  title="Total Submissions" 
-                  value={formSubmissions.totalSubmissions} 
-                  previousValue={Math.floor(formSubmissions.totalSubmissions * 0.85)} 
-                  description="Form submissions received"
-                />
-                <MetricCard 
-                  title="Active Forms" 
-                  value={formSubmissions.totalForms} 
-                  previousValue={formSubmissions.totalForms} 
-                  description="Forms currently tracking"
-                />
-                <MetricCard 
-                  title="Conversion Rate" 
-                  value={totalPageViews > 0 ? (formSubmissions.totalSubmissions / totalPageViews) * 100 : 0} 
-                  previousValue={0} 
-                  format="percentage"
-                  description="Submissions per page view"
-                />
-              </div>
-            </div>
-            
-            {/* Top Performing Forms */}
-            {formSubmissions.topPerformingForms.length > 0 && (
-              <div className="mt-4">
-                <h4 className="text-sm font-medium mb-3">Top Performing Forms</h4>
-                <div className="space-y-2">
-                  {formSubmissions.topPerformingForms.slice(0, 3).map((form) => (
-                    <div key={form.form_id} className="flex items-center justify-between p-2 bg-muted/50 rounded">
-                      <span className="text-sm font-medium truncate">{form.form_name}</span>
-                      <Badge variant="secondary" className="ml-2">
-                        {form.submissions} submissions
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
       </CardContent>
     </Card>
   );
