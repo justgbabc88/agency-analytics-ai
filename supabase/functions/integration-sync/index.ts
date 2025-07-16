@@ -181,6 +181,9 @@ async function syncForms(supabase: any, projectId: string, accessToken: string, 
 }
 
 async function syncSubmissions(supabase: any, projectId: string, accessToken: string, locationId: string): Promise<number> {
+  console.log(`📝 Starting submissions sync for project: ${projectId}`);
+  let totalSynced = 0;
+  
   try {
     // Calculate date range for last 2 weeks
     const twoWeeksAgo = new Date();
@@ -188,26 +191,71 @@ async function syncSubmissions(supabase: any, projectId: string, accessToken: st
     
     console.log(`📝 Syncing submissions from ${twoWeeksAgo.toISOString()} to now`);
     
-    // Use the original working approach first
-    console.log('📝 Fetching submissions from GHL API...');
+    // Try multiple pages to get more submissions
+    let allSubmissions: any[] = [];
+    let hasMore = true;
+    let page = 1;
+    const maxPages = 10; // Reasonable limit
     
-    const response = await fetch(`https://services.leadconnectorhq.com/forms/submissions?locationId=${locationId}`, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Version': '2021-07-28',
-        'Content-Type': 'application/json',
-      },
-    });
+    while (hasMore && page <= maxPages) {
+      console.log(`📝 Fetching page ${page}...`);
+      
+      try {
+        // Try the working API endpoint with page parameter
+        const response = await fetch(`https://services.leadconnectorhq.com/forms/submissions?locationId=${locationId}&limit=100&page=${page}`, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Version': '2021-07-28',
+            'Content-Type': 'application/json',
+          },
+        });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ GHL Submissions API error:', response.status, errorText);
-      return 0;
+        if (!response.ok) {
+          console.log(`📝 API returned ${response.status} for page ${page}`);
+          if (page === 1) {
+            // If first page fails, try without page parameter
+            const fallbackResponse = await fetch(`https://services.leadconnectorhq.com/forms/submissions?locationId=${locationId}`, {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Version': '2021-07-28',
+                'Content-Type': 'application/json',
+              },
+            });
+            
+            if (fallbackResponse.ok) {
+              const fallbackData = await fallbackResponse.json();
+              allSubmissions = fallbackData.submissions || [];
+              console.log(`📝 Fallback: Found ${allSubmissions.length} submissions`);
+            }
+          }
+          break;
+        }
+
+        const data = await response.json();
+        const submissions = data.submissions || [];
+        
+        console.log(`📝 Page ${page}: Found ${submissions.length} submissions`);
+        
+        if (submissions.length === 0) {
+          hasMore = false;
+        } else {
+          allSubmissions = [...allSubmissions, ...submissions];
+          
+          // If we got less than 100, we're probably at the end
+          if (submissions.length < 100) {
+            hasMore = false;
+          }
+        }
+        
+        page++;
+        
+      } catch (pageError) {
+        console.error(`❌ Error fetching page ${page}:`, pageError);
+        break;
+      }
     }
-
-    const data = await response.json();
-    const allSubmissions = data.submissions || [];
-    console.log(`📝 Total submissions fetched from API: ${allSubmissions.length}`);
+    
+    console.log(`📝 Total submissions fetched: ${allSubmissions.length}`);
     
     // Log sample submission structure
     if (allSubmissions.length > 0) {
