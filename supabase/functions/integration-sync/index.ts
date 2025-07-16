@@ -199,23 +199,26 @@ async function syncSubmissions(supabase: any, projectId: string, accessToken: st
       console.log(`📝 Fetching page ${page}...`);
       
       // Try different API endpoints and pagination methods
-      const endpoints = [
-        // API v2 endpoint (newer)
-        {
-          url: `https://rest.gohighlevel.com/v1/forms/submissions`,
-          params: new URLSearchParams({
-            locationId,
-            limit: limit.toString(),
-            page: page.toString()
-          }),
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Version': '2021-07-28',
-            'Content-Type': 'application/json',
-          }
-        },
-        // Try with cursor if we have one
-        ...(nextCursor ? [{
+      const endpoints = [];
+      
+      // API v2 endpoint (newer)
+      endpoints.push({
+        url: `https://rest.gohighlevel.com/v1/forms/submissions`,
+        params: new URLSearchParams({
+          locationId,
+          limit: limit.toString(),
+          page: page.toString()
+        }),
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Version': '2021-07-28',
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      // Try with cursor if we have one
+      if (nextCursor) {
+        endpoints.push({
           url: `https://rest.gohighlevel.com/v1/forms/submissions`,
           params: new URLSearchParams({
             locationId,
@@ -227,22 +230,23 @@ async function syncSubmissions(supabase: any, projectId: string, accessToken: st
             'Version': '2021-07-28',
             'Content-Type': 'application/json',
           }
-        }] : []),
-        // Fallback to old API with different parameters
-        {
-          url: `https://services.leadconnectorhq.com/forms/submissions`,
-          params: new URLSearchParams({
-            locationId,
-            limit: limit.toString(),
-            page: page.toString()
-          }),
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Version': '2021-07-28',
-            'Content-Type': 'application/json',
-          }
+        });
+      }
+      
+      // Fallback to old API with different parameters
+      endpoints.push({
+        url: `https://services.leadconnectorhq.com/forms/submissions`,
+        params: new URLSearchParams({
+          locationId,
+          limit: limit.toString(),
+          page: page.toString()
+        }),
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Version': '2021-07-28',
+          'Content-Type': 'application/json',
         }
-      ];
+      });
       
       let responseData = null;
       let submissions = [];
