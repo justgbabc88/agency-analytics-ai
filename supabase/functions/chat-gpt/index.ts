@@ -45,7 +45,7 @@ serve(async (req) => {
         .from('projects')
         .select('funnel_type')
         .eq('id', projectId)
-        .single();
+        .maybeSingle();
 
       const isBookCallFunnel = projectData?.funnel_type === 'book_call';
       
@@ -86,19 +86,42 @@ serve(async (req) => {
       // Fetch Calendly data
       if (needsCalendlyData) {
         try {
-          const { data: calendlyEvents } = await supabase
+          // Determine date range - use all data unless user specifically mentions dates
+          const hasDateContext = userQuestion.includes('today') || userQuestion.includes('yesterday') || 
+                                 userQuestion.includes('week') || userQuestion.includes('month') || 
+                                 userQuestion.includes('last') || userQuestion.includes('recent') ||
+                                 (dateRange?.from && dateRange?.to);
+          
+          let calendlyQuery = supabase
             .from('calendly_events')
             .select('*')
-            .eq('project_id', projectId)
-            .gte('created_at', dateRange?.from || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
-            .lte('created_at', dateRange?.to || new Date().toISOString())
-            .order('created_at', { ascending: false })
-            .limit(100);
+            .eq('project_id', projectId);
           
+          // Only apply date filters if user specified dates or we have a date range context
+          if (hasDateContext && dateRange?.from && dateRange?.to) {
+            calendlyQuery = calendlyQuery
+              .gte('created_at', dateRange.from)
+              .lte('created_at', dateRange.to);
+          }
+          
+          const { data: calendlyEvents } = await calendlyQuery
+            .order('created_at', { ascending: false })
+            .limit(500); // Get more comprehensive data
+           
           if (calendlyEvents && calendlyEvents.length > 0) {
+            // Calculate comprehensive stats
+            const totalBookings = calendlyEvents.length;
+            const callsTaken = calendlyEvents.filter(call => call.status.toLowerCase() !== 'cancelled').length;
+            const callsCancelled = calendlyEvents.filter(call => call.status.toLowerCase() === 'cancelled').length;
+            const showUpRate = (callsTaken + callsCancelled) > 0 ? Math.round((callsTaken / (callsTaken + callsCancelled)) * 100) : 0;
+            
             enhancedContext.calendlyData = {
-              totalBookings: calendlyEvents.length,
-              events: calendlyEvents.slice(0, 10) // Recent events
+              totalBookings,
+              callsTaken,
+              callsCancelled,
+              showUpRate,
+              recentEvents: calendlyEvents.slice(0, 10),
+              totalEvents: calendlyEvents.length
             };
           }
         } catch (error) {
@@ -109,19 +132,33 @@ serve(async (req) => {
       // Fetch GHL Form data
       if (needsFormData) {
         try {
-          const { data: formSubmissions } = await supabase
+          // Determine date range - use all data unless user specifically mentions dates
+          const hasDateContext = userQuestion.includes('today') || userQuestion.includes('yesterday') || 
+                                 userQuestion.includes('week') || userQuestion.includes('month') || 
+                                 userQuestion.includes('last') || userQuestion.includes('recent') ||
+                                 (dateRange?.from && dateRange?.to);
+          
+          let formQuery = supabase
             .from('ghl_form_submissions')
             .select('*')
-            .eq('project_id', projectId)
-            .gte('submitted_at', dateRange?.from || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
-            .lte('submitted_at', dateRange?.to || new Date().toISOString())
+            .eq('project_id', projectId);
+          
+          // Only apply date filters if user specified dates or we have a date range context
+          if (hasDateContext && dateRange?.from && dateRange?.to) {
+            formQuery = formQuery
+              .gte('submitted_at', dateRange.from)
+              .lte('submitted_at', dateRange.to);
+          }
+          
+          const { data: formSubmissions } = await formQuery
             .order('submitted_at', { ascending: false })
-            .limit(100);
+            .limit(500);
           
           if (formSubmissions && formSubmissions.length > 0) {
             enhancedContext.formData = {
               totalSubmissions: formSubmissions.length,
-              recentSubmissions: formSubmissions.slice(0, 5)
+              recentSubmissions: formSubmissions.slice(0, 5),
+              totalForms: [...new Set(formSubmissions.map(sub => sub.form_id))].length
             };
           }
         } catch (error) {
@@ -145,6 +182,22 @@ serve(async (req) => {
         } catch (error) {
           console.log('Could not fetch tracking data:', error);
         }
+      }
+
+      // Calculate comprehensive book call funnel metrics
+      if (isBookCallFunnel && enhancedContext.facebookData && enhancedContext.calendlyData && enhancedContext.formData) {
+        const totalSpend = enhancedContext.facebookData.spend || 0;
+        const totalLeads = enhancedContext.formData.totalSubmissions || 0;
+        const totalBookings = enhancedContext.calendlyData.totalBookings || 0;
+        
+        enhancedContext.calculatedMetrics = {
+          costPerLead: totalLeads > 0 ? (totalSpend / totalLeads) : 0,
+          costPerCall: totalBookings > 0 ? (totalSpend / totalBookings) : 0,
+          leadToCallRate: totalLeads > 0 ? (totalBookings / totalLeads * 100) : 0,
+          totalSpend,
+          totalLeads,
+          totalBookings
+        };
       }
     }
 
