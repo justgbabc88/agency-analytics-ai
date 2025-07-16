@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -25,6 +25,12 @@ export const FacebookCampaignFilter = ({
   onCampaignChange 
 }: FacebookCampaignFilterProps) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [tempSelectedIds, setTempSelectedIds] = useState<string[]>(selectedCampaignIds);
+
+  // Update temp state when selectedCampaignIds changes (from external)
+  useEffect(() => {
+    setTempSelectedIds(selectedCampaignIds);
+  }, [selectedCampaignIds]);
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -41,24 +47,36 @@ export const FacebookCampaignFilter = ({
 
   const handleCampaignToggle = (campaignId: string, event?: React.MouseEvent) => {
     event?.stopPropagation(); // Prevent event bubbling
-    if (selectedCampaignIds.includes(campaignId)) {
-      onCampaignChange(selectedCampaignIds.filter(id => id !== campaignId));
+    if (tempSelectedIds.includes(campaignId)) {
+      setTempSelectedIds(tempSelectedIds.filter(id => id !== campaignId));
     } else {
-      onCampaignChange([...selectedCampaignIds, campaignId]);
+      setTempSelectedIds([...tempSelectedIds, campaignId]);
     }
   };
 
   const handleSelectAll = () => {
-    if (selectedCampaignIds.length === campaigns.length) {
-      onCampaignChange([]);
+    if (tempSelectedIds.length === campaigns.length) {
+      setTempSelectedIds([]);
     } else {
-      onCampaignChange(campaigns.map(c => c.id));
+      setTempSelectedIds(campaigns.map(c => c.id));
     }
   };
 
   const handleClearAll = () => {
-    onCampaignChange([]);
+    setTempSelectedIds([]);
   };
+
+  const handleApply = () => {
+    onCampaignChange(tempSelectedIds);
+    setIsOpen(false);
+  };
+
+  const handleCancel = () => {
+    setTempSelectedIds(selectedCampaignIds);
+    setIsOpen(false);
+  };
+
+  const hasChanges = JSON.stringify(tempSelectedIds.sort()) !== JSON.stringify(selectedCampaignIds.sort());
 
   const getDisplayText = () => {
     if (selectedCampaignIds.length === 0) {
@@ -82,9 +100,12 @@ export const FacebookCampaignFilter = ({
         <PopoverTrigger asChild>
           <Button
             variant="outline"
-            className="w-[280px] justify-between bg-background"
+            className={`w-[280px] justify-between bg-background ${hasChanges ? 'border-primary' : ''}`}
           >
-            <span className="truncate">{getDisplayText()}</span>
+            <span className="truncate">
+              {getDisplayText()}
+              {hasChanges && <span className="ml-1 text-primary">*</span>}
+            </span>
             <ChevronDown className="h-4 w-4 opacity-50" />
           </Button>
         </PopoverTrigger>
@@ -102,9 +123,9 @@ export const FacebookCampaignFilter = ({
                   onClick={handleSelectAll}
                   className="h-6 px-2 text-xs"
                 >
-                  {selectedCampaignIds.length === campaigns.length ? 'Deselect All' : 'Select All'}
+                  {tempSelectedIds.length === campaigns.length ? 'Deselect All' : 'Select All'}
                 </Button>
-                {selectedCampaignIds.length > 0 && (
+                {tempSelectedIds.length > 0 && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -125,7 +146,7 @@ export const FacebookCampaignFilter = ({
                 className="flex items-center gap-3 p-3 hover:bg-muted/50 border-b border-border/50"
               >
                 <Checkbox
-                  checked={selectedCampaignIds.includes(campaign.id)}
+                  checked={tempSelectedIds.includes(campaign.id)}
                   onCheckedChange={() => handleCampaignToggle(campaign.id)}
                 />
                 <div 
@@ -148,8 +169,34 @@ export const FacebookCampaignFilter = ({
             ))}
           </div>
           
+          {/* Apply/Cancel buttons */}
+          <div className="p-3 border-t bg-background flex items-center justify-between">
+            <div className="text-xs text-muted-foreground">
+              {tempSelectedIds.length === 0 ? 'All campaigns' : `${tempSelectedIds.length} selected`}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCancel}
+                className="h-7 px-3 text-xs"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleApply}
+                disabled={!hasChanges}
+                className="h-7 px-3 text-xs"
+              >
+                Apply
+              </Button>
+            </div>
+          </div>
+          
           {selectedCampaignIds.length > 0 && (
             <div className="p-3 border-t bg-muted/20">
+              <div className="text-xs text-muted-foreground mb-2">Currently Applied:</div>
               <div className="flex flex-wrap gap-1">
                 {selectedCampaignIds.slice(0, 3).map((campaignId) => {
                   const campaign = campaigns.find(c => c.id === campaignId);
@@ -165,7 +212,7 @@ export const FacebookCampaignFilter = ({
                         className="h-3 w-3 cursor-pointer hover:text-destructive" 
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleCampaignToggle(campaignId);
+                          onCampaignChange(selectedCampaignIds.filter(id => id !== campaignId));
                         }}
                       />
                     </Badge>
