@@ -47,5 +47,8 @@ verify_jwt = true
 [functions.calendly-oauth-callback]
 verify_jwt = false
 
+[functions.ghl-webhook]
+verify_jwt = false
+
 [edge-runtime]
 policy = "per_request"

@@ -366,6 +366,97 @@ export type Database = {
           },
         ]
       }
+      ghl_form_submissions: {
+        Row: {
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          created_at: string
+          form_data: Json | null
+          form_id: string
+          id: string
+          project_id: string
+          submission_id: string
+          submitted_at: string
+          updated_at: string
+        }
+        Insert: {
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          form_data?: Json | null
+          form_id: string
+          id?: string
+          project_id: string
+          submission_id: string
+          submitted_at?: string
+          updated_at?: string
+        }
+        Update: {
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          form_data?: Json | null
+          form_id?: string
+          id?: string
+          project_id?: string
+          submission_id?: string
+          submitted_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_ghl_form_submissions_project_id"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ghl_forms: {
+        Row: {
+          created_at: string
+          form_id: string
+          form_name: string
+          form_url: string | null
+          id: string
+          is_active: boolean
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          form_id: string
+          form_name: string
+          form_url?: string | null
+          id?: string
+          is_active?: boolean
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          form_id?: string
+          form_name?: string
+          form_url?: string | null
+          id?: string
+          is_active?: boolean
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_ghl_forms_project_id"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       integration_data: {
         Row: {
           agency_id: string

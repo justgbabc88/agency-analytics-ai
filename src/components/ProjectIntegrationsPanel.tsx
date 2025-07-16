@@ -8,7 +8,8 @@ import { GoogleSheetsConnector } from "./GoogleSheetsConnector";
 import { FacebookConnector } from "./FacebookConnector";
 import { ClickFunnelsOAuthConnector } from "./ClickFunnelsOAuthConnector";
 import { CalendlyConnector } from "./CalendlyConnector";
-import { Settings, CheckCircle, XCircle, RefreshCw, FileSpreadsheet, BarChart3, ChevronDown, ChevronRight, Target, Calendar } from "lucide-react";
+import { GoHighLevelConnector } from "./GoHighLevelConnector";
+import { Settings, CheckCircle, XCircle, RefreshCw, FileSpreadsheet, BarChart3, ChevronDown, ChevronRight, Target, Calendar, FormInput } from "lucide-react";
 import { useState } from "react";
 
 const integrationPlatforms = [
@@ -39,6 +40,13 @@ const integrationPlatforms = [
     description: 'Track scheduled calls and appointments',
     color: 'bg-purple-100 text-purple-700',
     icon: Calendar
+  },
+  { 
+    id: 'ghl', 
+    name: 'Go High Level', 
+    description: 'Track form submissions and leads',
+    color: 'bg-cyan-100 text-cyan-700',
+    icon: FormInput
   },
 ];
 
@@ -146,6 +154,18 @@ export const ProjectIntegrationsPanel = ({ projectId }: ProjectIntegrationsPanel
       case 'calendly':
         return (
           <CalendlyConnector
+            projectId={projectId}
+            isConnected={isConnected}
+            onConnectionChange={(connected) => {
+              if (connected) {
+                handleToggleIntegration(platform.id, true);
+              }
+            }}
+          />
+        );
+      case 'ghl':
+        return (
+          <GoHighLevelConnector
             projectId={projectId}
             isConnected={isConnected}
             onConnectionChange={(connected) => {
