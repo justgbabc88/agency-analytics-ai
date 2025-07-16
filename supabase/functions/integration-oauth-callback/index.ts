@@ -123,6 +123,15 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    console.log('💾 Storing OAuth tokens in database...');
+    console.log('📋 Database insert data:', {
+      project_id: projectId,
+      platform: platform,
+      data_keys: Object.keys(tokenData),
+      has_access_token: !!tokenData.access_token,
+      has_location_id: !!tokenData.locationId
+    });
+
     const { error: dbError } = await supabase
       .from('project_integration_data')
       .upsert({
@@ -143,9 +152,15 @@ Deno.serve(async (req) => {
       });
 
     if (dbError) {
-      console.error('❌ Database error storing tokens:', dbError);
+      console.error('❌ Database error storing tokens:', {
+        error: dbError,
+        code: dbError.code,
+        message: dbError.message,
+        details: dbError.details,
+        hint: dbError.hint
+      });
       return new Response(
-        '<html><body><h1>Database Error</h1><p>Failed to store OAuth tokens</p></body></html>',
+        `<html><body><h1>Database Error</h1><p>Failed to store OAuth tokens</p><p>Error: ${dbError.message}</p><p>Code: ${dbError.code}</p></body></html>`,
         {
           status: 500,
           headers: { 'Content-Type': 'text/html' }
@@ -154,6 +169,7 @@ Deno.serve(async (req) => {
     }
 
     // Update project integration status
+    console.log('🔄 Updating project integration status...');
     const { error: integrationError } = await supabase
       .from('project_integrations')
       .upsert({
@@ -164,7 +180,12 @@ Deno.serve(async (req) => {
       });
 
     if (integrationError) {
-      console.error('❌ Error updating integration status:', integrationError);
+      console.error('❌ Error updating integration status:', {
+        error: integrationError,
+        code: integrationError.code,
+        message: integrationError.message,
+        details: integrationError.details
+      });
     }
 
     console.log(`✅ OAuth completed successfully for project ${projectId}`);
