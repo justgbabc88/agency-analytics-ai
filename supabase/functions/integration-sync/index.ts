@@ -185,9 +185,8 @@ async function syncSubmissions(supabase: any, projectId: string, accessToken: st
     // Calculate date range for last 2 weeks
     const twoWeeksAgo = new Date();
     twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
-    const startDate = twoWeeksAgo.toISOString();
     
-    console.log(`📝 Fetching submissions from ${startDate} to now`);
+    console.log(`📝 Syncing submissions from ${twoWeeksAgo.toISOString()} to now`);
     
     // Fetch all submissions using pagination
     let allSubmissions: any[] = [];
@@ -267,12 +266,20 @@ async function syncSubmissions(supabase: any, projectId: string, accessToken: st
     const trackedFormIds = trackedForms.map(f => f.form_id);
     console.log('📝 Tracked form IDs:', trackedFormIds);
     
-    // Filter submissions for tracked forms only
-    const relevantSubmissions = allSubmissions.filter((s: any) => 
-      trackedFormIds.includes(s.formId)
-    );
+    // Filter submissions for tracked forms and within the last 2 weeks
+    const relevantSubmissions = allSubmissions.filter((s: any) => {
+      if (!trackedFormIds.includes(s.formId)) return false;
+      
+      // Parse the submission date
+      const submissionDate = new Date(s.createdAt || s.created_at);
+      
+      // Check if it's within the last 2 weeks
+      const isWithinTimeRange = submissionDate >= twoWeeksAgo;
+      
+      return isWithinTimeRange;
+    });
 
-    console.log(`📝 Found ${relevantSubmissions.length} relevant submissions for tracked forms`);
+    console.log(`📝 Found ${relevantSubmissions.length} relevant submissions for tracked forms within last 2 weeks`);
 
     let totalSynced = 0;
 
