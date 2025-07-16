@@ -27,6 +27,7 @@ interface FacebookCampaign {
 interface FacebookData {
   insights: FacebookInsights;
   campaigns: FacebookCampaign[];
+  filteredCampaigns?: FacebookCampaign[]; // Optional filtered campaigns
   daily_insights?: any[];
   last_updated: string;
 }
@@ -257,7 +258,8 @@ export const useFacebookData = ({ dateRange, campaignIds }: UseFacebookDataProps
 
         return {
           insights: filteredInsights,
-          campaigns: filteredCampaigns,
+          campaigns: fbData.campaigns || [], // Always return all campaigns for the filter
+          filteredCampaigns: filteredCampaigns, // Filtered campaigns for display
           daily_insights: filteredDailyInsights,
           last_updated: syncedData.synced_at,
         } as FacebookData;
@@ -285,7 +287,9 @@ export const useFacebookData = ({ dateRange, campaignIds }: UseFacebookDataProps
     facebookData,
     isLoading,
     insights: facebookData?.insights || defaultInsights,
-    campaigns: facebookData?.campaigns || [],
+    campaigns: facebookData?.campaigns || [], // All campaigns for the filter
+    allCampaigns: facebookData?.campaigns || [], // Explicit all campaigns
+    filteredCampaigns: facebookData?.filteredCampaigns || [], // Filtered campaigns
     metrics: facebookData?.insights || defaultInsights,
   };
 };

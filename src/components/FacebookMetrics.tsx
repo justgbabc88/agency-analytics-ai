@@ -17,7 +17,7 @@ interface FacebookMetricsProps {
 
 export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) => {
   const [selectedCampaignIds, setSelectedCampaignIds] = useState<string[]>([]);
-  const { facebookData, isLoading, insights, campaigns, metrics } = useFacebookData({ 
+  const { facebookData, isLoading, insights, campaigns, allCampaigns, metrics } = useFacebookData({ 
     dateRange, 
     campaignIds: selectedCampaignIds 
   });
@@ -251,7 +251,7 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
               Facebook Ads Performance
             </CardTitle>
             <FacebookCampaignFilter 
-              campaigns={campaigns}
+              campaigns={allCampaigns} 
               selectedCampaignIds={selectedCampaignIds}
               onCampaignChange={setSelectedCampaignIds}
             />
