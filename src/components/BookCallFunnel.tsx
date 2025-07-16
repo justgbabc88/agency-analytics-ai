@@ -10,6 +10,7 @@ import { generateCallDataFromEvents } from "@/utils/chartDataGeneration";
 import { useCallStatsCalculations } from "@/hooks/useCallStatsCalculations";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useGHLFormSubmissions } from "@/hooks/useGHLFormSubmissions";
 
 interface BookCallFunnelProps {
   projectId: string;
@@ -20,6 +21,7 @@ export const BookCallFunnel = ({ projectId, dateRange }: BookCallFunnelProps) =>
   const { calendlyEvents, getRecentBookings, getMonthlyComparison, refetch } = useCalendlyData(projectId);
   const { getUserTimezone, profile } = useUserProfile();
   const { toast } = useToast();
+  const { metrics: formSubmissions, loading: formSubmissionsLoading } = useGHLFormSubmissions(projectId, dateRange);
   
   const userTimezone = getUserTimezone();
   
@@ -280,6 +282,7 @@ export const BookCallFunnel = ({ projectId, dateRange }: BookCallFunnelProps) =>
         previousTotalBookings={0}
         costPerBooking={costPerBooking}
         previousCostPerBooking={previousCostPerBooking}
+        formSubmissions={formSubmissions}
       />
 
       <CallStatsMetrics
