@@ -4,9 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CheckCircle, AlertCircle, Plus, Trash2, RefreshCw, Link } from "lucide-react";
+import { CheckCircle, AlertCircle, Plus, Trash2, RefreshCw, Link, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { GHLBulkSync } from './GHLBulkSync';
 
 interface GoHighLevelConnectorProps {
   projectId?: string;
@@ -441,6 +442,15 @@ export const GoHighLevelConnector = ({
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Bulk Import Section */}
+        {isConnected && (
+          <div className="space-y-4">
+            <div className="border-t pt-6">
+              <GHLBulkSync projectId={projectId} />
             </div>
           </div>
         )}
