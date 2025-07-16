@@ -121,6 +121,18 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
         totalSubmissions: submissions.length
       });
       
+      // Sample first few submissions to debug
+      const sampleSubmissions = submissions.slice(0, 5);
+      console.log('🔍 [useGHLFormSubmissions] Sample submissions for debugging:', 
+        sampleSubmissions.map(s => ({
+          id: s.id.substring(0, 8),
+          submitted_at: s.submitted_at,
+          submitted_at_utc: parseISO(s.submitted_at).toISOString(),
+          submitted_at_user_tz: toZonedTime(parseISO(s.submitted_at), userTimezone).toISOString(),
+          date_only: toZonedTime(parseISO(s.submitted_at), userTimezone).toISOString().split('T')[0]
+        }))
+      );
+      
       filteredSubmissions = submissions.filter(submission => {
         // Parse the submission timestamp (it's in UTC)
         const submissionDateUTC = parseISO(submission.submitted_at);
