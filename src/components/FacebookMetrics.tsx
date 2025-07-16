@@ -176,6 +176,14 @@ export const FacebookMetrics = ({ dateRange, projectId }: FacebookMetricsProps) 
       return generateDataForRange(startDate, endDate);
     }
 
+    // Check if it's a single day selection
+    const isSingleDay = format(dateRange.from, 'yyyy-MM-dd') === format(dateRange.to, 'yyyy-MM-dd');
+    
+    if (isSingleDay) {
+      // Return only one data point for single day selection
+      return generateDataForRange(dateRange.from, dateRange.from);
+    }
+
     return generateDataForRange(dateRange.from, dateRange.to);
   };
 
