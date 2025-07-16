@@ -188,116 +188,26 @@ async function syncSubmissions(supabase: any, projectId: string, accessToken: st
     
     console.log(`📝 Syncing submissions from ${twoWeeksAgo.toISOString()} to now`);
     
-    // Try multiple pagination approaches for GHL API
-    let allSubmissions: any[] = [];
-    let hasMore = true;
-    let page = 1;
-    let nextCursor = null;
-    const limit = 100;
+    // Use the original working approach first
+    console.log('📝 Fetching submissions from GHL API...');
     
-    while (hasMore && page <= 50) { // Safety limit to prevent infinite loops
-      console.log(`📝 Fetching page ${page}...`);
-      
-      // Try different API endpoints and pagination methods
-      const endpoints = [];
-      
-      // API v2 endpoint (newer)
-      endpoints.push({
-        url: `https://rest.gohighlevel.com/v1/forms/submissions`,
-        params: new URLSearchParams({
-          locationId,
-          limit: limit.toString(),
-          page: page.toString()
-        }),
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Version': '2021-07-28',
-          'Content-Type': 'application/json',
-        }
-      });
-      
-      // Try with cursor if we have one
-      if (nextCursor) {
-        endpoints.push({
-          url: `https://rest.gohighlevel.com/v1/forms/submissions`,
-          params: new URLSearchParams({
-            locationId,
-            limit: limit.toString(),
-            cursor: nextCursor
-          }),
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Version': '2021-07-28',
-            'Content-Type': 'application/json',
-          }
-        });
-      }
-      
-      // Fallback to old API with different parameters
-      endpoints.push({
-        url: `https://services.leadconnectorhq.com/forms/submissions`,
-        params: new URLSearchParams({
-          locationId,
-          limit: limit.toString(),
-          page: page.toString()
-        }),
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Version': '2021-07-28',
-          'Content-Type': 'application/json',
-        }
-      });
-      
-      let responseData = null;
-      let submissions = [];
-      
-      for (const endpoint of endpoints) {
-        try {
-          console.log(`📝 Trying endpoint: ${endpoint.url}?${endpoint.params.toString()}`);
-          
-          const response = await fetch(`${endpoint.url}?${endpoint.params.toString()}`, {
-            headers: endpoint.headers,
-          });
+    const response = await fetch(`https://services.leadconnectorhq.com/forms/submissions?locationId=${locationId}`, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Version': '2021-07-28',
+        'Content-Type': 'application/json',
+      },
+    });
 
-          if (response.ok) {
-            responseData = await response.json();
-            submissions = responseData.submissions || responseData.data || [];
-            
-            console.log(`📝 Success! Found ${submissions.length} submissions from ${endpoint.url}`);
-            
-            // Check for next page indicators
-            nextCursor = responseData.nextCursor || responseData.nextPageToken || responseData.next;
-            
-            break; // Success, exit endpoint loop
-          } else {
-            const errorText = await response.text();
-            console.log(`📝 Endpoint failed: ${endpoint.url} - ${response.status}: ${errorText}`);
-          }
-        } catch (error) {
-          console.log(`📝 Endpoint error: ${endpoint.url} - ${error.message}`);
-        }
-      }
-      
-      // If no endpoint worked, stop
-      if (!responseData || submissions.length === 0) {
-        console.log(`📝 No more submissions found on page ${page}`);
-        hasMore = false;
-        break;
-      }
-      
-      allSubmissions = [...allSubmissions, ...submissions];
-      console.log(`📝 Page ${page}: Added ${submissions.length} submissions (total: ${allSubmissions.length})`);
-      
-      // Check if we should continue
-      if (submissions.length < limit && !nextCursor) {
-        console.log(`📝 Reached end of submissions (got ${submissions.length} < ${limit})`);
-        hasMore = false;
-      }
-      
-      page++;
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ GHL Submissions API error:', response.status, errorText);
+      return 0;
     }
-    
-    console.log(`📝 Total submissions fetched: ${allSubmissions.length}`);
+
+    const data = await response.json();
+    const allSubmissions = data.submissions || [];
+    console.log(`📝 Total submissions fetched from API: ${allSubmissions.length}`);
     
     // Log sample submission structure
     if (allSubmissions.length > 0) {
