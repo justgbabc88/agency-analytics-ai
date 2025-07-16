@@ -154,8 +154,30 @@ export const useFacebookData = ({ dateRange }: UseFacebookDataProps = {}) => {
               from: format(dateRange.from, 'yyyy-MM-dd'),
               to: format(dateRange.to, 'yyyy-MM-dd')
             },
-            filteredDates: filteredDailyInsights.map((d: any) => d.date)
+            filteredDates: filteredDailyInsights.map((d: any) => d.date),
+            availableDates: fbData.daily_insights.map((d: any) => d.date).slice(0, 5)
           });
+          
+          // If no daily insights match the date range, fall back to the overall insights
+          // but still return the filtered daily insights array (even if empty) for charts
+          if (filteredDailyInsights.length === 0) {
+            console.log('useFacebookData - No daily insights match date range, using overall insights');
+            return {
+              insights: {
+                impressions: fbData.insights?.impressions || fbData.aggregated_metrics?.total_impressions || 0,
+                clicks: fbData.insights?.clicks || fbData.aggregated_metrics?.total_clicks || 0,
+                spend: fbData.insights?.spend || fbData.aggregated_metrics?.total_spend || 0,
+                reach: fbData.insights?.reach || 0,
+                ctr: fbData.insights?.ctr || fbData.aggregated_metrics?.overall_ctr || 0,
+                cpc: fbData.insights?.cpc || fbData.aggregated_metrics?.overall_cpc || 0,
+                conversions: fbData.insights?.conversions || fbData.aggregated_metrics?.total_conversions || 0,
+                conversion_values: fbData.insights?.conversion_values || fbData.aggregated_metrics?.total_revenue || 0,
+              },
+              campaigns: fbData.campaigns || [],
+              daily_insights: [], // Empty array for charts when no data matches
+              last_updated: syncedData.synced_at,
+            } as FacebookData;
+          }
           
           // Calculate aggregated metrics from filtered daily data
           const filteredInsights = filteredDailyInsights.reduce((totals: any, day: any) => {
