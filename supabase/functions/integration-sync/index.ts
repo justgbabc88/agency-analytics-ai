@@ -195,7 +195,7 @@ async function syncSubmissions(supabase: any, projectId: string, accessToken: st
     let allSubmissions: any[] = [];
     let hasMore = true;
     let page = 1;
-    const maxPages = 10; // Reasonable limit
+    const maxPages = 100; // Allow up to 10,000 submissions (100 pages × 100 per page)
     
     while (hasMore && page <= maxPages) {
       console.log(`📝 Fetching page ${page}...`);
