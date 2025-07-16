@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CheckCircle, AlertCircle, Plus, Trash2 } from "lucide-react";
+import { CheckCircle, AlertCircle, Plus, Trash2, RefreshCw, Link } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -39,23 +39,15 @@ export const GoHighLevelConnector = ({
   const [forms, setForms] = useState<GHLForm[]>([]);
   const [submissions, setSubmissions] = useState<GHLFormSubmission[]>([]);
   const [loading, setLoading] = useState(false);
-  const [newFormId, setNewFormId] = useState('');
-  const [newFormName, setNewFormName] = useState('');
-  const [newFormUrl, setNewFormUrl] = useState('');
-  const [webhookUrl, setWebhookUrl] = useState('');
+  const [syncing, setSyncing] = useState(false);
+  const [lastSync, setLastSync] = useState<string | null>(null);
   const { toast } = useToast();
-
-  useEffect(() => {
-    if (projectId) {
-      const projectUrl = `https://iqxvtfupjjxjkbajgcve.supabase.co/functions/v1/ghl-webhook?project_id=${projectId}`;
-      setWebhookUrl(projectUrl);
-    }
-  }, [projectId]);
 
   useEffect(() => {
     if (isConnected && projectId) {
       loadForms();
       loadSubmissions();
+      loadLastSync();
     }
   }, [isConnected, projectId]);
 
@@ -94,48 +86,109 @@ export const GoHighLevelConnector = ({
     }
   };
 
-  const handleAddForm = async () => {
-    if (!projectId || !newFormId || !newFormName) {
-      toast({
-        title: "Error",
-        description: "Please fill in Form ID and Form Name",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setLoading(true);
+  const loadLastSync = async () => {
+    if (!projectId) return;
 
     try {
-      const { error } = await supabase
-        .from('ghl_forms')
-        .insert({
-          project_id: projectId,
-          form_id: newFormId,
-          form_name: newFormName,
-          form_url: newFormUrl || null,
-          is_active: true
-        });
+      const { data, error } = await supabase
+        .from('project_integrations')
+        .select('last_sync')
+        .eq('project_id', projectId)
+        .eq('platform', 'ghl')
+        .single();
+
+      if (error) throw error;
+      setLastSync(data?.last_sync || null);
+    } catch (error) {
+      console.error('Failed to load last sync:', error);
+    }
+  };
+
+  const handleOAuthConnect = async () => {
+    if (!projectId) return;
+
+    setLoading(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('integration-oauth', {
+        body: {
+          projectId,
+          platform: 'ghl'
+        }
+      });
 
       if (error) throw error;
 
-      setNewFormId('');
-      setNewFormName('');
-      setNewFormUrl('');
-      await loadForms();
-      
+      // Open OAuth URL in popup
+      const popup = window.open(
+        data.authUrl,
+        'oauth-popup',
+        'width=600,height=700,scrollbars=yes,resizable=yes'
+      );
+
+      // Monitor popup for completion
+      const checkClosed = setInterval(() => {
+        if (popup?.closed) {
+          clearInterval(checkClosed);
+          // Refresh connection status
+          setTimeout(() => {
+            loadForms();
+            loadSubmissions();
+            loadLastSync();
+            onConnectionChange(true);
+          }, 1000);
+        }
+      }, 1000);
+
       toast({
-        title: "Form Added",
-        description: "GHL form has been added for tracking",
+        title: "OAuth Started",
+        description: "Please complete the authorization in the popup window",
       });
+
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to add form",
+        description: "Failed to initiate OAuth",
         variant: "destructive",
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSync = async (syncType: 'forms' | 'submissions' | 'both' = 'both') => {
+    if (!projectId) return;
+
+    setSyncing(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('integration-sync', {
+        body: {
+          projectId,
+          platform: 'ghl',
+          syncType
+        }
+      });
+
+      if (error) throw error;
+
+      await loadForms();
+      await loadSubmissions();
+      await loadLastSync();
+
+      toast({
+        title: "Sync Complete",
+        description: data.message || "Data synchronized successfully",
+      });
+
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to sync data",
+        variant: "destructive",
+      });
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -165,12 +218,35 @@ export const GoHighLevelConnector = ({
     }
   };
 
-  const copyWebhookUrl = () => {
-    navigator.clipboard.writeText(webhookUrl);
-    toast({
-      title: "Copied",
-      description: "Webhook URL copied to clipboard",
-    });
+  const handleDisconnect = async () => {
+    if (!projectId) return;
+
+    try {
+      const { error } = await supabase
+        .from('project_integrations')
+        .update({ is_connected: false })
+        .eq('project_id', projectId)
+        .eq('platform', 'ghl');
+
+      if (error) throw error;
+
+      onConnectionChange(false);
+      setForms([]);
+      setSubmissions([]);
+      setLastSync(null);
+
+      toast({
+        title: "Disconnected",
+        description: "Go High Level integration has been disconnected",
+      });
+
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to disconnect integration",
+        variant: "destructive",
+      });
+    }
   };
 
   if (!projectId) {
@@ -187,72 +263,90 @@ export const GoHighLevelConnector = ({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <CheckCircle className="h-5 w-5" />
-          Go High Level Integration
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CheckCircle className="h-5 w-5" />
+            Go High Level Integration
+          </div>
+          <div className="flex items-center gap-2">
+            {isConnected && (
+              <Badge variant="outline" className="text-green-600 border-green-600">
+                Connected
+              </Badge>
+            )}
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Webhook URL Section */}
-        <div className="space-y-2">
-          <Label htmlFor="webhook-url">Webhook URL</Label>
-          <div className="flex gap-2">
-            <Input
-              id="webhook-url"
-              value={webhookUrl}
-              readOnly
-              className="font-mono text-sm"
-            />
-            <Button onClick={copyWebhookUrl} variant="outline" size="sm">
-              Copy
+        {!isConnected ? (
+          <div className="text-center py-8">
+            <Link className="h-12 w-12 text-primary mx-auto mb-4" />
+            <h3 className="text-lg font-medium mb-2">Connect Go High Level</h3>
+            <p className="text-gray-600 mb-6">
+              Connect your Go High Level account to automatically sync forms and submissions.
+            </p>
+            <Button onClick={handleOAuthConnect} disabled={loading}>
+              {loading ? "Connecting..." : "Connect with OAuth"}
             </Button>
           </div>
-          <p className="text-sm text-gray-600">
-            Add this webhook URL to your Go High Level workflows to track form submissions.
-          </p>
-        </div>
+        ) : (
+          <>
+            {/* Connection Status & Actions */}
+            <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg">
+              <div className="flex items-center gap-3">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                <div>
+                  <p className="font-medium text-green-800">Connected to Go High Level</p>
+                  {lastSync && (
+                    <p className="text-sm text-green-600">
+                      Last sync: {new Date(lastSync).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => handleSync()}
+                  disabled={syncing}
+                  variant="outline"
+                  size="sm"
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+                  {syncing ? 'Syncing...' : 'Sync Now'}
+                </Button>
+                <Button
+                  onClick={handleDisconnect}
+                  variant="outline"
+                  size="sm"
+                >
+                  Disconnect
+                </Button>
+              </div>
+            </div>
 
-        {/* Add Form Section */}
-        <div className="space-y-4">
-          <h4 className="font-medium">Add Form to Track</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="form-id">Form ID</Label>
-              <Input
-                id="form-id"
-                value={newFormId}
-                onChange={(e) => setNewFormId(e.target.value)}
-                placeholder="Enter GHL form ID"
-              />
+            {/* Quick Actions */}
+            <div className="grid grid-cols-2 gap-4">
+              <Button
+                onClick={() => handleSync('forms')}
+                disabled={syncing}
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Sync Forms
+              </Button>
+              <Button
+                onClick={() => handleSync('submissions')}
+                disabled={syncing}
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Sync Submissions
+              </Button>
             </div>
-            <div>
-              <Label htmlFor="form-name">Form Name</Label>
-              <Input
-                id="form-name"
-                value={newFormName}
-                onChange={(e) => setNewFormName(e.target.value)}
-                placeholder="Enter form display name"
-              />
-            </div>
-          </div>
-          <div>
-            <Label htmlFor="form-url">Form URL (Optional)</Label>
-            <Input
-              id="form-url"
-              value={newFormUrl}
-              onChange={(e) => setNewFormUrl(e.target.value)}
-              placeholder="Enter form URL"
-            />
-          </div>
-          <Button 
-            onClick={handleAddForm} 
-            disabled={loading || !newFormId || !newFormName}
-            className="w-full"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Form
-          </Button>
-        </div>
+          </>
+        )}
 
         {/* Tracked Forms */}
         {forms.length > 0 && (
