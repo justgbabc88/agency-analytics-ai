@@ -155,7 +155,10 @@ export const useFacebookData = ({ dateRange }: UseFacebookDataProps = {}) => {
               to: format(dateRange.to, 'yyyy-MM-dd')
             },
             filteredDates: filteredDailyInsights.map((d: any) => d.date),
-            availableDates: fbData.daily_insights.map((d: any) => d.date).slice(0, 5)
+            availableDates: fbData.daily_insights.map((d: any) => d.date).slice(0, 5),
+            usingOverallInsights: filteredDailyInsights.length === 0,
+            filteredSpend: filteredDailyInsights.reduce((sum: number, day: any) => sum + (day.spend || 0), 0),
+            overallSpend: fbData.insights?.spend || fbData.aggregated_metrics?.total_spend || 0
           });
           
           // If no daily insights match the date range, fall back to the overall insights
