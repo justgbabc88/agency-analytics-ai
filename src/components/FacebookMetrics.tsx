@@ -159,60 +159,11 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
       return [];
     }
 
-    // If we have real daily insights data, filter and aggregate it by date
+    // Use the already filtered daily insights data from the hook
     if (dailyInsights && dailyInsights.length > 0) {
-      const filteredData = dailyInsights.filter((day: any) => {
-        // Parse the day date (should be in YYYY-MM-DD format from Facebook)
-        const dayDate = new Date(day.date + 'T00:00:00'); // Ensure it's treated as start of day
-        
-        // Convert the user's selected date range to the user's timezone for comparison
-        const fromDateInUserTz = toZonedTime(dateRange.from, userTimezone);
-        const toDateInUserTz = toZonedTime(dateRange.to, userTimezone);
-        
-        // Set all dates to start of day for accurate comparison
-        dayDate.setHours(0, 0, 0, 0);
-        fromDateInUserTz.setHours(0, 0, 0, 0);
-        toDateInUserTz.setHours(0, 0, 0, 0);
-        
-        return dayDate >= fromDateInUserTz && dayDate <= toDateInUserTz;
-      });
-
-      // Group data by date and aggregate metrics
-      const groupedByDate = filteredData.reduce((acc: any, day: any) => {
-        const dateKey = format(new Date(day.date), 'yyyy-MM-dd');
-        
-        if (!acc[dateKey]) {
-          acc[dateKey] = {
-            date: day.date,
-            spend: 0,
-            impressions: 0,
-            clicks: 0,
-            reach: 0,
-            conversions: 0,
-            conversion_values: 0,
-            frequency: 0,
-            campaignCount: 0
-          };
-        }
-        
-        // Aggregate metrics
-        acc[dateKey].spend += day.spend || 0;
-        acc[dateKey].impressions += day.impressions || 0;
-        acc[dateKey].clicks += day.clicks || 0;
-        acc[dateKey].reach = Math.max(acc[dateKey].reach, day.reach || 0); // Reach is unique
-        acc[dateKey].conversions += day.conversions || 0;
-        acc[dateKey].conversion_values += day.conversion_values || 0;
-        acc[dateKey].frequency += day.frequency || 0;
-        acc[dateKey].campaignCount += 1;
-        
-        return acc;
-      }, {});
-
-      // Convert grouped data to chart format and sort by date
-      const chartData = Object.keys(groupedByDate)
-        .sort((a, b) => new Date(a).getTime() - new Date(b).getTime()) // Sort by date key first
-        .map((dateKey) => {
-          const dayData = groupedByDate[dateKey];
+      // The dailyInsights are already filtered by the hook, so just format them for the chart
+      const chartData = dailyInsights
+        .map((dayData: any) => {
           const dayDate = new Date(dayData.date);
           const dayStart = startOfDay(toZonedTime(dayDate, userTimezone));
           
@@ -220,7 +171,6 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
           const ctr = dayData.impressions > 0 ? (dayData.clicks / dayData.impressions) * 100 : 0;
           const cpm = dayData.impressions > 0 ? (dayData.spend / dayData.impressions) * 1000 : 0;
           const cpc = dayData.clicks > 0 ? dayData.spend / dayData.clicks : 0;
-          const avgFrequency = dayData.campaignCount > 0 ? dayData.frequency / dayData.campaignCount : 0;
           
           // Find bookings for this specific day
           const dailyBookings = calendlyEvents.filter(event => {
@@ -233,16 +183,17 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
           
           return {
             date: format(dayDate, 'MMM dd'),
-            spend: dayData.spend,
+            spend: dayData.spend || 0,
             ctrAll: ctr,
             ctrLink: ctr * 0.75, // Estimate link CTR as 75% of all CTR
             cpm: cpm,
             cpc: cpc,
-            frequency: avgFrequency,
+            frequency: dayData.frequency || 0,
             costPerCall: costPerCall,
             dailyBookings: dailyBookings,
           };
-        });
+        })
+        .sort((a, b) => new Date(a.date + ' 2024').getTime() - new Date(b.date + ' 2024').getTime());
       
       return chartData;
     }
