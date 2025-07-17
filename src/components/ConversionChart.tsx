@@ -76,7 +76,9 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     callsTaken: '#3B82F6', 
     callsBooked: '#10B981',
     cancelled: '#EF4444',
-    showUpRate: '#8B5CF6'
+    showUpRate: '#8B5CF6',
+    costPerCall: '#9333EA',
+    costPerLead: '#EC4899'
   };
 
   const getMetricColor = (metric: string) => {
@@ -146,7 +148,7 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     
     // For currency/spend metrics, start from 0
     const isCurrencyMetric = metrics.some(m => 
-      m.includes('spend') || m.includes('revenue') || m.includes('cost') || m.includes('cpm') || m.includes('cpc')
+      m.includes('spend') || m.includes('revenue') || m.includes('cost') || m.includes('cpm') || m.includes('cpc') || m.includes('costPer')
     );
     
     if (isCurrencyMetric) {
@@ -165,7 +167,7 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     if (name.includes('Rate') || name.includes('CTR') || name.includes('showUp') || name.includes('ctr')) {
       return `${value.toFixed(2)}%`;
     }
-    if (name.includes('Revenue') || name.includes('Cost') || name.includes('CPC') || name.includes('Spend') || name.includes('CPM') || name.includes('spend') || name.includes('cpm') || name.includes('cpc')) {
+    if (name.includes('Revenue') || name.includes('Cost') || name.includes('CPC') || name.includes('Spend') || name.includes('CPM') || name.includes('spend') || name.includes('cpm') || name.includes('cpc') || name.includes('costPer')) {
       return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
     if (name.includes('ROAS') || name.includes('frequency')) {
@@ -185,7 +187,7 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     }
     
     const isCurrencyMetric = metrics.some(m => 
-      m.includes('Revenue') || m.includes('Cost') || m.includes('Spend') || m.includes('spend') || m.includes('cpm') || m.includes('cpc')
+      m.includes('Revenue') || m.includes('Cost') || m.includes('Spend') || m.includes('spend') || m.includes('cpm') || m.includes('cpc') || m.includes('costPer')
     );
     
     if (isCurrencyMetric) {
@@ -241,7 +243,9 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
       callsTaken: 'Calls Taken',
       callsBooked: 'Calls Booked',
       cancelled: 'Cancelled',
-      showUpRate: 'Show Up Rate'
+      showUpRate: 'Show Up Rate',
+      costPerCall: 'Cost Per Call',
+      costPerLead: 'Cost Per Lead'
     };
 
     return nameMap[metric as keyof typeof nameMap] || metric.charAt(0).toUpperCase() + metric.slice(1).replace(/([A-Z])/g, ' $1');
@@ -425,13 +429,12 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
             labelFormatter={(label) => `Date: ${label}`}
           />
           {metrics.map(metric => {
-            const hasData = filteredData.some(d => 
+            const hasValidData = filteredData.some(d => 
               d[metric] !== undefined && 
               d[metric] !== null && 
-              !isNaN(Number(d[metric])) &&
-              Number(d[metric]) !== 0
+              !isNaN(Number(d[metric]))
             );
-            return hasData ? (
+            return hasValidData ? (
               <Line 
                 key={metric}
                 type="monotone" 
