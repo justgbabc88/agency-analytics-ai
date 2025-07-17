@@ -161,11 +161,41 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
 
     // Use the already filtered daily insights data from the hook
     if (dailyInsights && dailyInsights.length > 0) {
-      // The dailyInsights are already filtered by the hook, so just format them for the chart
-      const chartData = dailyInsights
-        .map((dayData: any) => {
+      // Group by date to ensure one data point per date
+      const groupedByDate = dailyInsights.reduce((acc: any, dayData: any) => {
+        const dateKey = dayData.date; // Use the date as-is from Facebook data
+        
+        if (!acc[dateKey]) {
+          acc[dateKey] = {
+            date: dateKey,
+            spend: 0,
+            impressions: 0,
+            clicks: 0,
+            reach: 0,
+            conversions: 0,
+            conversion_values: 0,
+            frequency: 0
+          };
+        }
+        
+        // Aggregate metrics for this date
+        acc[dateKey].spend += dayData.spend || 0;
+        acc[dateKey].impressions += dayData.impressions || 0;
+        acc[dateKey].clicks += dayData.clicks || 0;
+        acc[dateKey].reach = Math.max(acc[dateKey].reach, dayData.reach || 0);
+        acc[dateKey].conversions += dayData.conversions || 0;
+        acc[dateKey].conversion_values += dayData.conversion_values || 0;
+        acc[dateKey].frequency = dayData.frequency || 0;
+        
+        return acc;
+      }, {});
+
+      // Convert to chart format with one point per date
+      const chartData = Object.keys(groupedByDate)
+        .sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
+        .map((dateKey) => {
+          const dayData = groupedByDate[dateKey];
           const dayDate = new Date(dayData.date);
-          const dayStart = startOfDay(toZonedTime(dayDate, userTimezone));
           
           // Calculate derived metrics
           const ctr = dayData.impressions > 0 ? (dayData.clicks / dayData.impressions) * 100 : 0;
@@ -173,6 +203,7 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
           const cpc = dayData.clicks > 0 ? dayData.spend / dayData.clicks : 0;
           
           // Find bookings for this specific day
+          const dayStart = startOfDay(toZonedTime(dayDate, userTimezone));
           const dailyBookings = calendlyEvents.filter(event => {
             const eventCreatedInUserTz = toZonedTime(new Date(event.created_at), userTimezone);
             const eventDate = startOfDay(eventCreatedInUserTz);
@@ -183,17 +214,16 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
           
           return {
             date: format(dayDate, 'MMM dd'),
-            spend: dayData.spend || 0,
+            spend: dayData.spend,
             ctrAll: ctr,
-            ctrLink: ctr * 0.75, // Estimate link CTR as 75% of all CTR
+            ctrLink: ctr * 0.75,
             cpm: cpm,
             cpc: cpc,
-            frequency: dayData.frequency || 0,
+            frequency: dayData.frequency,
             costPerCall: costPerCall,
             dailyBookings: dailyBookings,
           };
-        })
-        .sort((a, b) => new Date(a.date + ' 2024').getTime() - new Date(b.date + ' 2024').getTime());
+        });
       
       return chartData;
     }
