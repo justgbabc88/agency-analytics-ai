@@ -2,10 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CheckCircle, AlertCircle, Plus, Trash2, RefreshCw, Link, Download } from "lucide-react";
+import { CheckCircle, AlertCircle, Plus, Trash2, RefreshCw, Link as LinkIcon, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { GHLBulkSync } from './GHLBulkSync';
@@ -15,7 +14,7 @@ interface GoHighLevelConnectorProps {
   isConnected: boolean;
   onConnectionChange: (connected: boolean) => void;
   selectedFormIds?: string[];
-  onFormSelectionChange?: (selectedFormIds: string[]) => void;
+  onFormSelectionChange?: (formIds: string[]) => void;
 }
 
 interface GHLForm {
@@ -49,7 +48,7 @@ export const GoHighLevelConnector = ({
   const [lastSync, setLastSync] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Initialization effect
+  // Initialization effect - only initialize if no forms are selected yet
   useEffect(() => {
     if (forms.length > 0 && onFormSelectionChange && selectedFormIds.length === 0) {
       const activeFormIds = forms.filter(form => form.is_active).map(form => form.form_id);
@@ -57,6 +56,7 @@ export const GoHighLevelConnector = ({
     }
   }, [forms, onFormSelectionChange, selectedFormIds]);
 
+  // Load forms and submissions when connected
   useEffect(() => {
     if (isConnected && projectId) {
       loadForms();
@@ -80,7 +80,7 @@ export const GoHighLevelConnector = ({
       
       console.log('🔍 [GoHighLevelConnector] Forms loaded:', {
         total: data?.length || 0,
-        selectedFormIds
+        selectedFormIds: selectedFormIds || []
       });
     } catch (error) {
       console.error('Failed to load forms:', error);
@@ -268,9 +268,10 @@ export const GoHighLevelConnector = ({
   const handleFormSelection = (formId: string, checked: boolean) => {
     if (!onFormSelectionChange) return;
     
+    const formIdsArray = selectedFormIds || [];
     const newSelection = checked
-      ? [...selectedFormIds, formId]
-      : selectedFormIds.filter(id => id !== formId);
+      ? [...formIdsArray, formId]
+      : formIdsArray.filter(id => id !== formId);
     
     console.log('🔍 Form selection changed:', { formId, checked, newSelection });
     onFormSelectionChange(newSelection);
@@ -287,6 +288,7 @@ export const GoHighLevelConnector = ({
     onFormSelectionChange(newSelection);
   };
 
+  // Return early if no project selected
   if (!projectId) {
     return (
       <Card>
@@ -297,6 +299,10 @@ export const GoHighLevelConnector = ({
       </Card>
     );
   }
+
+  // Safe access to form IDs
+  const formIdsArray = selectedFormIds || [];
+  const activeFormCount = forms.filter(f => f.is_active).length;
 
   return (
     <Card>
@@ -318,7 +324,7 @@ export const GoHighLevelConnector = ({
       <CardContent className="space-y-6">
         {!isConnected ? (
           <div className="text-center py-8">
-            <Link className="h-12 w-12 text-primary mx-auto mb-4" />
+            <LinkIcon className="h-12 w-12 text-primary mx-auto mb-4" />
             <h3 className="text-lg font-medium mb-2">Connect Go High Level</h3>
             <p className="text-gray-600 mb-6">
               Connect your Go High Level account to automatically sync forms and submissions.
@@ -394,7 +400,7 @@ export const GoHighLevelConnector = ({
               <div className="flex items-center gap-2">
                 <Checkbox
                   id="select-all"
-                  checked={selectedFormIds.length === forms.filter(f => f.is_active).length && forms.filter(f => f.is_active).length > 0}
+                  checked={formIdsArray.length === activeFormCount && activeFormCount > 0}
                   onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
                 />
                 <Label htmlFor="select-all" className="text-sm">
@@ -403,7 +409,7 @@ export const GoHighLevelConnector = ({
               </div>
             </div>
             <p className="text-sm text-gray-600">
-              Select which forms to include in metrics calculations ({selectedFormIds.length} selected)
+              Select which forms to include in metrics calculations ({formIdsArray.length} selected)
             </p>
             <div className="space-y-2">
               {forms.map((form) => (
@@ -411,7 +417,7 @@ export const GoHighLevelConnector = ({
                   <div className="flex items-center gap-3 flex-1">
                     <Checkbox
                       id={`form-${form.form_id}`}
-                      checked={selectedFormIds.includes(form.form_id)}
+                      checked={formIdsArray.includes(form.form_id)}
                       onCheckedChange={(checked) => handleFormSelection(form.form_id, checked as boolean)}
                       disabled={!form.is_active}
                     />

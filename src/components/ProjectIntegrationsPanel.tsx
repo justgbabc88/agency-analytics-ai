@@ -173,6 +173,7 @@ export const ProjectIntegrationsPanel = ({ projectId }: ProjectIntegrationsPanel
                 handleToggleIntegration(platform.id, true);
               }
             }}
+            selectedFormIds={[]}
           />
         );
       default:
