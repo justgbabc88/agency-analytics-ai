@@ -205,38 +205,41 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
         return acc;
       }, {});
 
-      // Convert grouped data to chart format
-      const chartData = Object.values(groupedByDate).map((dayData: any) => {
-        const dayDate = new Date(dayData.date);
-        const dayStart = startOfDay(toZonedTime(dayDate, userTimezone));
-        
-        // Calculate derived metrics
-        const ctr = dayData.impressions > 0 ? (dayData.clicks / dayData.impressions) * 100 : 0;
-        const cpm = dayData.impressions > 0 ? (dayData.spend / dayData.impressions) * 1000 : 0;
-        const cpc = dayData.clicks > 0 ? dayData.spend / dayData.clicks : 0;
-        const avgFrequency = dayData.campaignCount > 0 ? dayData.frequency / dayData.campaignCount : 0;
-        
-        // Find bookings for this specific day
-        const dailyBookings = calendlyEvents.filter(event => {
-          const eventCreatedInUserTz = toZonedTime(new Date(event.created_at), userTimezone);
-          const eventDate = startOfDay(eventCreatedInUserTz);
-          return eventDate.getTime() === dayStart.getTime();
-        }).length;
-        
-        const costPerCall = dailyBookings > 0 ? dayData.spend / dailyBookings : 0;
-        
-        return {
-          date: format(dayDate, 'MMM dd'),
-          spend: dayData.spend,
-          ctrAll: ctr,
-          ctrLink: ctr * 0.75, // Estimate link CTR as 75% of all CTR
-          cpm: cpm,
-          cpc: cpc,
-          frequency: avgFrequency,
-          costPerCall: costPerCall,
-          dailyBookings: dailyBookings,
-        };
-      }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      // Convert grouped data to chart format and sort by date
+      const chartData = Object.keys(groupedByDate)
+        .sort((a, b) => new Date(a).getTime() - new Date(b).getTime()) // Sort by date key first
+        .map((dateKey) => {
+          const dayData = groupedByDate[dateKey];
+          const dayDate = new Date(dayData.date);
+          const dayStart = startOfDay(toZonedTime(dayDate, userTimezone));
+          
+          // Calculate derived metrics
+          const ctr = dayData.impressions > 0 ? (dayData.clicks / dayData.impressions) * 100 : 0;
+          const cpm = dayData.impressions > 0 ? (dayData.spend / dayData.impressions) * 1000 : 0;
+          const cpc = dayData.clicks > 0 ? dayData.spend / dayData.clicks : 0;
+          const avgFrequency = dayData.campaignCount > 0 ? dayData.frequency / dayData.campaignCount : 0;
+          
+          // Find bookings for this specific day
+          const dailyBookings = calendlyEvents.filter(event => {
+            const eventCreatedInUserTz = toZonedTime(new Date(event.created_at), userTimezone);
+            const eventDate = startOfDay(eventCreatedInUserTz);
+            return eventDate.getTime() === dayStart.getTime();
+          }).length;
+          
+          const costPerCall = dailyBookings > 0 ? dayData.spend / dailyBookings : 0;
+          
+          return {
+            date: format(dayDate, 'MMM dd'),
+            spend: dayData.spend,
+            ctrAll: ctr,
+            ctrLink: ctr * 0.75, // Estimate link CTR as 75% of all CTR
+            cpm: cpm,
+            cpc: cpc,
+            frequency: avgFrequency,
+            costPerCall: costPerCall,
+            dailyBookings: dailyBookings,
+          };
+        });
       
       return chartData;
     }
