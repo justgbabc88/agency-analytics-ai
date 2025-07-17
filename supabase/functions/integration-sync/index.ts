@@ -418,14 +418,14 @@ async function refreshGHLToken(refreshToken: string): Promise<{
     const response = await fetch('https://services.leadconnectorhq.com/oauth/token', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: JSON.stringify({
+      body: new URLSearchParams({
         client_id: clientId,
         client_secret: clientSecret,
         grant_type: 'refresh_token',
         refresh_token: refreshToken
-      })
+      }).toString()
     });
     
     if (!response.ok) {
