@@ -69,10 +69,14 @@ export const GoHighLevelConnector = ({
       if (error) throw error;
       setForms(data || []);
       
-      // Initialize selected forms to all active forms
+      // Calculate active forms
       const activeFormIds = (data || []).filter(form => form.is_active).map(form => form.form_id);
-      setSelectedFormIds(activeFormIds);
-      onFormSelectionChange?.(activeFormIds);
+      
+      // Only initialize form selection if not already set
+      if (selectedFormIds.length === 0) {
+        setSelectedFormIds(activeFormIds);
+        onFormSelectionChange?.(activeFormIds);
+      }
       
       console.log('🔍 [GoHighLevelConnector] Active forms loaded:', {
         total: data?.length || 0,

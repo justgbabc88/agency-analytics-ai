@@ -41,6 +41,11 @@ const Index = () => {
   // Add Facebook campaign filter state
   const [selectedCampaignIds, setSelectedCampaignIds] = useState<string[]>([]);
   const [selectedFormIds, setSelectedFormIds] = useState<string[]>([]); // Track selected form IDs across all components
+
+  // Log form selection updates
+  useEffect(() => {
+    console.log('🔍 Form selection state updated:', selectedFormIds);
+  }, [selectedFormIds]);
   
   const [selectedProducts, setSelectedProducts] = useState<FunnelProductConfig[]>([
     { id: 'mainProduct', label: 'Main Product Rate', visible: true, color: '#10B981' },
