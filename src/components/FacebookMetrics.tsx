@@ -213,7 +213,7 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
           const costPerCall = dailyBookings > 0 ? dayData.spend / dailyBookings : 0;
           
           return {
-            date: format(new Date(dateKey), 'MMM dd'), // Use dateKey directly for consistent formatting
+            date: format(toZonedTime(new Date(dateKey + 'T12:00:00Z'), userTimezone), 'MMM dd'), // Convert to user timezone for display
             spend: dayData.spend,
             ctrAll: ctr,
             ctrLink: ctr * 0.75,
