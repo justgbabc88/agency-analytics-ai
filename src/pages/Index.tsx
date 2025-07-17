@@ -425,7 +425,11 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-6">
-            <ProjectIntegrationsPanel projectId={selectedProjectId} />
+            <ProjectIntegrationsPanel 
+              projectId={selectedProjectId} 
+              selectedFormIds={selectedFormIds}
+              onFormSelectionChange={setSelectedFormIds}
+            />
           </TabsContent>
         </Tabs>
       </div>

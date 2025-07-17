@@ -52,12 +52,13 @@ const integrationPlatforms = [
 
 interface ProjectIntegrationsPanelProps {
   projectId?: string;
+  selectedFormIds?: string[];
+  onFormSelectionChange?: (formIds: string[]) => void;
 }
 
-export const ProjectIntegrationsPanel = ({ projectId }: ProjectIntegrationsPanelProps) => {
+export const ProjectIntegrationsPanel = ({ projectId, selectedFormIds = [], onFormSelectionChange }: ProjectIntegrationsPanelProps) => {
   const { integrations, updateIntegration } = useProjectIntegrations(projectId);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
-  const [selectedFormIds, setSelectedFormIds] = useState<string[]>([]);
 
   const getIntegrationStatus = (platformId: string) => {
     const integration = integrations?.find(i => i.platform === platformId);
@@ -175,7 +176,7 @@ export const ProjectIntegrationsPanel = ({ projectId }: ProjectIntegrationsPanel
               }
             }}
             selectedFormIds={selectedFormIds}
-            onFormSelectionChange={setSelectedFormIds}
+            onFormSelectionChange={onFormSelectionChange}
           />
         );
       default:
