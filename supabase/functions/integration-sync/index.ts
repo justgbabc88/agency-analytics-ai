@@ -60,7 +60,47 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { access_token, location_id } = integrationData.data;
+    let { access_token, refresh_token, location_id } = integrationData.data;
+    
+    // Check if we need to refresh the token
+    const tokenExpired = await testToken(access_token, location_id);
+    
+    if (tokenExpired && refresh_token) {
+      console.log('🔄 Access token expired, attempting to refresh...');
+      const refreshResult = await refreshGHLToken(refresh_token);
+      
+      if (refreshResult.success) {
+        console.log('✅ Token refreshed successfully');
+        // Update the token in the database
+        const { error: updateError } = await supabase
+          .from('project_integration_data')
+          .update({
+            data: {
+              ...integrationData.data,
+              access_token: refreshResult.access_token,
+              refresh_token: refreshResult.refresh_token
+            }
+          })
+          .eq('project_id', projectId)
+          .eq('platform', platform);
+          
+        if (updateError) {
+          console.error('❌ Failed to update token in database:', updateError);
+        } else {
+          // Use the new token
+          access_token = refreshResult.access_token;
+        }
+      } else {
+        console.error('❌ Failed to refresh token:', refreshResult.error);
+        return new Response(
+          JSON.stringify({ error: 'Authentication expired. Please reconnect your GHL account.' }),
+          { 
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+    }
 
     if (!access_token || !location_id) {
       console.error('❌ Missing access token or location ID');
@@ -336,5 +376,74 @@ async function syncSubmissions(supabase: any, projectId: string, accessToken: st
   } catch (error) {
     console.error('❌ Submissions sync error:', error);
     return 0;
+  }
+}
+
+// Test if the token is valid
+async function testToken(accessToken: string, locationId: string): Promise<boolean> {
+  try {
+    // Try a simple API call to see if the token is still valid
+    const response = await fetch(`https://services.leadconnectorhq.com/locations/${locationId}`, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Version': '2021-07-28',
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    // If we get a 401, the token is expired
+    return response.status === 401;
+  } catch (error) {
+    console.error('❌ Error testing token:', error);
+    // If there's an error, assume token is expired to be safe
+    return true;
+  }
+}
+
+// Refresh GHL token
+async function refreshGHLToken(refreshToken: string): Promise<{ 
+  success: boolean; 
+  access_token?: string; 
+  refresh_token?: string;
+  error?: string;
+}> {
+  try {
+    const clientId = Deno.env.get('GHL_CLIENT_ID');
+    const clientSecret = Deno.env.get('GHL_CLIENT_SECRET');
+    
+    if (!clientId || !clientSecret) {
+      return { success: false, error: 'OAuth client credentials missing' };
+    }
+    
+    const response = await fetch('https://services.leadconnectorhq.com/oauth/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        client_id: clientId,
+        client_secret: clientSecret,
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken
+      })
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      return { 
+        success: false, 
+        error: `Token refresh failed: ${response.status} ${errorText}` 
+      };
+    }
+    
+    const data = await response.json();
+    return {
+      success: true,
+      access_token: data.access_token,
+      refresh_token: data.refresh_token || refreshToken
+    };
+  } catch (error) {
+    console.error('❌ Token refresh error:', error);
+    return { success: false, error: error.message || 'Unknown error' };
   }
 }
