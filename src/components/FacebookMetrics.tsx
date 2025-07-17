@@ -217,6 +217,15 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
           const dailySubmissions = formSubmissions.submissionsByDay?.[dateKey_formatted] || 0;
           const costPerLead = dailySubmissions > 0 ? dayData.spend / dailySubmissions : 0;
           
+          // Debug logging for cost per lead calculation
+          console.log(`🔍 [Cost Per Lead Debug] Date: ${dateKey_formatted}`, {
+            dateKey,
+            dayDataSpend: dayData.spend,
+            dailySubmissions,
+            costPerLead,
+            submissionsByDay: formSubmissions.submissionsByDay
+          });
+          
           return {
             date: format(toZonedTime(new Date(dateKey + 'T12:00:00Z'), userTimezone), 'MMM dd'), // Convert to user timezone for display
             spend: dayData.spend,
