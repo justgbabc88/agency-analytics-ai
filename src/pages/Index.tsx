@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Navbar } from "@/components/Navbar";
 import { LowTicketFunnel } from "@/components/LowTicketFunnel";
@@ -7,7 +6,6 @@ import { ProjectIntegrationsPanel } from "@/components/ProjectIntegrationsPanel"
 import { FacebookAIInsights } from "@/components/FacebookAIInsights";
 import { BookCallAIAssistant } from "@/components/BookCallAIAssistant";
 import { FacebookMetrics } from "@/components/FacebookMetrics";
-
 import { PixelSetupWizard } from '@/components/PixelSetupWizard';
 import { TrackingPixelManager } from '@/components/TrackingPixelManager';
 import { AttributionDashboard } from '@/components/AttributionDashboard';
@@ -38,9 +36,9 @@ const Index = () => {
     };
   });
   
-  // Add Facebook campaign filter state
+  // State hooks first
   const [selectedCampaignIds, setSelectedCampaignIds] = useState<string[]>([]);
-  const [selectedFormIds, setSelectedFormIds] = useState<string[]>([]); // Track selected form IDs across all components
+  const [selectedFormIds, setSelectedFormIds] = useState<string[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<FunnelProductConfig[]>([
     { id: 'mainProduct', label: 'Main Product Rate', visible: true, color: '#10B981' },
     { id: 'bump', label: 'Bump Rate', visible: true, color: '#3B82F6' },
@@ -50,37 +48,15 @@ const Index = () => {
     { id: 'downsell2', label: 'Downsell 2 Rate', visible: false, color: '#06B6D4' },
   ]);
 
-  const { projects, selectedProjectId, isLoading } = useProjects();
-
-  // Log whenever form selection changes
-  useEffect(() => {
-    console.log('🔍 [Index] Form selection changed:', {
-      selectedFormIds,
-      count: selectedFormIds.length
-    });
-  }, [selectedFormIds]);
-
-  const selectedProject = projects?.find(p => p.id === selectedProjectId);
-
-  if (isLoading) {
-    return (
-      <div className="p-6">
-        <Card>
-          <CardContent className="p-12 text-center">
-            <div className="mb-4">Loading projects...</div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // Tracking events queries (moved from Tracking page)
+  // Project data hook
+  const { projects, selectedProjectId, isLoading: projectsLoading } = useProjects();
+  
+  // React Query hooks
   const { data: recentEvents, isLoading: eventsLoading, refetch: refetchEvents } = useQuery({
     queryKey: ['recent-events', selectedProjectId, dateRange],
     queryFn: async () => {
       if (!selectedProjectId) return [];
       
-      console.log('Fetching recent events for project:', selectedProjectId, 'date range:', dateRange);
       const { data, error } = await supabase
         .from('tracking_events')
         .select('*')
@@ -90,12 +66,7 @@ const Index = () => {
         .order('created_at', { ascending: false })
         .limit(50);
 
-      if (error) {
-        console.error('Error fetching recent events:', error);
-        throw error;
-      }
-
-      console.log('Fetched recent events:', data);
+      if (error) throw error;
       return data || [];
     },
     enabled: !!selectedProjectId,
@@ -107,7 +78,6 @@ const Index = () => {
     queryFn: async () => {
       if (!selectedProjectId) return { total: 0, types: {} };
       
-      console.log('Fetching event stats for project:', selectedProjectId, 'date range:', dateRange);
       const { data, error } = await supabase
         .from('tracking_events')
         .select('event_type, created_at')
@@ -115,10 +85,7 @@ const Index = () => {
         .gte('created_at', dateRange.from.toISOString())
         .lte('created_at', dateRange.to.toISOString());
 
-      if (error) {
-        console.error('Error fetching event stats:', error);
-        throw error;
-      }
+      if (error) throw error;
 
       const stats = data?.reduce((acc, event) => {
         acc.total = (acc.total || 0) + 1;
@@ -133,16 +100,31 @@ const Index = () => {
     refetchInterval: 10000,
   });
 
+  // Derived state
+  const selectedProject = projects?.find(p => p.id === selectedProjectId);
+
+  // Effect hooks
+  useEffect(() => {
+    console.log('🔍 Form selection changed:', {
+      selectedFormIds,
+      count: selectedFormIds.length
+    });
+  }, [selectedFormIds]);
+
+  // Event handlers
   const handleDateChange = (from: Date, to: Date) => {
-    console.log('🚀 Main date range changed:', from, 'to', to);
     setDateRange({ from, to });
   };
 
   const handleProductsChange = (products: FunnelProductConfig[]) => {
     setSelectedProducts(products);
-    console.log("Products changed:", products);
   };
 
+  const handleRefreshEvents = () => {
+    refetchEvents();
+  };
+
+  // Utility functions
   const getEventTypeColor = (eventType: string) => {
     switch (eventType) {
       case 'page_view': return 'bg-blue-100 text-blue-800';
@@ -175,15 +157,24 @@ const Index = () => {
       const url = new URL(pageUrl);
       return url.pathname;
     } catch (error) {
-      console.warn('Invalid URL:', pageUrl, error);
       return pageUrl || 'Unknown page';
     }
   };
 
-  const handleRefreshEvents = () => {
-    refetchEvents();
-  };
+  // Loading state
+  if (projectsLoading) {
+    return (
+      <div className="p-6">
+        <Card>
+          <CardContent className="p-12 text-center">
+            <div className="mb-4">Loading projects...</div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
+  // Render functions
   const renderFunnelContent = () => {
     if (!selectedProject) {
       return (
@@ -196,12 +187,14 @@ const Index = () => {
 
     switch (selectedProject.funnel_type) {
       case "book_call":
-        return <BookCallFunnel 
-          projectId={selectedProjectId} 
-          dateRange={dateRange} 
-          selectedCampaignIds={selectedCampaignIds}
-          selectedFormIds={selectedFormIds}
-        />;
+        return (
+          <BookCallFunnel 
+            projectId={selectedProjectId} 
+            dateRange={dateRange} 
+            selectedCampaignIds={selectedCampaignIds}
+            selectedFormIds={selectedFormIds}
+          />
+        );
       case "high_ticket":
       case "webinar":
         return (
@@ -224,13 +217,13 @@ const Index = () => {
     }
   };
 
+  // Main render
   return (
     <div className="bg-gray-50">
       <Navbar onDateChange={handleDateChange} />
       
       <div className="p-6">
         <Tabs defaultValue="funnel" className="space-y-6">
-          {/* Navigation tabs */}
           <div className="bg-white border border-gray-200 rounded-lg p-6">
             <TabsList className="grid w-full grid-cols-5 h-12">
               <TabsTrigger value="funnel" className="flex items-center justify-center gap-2 h-10">
@@ -315,7 +308,6 @@ const Index = () => {
                 </TabsContent>
 
                 <TabsContent value="events">
-                  {/* Event Stats Overview */}
                   <Card>
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between mb-6">
@@ -350,7 +342,6 @@ const Index = () => {
                         </div>
                       </div>
 
-                      {/* Event Types Breakdown */}
                       {eventStats?.types && Object.keys(eventStats.types).length > 0 && (
                         <div className="space-y-2">
                           <h4 className="font-medium">Event Types Breakdown:</h4>
@@ -366,7 +357,6 @@ const Index = () => {
                     </CardContent>
                   </Card>
 
-                  {/* Recent Events Feed */}
                   <Card>
                     <CardContent className="p-6">
                       <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
@@ -415,9 +405,6 @@ const Index = () => {
                           <p className="text-muted-foreground mb-4">
                             Set up your tracking pixel and start collecting events to see them here.
                           </p>
-                          <p className="text-sm text-muted-foreground">
-                            Events will automatically refresh every 5 seconds.
-                          </p>
                         </div>
                       )}
                     </CardContent>
@@ -428,17 +415,13 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="assistant" className="space-y-6">
-            {selectedProject?.funnel_type === "book_call" ? (
-              <BookCallAIAssistant 
-                projectId={selectedProjectId} 
-                dateRange={dateRange} 
-                selectedCampaignIds={selectedCampaignIds}
-                selectedFormIds={selectedFormIds}
-                onFormSelectionChange={setSelectedFormIds}
-              />
-            ) : (
-              <FacebookAIInsights dateRange={dateRange} />
-            )}
+            <BookCallAIAssistant 
+              projectId={selectedProjectId} 
+              dateRange={dateRange}
+              selectedCampaignIds={selectedCampaignIds}
+              selectedFormIds={selectedFormIds}
+              onFormSelectionChange={setSelectedFormIds}
+            />
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-6">
@@ -448,6 +431,6 @@ const Index = () => {
       </div>
     </div>
   );
-};
+}
 
 export default Index;
