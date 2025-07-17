@@ -156,20 +156,12 @@ export const BookCallAIAssistant = ({ projectId, dateRange, selectedCampaignIds 
         </CardContent>
       </Card>
 
-      {/* Book Call Funnel */}
+      {/* Book Call Funnel with integrated form selection */}
       <BookCallFunnel
         projectId={projectId}
         dateRange={dateRange}
         selectedCampaignIds={selectedCampaignIds}
         selectedFormIds={selectedFormIds}
-        onFormSelectionChange={setSelectedFormIds}
-      />
-
-      {/* GHL Form Selection */}
-      <GoHighLevelConnector
-        projectId={projectId}
-        isConnected={isGHLConnected}
-        onConnectionChange={() => {}} // Handle in parent if needed
         onFormSelectionChange={setSelectedFormIds}
       />
 
