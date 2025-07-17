@@ -269,7 +269,8 @@ export const GoHighLevelConnector = ({
   const handleFormSelection = (formId: string, checked: boolean) => {
     if (!onFormSelectionChange) return;
     
-    const formIdsArray = selectedFormIds || [];
+    // Use the callback to update the selection
+    const formIdsArray = [...selectedFormIds];
     const newSelection = checked
       ? [...formIdsArray, formId]
       : formIdsArray.filter(id => id !== formId);
@@ -281,9 +282,10 @@ export const GoHighLevelConnector = ({
   const handleSelectAll = (checked: boolean) => {
     if (!onFormSelectionChange) return;
     
-    const newSelection = checked
-      ? forms.filter(form => form.is_active).map(form => form.form_id)
-      : [];
+    // If all active forms are already selected, clear the selection
+    // Otherwise, select all active forms
+    const activeFormIds = forms.filter(form => form.is_active).map(form => form.form_id);
+    const newSelection = formIdsArray.length === activeFormCount ? [] : activeFormIds;
     
     console.log('🔍 Select all forms:', { checked, newSelection });
     onFormSelectionChange(newSelection);
@@ -402,7 +404,7 @@ export const GoHighLevelConnector = ({
                 <Checkbox
                   id="select-all"
                   checked={formIdsArray.length === activeFormCount && activeFormCount > 0}
-                  onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
+                  onCheckedChange={() => handleSelectAll(formIdsArray.length === activeFormCount)}
                 />
                 <Label htmlFor="select-all" className="text-sm">
                   Select All
