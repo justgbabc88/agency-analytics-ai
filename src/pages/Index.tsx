@@ -40,6 +40,7 @@ const Index = () => {
   
   // Add Facebook campaign filter state
   const [selectedCampaignIds, setSelectedCampaignIds] = useState<string[]>([]);
+  const [selectedFormIds, setSelectedFormIds] = useState<string[]>([]);
   
   const [selectedProducts, setSelectedProducts] = useState<FunnelProductConfig[]>([
     { id: 'mainProduct', label: 'Main Product Rate', visible: true, color: '#10B981' },
@@ -179,6 +180,7 @@ const Index = () => {
           projectId={selectedProjectId} 
           dateRange={dateRange} 
           selectedCampaignIds={selectedCampaignIds}
+          selectedFormIds={selectedFormIds}
         />;
       case "high_ticket":
       case "webinar":
@@ -244,6 +246,7 @@ const Index = () => {
               projectId={selectedProjectId} 
               selectedCampaignIds={selectedCampaignIds}
               onCampaignChange={setSelectedCampaignIds}
+              selectedFormIds={selectedFormIds}
             />
           </TabsContent>
 
@@ -410,6 +413,8 @@ const Index = () => {
                 projectId={selectedProjectId} 
                 dateRange={dateRange} 
                 selectedCampaignIds={selectedCampaignIds}
+                selectedFormIds={selectedFormIds}
+                onFormSelectionChange={setSelectedFormIds}
               />
             ) : (
               <FacebookAIInsights dateRange={dateRange} />

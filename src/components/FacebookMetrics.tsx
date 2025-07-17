@@ -16,9 +16,10 @@ interface FacebookMetricsProps {
   projectId?: string;
   selectedCampaignIds?: string[];
   onCampaignChange?: (campaignIds: string[]) => void;
+  selectedFormIds?: string[];
 }
 
-export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onCampaignChange }: FacebookMetricsProps) => {
+export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onCampaignChange, selectedFormIds = [] }: FacebookMetricsProps) => {
   const [internalSelectedCampaignIds, setInternalSelectedCampaignIds] = useState<string[]>(selectedCampaignIds || []);
   
   // Use external campaign IDs if provided, otherwise use internal state
@@ -33,7 +34,7 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
   // Extract the filtered daily insights properly
   const dailyInsights = facebookData?.daily_insights;
   const { calendlyEvents } = useCalendlyData(projectId);
-  const { metrics: formSubmissions } = useGHLFormSubmissions(projectId || '', dateRange);
+  const { metrics: formSubmissions } = useGHLFormSubmissions(projectId || '', dateRange, selectedFormIds);
   const { profile } = useUserProfile();
   const userTimezone = profile?.timezone || 'UTC';
 

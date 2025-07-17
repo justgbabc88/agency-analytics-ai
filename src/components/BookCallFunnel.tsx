@@ -17,13 +17,14 @@ interface BookCallFunnelProps {
   projectId: string;
   dateRange: { from: Date; to: Date };
   selectedCampaignIds?: string[];
+  selectedFormIds?: string[];
 }
 
-export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [] }: BookCallFunnelProps) => {
+export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [], selectedFormIds = [] }: BookCallFunnelProps) => {
   const { calendlyEvents, getRecentBookings, getMonthlyComparison, refetch } = useCalendlyData(projectId);
   const { getUserTimezone, profile } = useUserProfile();
   const { toast } = useToast();
-  const { metrics: formSubmissions, loading: formSubmissionsLoading } = useGHLFormSubmissions(projectId, dateRange);
+  const { metrics: formSubmissions, loading: formSubmissionsLoading } = useGHLFormSubmissions(projectId, dateRange, selectedFormIds);
   const { facebookData } = useFacebookData({ dateRange, campaignIds: selectedCampaignIds });
   
   const userTimezone = getUserTimezone();

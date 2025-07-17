@@ -16,10 +16,11 @@ interface BookCallAIAssistantProps {
   projectId: string;
   dateRange: { from: Date; to: Date };
   selectedCampaignIds?: string[];
+  selectedFormIds?: string[];
+  onFormSelectionChange?: (selectedFormIds: string[]) => void;
 }
 
-export const BookCallAIAssistant = ({ projectId, dateRange, selectedCampaignIds = [] }: BookCallAIAssistantProps) => {
-  const [selectedFormIds, setSelectedFormIds] = useState<string[]>([]);
+export const BookCallAIAssistant = ({ projectId, dateRange, selectedCampaignIds = [], selectedFormIds = [], onFormSelectionChange }: BookCallAIAssistantProps) => {
   const { calendlyEvents } = useCalendlyData(projectId);
   const { metrics: formSubmissions } = useGHLFormSubmissions(projectId, dateRange, selectedFormIds);
   const { facebookData } = useFacebookData({ dateRange, campaignIds: selectedCampaignIds });
@@ -160,7 +161,7 @@ export const BookCallAIAssistant = ({ projectId, dateRange, selectedCampaignIds 
         projectId={projectId}
         isConnected={isGHLConnected}
         onConnectionChange={() => {}} // Handle in parent if needed
-        onFormSelectionChange={setSelectedFormIds}
+        onFormSelectionChange={onFormSelectionChange}
       />
 
       <AIChatPanel 
