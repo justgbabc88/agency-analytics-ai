@@ -143,8 +143,8 @@ export const FacebookCampaignFilter = ({
             {campaigns
               .sort((a, b) => {
                 // Sort active campaigns first
-                if (a.status === 'active' && b.status !== 'active') return -1;
-                if (a.status !== 'active' && b.status === 'active') return 1;
+                if (a.status.toLowerCase() === 'active' && b.status.toLowerCase() !== 'active') return -1;
+                if (a.status.toLowerCase() !== 'active' && b.status.toLowerCase() === 'active') return 1;
                 return a.name.localeCompare(b.name);
               })
               .map((campaign) => (
