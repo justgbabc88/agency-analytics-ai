@@ -46,6 +46,18 @@ export const GoHighLevelConnector = ({
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(null);
   const [selectedFormIds, setSelectedFormIds] = useState<string[]>([]);
+  
+  // Effect for initializing selected forms
+  useEffect(() => {
+    if (forms.length > 0) {
+      // Initialize with active forms if no selection exists
+      const activeFormIds = forms.filter(form => form.is_active).map(form => form.form_id);
+      setSelectedFormIds(prev => prev.length === 0 ? activeFormIds : prev);
+      if (selectedFormIds.length === 0) {
+        onFormSelectionChange?.(activeFormIds);
+      }
+    }
+  }, [forms, onFormSelectionChange]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -69,14 +81,7 @@ export const GoHighLevelConnector = ({
       if (error) throw error;
       setForms(data || []);
       
-      // Calculate active forms
       const activeFormIds = (data || []).filter(form => form.is_active).map(form => form.form_id);
-      
-      // Only initialize form selection if not already set
-      if (selectedFormIds.length === 0) {
-        setSelectedFormIds(activeFormIds);
-        onFormSelectionChange?.(activeFormIds);
-      }
       
       console.log('🔍 [GoHighLevelConnector] Active forms loaded:', {
         total: data?.length || 0,
