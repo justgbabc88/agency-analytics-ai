@@ -3,7 +3,9 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAgency } from './useAgency';
 import { useApiKeys } from './useApiKeys';
+import { useUserProfile } from './useUserProfile';
 import { format } from 'date-fns';
+import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 
 interface FacebookInsights {
   impressions: number;
@@ -40,6 +42,8 @@ interface UseFacebookDataProps {
 export const useFacebookData = ({ dateRange, campaignIds }: UseFacebookDataProps = {}) => {
   const { agency } = useAgency();
   const { getApiKeys } = useApiKeys();
+  const { profile } = useUserProfile();
+  const userTimezone = profile?.timezone || 'UTC';
 
   const { data: facebookData, isLoading } = useQuery({
     queryKey: ['facebook-integrations', agency?.id, dateRange?.from, dateRange?.to, campaignIds],
@@ -219,22 +223,26 @@ export const useFacebookData = ({ dateRange, campaignIds }: UseFacebookDataProps
           });
 
           filteredDailyInsights = filteredDailyInsights.filter((day: any) => {
-            const dayDate = new Date(day.date);
-            const fromDate = new Date(dateRange.from);
-            const toDate = new Date(dateRange.to);
+            // Parse the day date (should be in YYYY-MM-DD format from Facebook)
+            const dayDate = new Date(day.date + 'T00:00:00'); // Ensure it's treated as start of day
+            
+            // Convert the user's selected date range to the user's timezone for comparison
+            const fromDateInUserTz = toZonedTime(dateRange.from, userTimezone);
+            const toDateInUserTz = toZonedTime(dateRange.to, userTimezone);
             
             // Set all dates to start of day for accurate comparison
             dayDate.setHours(0, 0, 0, 0);
-            fromDate.setHours(0, 0, 0, 0);
-            toDate.setHours(0, 0, 0, 0);
+            fromDateInUserTz.setHours(0, 0, 0, 0);
+            toDateInUserTz.setHours(0, 0, 0, 0);
             
-            const isInRange = dayDate >= fromDate && dayDate <= toDate;
+            const isInRange = dayDate >= fromDateInUserTz && dayDate <= toDateInUserTz;
             
             if (!isInRange) {
               console.log('useFacebookData - Day filtered out:', {
                 dayDate: format(dayDate, 'yyyy-MM-dd'),
-                fromDate: format(fromDate, 'yyyy-MM-dd'),
-                toDate: format(toDate, 'yyyy-MM-dd'),
+                fromDate: format(fromDateInUserTz, 'yyyy-MM-dd'),
+                toDate: format(toDateInUserTz, 'yyyy-MM-dd'),
+                userTimezone,
                 isInRange
               });
             }

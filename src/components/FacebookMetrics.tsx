@@ -162,16 +162,19 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
     // If we have real daily insights data, filter and aggregate it by date
     if (dailyInsights && dailyInsights.length > 0) {
       const filteredData = dailyInsights.filter((day: any) => {
-        const dayDate = new Date(day.date);
-        const fromDate = new Date(dateRange.from);
-        const toDate = new Date(dateRange.to);
+        // Parse the day date (should be in YYYY-MM-DD format from Facebook)
+        const dayDate = new Date(day.date + 'T00:00:00'); // Ensure it's treated as start of day
+        
+        // Convert the user's selected date range to the user's timezone for comparison
+        const fromDateInUserTz = toZonedTime(dateRange.from, userTimezone);
+        const toDateInUserTz = toZonedTime(dateRange.to, userTimezone);
         
         // Set all dates to start of day for accurate comparison
         dayDate.setHours(0, 0, 0, 0);
-        fromDate.setHours(0, 0, 0, 0);
-        toDate.setHours(0, 0, 0, 0);
+        fromDateInUserTz.setHours(0, 0, 0, 0);
+        toDateInUserTz.setHours(0, 0, 0, 0);
         
-        return dayDate >= fromDate && dayDate <= toDate;
+        return dayDate >= fromDateInUserTz && dayDate <= toDateInUserTz;
       });
 
       // Group data by date and aggregate metrics
