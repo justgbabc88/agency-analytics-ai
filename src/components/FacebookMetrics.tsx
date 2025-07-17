@@ -213,7 +213,7 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
           const costPerCall = dailyBookings > 0 ? dayData.spend / dailyBookings : 0;
           
           return {
-            date: format(dayDate, 'MMM dd'),
+            date: format(new Date(dateKey), 'MMM dd'), // Use dateKey directly for consistent formatting
             spend: dayData.spend,
             ctrAll: ctr,
             ctrLink: ctr * 0.75,

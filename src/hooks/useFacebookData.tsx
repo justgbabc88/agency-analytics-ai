@@ -88,8 +88,8 @@ export const useFacebookData = ({ dateRange, campaignIds }: UseFacebookDataProps
               selected_ad_account_id: apiKeys.selected_ad_account_id,
               ...(dateRange && {
                 date_range: {
-                  since: format(dateRange.from, 'yyyy-MM-dd'),
-                  until: format(dateRange.to, 'yyyy-MM-dd')
+                  since: format(toZonedTime(dateRange.from, userTimezone), 'yyyy-MM-dd'),
+                  until: format(toZonedTime(dateRange.to, userTimezone), 'yyyy-MM-dd')
                 }
               })
             },
