@@ -12,27 +12,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useGHLFormSubmissions } from "@/hooks/useGHLFormSubmissions";
 import { useFacebookData } from "@/hooks/useFacebookData";
-import { GoHighLevelConnector } from "./GoHighLevelConnector";
 
 interface BookCallFunnelProps {
   projectId: string;
   dateRange: { from: Date; to: Date };
   selectedCampaignIds?: string[];
-  selectedFormIds?: string[];
-  onFormSelectionChange?: (selectedFormIds: string[]) => void;
 }
 
-export const BookCallFunnel = ({ 
-  projectId, 
-  dateRange, 
-  selectedCampaignIds = [],
-  selectedFormIds = [],
-  onFormSelectionChange
-}: BookCallFunnelProps) => {
+export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [] }: BookCallFunnelProps) => {
   const { calendlyEvents, getRecentBookings, getMonthlyComparison, refetch } = useCalendlyData(projectId);
   const { getUserTimezone, profile } = useUserProfile();
   const { toast } = useToast();
-  const { metrics: formSubmissions, loading: formSubmissionsLoading, forms } = useGHLFormSubmissions(projectId, dateRange, selectedFormIds);
+  const { metrics: formSubmissions, loading: formSubmissionsLoading } = useGHLFormSubmissions(projectId, dateRange);
   const { facebookData } = useFacebookData({ dateRange, campaignIds: selectedCampaignIds });
   
   const userTimezone = getUserTimezone();
@@ -300,16 +291,6 @@ export const BookCallFunnel = ({
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Book Call Funnel</h2>
       </div>
-
-      {/* GHL Form Selection */}
-      {forms && forms.length > 0 && (
-        <GoHighLevelConnector
-          projectId={projectId}
-          isConnected={true}
-          onConnectionChange={() => {}} 
-          onFormSelectionChange={onFormSelectionChange}
-        />
-      )}
 
       <LandingPageMetrics
         totalPageViews={totalPageViews}
