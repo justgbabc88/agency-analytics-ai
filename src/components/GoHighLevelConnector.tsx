@@ -48,14 +48,18 @@ export const GoHighLevelConnector = ({
   const [lastSync, setLastSync] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Initialization effect - only initialize if forms are loaded and no forms are selected yet
+  // Track if we've initialized this instance
+  const [hasInitialized, setHasInitialized] = useState(false);
+
+  // Initialization effect - only initialize once when forms are first loaded
   useEffect(() => {
-    if (forms.length > 0 && onFormSelectionChange && selectedFormIds.length === 0) {
+    if (forms.length > 0 && onFormSelectionChange && !hasInitialized) {
       console.log('Initializing form selection with active forms');
       const activeFormIds = forms.filter(form => form.is_active).map(form => form.form_id);
       onFormSelectionChange(activeFormIds);
+      setHasInitialized(true);
     }
-  }, [forms, onFormSelectionChange, selectedFormIds]);
+  }, [forms, onFormSelectionChange, hasInitialized]);
 
   // Load forms and submissions when connected
   useEffect(() => {
