@@ -14,6 +14,7 @@ interface GoHighLevelConnectorProps {
   projectId?: string;
   isConnected: boolean;
   onConnectionChange: (connected: boolean) => void;
+  selectedFormIds?: string[];
   onFormSelectionChange?: (selectedFormIds: string[]) => void;
 }
 
@@ -38,6 +39,7 @@ export const GoHighLevelConnector = ({
   projectId, 
   isConnected, 
   onConnectionChange,
+  selectedFormIds = [],
   onFormSelectionChange
 }: GoHighLevelConnectorProps) => {
   const [forms, setForms] = useState<GHLForm[]>([]);
@@ -45,20 +47,15 @@ export const GoHighLevelConnector = ({
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(null);
-  const [selectedFormIds, setSelectedFormIds] = useState<string[]>([]);
-  
-  // Effect for initializing selected forms
-  useEffect(() => {
-    if (forms.length > 0) {
-      // Initialize with active forms if no selection exists
-      const activeFormIds = forms.filter(form => form.is_active).map(form => form.form_id);
-      setSelectedFormIds(prev => prev.length === 0 ? activeFormIds : prev);
-      if (selectedFormIds.length === 0) {
-        onFormSelectionChange?.(activeFormIds);
-      }
-    }
-  }, [forms, onFormSelectionChange]);
   const { toast } = useToast();
+
+  // Initialization effect
+  useEffect(() => {
+    if (forms.length > 0 && onFormSelectionChange && selectedFormIds.length === 0) {
+      const activeFormIds = forms.filter(form => form.is_active).map(form => form.form_id);
+      onFormSelectionChange(activeFormIds);
+    }
+  }, [forms, onFormSelectionChange, selectedFormIds]);
 
   useEffect(() => {
     if (isConnected && projectId) {
@@ -81,12 +78,9 @@ export const GoHighLevelConnector = ({
       if (error) throw error;
       setForms(data || []);
       
-      const activeFormIds = (data || []).filter(form => form.is_active).map(form => form.form_id);
-      
-      console.log('🔍 [GoHighLevelConnector] Active forms loaded:', {
+      console.log('🔍 [GoHighLevelConnector] Forms loaded:', {
         total: data?.length || 0,
-        active: activeFormIds.length,
-        activeIds: activeFormIds
+        selectedFormIds
       });
     } catch (error) {
       console.error('Failed to load forms:', error);
@@ -144,18 +138,15 @@ export const GoHighLevelConnector = ({
 
       if (error) throw error;
 
-      // Open OAuth URL in popup
       const popup = window.open(
         data.authUrl,
         'oauth-popup',
         'width=600,height=700,scrollbars=yes,resizable=yes'
       );
 
-      // Monitor popup for completion
       const checkClosed = setInterval(() => {
         if (popup?.closed) {
           clearInterval(checkClosed);
-          // Refresh connection status
           setTimeout(() => {
             loadForms();
             loadSubmissions();
@@ -182,25 +173,11 @@ export const GoHighLevelConnector = ({
   };
 
   const handleSync = async (syncType: 'forms' | 'submissions' | 'both' = 'both') => {
-    if (!projectId) {
-      console.error('❌ No project ID provided for sync');
-      return;
-    }
+    if (!projectId) return;
 
-    console.log('🔄 Starting sync with:', { projectId, syncType });
     setSyncing(true);
 
     try {
-      console.log('📞 Calling integration-sync function...');
-      console.log('📞 Function call details:', {
-        functionName: 'integration-sync',
-        body: {
-          projectId,
-          platform: 'ghl',
-          syncType
-        }
-      });
-
       const { data, error } = await supabase.functions.invoke('integration-sync', {
         body: {
           projectId,
@@ -209,20 +186,8 @@ export const GoHighLevelConnector = ({
         }
       });
 
-      console.log('📨 Full sync response:', { data, error, status: 'completed' });
+      if (error) throw error;
 
-      if (error) {
-        console.error('❌ Sync error details:', {
-          error,
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code
-        });
-        throw error;
-      }
-
-      console.log('✅ Sync successful, reloading data...');
       await loadForms();
       await loadSubmissions();
       await loadLastSync();
@@ -233,14 +198,12 @@ export const GoHighLevelConnector = ({
       });
 
     } catch (error) {
-      console.error('❌ Sync failed with error:', error);
       toast({
         title: "Error",
         description: `Failed to sync data: ${error.message || 'Unknown error'}`,
         variant: "destructive",
       });
     } finally {
-      console.log('🔄 Sync operation completed, setting syncing to false');
       setSyncing(false);
     }
   };
@@ -303,21 +266,25 @@ export const GoHighLevelConnector = ({
   };
 
   const handleFormSelection = (formId: string, checked: boolean) => {
-    const updatedSelection = checked
+    if (!onFormSelectionChange) return;
+    
+    const newSelection = checked
       ? [...selectedFormIds, formId]
       : selectedFormIds.filter(id => id !== formId);
     
-    setSelectedFormIds(updatedSelection);
-    onFormSelectionChange?.(updatedSelection);
+    console.log('🔍 Form selection changed:', { formId, checked, newSelection });
+    onFormSelectionChange(newSelection);
   };
 
   const handleSelectAll = (checked: boolean) => {
-    const updatedSelection = checked
+    if (!onFormSelectionChange) return;
+    
+    const newSelection = checked
       ? forms.filter(form => form.is_active).map(form => form.form_id)
       : [];
     
-    setSelectedFormIds(updatedSelection);
-    onFormSelectionChange?.(updatedSelection);
+    console.log('🔍 Select all forms:', { checked, newSelection });
+    onFormSelectionChange(newSelection);
   };
 
   if (!projectId) {

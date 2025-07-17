@@ -161,6 +161,7 @@ export const BookCallAIAssistant = ({ projectId, dateRange, selectedCampaignIds 
         projectId={projectId}
         isConnected={isGHLConnected}
         onConnectionChange={() => {}} // Handle in parent if needed
+        selectedFormIds={selectedFormIds}
         onFormSelectionChange={onFormSelectionChange}
       />
 
