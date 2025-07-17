@@ -22,7 +22,12 @@ interface BookCallAIAssistantProps {
 
 export const BookCallAIAssistant = ({ projectId, dateRange, selectedCampaignIds = [], selectedFormIds = [], onFormSelectionChange }: BookCallAIAssistantProps) => {
   const { calendlyEvents } = useCalendlyData(projectId);
-  const { metrics: formSubmissions } = useGHLFormSubmissions(projectId, dateRange, selectedFormIds);
+  // Filter out the 'initialized' marker from selected form IDs for actual data processing
+  const actualSelectedFormIds = useMemo(() => {
+    return selectedFormIds.filter(id => id !== 'initialized');
+  }, [selectedFormIds]);
+  
+  const { metrics: formSubmissions } = useGHLFormSubmissions(projectId, dateRange, actualSelectedFormIds);
   const { facebookData } = useFacebookData({ dateRange, campaignIds: selectedCampaignIds });
   const { getUserTimezone } = useUserProfile();
   const { integrations } = useProjectIntegrations(projectId);

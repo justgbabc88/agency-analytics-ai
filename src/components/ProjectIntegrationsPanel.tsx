@@ -163,7 +163,7 @@ export const ProjectIntegrationsPanel = ({ projectId }: ProjectIntegrationsPanel
             }}
           />
         );
-      case 'ghl':
+        case 'ghl':
         return (
           <GoHighLevelConnector
             projectId={projectId}
@@ -174,6 +174,7 @@ export const ProjectIntegrationsPanel = ({ projectId }: ProjectIntegrationsPanel
               }
             }}
             selectedFormIds={[]}
+            onFormSelectionChange={() => {}} // Add empty handler
           />
         );
       default:

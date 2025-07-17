@@ -134,15 +134,21 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
 
     // Filter by selected forms if provided
     if (selectedFormIds?.length) {
-      filteredSubmissions = filteredSubmissions.filter(submission => 
-        selectedFormIds.includes(submission.form_id)
-      );
+      // Filter out the 'initialized' marker from actual form filtering
+      const actualFormIds = selectedFormIds.filter(id => id !== 'initialized');
       
-      console.log('🔍 [useGHLFormSubmissions] Form selection filter:', {
-        selectedFormIds,
-        originalCount: submissions.length,
-        afterFormFilter: filteredSubmissions.length
-      });
+      if (actualFormIds.length > 0) {
+        filteredSubmissions = filteredSubmissions.filter(submission => 
+          actualFormIds.includes(submission.form_id)
+        );
+        
+        console.log('🔍 [useGHLFormSubmissions] Form selection filter:', {
+          selectedFormIds,
+          actualFormIds,
+          originalCount: submissions.length,
+          afterFormFilter: filteredSubmissions.length
+        });
+      }
     }
 
     // Filter by date range if provided
