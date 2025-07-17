@@ -210,6 +210,14 @@ export const useFacebookData = ({ dateRange, campaignIds }: UseFacebookDataProps
 
         // Filter by date range if provided
         if (dateRange && filteredDailyInsights.length > 0) {
+          console.log('useFacebookData - Filtering by date range:', {
+            dateRange: {
+              from: format(dateRange.from, 'yyyy-MM-dd'),
+              to: format(dateRange.to, 'yyyy-MM-dd')
+            },
+            beforeFilterCount: filteredDailyInsights.length
+          });
+
           filteredDailyInsights = filteredDailyInsights.filter((day: any) => {
             const dayDate = new Date(day.date);
             const fromDate = new Date(dateRange.from);
@@ -220,7 +228,23 @@ export const useFacebookData = ({ dateRange, campaignIds }: UseFacebookDataProps
             fromDate.setHours(0, 0, 0, 0);
             toDate.setHours(0, 0, 0, 0);
             
-            return dayDate >= fromDate && dayDate <= toDate;
+            const isInRange = dayDate >= fromDate && dayDate <= toDate;
+            
+            if (!isInRange) {
+              console.log('useFacebookData - Day filtered out:', {
+                dayDate: format(dayDate, 'yyyy-MM-dd'),
+                fromDate: format(fromDate, 'yyyy-MM-dd'),
+                toDate: format(toDate, 'yyyy-MM-dd'),
+                isInRange
+              });
+            }
+            
+            return isInRange;
+          });
+          
+          console.log('useFacebookData - After date filtering:', {
+            afterFilterCount: filteredDailyInsights.length,
+            datesIncluded: filteredDailyInsights.map((d: any) => d.date)
           });
           
           // Recalculate aggregated metrics from filtered daily data if we have it
@@ -242,6 +266,8 @@ export const useFacebookData = ({ dateRange, campaignIds }: UseFacebookDataProps
             dailyAggregated.cpc = dailyAggregated.clicks > 0 ? dailyAggregated.spend / dailyAggregated.clicks : 0;
             
             filteredInsights = dailyAggregated;
+            
+            console.log('useFacebookData - Recalculated insights from filtered daily data:', filteredInsights);
           }
         }
 
