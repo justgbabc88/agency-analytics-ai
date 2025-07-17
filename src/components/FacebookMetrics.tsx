@@ -212,6 +212,11 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
           
           const costPerCall = dailyBookings > 0 ? dayData.spend / dailyBookings : 0;
           
+          // Find form submissions for this specific day
+          const dateKey_formatted = format(new Date(dateKey), 'yyyy-MM-dd');
+          const dailySubmissions = formSubmissions.submissionsByDay?.[dateKey_formatted] || 0;
+          const costPerLead = dailySubmissions > 0 ? dayData.spend / dailySubmissions : 0;
+          
           return {
             date: format(toZonedTime(new Date(dateKey + 'T12:00:00Z'), userTimezone), 'MMM dd'), // Convert to user timezone for display
             spend: dayData.spend,
@@ -221,7 +226,9 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
             cpc: cpc,
             frequency: dayData.frequency,
             costPerCall: costPerCall,
+            costPerLead: costPerLead,
             dailyBookings: dailyBookings,
+            dailySubmissions: dailySubmissions,
           };
         });
       
