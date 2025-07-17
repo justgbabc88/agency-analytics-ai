@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MessageSquare, Brain } from "lucide-react";
 import { GoHighLevelConnector } from "./GoHighLevelConnector";
 import { useProjectIntegrations } from "@/hooks/useProjectIntegrations";
+import { BookCallFunnel } from "./BookCallFunnel";
 
 interface BookCallAIAssistantProps {
   projectId: string;
@@ -28,7 +29,7 @@ export const BookCallAIAssistant = ({ projectId, dateRange, selectedCampaignIds 
   
   const userTimezone = getUserTimezone();
 
-  // Calculate metrics for the AI context
+  // Calculate metrics based on date range and selected forms
   const metrics = useMemo(() => {
     // Filter events for the date range
     const filteredEvents = calendlyEvents.filter(event => {
@@ -154,6 +155,15 @@ export const BookCallAIAssistant = ({ projectId, dateRange, selectedCampaignIds 
           </div>
         </CardContent>
       </Card>
+
+      {/* Book Call Funnel */}
+      <BookCallFunnel
+        projectId={projectId}
+        dateRange={dateRange}
+        selectedCampaignIds={selectedCampaignIds}
+        selectedFormIds={selectedFormIds}
+        onFormSelectionChange={setSelectedFormIds}
+      />
 
       {/* GHL Form Selection */}
       <GoHighLevelConnector
