@@ -73,6 +73,12 @@ export const GoHighLevelConnector = ({
       const activeFormIds = (data || []).filter(form => form.is_active).map(form => form.form_id);
       setSelectedFormIds(activeFormIds);
       onFormSelectionChange?.(activeFormIds);
+      
+      console.log('🔍 [GoHighLevelConnector] Active forms loaded:', {
+        total: data?.length || 0,
+        active: activeFormIds.length,
+        activeIds: activeFormIds
+      });
     } catch (error) {
       console.error('Failed to load forms:', error);
     }

@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Navbar } from "@/components/Navbar";
 import { LowTicketFunnel } from "@/components/LowTicketFunnel";
 import { BookCallFunnel } from "@/components/BookCallFunnel";
@@ -40,7 +40,7 @@ const Index = () => {
   
   // Add Facebook campaign filter state
   const [selectedCampaignIds, setSelectedCampaignIds] = useState<string[]>([]);
-  const [selectedFormIds, setSelectedFormIds] = useState<string[]>([]);
+  const [selectedFormIds, setSelectedFormIds] = useState<string[]>([]); // Track selected form IDs across all components
   
   const [selectedProducts, setSelectedProducts] = useState<FunnelProductConfig[]>([
     { id: 'mainProduct', label: 'Main Product Rate', visible: true, color: '#10B981' },
@@ -52,6 +52,15 @@ const Index = () => {
   ]);
 
   const { projects, selectedProjectId } = useProjects();
+
+  // Log whenever form selection changes
+  useEffect(() => {
+    console.log('🔍 [Index] Form selection changed:', {
+      selectedFormIds,
+      count: selectedFormIds.length
+    });
+  }, [selectedFormIds]);
+
   const selectedProject = projects.find(p => p.id === selectedProjectId);
 
   // Tracking events queries (moved from Tracking page)
