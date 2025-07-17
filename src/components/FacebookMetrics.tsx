@@ -212,22 +212,14 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
           
           const costPerCall = dailyBookings > 0 ? dayData.spend / dailyBookings : 0;
           
-          // Find form submissions for this specific day
-          const dateKey_formatted = format(new Date(dateKey), 'yyyy-MM-dd');
+          // Find form submissions for this specific day (align with user timezone)
+          const facebookDateInUserTz = toZonedTime(new Date(dateKey + 'T12:00:00Z'), userTimezone);
+          const dateKey_formatted = format(facebookDateInUserTz, 'yyyy-MM-dd');
           const dailySubmissions = formSubmissions.submissionsByDay?.[dateKey_formatted] || 0;
           const costPerLead = dailySubmissions > 0 ? dayData.spend / dailySubmissions : 0;
           
-          // Debug logging for cost per lead calculation
-          console.log(`🔍 [Cost Per Lead Debug] Date: ${dateKey_formatted}`, {
-            dateKey,
-            dayDataSpend: dayData.spend,
-            dailySubmissions,
-            costPerLead,
-            submissionsByDay: formSubmissions.submissionsByDay
-          });
-          
           return {
-            date: format(toZonedTime(new Date(dateKey + 'T12:00:00Z'), userTimezone), 'MMM dd'), // Convert to user timezone for display
+            date: format(facebookDateInUserTz, 'MMM dd'),
             spend: dayData.spend,
             ctrAll: ctr,
             ctrLink: ctr * 0.75,
