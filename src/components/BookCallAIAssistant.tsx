@@ -156,14 +156,6 @@ export const BookCallAIAssistant = ({ projectId, dateRange, selectedCampaignIds 
         </CardContent>
       </Card>
 
-      {/* GHL Form Selection */}
-      <GoHighLevelConnector
-        projectId={projectId}
-        isConnected={isGHLConnected}
-        onConnectionChange={() => {}} // Handle in parent if needed
-        selectedFormIds={selectedFormIds}
-        onFormSelectionChange={onFormSelectionChange}
-      />
 
       <AIChatPanel 
         dateRange={dateRange}
