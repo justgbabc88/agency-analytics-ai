@@ -128,12 +128,15 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
     fetchData();
   }, [projectId]);
 
-  // Calculate metrics based on date range and selected forms
+    // Calculate metrics based on date range and selected forms
   const metrics = useMemo((): FormSubmissionMetrics => {
     let filteredSubmissions = submissions;
 
-    // Filter by selected forms first
-    if (selectedFormIds && selectedFormIds.length > 0) {
+    // Filter by selected forms FIRST and ONLY show submissions for selected forms
+    // If no forms are selected, show no submissions
+    if (!selectedFormIds?.length) {
+      filteredSubmissions = [];
+    } else {
       filteredSubmissions = filteredSubmissions.filter(submission => 
         selectedFormIds.includes(submission.form_id)
       );
