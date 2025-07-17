@@ -57,6 +57,7 @@ interface ProjectIntegrationsPanelProps {
 export const ProjectIntegrationsPanel = ({ projectId }: ProjectIntegrationsPanelProps) => {
   const { integrations, updateIntegration } = useProjectIntegrations(projectId);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  const [selectedFormIds, setSelectedFormIds] = useState<string[]>([]);
 
   const getIntegrationStatus = (platformId: string) => {
     const integration = integrations?.find(i => i.platform === platformId);
@@ -173,8 +174,8 @@ export const ProjectIntegrationsPanel = ({ projectId }: ProjectIntegrationsPanel
                 handleToggleIntegration(platform.id, true);
               }
             }}
-            selectedFormIds={[]}
-            onFormSelectionChange={() => {}} // Add empty handler
+            selectedFormIds={selectedFormIds}
+            onFormSelectionChange={setSelectedFormIds}
           />
         );
       default:
