@@ -29,7 +29,9 @@ interface FacebookCampaign {
 interface FacebookData {
   insights: FacebookInsights;
   campaigns: FacebookCampaign[];
-  filteredCampaigns?: FacebookCampaign[]; // Optional filtered campaigns
+  filteredCampaigns?: FacebookCampaign[];
+  adSets?: any[];
+  filteredAdSets?: any[];
   daily_insights?: any[];
   last_updated: string;
 }
@@ -37,16 +39,17 @@ interface FacebookData {
 interface UseFacebookDataProps {
   dateRange?: { from: Date; to: Date };
   campaignIds?: string[];
+  adSetIds?: string[];
 }
 
-export const useFacebookData = ({ dateRange, campaignIds }: UseFacebookDataProps = {}) => {
+export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFacebookDataProps = {}) => {
   const { agency } = useAgency();
   const { getApiKeys } = useApiKeys();
   const { profile } = useUserProfile();
   const userTimezone = profile?.timezone || 'UTC';
 
   const { data: facebookData, isLoading } = useQuery({
-    queryKey: ['facebook-integrations', agency?.id, dateRange?.from, dateRange?.to, campaignIds],
+    queryKey: ['facebook-integrations', agency?.id, dateRange?.from, dateRange?.to, campaignIds, adSetIds],
     queryFn: async () => {
       if (!agency) return null;
       
@@ -294,6 +297,11 @@ export const useFacebookData = ({ dateRange, campaignIds }: UseFacebookDataProps
           insights: filteredInsights,
           campaigns: fbData.campaigns || [], // Always return all campaigns for the filter
           filteredCampaigns: filteredCampaigns, // Filtered campaigns for display
+          adSets: fbData.adsets || [], // All ad sets for the filter
+          filteredAdSets: fbData.adsets?.filter((adSet: any) => 
+            (campaignIds && campaignIds.length > 0 ? campaignIds.includes(adSet.campaign_id) : true) &&
+            (adSetIds && adSetIds.length > 0 ? adSetIds.includes(adSet.id) : true)
+          ) || [],
           daily_insights: filteredDailyInsights,
           last_updated: syncedData.synced_at,
         } as FacebookData;
@@ -324,6 +332,8 @@ export const useFacebookData = ({ dateRange, campaignIds }: UseFacebookDataProps
     campaigns: facebookData?.campaigns || [], // All campaigns for the filter
     allCampaigns: facebookData?.campaigns || [], // Explicit all campaigns
     filteredCampaigns: facebookData?.filteredCampaigns || [], // Filtered campaigns
+    adSets: facebookData?.adSets || [], // All ad sets for the filter
+    filteredAdSets: facebookData?.filteredAdSets || [], // Filtered ad sets
     metrics: facebookData?.insights || defaultInsights,
   };
 };

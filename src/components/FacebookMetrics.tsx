@@ -7,6 +7,7 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 import { useGHLFormSubmissions } from "@/hooks/useGHLFormSubmissions";
 import { ConversionChart } from "./ConversionChart";
 import { FacebookCampaignFilter } from "./FacebookCampaignFilter";
+import { FacebookAdSetFilter } from "./FacebookAdSetFilter";
 import { BarChart3, TrendingUp, Users, DollarSign, MousePointer, Eye, ArrowUpRight, ArrowDownRight, Calendar } from "lucide-react";
 import { format, eachDayOfInterval, subDays, isWithinInterval, startOfDay } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
@@ -16,19 +17,25 @@ interface FacebookMetricsProps {
   projectId?: string;
   selectedCampaignIds?: string[];
   onCampaignChange?: (campaignIds: string[]) => void;
+  selectedAdSetIds?: string[];
+  onAdSetChange?: (adSetIds: string[]) => void;
   selectedFormIds?: string[];
 }
 
-export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onCampaignChange, selectedFormIds = [] }: FacebookMetricsProps) => {
+export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onCampaignChange, selectedAdSetIds, onAdSetChange, selectedFormIds = [] }: FacebookMetricsProps) => {
   const [internalSelectedCampaignIds, setInternalSelectedCampaignIds] = useState<string[]>(selectedCampaignIds || []);
+  const [internalSelectedAdSetIds, setInternalSelectedAdSetIds] = useState<string[]>(selectedAdSetIds || []);
   
-  // Use external campaign IDs if provided, otherwise use internal state
+  // Use external IDs if provided, otherwise use internal state
   const activeCampaignIds = selectedCampaignIds || internalSelectedCampaignIds;
+  const activeAdSetIds = selectedAdSetIds || internalSelectedAdSetIds;
   const handleCampaignChange = onCampaignChange || setInternalSelectedCampaignIds;
+  const handleAdSetChange = onAdSetChange || setInternalSelectedAdSetIds;
   
-  const { facebookData, isLoading, insights, campaigns, allCampaigns, metrics } = useFacebookData({ 
+  const { facebookData, isLoading, insights, campaigns, allCampaigns, metrics, adSets } = useFacebookData({ 
     dateRange, 
-    campaignIds: activeCampaignIds 
+    campaignIds: activeCampaignIds,
+    adSetIds: activeAdSetIds
   });
   
   // Extract the filtered daily insights properly
@@ -323,11 +330,19 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
               <BarChart3 className="h-5 w-5 text-blue-600" />
               Facebook Ads Performance
             </CardTitle>
-            <FacebookCampaignFilter 
-              campaigns={allCampaigns} 
-              selectedCampaignIds={activeCampaignIds}
-              onCampaignChange={handleCampaignChange}
-            />
+            <div className="flex items-center gap-4">
+              <FacebookCampaignFilter 
+                campaigns={allCampaigns} 
+                selectedCampaignIds={activeCampaignIds}
+                onCampaignChange={handleCampaignChange}
+              />
+              <FacebookAdSetFilter
+                adSets={adSets || []}
+                selectedAdSetIds={activeAdSetIds}
+                onAdSetChange={handleAdSetChange}
+                selectedCampaignIds={activeCampaignIds}
+              />
+            </div>
           </div>
         </CardHeader>
         <CardContent>
