@@ -4,11 +4,13 @@ import { useGHLFormSubmissions } from "@/hooks/useGHLFormSubmissions";
 import { useFacebookData } from "@/hooks/useFacebookData";
 import { generateCallDataFromEvents } from "@/utils/chartDataGeneration";
 import { useUserProfile } from "@/hooks/useUserProfile";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { startOfDay } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MessageSquare, Brain } from "lucide-react";
+import { GoHighLevelConnector } from "./GoHighLevelConnector";
+import { useProjectIntegrations } from "@/hooks/useProjectIntegrations";
 
 interface BookCallAIAssistantProps {
   projectId: string;
@@ -17,10 +19,12 @@ interface BookCallAIAssistantProps {
 }
 
 export const BookCallAIAssistant = ({ projectId, dateRange, selectedCampaignIds = [] }: BookCallAIAssistantProps) => {
+  const [selectedFormIds, setSelectedFormIds] = useState<string[]>([]);
   const { calendlyEvents } = useCalendlyData(projectId);
-  const { metrics: formSubmissions } = useGHLFormSubmissions(projectId, dateRange);
+  const { metrics: formSubmissions } = useGHLFormSubmissions(projectId, dateRange, selectedFormIds);
   const { facebookData } = useFacebookData({ dateRange, campaignIds: selectedCampaignIds });
   const { getUserTimezone } = useUserProfile();
+  const { integrations } = useProjectIntegrations(projectId);
   
   const userTimezone = getUserTimezone();
 
@@ -97,6 +101,9 @@ export const BookCallAIAssistant = ({ projectId, dateRange, selectedCampaignIds 
     };
   }, [calendlyEvents, formSubmissions, facebookData, dateRange, userTimezone]);
 
+  const ghlIntegration = integrations.find(i => i.platform === 'ghl');
+  const isGHLConnected = ghlIntegration?.is_connected || false;
+
   if (!projectId) {
     return (
       <Card>
@@ -147,6 +154,14 @@ export const BookCallAIAssistant = ({ projectId, dateRange, selectedCampaignIds 
           </div>
         </CardContent>
       </Card>
+
+      {/* GHL Form Selection */}
+      <GoHighLevelConnector
+        projectId={projectId}
+        isConnected={isGHLConnected}
+        onConnectionChange={() => {}} // Handle in parent if needed
+        onFormSelectionChange={setSelectedFormIds}
+      />
 
       <AIChatPanel 
         dateRange={dateRange}

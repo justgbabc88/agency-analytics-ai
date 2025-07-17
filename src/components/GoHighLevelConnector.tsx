@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { CheckCircle, AlertCircle, Plus, Trash2, RefreshCw, Link, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -13,6 +14,7 @@ interface GoHighLevelConnectorProps {
   projectId?: string;
   isConnected: boolean;
   onConnectionChange: (connected: boolean) => void;
+  onFormSelectionChange?: (selectedFormIds: string[]) => void;
 }
 
 interface GHLForm {
@@ -35,13 +37,15 @@ interface GHLFormSubmission {
 export const GoHighLevelConnector = ({ 
   projectId, 
   isConnected, 
-  onConnectionChange 
+  onConnectionChange,
+  onFormSelectionChange
 }: GoHighLevelConnectorProps) => {
   const [forms, setForms] = useState<GHLForm[]>([]);
   const [submissions, setSubmissions] = useState<GHLFormSubmission[]>([]);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(null);
+  const [selectedFormIds, setSelectedFormIds] = useState<string[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -64,6 +68,11 @@ export const GoHighLevelConnector = ({
 
       if (error) throw error;
       setForms(data || []);
+      
+      // Initialize selected forms to all active forms
+      const activeFormIds = (data || []).filter(form => form.is_active).map(form => form.form_id);
+      setSelectedFormIds(activeFormIds);
+      onFormSelectionChange?.(activeFormIds);
     } catch (error) {
       console.error('Failed to load forms:', error);
     }
@@ -278,6 +287,24 @@ export const GoHighLevelConnector = ({
     }
   };
 
+  const handleFormSelection = (formId: string, checked: boolean) => {
+    const updatedSelection = checked
+      ? [...selectedFormIds, formId]
+      : selectedFormIds.filter(id => id !== formId);
+    
+    setSelectedFormIds(updatedSelection);
+    onFormSelectionChange?.(updatedSelection);
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    const updatedSelection = checked
+      ? forms.filter(form => form.is_active).map(form => form.form_id)
+      : [];
+    
+    setSelectedFormIds(updatedSelection);
+    onFormSelectionChange?.(updatedSelection);
+  };
+
   if (!projectId) {
     return (
       <Card>
@@ -380,21 +407,47 @@ export const GoHighLevelConnector = ({
         {/* Tracked Forms */}
         {forms.length > 0 && (
           <div className="space-y-4">
-            <h4 className="font-medium">Tracked Forms</h4>
+            <div className="flex items-center justify-between">
+              <h4 className="font-medium">Tracked Forms</h4>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="select-all"
+                  checked={selectedFormIds.length === forms.filter(f => f.is_active).length && forms.filter(f => f.is_active).length > 0}
+                  onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
+                />
+                <Label htmlFor="select-all" className="text-sm">
+                  Select All
+                </Label>
+              </div>
+            </div>
+            <p className="text-sm text-gray-600">
+              Select which forms to include in metrics calculations ({selectedFormIds.length} selected)
+            </p>
             <div className="space-y-2">
               {forms.map((form) => (
                 <div key={form.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <p className="font-medium">{form.form_name}</p>
-                    <p className="text-sm text-gray-500">ID: {form.form_id}</p>
-                    {form.form_url && (
-                      <p className="text-sm text-gray-500">URL: {form.form_url}</p>
-                    )}
+                  <div className="flex items-center gap-3 flex-1">
+                    <Checkbox
+                      id={`form-${form.form_id}`}
+                      checked={selectedFormIds.includes(form.form_id)}
+                      onCheckedChange={(checked) => handleFormSelection(form.form_id, checked as boolean)}
+                      disabled={!form.is_active}
+                    />
+                    <div className="flex-1">
+                      <p className="font-medium">{form.form_name}</p>
+                      <p className="text-sm text-gray-500">ID: {form.form_id}</p>
+                      {form.form_url && (
+                        <p className="text-sm text-gray-500">URL: {form.form_url}</p>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-green-600 border-green-600">
+                    <Badge 
+                      variant="outline" 
+                      className={form.is_active ? "text-green-600 border-green-600" : "text-gray-500 border-gray-300"}
+                    >
                       <CheckCircle className="h-3 w-3 mr-1" />
-                      Active
+                      {form.is_active ? "Active" : "Inactive"}
                     </Badge>
                     <Button
                       variant="ghost"

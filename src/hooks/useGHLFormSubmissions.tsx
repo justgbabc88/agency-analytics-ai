@@ -42,7 +42,7 @@ export interface FormSubmissionMetrics {
   }>;
 }
 
-export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Date; to: Date }) => {
+export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Date; to: Date }, selectedFormIds?: string[]) => {
   const [submissions, setSubmissions] = useState<GHLFormSubmission[]>([]);
   const [forms, setForms] = useState<GHLForm[]>([]);
   const [loading, setLoading] = useState(true);
@@ -128,9 +128,22 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
     fetchData();
   }, [projectId]);
 
-  // Calculate metrics based on date range
+  // Calculate metrics based on date range and selected forms
   const metrics = useMemo((): FormSubmissionMetrics => {
     let filteredSubmissions = submissions;
+
+    // Filter by selected forms first
+    if (selectedFormIds && selectedFormIds.length > 0) {
+      filteredSubmissions = filteredSubmissions.filter(submission => 
+        selectedFormIds.includes(submission.form_id)
+      );
+      
+      console.log('🔍 [useGHLFormSubmissions] Form selection filter:', {
+        selectedFormIds,
+        originalCount: submissions.length,
+        afterFormFilter: filteredSubmissions.length
+      });
+    }
 
     // Filter by date range if provided
     if (dateRange) {
@@ -145,7 +158,7 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
         totalSubmissions: submissions.length
       });
       
-      filteredSubmissions = submissions.filter((submission, index) => {
+      filteredSubmissions = filteredSubmissions.filter((submission, index) => {
         // Parse the submission timestamp (it's in UTC)
         const submissionDateUTC = parseISO(submission.submitted_at);
         
@@ -232,7 +245,7 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
       recentSubmissions: filteredSubmissions.slice(0, 10),
       topPerformingForms
     };
-  }, [submissions, forms, dateRange, userTimezone]);
+  }, [submissions, forms, dateRange, userTimezone, selectedFormIds]);
 
   // Refetch data function
   const refetch = async () => {
