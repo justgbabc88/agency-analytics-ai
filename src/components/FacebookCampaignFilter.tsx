@@ -140,7 +140,14 @@ export const FacebookCampaignFilter = ({
           </div>
           
           <div className="max-h-64 overflow-y-auto bg-background">
-            {campaigns.map((campaign) => (
+            {campaigns
+              .sort((a, b) => {
+                // Sort active campaigns first
+                if (a.status === 'active' && b.status !== 'active') return -1;
+                if (a.status !== 'active' && b.status === 'active') return 1;
+                return a.name.localeCompare(b.name);
+              })
+              .map((campaign) => (
               <div
                 key={campaign.id}
                 className="flex items-center gap-3 p-3 hover:bg-muted/50 border-b border-border/50"
@@ -153,13 +160,13 @@ export const FacebookCampaignFilter = ({
                   className="flex-1 min-w-0 cursor-pointer"
                   onClick={(e) => handleCampaignToggle(campaign.id, e)}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="truncate text-sm font-medium">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-sm font-medium break-words leading-tight">
                       {campaign.name}
                     </span>
                     <Badge 
                       variant="outline" 
-                      className={`ml-2 text-xs ${getStatusColor(campaign.status)}`}
+                      className={`self-start text-xs ${getStatusColor(campaign.status)}`}
                     >
                       {campaign.status}
                     </Badge>
