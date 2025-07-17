@@ -51,7 +51,7 @@ const Index = () => {
     { id: 'downsell2', label: 'Downsell 2 Rate', visible: false, color: '#06B6D4' },
   ]);
 
-  const { projects, selectedProjectId } = useProjects();
+  const { projects, selectedProjectId, isLoading } = useProjects();
 
   // Log whenever form selection changes
   useEffect(() => {
@@ -61,7 +61,19 @@ const Index = () => {
     });
   }, [selectedFormIds]);
 
-  const selectedProject = projects.find(p => p.id === selectedProjectId);
+  const selectedProject = projects?.find(p => p.id === selectedProjectId);
+
+  if (isLoading) {
+    return (
+      <div className="p-6">
+        <Card>
+          <CardContent className="p-12 text-center">
+            <div className="mb-4">Loading projects...</div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   // Tracking events queries (moved from Tracking page)
   const { data: recentEvents, isLoading: eventsLoading, refetch: refetchEvents } = useQuery({
