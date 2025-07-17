@@ -132,11 +132,8 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
   const metrics = useMemo((): FormSubmissionMetrics => {
     let filteredSubmissions = submissions;
 
-    // Filter by selected forms FIRST and ONLY show submissions for selected forms
-    // If no forms are selected, show no submissions
-    if (!selectedFormIds?.length) {
-      filteredSubmissions = [];
-    } else {
+    // Filter by selected forms if provided
+    if (selectedFormIds?.length) {
       filteredSubmissions = filteredSubmissions.filter(submission => 
         selectedFormIds.includes(submission.form_id)
       );
