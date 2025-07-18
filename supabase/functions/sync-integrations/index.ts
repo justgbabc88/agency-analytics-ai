@@ -102,6 +102,61 @@ serve(async (req) => {
   }
 })
 
+// Helper function to handle Facebook API calls with rate limiting and retries
+async function fetchFromFacebookWithRetry(url: string, maxRetries = 3): Promise<any> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`Facebook API call attempt ${attempt}/${maxRetries}: ${url}`)
+      
+      const response = await fetch(url)
+      
+      if (response.ok) {
+        return await response.json()
+      }
+      
+      // Check if it's a rate limit error
+      if (response.status === 400) {
+        const errorText = await response.text()
+        const errorData = JSON.parse(errorText)
+        
+        if (errorData?.error?.code === 17 || errorData?.error?.error_subcode === 2446079) {
+          // Rate limit error - wait before retrying
+          const waitTime = Math.min(1000 * Math.pow(2, attempt), 10000) // Exponential backoff, max 10 seconds
+          console.log(`Rate limit hit. Waiting ${waitTime}ms before retry ${attempt}/${maxRetries}`)
+          await new Promise(resolve => setTimeout(resolve, waitTime))
+          
+          if (attempt === maxRetries) {
+            console.error('Max retries reached for rate limited request:', { url, error: errorData })
+            throw new Error(`Facebook API rate limit exceeded after ${maxRetries} attempts`)
+          }
+          continue
+        }
+      }
+      
+      // Other errors - don't retry
+      const errorText = await response.text()
+      console.error(`Facebook API error (attempt ${attempt}):`, {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText,
+        url
+      })
+      throw new Error(`Facebook API error: ${response.status} ${response.statusText}`)
+      
+    } catch (error) {
+      if (attempt === maxRetries) {
+        console.error(`Final attempt failed for ${url}:`, error)
+        throw error
+      }
+      
+      // Wait before retrying on network errors
+      const waitTime = 1000 * attempt
+      console.log(`Network error on attempt ${attempt}. Waiting ${waitTime}ms before retry:`, error)
+      await new Promise(resolve => setTimeout(resolve, waitTime))
+    }
+  }
+}
+
 async function syncFacebook(apiKeys: Record<string, string>) {
   const { access_token, selected_ad_account_id, date_range } = apiKeys
   
@@ -127,47 +182,23 @@ async function syncFacebook(apiKeys: Record<string, string>) {
   }
 
   try {
-    // Fetch campaigns
-    const campaignsResponse = await fetch(
+    // Fetch campaigns with retry logic
+    const campaignsData = await fetchFromFacebookWithRetry(
       `https://graph.facebook.com/v18.0/${adAccountId}/campaigns?access_token=${access_token}&fields=id,name,status,objective,created_time,updated_time`
     )
-    
-    if (!campaignsResponse.ok) {
-      throw new Error('Failed to fetch campaigns from Facebook')
-    }
-    
-    const campaignsData = await campaignsResponse.json()
 
-    // Fetch ad sets for all campaigns
-    const adSetsResponse = await fetch(
-      `https://graph.facebook.com/v18.0/${adAccountId}/adsets?access_token=${access_token}&fields=id,name,campaign_id,status,created_time,updated_time`
-    )
-    
+    // Fetch ad sets with retry logic
     let adSetsData = { data: [] }
-    if (adSetsResponse.ok) {
-      adSetsData = await adSetsResponse.json()
-      console.log(`Fetched ${adSetsData.data?.length || 0} ad sets`)
-    } else {
-      const errorText = await adSetsResponse.text()
-      console.error('Failed to fetch ad sets from Facebook:', {
-        status: adSetsResponse.status,
-        statusText: adSetsResponse.statusText,
-        error: errorText,
-        url: `https://graph.facebook.com/v18.0/${adAccountId}/adsets`
-      })
-      
-      // Use mock ad sets data when API fails (same as campaigns fallback)
-      console.log('Using mock ad sets data due to API failure')
-      adSetsData = {
-        data: campaignsData.data?.slice(0, 25).map((campaign: any, index: number) => ({
-          id: `mock_adset_${campaign.id}_${index}`,
-          name: `${campaign.name} - Ad Set ${index + 1}`,
-          campaign_id: campaign.id,
-          status: index % 3 === 0 ? 'ACTIVE' : index % 3 === 1 ? 'PAUSED' : 'ACTIVE',
-          daily_budget: Math.floor(Math.random() * 500) + 100,
-          created_time: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString()
-        })) || []
-      }
+    try {
+      adSetsData = await fetchFromFacebookWithRetry(
+        `https://graph.facebook.com/v18.0/${adAccountId}/adsets?access_token=${access_token}&fields=id,name,campaign_id,status,created_time,updated_time`
+      )
+      console.log(`Successfully fetched ${adSetsData.data?.length || 0} ad sets`)
+    } catch (adSetsError) {
+      console.error('Failed to fetch ad sets after retries:', adSetsError)
+      // Don't use mock data - return empty array and let user know
+      console.log('Ad sets unavailable due to Facebook API rate limits. No mock data provided.')
+      adSetsData = { data: [] }
     }
 
     // Add campaign names to ad sets
