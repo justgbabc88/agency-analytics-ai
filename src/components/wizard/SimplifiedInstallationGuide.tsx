@@ -122,24 +122,41 @@ export const SimplifiedInstallationGuide = ({ pixelData, funnelPages }: Simplifi
       ...data
     };
 
-    console.log('Tracking event on ${page.name}:', trackingData);
+    console.log('🚀 Attempting to track event on ${page.name}:', trackingData);
 
     fetch(API_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(trackingData)
+      headers: { 
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(trackingData),
+      mode: 'cors'
     }).then(response => {
+      console.log('📡 Response received for ${page.name}:', response.status, response.statusText);
       if (response.ok) {
-        console.log('Successfully tracked ${page.name} event:', eventType);
-        return response.json();
+        return response.json().then(data => {
+          console.log('✅ Successfully tracked ${page.name} event:', eventType, data);
+          return data;
+        });
       } else {
-        console.error('Failed to track ${page.name} event:', response.status, response.statusText);
+        console.error('❌ Failed to track ${page.name} event:', response.status, response.statusText);
         return response.text().then(text => {
-          console.error('Error details:', text);
+          console.error('❌ Error details:', text);
+          throw new Error('HTTP ' + response.status + ': ' + text);
         });
       }
     }).catch(err => {
-      console.error('Tracking failed for ${page.name}:', err);
+      console.error('💥 Tracking failed for ${page.name}:', err);
+      console.error('💥 Full error:', err.stack || err.message);
+      
+      // Try alternative tracking method as fallback
+      console.log('🔄 Attempting fallback tracking method...');
+      const img = new Image();
+      img.src = API_URL + '?' + new URLSearchParams({
+        method: 'POST',
+        data: JSON.stringify(trackingData)
+      });
     });
   }
 
