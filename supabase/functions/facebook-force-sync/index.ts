@@ -153,8 +153,37 @@ serve(async (req) => {
       synced_at: new Date().toISOString()
     }
 
-    // Store directly in database (force overwrite)
-    console.log('Storing fresh data in database...')
+    // Store directly in database (merge with existing data)
+    console.log('Fetching existing data to merge...')
+    const { data: existingData } = await supabase
+      .from('integration_data')
+      .select('data')
+      .eq('agency_id', agencyId)
+      .eq('platform', 'facebook')
+      .single()
+
+    let mergedInsights = sortedInsights
+    let mergedCampaignInsights = campaignInsights
+
+    if (existingData?.data?.daily_insights) {
+      const existingInsights = existingData.data.daily_insights
+      const newDates = new Set(sortedInsights.map(i => i.date))
+      
+      // Keep existing insights for dates not in the new data
+      const preservedInsights = existingInsights.filter(insight => !newDates.has(insight.date))
+      
+      // Combine and sort all insights
+      mergedInsights = [...sortedInsights, ...preservedInsights]
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      
+      console.log(`Merged insights: ${sortedInsights.length} new + ${preservedInsights.length} preserved = ${mergedInsights.length} total`)
+    }
+
+    // Update sync result with merged data
+    syncResult.daily_insights = mergedInsights
+    syncResult.campaign_insights = mergedCampaignInsights
+
+    console.log('Storing merged data in database...')
     const { error: insertError } = await supabase
       .from('integration_data')
       .upsert({
