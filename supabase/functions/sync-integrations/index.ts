@@ -254,47 +254,54 @@ async function syncFacebook(apiKeys: Record<string, string>, agencyId?: string) 
         console.log('Query error, defaulting to last 30 days sync')
       } else if (existingData?.data?.daily_insights) {
         const dailyInsights = existingData.data.daily_insights as any[]
-        if (dailyInsights.length > 0) {
-          // Find the latest date in existing data
-          const latestDate = dailyInsights
-            .map(d => new Date(d.date))
-            .sort((a, b) => b.getTime() - a.getTime())[0]
-          
-          // Calculate 30 days ago from today
-          const thirtyDaysAgo = new Date()
-          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-          
-          console.log(`Latest existing data: ${latestDate.toISOString().split('T')[0]}`)
-          
-          // If we have recent data, only sync from the day after latest existing data
-          if (latestDate > thirtyDaysAgo) {
-            const nextDay = new Date(latestDate)
-            nextDay.setDate(nextDay.getDate() + 1)
-            
-            const today = new Date()
-            
-            console.log(`Next day to sync: ${nextDay.toISOString().split('T')[0]}, Today: ${today.toISOString().split('T')[0]}`)
-            
-          // Only sync if there are missing days
-          if (nextDay <= today) {
-            sinceParam = `&time_range[since]=${nextDay.toISOString().split('T')[0]}`
-            untilParam = `&time_range[until]=${today.toISOString().split('T')[0]}`
-            console.log(`Incremental sync: fetching data from ${nextDay.toISOString().split('T')[0]} to ${today.toISOString().split('T')[0]}`)
-          } else {
-            console.log('Data is up to date, skipping sync - returning existing data without API call')
-            // Don't return early - continue with full sync to ensure we have latest data
-            console.log('Actually, continuing with last 7 days sync to ensure we have all available data')
-            datePreset = '&date_preset=last_7d'
-          }
-          } else {
-            // Data is too old, sync last 30 days
-            datePreset = '&date_preset=last_30d'
-            console.log('Existing data is older than 30 days, syncing last 30 days')
-          }
-        } else {
-          // No daily insights, sync last 30 days
+        
+        console.log(`Existing data count: ${dailyInsights.length}`)
+        
+        // Calculate 30-day date range
+        const today = new Date()
+        const thirtyDaysAgo = new Date()
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+        
+        console.log(`Checking for missing data in range: ${thirtyDaysAgo.toISOString().split('T')[0]} to ${today.toISOString().split('T')[0]}`)
+        
+        // Get all existing dates within the last 30 days
+        const existingDates = new Set(
+          dailyInsights
+            .map(d => d.date)
+            .filter(date => {
+              const dateObj = new Date(date)
+              return dateObj >= thirtyDaysAgo && dateObj <= today
+            })
+        )
+        
+        // Generate all dates in the last 30 days (excluding weekends for now, can adjust later)
+        const allDatesInRange: string[] = []
+        for (let d = new Date(thirtyDaysAgo); d <= today; d.setDate(d.getDate() + 1)) {
+          allDatesInRange.push(d.toISOString().split('T')[0])
+        }
+        
+        // Find missing dates
+        const missingDates = allDatesInRange.filter(date => !existingDates.has(date))
+        
+        console.log(`Existing dates count: ${existingDates.size}`)
+        console.log(`Total possible dates in 30-day range: ${allDatesInRange.length}`) 
+        console.log(`Missing dates: ${missingDates.length} - ${missingDates.slice(0, 5).join(', ')}${missingDates.length > 5 ? '...' : ''}`)
+        
+        if (missingDates.length === 0) {
+          console.log('No missing dates found, data is complete for last 30 days')
+          return existingData.data
+        }
+        
+        // For efficiency, if we're missing more than 10 days, just sync the whole last 30 days
+        if (missingDates.length > 10) {
+          console.log(`Missing ${missingDates.length} dates, syncing full last 30 days`)
           datePreset = '&date_preset=last_30d'
-          console.log('No existing daily insights, syncing last 30 days')
+        } else {
+          // Sync from earliest missing date to today to capture all gaps
+          const earliestMissing = missingDates.sort()[0]
+          sinceParam = `&time_range[since]=${earliestMissing}`
+          untilParam = `&time_range[until]=${today.toISOString().split('T')[0]}`
+          console.log(`Targeted gap-fill sync: fetching from ${earliestMissing} to ${today.toISOString().split('T')[0]} to fill ${missingDates.length} missing dates`)
         }
       } else {
         // No existing data, sync last 30 days
