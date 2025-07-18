@@ -169,6 +169,32 @@ Deno.serve(async (req) => {
   }
 });
 
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function fetchWithUsageCheck(url: string, options: RequestInit) {
+  const response = await fetch(url, options);
+  const headers = Object.fromEntries(response.headers.entries());
+
+  try {
+    const usage = headers['x-ad-account-usage'] ? JSON.parse(headers['x-ad-account-usage']) : null;
+    const appUsage = headers['x-app-usage'] ? JSON.parse(headers['x-app-usage']) : null;
+    
+    console.log('📊 Ad account usage:', usage);
+    console.log('📊 App usage:', appUsage);
+
+    if (usage && usage.call_count > 80000) {
+      console.warn('⏳ Approaching rate limit. Sleeping for 60 seconds...');
+      await sleep(60000);
+    }
+  } catch (err) {
+    console.warn('Could not parse usage headers:', headers['x-ad-account-usage'], headers['x-app-usage']);
+  }
+
+  return response;
+}
+
 async function performBatchSync(accessToken: string, adAccountId: string): Promise<any> {
   console.log(`🔄 Starting batch sync for ad account ${adAccountId}`);
 
@@ -189,7 +215,7 @@ async function performBatchSync(accessToken: string, adAccountId: string): Promi
   ];
 
   // Make single batch API call to Facebook
-  const batchResponse = await fetch('https://graph.facebook.com/v18.0/', {
+  const batchResponse = await fetchWithUsageCheck('https://graph.facebook.com/v18.0/', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -223,35 +249,51 @@ async function performBatchSync(accessToken: string, adAccountId: string): Promi
     };
   });
 
-  // Get detailed insights for campaigns (using another batch request)
+  // Get detailed insights for campaigns (using chunked batch requests)
   let campaignInsights = [];
   if (campaigns.length > 0) {
-    const campaignBatchRequests = campaigns.slice(0, 25).map((campaign: any) => ({ // Limit to 25 to stay under batch limits
-      method: 'GET',
-      relative_url: `${campaign.id}/insights?fields=impressions,clicks,spend,reach,conversions,conversion_values&date_preset=last_30d`
-    }));
+    console.log(`📊 Processing ${campaigns.length} campaigns in chunks of 10...`);
+    
+    // Split campaigns into chunks of 10 to reduce burst rate
+    const chunkSize = 10;
+    for (let i = 0; i < campaigns.length; i += chunkSize) {
+      const chunk = campaigns.slice(i, i + chunkSize);
+      console.log(`Processing chunk ${Math.floor(i / chunkSize) + 1}/${Math.ceil(campaigns.length / chunkSize)} (${chunk.length} campaigns)`);
+      
+      const campaignBatchRequests = chunk.map((campaign: any) => ({
+        method: 'GET',
+        relative_url: `${campaign.id}/insights?fields=impressions,clicks,spend,reach,conversions,conversion_values&date_preset=last_30d`
+      }));
 
-    const campaignBatchResponse = await fetch('https://graph.facebook.com/v18.0/', {
-      method: 'POST', 
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        access_token: accessToken,
-        batch: campaignBatchRequests
-      })
-    });
-
-    if (campaignBatchResponse.ok) {
-      const campaignBatchResults: BatchResponse[] = await campaignBatchResponse.json();
-      campaignInsights = campaignBatchResults.map((result, index) => {
-        const campaignData = result.code === 200 ? JSON.parse(result.body).data?.[0] || {} : {};
-        return {
-          campaign_id: campaigns[index].id,
-          campaign_name: campaigns[index].name,
-          ...campaignData
-        };
+      const campaignBatchResponse = await fetchWithUsageCheck('https://graph.facebook.com/v18.0/', {
+        method: 'POST', 
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          access_token: accessToken,
+          batch: campaignBatchRequests
+        })
       });
+
+      if (campaignBatchResponse.ok) {
+        const campaignBatchResults: BatchResponse[] = await campaignBatchResponse.json();
+        const chunkInsights = campaignBatchResults.map((result, index) => {
+          const campaignData = result.code === 200 ? JSON.parse(result.body).data?.[0] || {} : {};
+          return {
+            campaign_id: chunk[index].id,
+            campaign_name: chunk[index].name,
+            ...campaignData
+          };
+        });
+        campaignInsights.push(...chunkInsights);
+      }
+      
+      // Add delay between chunks to reduce burst rate (except for the last chunk)
+      if (i + chunkSize < campaigns.length) {
+        console.log('⏱️  Waiting 1.5 seconds before next chunk...');
+        await sleep(1500);
+      }
     }
   }
 
