@@ -44,6 +44,36 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
   });
   console.log('🔄 All Calendly events available:', calendlyEvents.length);
 
+  // State for tracking pixel configuration
+  const [pixelConfig, setPixelConfig] = useState<any>(null);
+  
+  // Fetch pixel configuration to get page settings
+  useEffect(() => {
+    const fetchPixelConfig = async () => {
+      if (!projectId) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('tracking_pixels')
+          .select('config')
+          .eq('project_id', projectId)
+          .eq('is_active', true)
+          .single();
+
+        if (error) {
+          console.error('Error fetching pixel config:', error);
+          return;
+        }
+
+        setPixelConfig(data?.config || null);
+      } catch (error) {
+        console.error('Error fetching pixel config:', error);
+      }
+    };
+
+    fetchPixelConfig();
+  }, [projectId]);
+
   // Fetch tracking events for page views
   const fetchTrackingEvents = async () => {
     if (!projectId) return;
@@ -325,7 +355,43 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
   const recentBookings = getRecentBookings(7);
   const monthlyComparison = getMonthlyComparison();
 
-  const totalPageViews = chartData.reduce((sum, day) => sum + day.pageViews, 0);
+  // Filter page views based on pixel configuration
+  const filteredPageViews = useMemo(() => {
+    if (!pixelConfig?.funnelPages || !trackingEvents.length) {
+      return trackingEvents;
+    }
+
+    // Get URLs from pages that should be included in metrics
+    const includedPageUrls = pixelConfig.funnelPages
+      .filter((page: any) => page.includeInPageViewMetrics !== false)
+      .map((page: any) => page.url);
+
+    console.log('📊 Pages included in metrics:', includedPageUrls);
+
+    // If no pages are configured to be included, include all
+    if (includedPageUrls.length === 0) {
+      return trackingEvents;
+    }
+
+    // Filter tracking events to only include those from included pages
+    const filtered = trackingEvents.filter((event: any) => {
+      if (!event.page_url) return false;
+      
+      return includedPageUrls.some((url: string) => {
+        // Clean both URLs for comparison
+        const cleanEventUrl = event.page_url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
+        const cleanConfigUrl = url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
+        
+        // Check if the event URL matches or contains the configured URL
+        return cleanEventUrl === cleanConfigUrl || cleanEventUrl.includes(cleanConfigUrl);
+      });
+    });
+
+    console.log('📊 Filtered page views:', filtered.length, 'from', trackingEvents.length, 'total');
+    return filtered;
+  }, [pixelConfig, trackingEvents]);
+
+  const totalPageViews = filteredPageViews.length;
   const bookingRate = totalPageViews > 0 ? ((callStatsData.totalBookings / totalPageViews) * 100) : 0;
   const previousBookingRate = 0; // Simplified for now since we're focusing on current period accuracy
   

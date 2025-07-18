@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Globe, Trash2, Plus } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 
 interface FunnelPage {
   id: string;
@@ -15,6 +16,7 @@ interface FunnelPage {
   url: string;
   type: string;
   events: string[];
+  includeInPageViewMetrics?: boolean;
 }
 
 interface FunnelPageMapperProps {
@@ -39,7 +41,8 @@ export const FunnelPageMapper = ({
         name: '',
         url: '',
         type: 'landing',
-        events: []
+        events: [],
+        includeInPageViewMetrics: true
       }]);
     }
   }, [initialPages]);
@@ -54,7 +57,8 @@ export const FunnelPageMapper = ({
       name: '',
       url: '',
       type: 'landing',
-      events: []
+      events: [],
+      includeInPageViewMetrics: true
     }]);
   };
 
@@ -213,6 +217,25 @@ export const FunnelPageMapper = ({
                       </div>
                     ))}
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Page View Metrics</Label>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id={`${page.id}-include-metrics`}
+                      checked={page.includeInPageViewMetrics !== false}
+                      onCheckedChange={(checked) => {
+                        updatePage(page.id, { includeInPageViewMetrics: checked });
+                      }}
+                    />
+                    <Label htmlFor={`${page.id}-include-metrics`} className="text-sm">
+                      Include this page in funnel page view metrics
+                    </Label>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    When enabled, page views from this page will be counted in the total page views metric on the funnel tab
+                  </p>
                 </div>
               </div>
             </Card>
