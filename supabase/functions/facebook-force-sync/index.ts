@@ -42,14 +42,23 @@ serve(async (req) => {
     
     console.log(`Found ${campaignsData.data?.length || 0} campaigns`)
 
-    // Fetch last 30 days of insights for all campaigns
+    // Fetch last 30 days of insights for all campaigns using specific date range
+    const today = new Date()
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+    
+    const sinceDate = thirtyDaysAgo.toISOString().split('T')[0]
+    const untilDate = today.toISOString().split('T')[0]
+    
+    console.log(`Using specific date range: ${sinceDate} to ${untilDate}`)
+    
     const allDailyInsights: any[] = []
     const campaignInsights: any[] = []
     
     for (const campaign of campaignsData.data || []) {
       console.log(`Fetching insights for campaign: ${campaign.name}`)
       
-      const insightsUrl = `https://graph.facebook.com/v18.0/${campaign.id}/insights?access_token=${accessToken}&fields=campaign_id,campaign_name,impressions,clicks,spend,reach,frequency,ctr,cpm,cpp,cpc,conversions,conversion_values,date_start,date_stop&date_preset=last_30d&time_increment=1`
+      const insightsUrl = `https://graph.facebook.com/v18.0/${campaign.id}/insights?access_token=${accessToken}&fields=campaign_id,campaign_name,impressions,clicks,spend,reach,frequency,ctr,cpm,cpp,cpc,conversions,conversion_values,date_start,date_stop&time_range[since]=${sinceDate}&time_range[until]=${untilDate}&time_increment=1`
       
       try {
         const insightsResponse = await fetch(insightsUrl)
