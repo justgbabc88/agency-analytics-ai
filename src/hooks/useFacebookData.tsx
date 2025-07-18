@@ -158,6 +158,14 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
 
         // Filter by campaigns if provided
         if (campaignIds && campaignIds.length > 0) {
+          console.log('🔍 DEBUG: Campaign filtering in useFacebookData:', {
+            campaignIds,
+            campaignIdsType: typeof campaignIds[0],
+            availableCampaigns: fbData.campaigns?.map(c => ({ id: c.id, name: c.name, idType: typeof c.id })) || [],
+            availableAdSets: fbData.adsets?.map(a => ({ id: a.id, name: a.name, campaign_id: a.campaign_id, campaignIdType: typeof a.campaign_id })) || [],
+            timestamp: new Date().toISOString()
+          });
+          
           filteredCampaigns = fbData.campaigns?.filter((campaign: any) => campaignIds.includes(campaign.id)) || [];
           
           // Get insights for selected campaigns from campaign_insights array

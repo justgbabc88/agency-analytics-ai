@@ -49,17 +49,22 @@ export const FacebookAdSetFilter = ({
     ? adSets // Show all ad sets when no campaigns selected
     : adSets.filter(adSet => selectedCampaignIds.includes(adSet.campaign_id)); // Show only ad sets from selected campaigns
 
-  console.log('🔍 Simple AdSet Filter:', {
+  console.log('🔍 DEBUG: AdSet Filter Details:', {
     totalAdSets: adSets.length,
-    selectedCampaignIds,
-    selectedCampaignIdsLength: selectedCampaignIds.length,
-    filteredAdSets: filteredAdSets.length,
+    selectedCampaignIds: selectedCampaignIds,
+    selectedCampaignIdsType: typeof selectedCampaignIds[0],
+    filteredAdSetsCount: filteredAdSets.length,
     sampleAdSet: adSets[0],
-    campaignIdMatches: adSets.map(adSet => ({
+    sampleAdSetCampaignId: adSets[0]?.campaign_id,
+    sampleAdSetCampaignIdType: typeof adSets[0]?.campaign_id,
+    campaignIdMatches: adSets.slice(0, 3).map(adSet => ({
       adSetId: adSet.id,
       adSetName: adSet.name,
       campaignId: adSet.campaign_id,
-      isSelected: selectedCampaignIds.includes(adSet.campaign_id)
+      campaignIdType: typeof adSet.campaign_id,
+      isIncluded: selectedCampaignIds.includes(adSet.campaign_id),
+      isIncludedString: selectedCampaignIds.includes(String(adSet.campaign_id)),
+      selectedCampaignIds: selectedCampaignIds
     })),
     timestamp: new Date().toISOString()
   });
