@@ -257,12 +257,16 @@ async function syncFacebook(apiKeys: Record<string, string>, agencyId?: string) 
           const thirtyDaysAgo = new Date()
           thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
           
+          console.log(`Latest existing data: ${latestDate.toISOString().split('T')[0]}`)
+          
           // If we have recent data, only sync from the day after latest existing data
           if (latestDate > thirtyDaysAgo) {
             const nextDay = new Date(latestDate)
             nextDay.setDate(nextDay.getDate() + 1)
             
             const today = new Date()
+            
+            console.log(`Next day to sync: ${nextDay.toISOString().split('T')[0]}, Today: ${today.toISOString().split('T')[0]}`)
             
             // Only sync if there are missing days
             if (nextDay <= today) {
@@ -346,6 +350,8 @@ async function syncFacebook(apiKeys: Record<string, string>, agencyId?: string) 
         if (campaignResponse.ok) {
           const campaignData = await campaignResponse.json()
           
+          console.log(`Campaign ${campaign.id} insights: ${campaignData.data?.length || 0} days of data`)
+          
           // Process daily insights for this campaign
           const dailyData = campaignData.data || []
           
@@ -405,7 +411,7 @@ async function syncFacebook(apiKeys: Record<string, string>, agencyId?: string) 
     overallInsights.cpm = overallInsights.impressions > 0 ? (overallInsights.spend / overallInsights.impressions) * 1000 : 0
     overallInsights.cpc = overallInsights.clicks > 0 ? overallInsights.spend / overallInsights.clicks : 0
 
-    console.log(`Facebook sync successful - ${campaignsData.data?.length || 0} campaigns, ${adSetsWithCampaignNames.length} ad sets, insights fetched for date range: ${date_range?.since || 'last 30 days'} to ${date_range?.until || 'today'}`)
+    console.log(`Facebook sync successful - ${campaignsData.data?.length || 0} campaigns, ${adSetsWithCampaignNames.length} ad sets, ${campaignDailyInsights.length} total daily insights fetched for date range: ${sinceParam || datePreset || 'custom range'}`)
 
     return {
       campaigns: campaignsData.data || [],
