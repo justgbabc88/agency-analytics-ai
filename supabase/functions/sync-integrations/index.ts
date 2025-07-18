@@ -53,16 +53,18 @@ serve(async (req) => {
     let finalData = syncResult
     if (platform === 'facebook' && syncResult?.daily_insights?.length > 0) {
       // Get existing data to merge with new incremental data
-      const { data: existingRecord } = await supabase
+      const { data: existingRecord, error: mergeQueryError } = await supabase
         .from('integration_data')
         .select('data')
         .eq('agency_id', agencyId)
         .eq('platform', 'facebook')
         .order('synced_at', { ascending: false })
         .limit(1)
-        .single()
+        .maybeSingle()
 
-      if (existingRecord?.data?.daily_insights) {
+      if (mergeQueryError) {
+        console.error('Error querying existing data for merge:', mergeQueryError)
+      } else if (existingRecord?.data?.daily_insights) {
         const existingDailyInsights = existingRecord.data.daily_insights as any[]
         const newDailyInsights = syncResult.daily_insights as any[]
         
@@ -236,16 +238,21 @@ async function syncFacebook(apiKeys: Record<string, string>, agencyId?: string) 
       )
 
       // Get the most recent data to find gaps
-      const { data: existingData } = await supabase
+      const { data: existingData, error: queryError } = await supabase
         .from('integration_data')
         .select('data')
         .eq('agency_id', agencyId)
         .eq('platform', 'facebook')
         .order('synced_at', { ascending: false })
         .limit(1)
-        .single()
+        .maybeSingle()
 
-      if (existingData?.data?.daily_insights) {
+      if (queryError) {
+        console.error('Error querying existing data:', queryError)
+        // Continue with full sync as fallback
+        datePreset = '&date_preset=last_30d'
+        console.log('Query error, defaulting to last 30 days sync')
+      } else if (existingData?.data?.daily_insights) {
         const dailyInsights = existingData.data.daily_insights as any[]
         if (dailyInsights.length > 0) {
           // Find the latest date in existing data
