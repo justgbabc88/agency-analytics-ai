@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useGHLFormSubmissions } from "@/hooks/useGHLFormSubmissions";
 import { useFacebookData } from "@/hooks/useFacebookData";
+import { PageViewFilter } from "./PageViewFilter";
 
 interface BookCallFunnelProps {
   projectId: string;
@@ -30,6 +31,7 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
   // State for tracking events
   const [trackingEvents, setTrackingEvents] = useState<any[]>([]);
   const [trackingEventsLoading, setTrackingEventsLoading] = useState(false);
+  const [enabledPages, setEnabledPages] = useState<string[]>([]);
   
   const userTimezone = getUserTimezone();
   
@@ -264,10 +266,15 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       return [];
     }
     
-    const data = generateCallDataFromEvents(filteredEvents, dateRange, userTimezone, trackingEvents);
+    // Filter tracking events based on enabled pages
+    const filteredTrackingEvents = trackingEvents.filter(event => 
+      enabledPages.length === 0 || enabledPages.includes(event.page_url)
+    );
+    
+    const data = generateCallDataFromEvents(filteredEvents, dateRange, userTimezone, filteredTrackingEvents);
     console.log('🎯 Generated chart data:', data);
     return data;
-  }, [filteredEvents, dateRangeKey, userTimezone, trackingEvents]);
+  }, [filteredEvents, dateRangeKey, userTimezone, trackingEvents, enabledPages]);
 
   
   // Calculate stats using the same exact logic as CallsList for consistency
@@ -325,6 +332,9 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
   const recentBookings = getRecentBookings(7);
   const monthlyComparison = getMonthlyComparison();
 
+  const filteredTrackingEvents = trackingEvents.filter(event => 
+    enabledPages.length === 0 || enabledPages.includes(event.page_url)
+  );
   const totalPageViews = chartData.reduce((sum, day) => sum + day.pageViews, 0);
   const bookingRate = totalPageViews > 0 ? ((callStatsData.totalBookings / totalPageViews) * 100) : 0;
   const previousBookingRate = 0; // Simplified for now since we're focusing on current period accuracy
@@ -370,6 +380,11 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Book Call Funnel</h2>
       </div>
+
+      <PageViewFilter
+        trackingEvents={trackingEvents}
+        onFilterChange={setEnabledPages}
+      />
 
       <LandingPageMetrics
         totalPageViews={totalPageViews}
