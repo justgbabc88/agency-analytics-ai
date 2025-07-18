@@ -138,6 +138,28 @@ async function syncFacebook(apiKeys: Record<string, string>) {
     
     const campaignsData = await campaignsResponse.json()
 
+    // Fetch ad sets for all campaigns
+    const adSetsResponse = await fetch(
+      `https://graph.facebook.com/v18.0/${adAccountId}/adsets?access_token=${access_token}&fields=id,name,campaign_id,status,created_time,updated_time`
+    )
+    
+    let adSetsData = { data: [] }
+    if (adSetsResponse.ok) {
+      adSetsData = await adSetsResponse.json()
+      console.log(`Fetched ${adSetsData.data?.length || 0} ad sets`)
+    } else {
+      console.warn('Failed to fetch ad sets from Facebook')
+    }
+
+    // Add campaign names to ad sets
+    const adSetsWithCampaignNames = (adSetsData.data || []).map((adSet: any) => {
+      const campaign = campaignsData.data?.find((c: any) => c.id === adSet.campaign_id)
+      return {
+        ...adSet,
+        campaign_name: campaign?.name || 'Unknown Campaign'
+      }
+    })
+
     // Fetch insights for each campaign individually
     const campaignInsights: any[] = []
     const campaignDailyInsights: any[] = []
@@ -213,10 +235,11 @@ async function syncFacebook(apiKeys: Record<string, string>) {
     overallInsights.cpm = overallInsights.impressions > 0 ? (overallInsights.spend / overallInsights.impressions) * 1000 : 0
     overallInsights.cpc = overallInsights.clicks > 0 ? overallInsights.spend / overallInsights.clicks : 0
 
-    console.log(`Facebook sync successful - ${campaignsData.data?.length || 0} campaigns, insights fetched for date range: ${date_range?.since || 'last 30 days'} to ${date_range?.until || 'today'}`)
+    console.log(`Facebook sync successful - ${campaignsData.data?.length || 0} campaigns, ${adSetsWithCampaignNames.length} ad sets, insights fetched for date range: ${date_range?.since || 'last 30 days'} to ${date_range?.until || 'today'}`)
 
     return {
       campaigns: campaignsData.data || [],
+      adsets: adSetsWithCampaignNames,
       campaign_insights: campaignInsights,
       insights: {
         impressions: parseInt(overallInsights.impressions || '0'),
@@ -267,6 +290,32 @@ async function syncFacebook(apiKeys: Record<string, string>) {
     // Return mock data for demo purposes if API fails
     return {
       campaigns: [],
+      adsets: [
+        {
+          id: "23851234567890",
+          name: "Interest Targeting - Lookalike",
+          campaign_id: "23851234567891",
+          campaign_name: "Demo Campaign 1",
+          status: "ACTIVE",
+          created_time: "2024-01-15T10:00:00+0000"
+        },
+        {
+          id: "23851234567892",
+          name: "Retargeting - Website Visitors",
+          campaign_id: "23851234567891",
+          campaign_name: "Demo Campaign 1", 
+          status: "ACTIVE",
+          created_time: "2024-01-16T10:00:00+0000"
+        },
+        {
+          id: "23851234567893",
+          name: "Broad Targeting Test",
+          campaign_id: "23851234567894",
+          campaign_name: "Demo Campaign 2",
+          status: "PAUSED",
+          created_time: "2024-01-17T10:00:00+0000"
+        }
+      ],
       insights: {
         impressions: 150000,
         clicks: 3200,

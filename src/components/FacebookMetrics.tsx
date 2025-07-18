@@ -49,6 +49,7 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
     facebookData,
     insights,
     campaigns,
+    adSets,
     isLoading,
     dateRange
   });

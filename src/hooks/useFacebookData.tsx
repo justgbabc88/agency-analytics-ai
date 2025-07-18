@@ -137,10 +137,12 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
         
         console.log('useFacebookData - Facebook data structure:', {
           campaigns: fbData.campaigns,
+          adSets: fbData.adsets,
           dailyInsightsCount: fbData.daily_insights?.length || 0,
           firstDailyInsight: fbData.daily_insights?.[0],
           hasAggregatedMetrics: !!fbData.aggregated_metrics,
-          campaignIds
+          campaignIds,
+          adSetIds
         });
         
         // Filter data by campaign and date range
