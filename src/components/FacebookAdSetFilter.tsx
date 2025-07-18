@@ -31,26 +31,24 @@ export const FacebookAdSetFilter = ({
   const [tempSelectedIds, setTempSelectedIds] = useState<string[]>(selectedAdSetIds);
 
   // Simple filtering logic: 
-  // - If no campaigns selected OR all campaigns selected: show all ad sets
+  // - If no campaigns selected: show all ad sets
   // - If specific campaigns selected: show only ad sets from those campaigns
-  const totalCampaigns = adSets.reduce((acc, adSet) => {
-    const uniqueCampaigns = new Set(acc);
-    uniqueCampaigns.add(adSet.campaign_id);
-    return Array.from(uniqueCampaigns);
-  }, [] as string[]).length;
-
-  const allCampaignsSelected = selectedCampaignIds.length === 0 || selectedCampaignIds.length === totalCampaigns;
-  
-  const filteredAdSets = allCampaignsSelected 
-    ? adSets // Show all ad sets
+  const filteredAdSets = selectedCampaignIds.length === 0 
+    ? adSets // Show all ad sets when no campaigns selected
     : adSets.filter(adSet => selectedCampaignIds.includes(adSet.campaign_id)); // Show only ad sets from selected campaigns
 
   console.log('🔍 Simple AdSet Filter:', {
     totalAdSets: adSets.length,
-    totalCampaigns,
-    selectedCampaignIds: selectedCampaignIds.length,
-    allCampaignsSelected,
+    selectedCampaignIds,
+    selectedCampaignIdsLength: selectedCampaignIds.length,
     filteredAdSets: filteredAdSets.length,
+    sampleAdSet: adSets[0],
+    campaignIdMatches: adSets.map(adSet => ({
+      adSetId: adSet.id,
+      adSetName: adSet.name,
+      campaignId: adSet.campaign_id,
+      isSelected: selectedCampaignIds.includes(adSet.campaign_id)
+    })),
     timestamp: new Date().toISOString()
   });
 
