@@ -235,16 +235,56 @@ async function performBatchSync(accessToken: string, adAccountId: string): Promi
 
   // Parse batch responses
   const campaigns = batchResults[0]?.code === 200 ? JSON.parse(batchResults[0].body).data || [] : [];
-  const adSets = batchResults[1]?.code === 200 ? JSON.parse(batchResults[1].body).data || [] : [];
   const insights = batchResults[2]?.code === 200 ? JSON.parse(batchResults[2].body).data?.[0] || {} : {};
 
-  // Track if we hit rate limits
-  const rateLimitHit = batchResults[1]?.code === 400 || batchResults[1]?.code === 429;
+  // Handle ad sets with rate limit awareness
+  let adSets = [];
+  let rateLimitHit = false;
+  let preserveExistingAdSets = false;
+
+  if (batchResults[1]?.code === 200) {
+    adSets = JSON.parse(batchResults[1].body).data || [];
+    console.log(`📊 Successfully fetched ${adSets.length} ad sets`);
+  } else if (batchResults[1]?.code === 400 || batchResults[1]?.code === 429) {
+    rateLimitHit = true;
+    preserveExistingAdSets = true;
+    console.log('⚠️  Rate limit detected for ad sets - will preserve existing data');
+    
+    // Try to get existing ad sets from the most recent sync
+    try {
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+      
+      const { data: existingData } = await supabase
+        .from('integration_data')
+        .select('data')
+        .eq('platform', 'facebook')
+        .order('synced_at', { ascending: false })
+        .limit(3); // Check last 3 syncs for ad sets
+      
+      if (existingData) {
+        for (const record of existingData) {
+          const fbData = record.data as any;
+          if (fbData.adsets && fbData.adsets.length > 0) {
+            adSets = fbData.adsets;
+            console.log(`📚 Using ${adSets.length} ad sets from previous sync`);
+            break;
+          }
+        }
+      }
+    } catch (error) {
+      console.log('⚠️  Could not retrieve existing ad sets:', error.message);
+    }
+  } else {
+    console.log(`❌ Ad sets request failed with code ${batchResults[1]?.code}`);
+  }
   
-  console.log(`📊 Parsed data: ${campaigns.length} campaigns, ${adSets.length} ad sets`);
+  console.log(`📊 Final data: ${campaigns.length} campaigns, ${adSets.length} ad sets`);
   
   if (rateLimitHit) {
-    console.log('⚠️  Rate limit detected for ad sets');
+    console.log('⚠️  Rate limit hit - using fallback ad sets data');
   }
 
   // Enhance ad sets with campaign names
