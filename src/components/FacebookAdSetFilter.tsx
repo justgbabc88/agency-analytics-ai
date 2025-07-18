@@ -35,6 +35,14 @@ export const FacebookAdSetFilter = ({
     ? adSets.filter(adSet => selectedCampaignIds.includes(adSet.campaign_id))
     : adSets;
 
+  console.log('🔍 AdSet Filter Debug:', {
+    totalAdSets: adSets.length,
+    selectedCampaignIds,
+    filteredAdSets: filteredAdSets.length,
+    adSetsData: adSets,
+    filteredAdSetsData: filteredAdSets
+  });
+
   // Update temp state when selectedAdSetIds changes (from external)
   useEffect(() => {
     setTempSelectedIds(selectedAdSetIds);

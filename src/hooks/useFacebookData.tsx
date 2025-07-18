@@ -327,6 +327,14 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
     conversion_values: 0,
   };
 
+  console.log('useFacebookData - Return data:', {
+    hasData: !!facebookData,
+    adSetsCount: facebookData?.adSets?.length || 0,
+    filteredAdSetsCount: facebookData?.filteredAdSets?.length || 0,
+    campaignIds,
+    adSetIds
+  });
+
   return {
     facebookData,
     isLoading,
