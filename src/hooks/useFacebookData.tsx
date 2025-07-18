@@ -286,18 +286,13 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
       }
     }
 
-    // Filter by date range
+    // Filter by date range - simple date string comparison since data is already in user timezone
     if (dateRange && filteredDailyInsights?.length > 0) {
+      const fromDate = format(dateRange.from, 'yyyy-MM-dd');
+      const toDate = format(dateRange.to, 'yyyy-MM-dd');
+      
       filteredDailyInsights = filteredDailyInsights.filter(day => {
-        const dayDate = new Date(day.date + 'T00:00:00');
-        const fromDateInUserTz = toZonedTime(dateRange.from, userTimezone);
-        const toDateInUserTz = toZonedTime(dateRange.to, userTimezone);
-        
-        dayDate.setHours(0, 0, 0, 0);
-        fromDateInUserTz.setHours(0, 0, 0, 0);
-        toDateInUserTz.setHours(0, 0, 0, 0);
-        
-        return dayDate >= fromDateInUserTz && dayDate <= toDateInUserTz;
+        return day.date >= fromDate && day.date <= toDate;
       });
 
       // Recalculate insights from filtered daily data
