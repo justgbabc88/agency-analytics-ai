@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Eye, Trash2, Copy, Globe, ShoppingCart, CheckCircle, Video, Calendar, FileText, Settings, ChevronDown, ChevronUp, ExternalLink, AlertTriangle } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -40,6 +41,7 @@ interface PixelWithConfig {
 export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) => {
   const [expandedPixels, setExpandedPixels] = useState<Set<string>>(new Set());
   const [editingPixels, setEditingPixels] = useState<Set<string>>(new Set());
+  const [pageViewToggles, setPageViewToggles] = useState<Record<string, boolean>>({});
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -66,6 +68,17 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
         throw error;
       }
       console.log('TrackingPixelManager: Fetched pixels:', data);
+      
+      // Initialize page view toggles from pixel config
+      const toggleStates: Record<string, boolean> = {};
+      data?.forEach(pixel => {
+        const funnelPages = getFunnelPages(pixel.config);
+        funnelPages.forEach((page: any) => {
+          const toggleKey = `${pixel.id}-${page.id}`;
+          toggleStates[toggleKey] = page.pageViewEnabled !== false; // Default to true
+        });
+      });
+      setPageViewToggles(toggleStates);
       
       // Log each pixel's config to debug
       data?.forEach(pixel => {
@@ -299,6 +312,32 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
       const newSet = new Set(prev);
       newSet.delete(pixelId);
       return newSet;
+    });
+  };
+
+  const handlePageViewToggle = async (pixelId: string, pageId: string, enabled: boolean) => {
+    const toggleKey = `${pixelId}-${pageId}`;
+    setPageViewToggles(prev => ({ ...prev, [toggleKey]: enabled }));
+
+    const pixel = pixels?.find(p => p.id === pixelId);
+    if (!pixel) return;
+
+    const funnelPages = getFunnelPages(pixel.config);
+    const updatedPages = funnelPages.map((page: any) => {
+      if (page.id === pageId) {
+        return { ...page, pageViewEnabled: enabled };
+      }
+      return page;
+    });
+
+    const updatedConfig = {
+      ...(pixel.config && typeof pixel.config === 'object' ? pixel.config : {}),
+      funnelPages: updatedPages
+    };
+
+    await updatePixelConfig.mutateAsync({
+      pixelId: pixelId,
+      config: updatedConfig
     });
   };
 
@@ -607,13 +646,15 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
                       </div>
                     </div>
 
-                    {/* Display funnel pages with clickable links */}
+                    {/* Display funnel pages with clickable links and toggles */}
                     {funnelPages.length > 0 && !isEditing && (
                       <div className="border-t pt-4">
                         <h4 className="font-medium mb-3">Connected Pages</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                           {funnelPages.map((page: any, index: number) => {
                             const PageIcon = getPageIcon(page.type);
+                            const toggleKey = `${pixel.id}-${page.id}`;
+                            const isToggleEnabled = pageViewToggles[toggleKey] !== false;
                             
                             return (
                               <Card key={page.id || index} className="p-3">
@@ -642,13 +683,24 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
                                     </a>
                                   </div>
                                   
-                                  <div className="space-y-2">
+                                  <div className="space-y-3">
                                     <div className="flex flex-wrap gap-1">
                                       {(page.events || []).map((event: string) => (
                                         <Badge key={event} variant="secondary" className="text-xs px-1 py-0">
                                           {event.replace(/_/g, ' ')}
                                         </Badge>
                                       ))}
+                                    </div>
+
+                                    {/* Page View Toggle */}
+                                    <div className="flex items-center justify-between pt-2 border-t">
+                                      <div className="flex items-center space-x-2">
+                                        <span className="text-sm font-medium">Page View Tracking</span>
+                                      </div>
+                                      <Switch
+                                        checked={isToggleEnabled}
+                                        onCheckedChange={(checked) => handlePageViewToggle(pixel.id, page.id, checked)}
+                                      />
                                     </div>
                                   </div>
                                 </div>
