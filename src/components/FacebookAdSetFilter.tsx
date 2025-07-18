@@ -105,6 +105,13 @@ export const FacebookAdSetFilter = ({
   const hasChanges = JSON.stringify(tempSelectedIds.sort()) !== JSON.stringify(selectedAdSetIds.sort());
 
   const getDisplayText = () => {
+    if (isDisabled) {
+      if (selectedCampaignIds.length === 0) {
+        return "Select campaigns first";
+      } else {
+        return "No ad sets available";
+      }
+    }
     if (selectedAdSetIds.length === 0) {
       return "All Ad Sets";
     } else if (selectedAdSetIds.length === 1) {
@@ -135,7 +142,7 @@ export const FacebookAdSetFilter = ({
             }`}
           >
             <span className="truncate">
-              {isDisabled ? "Select campaigns first" : getDisplayText()}
+              {getDisplayText()}
               {hasChanges && <span className="ml-1 text-primary">*</span>}
             </span>
             <ChevronDown className="h-4 w-4 opacity-50" />

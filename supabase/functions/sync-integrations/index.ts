@@ -156,37 +156,8 @@ async function syncFacebook(apiKeys: Record<string, string>) {
         url: `https://graph.facebook.com/v18.0/${adAccountId}/adsets`
       })
       
-      // Use mock ad sets data for testing when API fails
-      // Generate 2-4 ad sets per campaign for realistic testing
-      const mockAdSets: any[] = []
-      
-      campaignsData.data?.forEach((campaign: any, campaignIndex: number) => {
-        const adSetsPerCampaign = 2 + (campaignIndex % 3) // 2-4 ad sets per campaign
-        
-        for (let i = 0; i < adSetsPerCampaign; i++) {
-          const adSetTypes = [
-            'Interest Targeting',
-            'Lookalike Audience',
-            'Retargeting - Website Visitors', 
-            'Custom Audience',
-            'Broad Targeting',
-            'Behavior Targeting'
-          ]
-          
-          const statuses = ['ACTIVE', 'ACTIVE', 'ACTIVE', 'PAUSED'] // 75% active
-          
-          mockAdSets.push({
-            id: `mock_adset_${campaignIndex}_${i}_${Date.now()}`,
-            name: `${adSetTypes[i % adSetTypes.length]} ${i + 1}`,
-            campaign_id: campaign.id,
-            status: statuses[i % statuses.length],
-            created_time: new Date(Date.now() - (campaignIndex * 86400000) - (i * 3600000)).toISOString()
-          })
-        }
-      })
-      
-      adSetsData = { data: mockAdSets }
-      console.log(`Using mock ad sets data for testing: ${mockAdSets.length} ad sets across ${campaignsData.data?.length || 0} campaigns`)
+      // Log the error but don't use mock data
+      console.log('No ad sets data available - Facebook API failed and no mock data will be used')
     }
 
     // Add campaign names to ad sets
@@ -328,32 +299,7 @@ async function syncFacebook(apiKeys: Record<string, string>) {
     // Return mock data for demo purposes if API fails
     return {
       campaigns: [],
-      adsets: [
-        {
-          id: "23851234567890",
-          name: "Interest Targeting - Lookalike",
-          campaign_id: "23851234567891",
-          campaign_name: "Demo Campaign 1",
-          status: "ACTIVE",
-          created_time: "2024-01-15T10:00:00+0000"
-        },
-        {
-          id: "23851234567892",
-          name: "Retargeting - Website Visitors",
-          campaign_id: "23851234567891",
-          campaign_name: "Demo Campaign 1", 
-          status: "ACTIVE",
-          created_time: "2024-01-16T10:00:00+0000"
-        },
-        {
-          id: "23851234567893",
-          name: "Broad Targeting Test",
-          campaign_id: "23851234567894",
-          campaign_name: "Demo Campaign 2",
-          status: "PAUSED",
-          created_time: "2024-01-17T10:00:00+0000"
-        }
-      ],
+      adsets: [], // No mock ad sets
       insights: {
         impressions: 150000,
         clicks: 3200,
