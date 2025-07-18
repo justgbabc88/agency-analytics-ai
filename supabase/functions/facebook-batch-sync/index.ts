@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
         id,
         agency_id,
         platform,
-        agencies (
+        agencies!fk_integrations_agency_id (
           id,
           name,
           user_id
