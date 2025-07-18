@@ -31,7 +31,7 @@ serve(async (req) => {
 
     switch (platform) {
       case 'facebook':
-        syncResult = await syncFacebook(apiKeys)
+        syncResult = await syncFacebook(apiKeys, agencyId)
         break
       case 'clickfunnels':
         syncResult = await syncClickFunnels(apiKeys)
@@ -49,13 +49,68 @@ serve(async (req) => {
         throw new Error(`Unsupported platform: ${platform}`)
     }
 
+    // Handle data merging for incremental syncs
+    let finalData = syncResult
+    if (platform === 'facebook' && syncResult?.daily_insights?.length > 0) {
+      // Get existing data to merge with new incremental data
+      const { data: existingRecord } = await supabase
+        .from('integration_data')
+        .select('data')
+        .eq('agency_id', agencyId)
+        .eq('platform', 'facebook')
+        .order('synced_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (existingRecord?.data?.daily_insights) {
+        const existingDailyInsights = existingRecord.data.daily_insights as any[]
+        const newDailyInsights = syncResult.daily_insights as any[]
+        
+        // Create a map of existing data by date and campaign
+        const existingMap = new Map()
+        existingDailyInsights.forEach((insight: any) => {
+          const key = `${insight.date}-${insight.campaign_id}`
+          existingMap.set(key, insight)
+        })
+        
+        // Add new insights, replacing any existing ones for the same date/campaign
+        newDailyInsights.forEach((insight: any) => {
+          const key = `${insight.date}-${insight.campaign_id}`
+          existingMap.set(key, insight)
+        })
+        
+        // Convert back to array and sort by date
+        const mergedDailyInsights = Array.from(existingMap.values())
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        
+        // Keep only last 30 days of data
+        const thirtyDaysAgo = new Date()
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+        
+        const filteredInsights = mergedDailyInsights.filter(insight => 
+          new Date(insight.date) >= thirtyDaysAgo
+        )
+        
+        console.log(`Merged data: ${existingDailyInsights.length} existing + ${newDailyInsights.length} new = ${filteredInsights.length} total insights`)
+        
+        // Update the final data with merged insights
+        finalData = {
+          ...existingRecord.data,
+          ...syncResult,
+          daily_insights: filteredInsights,
+          last_updated: new Date().toISOString(),
+          synced_at: new Date().toISOString()
+        }
+      }
+    }
+
     // Store the synced data in the database using upsert
     const { error: insertError } = await supabase
       .from('integration_data')
       .upsert({
         agency_id: agencyId,
         platform,
-        data: syncResult,
+        data: finalData,
         synced_at: new Date().toISOString()
       }, {
         onConflict: 'agency_id,platform'
@@ -157,28 +212,94 @@ async function fetchFromFacebookWithRetry(url: string, maxRetries = 3): Promise<
   }
 }
 
-async function syncFacebook(apiKeys: Record<string, string>) {
+async function syncFacebook(apiKeys: Record<string, string>, agencyId?: string) {
   const { access_token, selected_ad_account_id, date_range } = apiKeys
   
   if (!access_token) {
     throw new Error('Facebook access token is required')
   }
 
-  console.log('Facebook sync initiated - fetching ad data')
+  console.log('Facebook sync initiated - checking for existing data')
 
-  const adAccountId = selected_ad_account_id || 'act_123456789' // fallback for demo
+  const adAccountId = selected_ad_account_id || 'act_123456789'
 
-  // Determine date range - use custom range if provided, otherwise default to last 30 days
-  let datePreset = 'last_30d'
+  // Check existing data to determine what date range to sync
   let sinceParam = ''
   let untilParam = ''
+  let datePreset = ''
   
+  if (agencyId) {
+    try {
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      )
+
+      // Get the most recent data to find gaps
+      const { data: existingData } = await supabase
+        .from('integration_data')
+        .select('data')
+        .eq('agency_id', agencyId)
+        .eq('platform', 'facebook')
+        .order('synced_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (existingData?.data?.daily_insights) {
+        const dailyInsights = existingData.data.daily_insights as any[]
+        if (dailyInsights.length > 0) {
+          // Find the latest date in existing data
+          const latestDate = dailyInsights
+            .map(d => new Date(d.date))
+            .sort((a, b) => b.getTime() - a.getTime())[0]
+          
+          // Calculate 30 days ago from today
+          const thirtyDaysAgo = new Date()
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+          
+          // If we have recent data, only sync from the day after latest existing data
+          if (latestDate > thirtyDaysAgo) {
+            const nextDay = new Date(latestDate)
+            nextDay.setDate(nextDay.getDate() + 1)
+            
+            const today = new Date()
+            
+            // Only sync if there are missing days
+            if (nextDay <= today) {
+              sinceParam = `&time_range[since]=${nextDay.toISOString().split('T')[0]}`
+              untilParam = `&time_range[until]=${today.toISOString().split('T')[0]}`
+              console.log(`Incremental sync: fetching data from ${nextDay.toISOString().split('T')[0]} to ${today.toISOString().split('T')[0]}`)
+            } else {
+              console.log('Data is up to date, skipping sync')
+              return existingData.data
+            }
+          } else {
+            // Data is too old, sync last 30 days
+            datePreset = '&date_preset=last_30d'
+            console.log('Existing data is older than 30 days, syncing last 30 days')
+          }
+        } else {
+          // No daily insights, sync last 30 days
+          datePreset = '&date_preset=last_30d'
+          console.log('No existing daily insights, syncing last 30 days')
+        }
+      } else {
+        // No existing data, sync last 30 days
+        datePreset = '&date_preset=last_30d'
+        console.log('No existing data found, syncing last 30 days')
+      }
+    } catch (error) {
+      console.log('Error checking existing data, defaulting to last 30 days:', error)
+      datePreset = '&date_preset=last_30d'
+    }
+  }
+  
+  // Override with custom date range if provided
   if (date_range?.since && date_range?.until) {
     sinceParam = `&time_range[since]=${date_range.since}`
     untilParam = `&time_range[until]=${date_range.until}`
-    datePreset = '' // Don't use preset when custom range is provided
-  } else {
-    datePreset = '&date_preset=last_30d'
+    datePreset = ''
+    console.log(`Using custom date range: ${date_range.since} to ${date_range.until}`)
   }
 
   try {
