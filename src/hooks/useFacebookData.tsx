@@ -242,101 +242,135 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
     queryKey: ['facebook-integrations', agency?.id, dateRange?.from, dateRange?.to, campaignIds, adSetIds]
   });
 
-  // Apply filtering logic to the cached data
-  const filteredData = React.useMemo(() => {
-    if (!facebookData) return null;
+    // Apply filtering logic to the cached data
+    const filteredData = React.useMemo(() => {
+      if (!facebookData) return null;
 
-    // Filter campaigns if campaign IDs are provided
-    let filteredCampaigns = facebookData.campaigns;
-    let filteredInsights = facebookData.insights;
-    let filteredDailyInsights = facebookData.daily_insights;
+      console.log('Filtering Facebook data:', {
+        hasData: !!facebookData,
+        dailyInsightsCount: facebookData.daily_insights?.length || 0,
+        campaignIds,
+        dateRange,
+        userTimezone
+      });
 
-    if (campaignIds && campaignIds.length > 0) {
-      filteredCampaigns = facebookData.campaigns.filter(campaign => campaignIds.includes(campaign.id));
-      
-      // Filter daily insights by campaigns
-      if (facebookData.daily_insights?.length > 0) {
-        filteredDailyInsights = facebookData.daily_insights.filter(day => 
-          campaignIds.includes(day.campaign_id)
-        );
+      // Start with raw data
+      let filteredCampaigns = facebookData.campaigns || [];
+      let filteredInsights = facebookData.insights || {};
+      let filteredDailyInsights = facebookData.daily_insights || [];
+      let filteredAdSets = facebookData.adSets || [];
+
+      // Filter campaigns if campaign IDs are provided
+      if (campaignIds && campaignIds.length > 0) {
+        filteredCampaigns = facebookData.campaigns?.filter(campaign => 
+          campaignIds.includes(campaign.id)
+        ) || [];
+        
+        // Filter daily insights by campaigns
+        if (facebookData.daily_insights?.length > 0) {
+          filteredDailyInsights = facebookData.daily_insights.filter(day => 
+            campaignIds.includes(day.campaign_id)
+          );
+        }
+
+        // Filter ad sets by selected campaigns
+        if (facebookData.adSets?.length > 0) {
+          filteredAdSets = facebookData.adSets.filter(adSet => 
+            campaignIds.includes(adSet.campaign_id)
+          );
+        }
+
+        // Calculate insights from campaign insights if available
+        if (facebookData.campaign_insights?.length > 0) {
+          const selectedCampaignInsights = facebookData.campaign_insights.filter(insight => 
+            campaignIds.includes(insight.campaign_id)
+          );
+          
+          if (selectedCampaignInsights.length > 0) {
+            filteredInsights = selectedCampaignInsights.reduce((totals, insight) => ({
+              impressions: (totals.impressions || 0) + (insight.impressions || 0),
+              clicks: (totals.clicks || 0) + (insight.clicks || 0),
+              spend: (totals.spend || 0) + (insight.spend || 0),
+              reach: Math.max(totals.reach || 0, insight.reach || 0),
+              conversions: (totals.conversions || 0) + (insight.conversions || 0),
+              conversion_values: (totals.conversion_values || 0) + (insight.conversion_values || 0),
+              ctr: 0, // Will be calculated below
+              cpc: 0, // Will be calculated below
+            }), { impressions: 0, clicks: 0, spend: 0, reach: 0, conversions: 0, conversion_values: 0, ctr: 0, cpc: 0 });
+            
+            // Calculate derived metrics
+            filteredInsights.ctr = filteredInsights.impressions > 0 ? (filteredInsights.clicks / filteredInsights.impressions) * 100 : 0;
+            filteredInsights.cpc = filteredInsights.clicks > 0 ? filteredInsights.spend / filteredInsights.clicks : 0;
+          }
+        }
       }
 
-      // Calculate insights from campaign insights if available
-      if (facebookData.campaign_insights?.length > 0) {
-        const selectedCampaignInsights = facebookData.campaign_insights.filter(insight => 
-          campaignIds.includes(insight.campaign_id)
-        );
+      // Filter by date range - if no campaigns are selected, start with all daily insights
+      if (dateRange && facebookData.daily_insights?.length > 0) {
+        // Use filtered daily insights from campaign filtering, or all daily insights if no campaigns selected
+        const insightsToFilter = filteredDailyInsights.length > 0 ? filteredDailyInsights : facebookData.daily_insights;
         
-        if (selectedCampaignInsights.length > 0) {
-          filteredInsights = selectedCampaignInsights.reduce((totals, insight) => ({
-            impressions: (totals.impressions || 0) + (insight.impressions || 0),
-            clicks: (totals.clicks || 0) + (insight.clicks || 0),
-            spend: (totals.spend || 0) + (insight.spend || 0),
-            reach: Math.max(totals.reach || 0, insight.reach || 0),
-            conversions: (totals.conversions || 0) + (insight.conversions || 0),
-            conversion_values: (totals.conversion_values || 0) + (insight.conversion_values || 0),
+        filteredDailyInsights = insightsToFilter.filter(day => {
+          const dayDate = new Date(day.date + 'T00:00:00Z');
+          const fromDate = new Date(format(dateRange.from, 'yyyy-MM-dd') + 'T00:00:00Z');
+          const toDate = new Date(format(dateRange.to, 'yyyy-MM-dd') + 'T23:59:59Z');
+          
+          return dayDate >= fromDate && dayDate <= toDate;
+        });
+
+        console.log('Date filtering results:', {
+          originalCount: insightsToFilter.length,
+          filteredCount: filteredDailyInsights.length,
+          dateRange: {
+            from: format(dateRange.from, 'yyyy-MM-dd'),
+            to: format(dateRange.to, 'yyyy-MM-dd')
+          },
+          sampleDates: filteredDailyInsights.slice(0, 3).map(d => d.date)
+        });
+
+        // Recalculate insights from filtered daily data if we have date-filtered data
+        if (filteredDailyInsights.length > 0) {
+          const dailyAggregated = filteredDailyInsights.reduce((totals, day) => ({
+            impressions: (totals.impressions || 0) + (day.impressions || 0),
+            clicks: (totals.clicks || 0) + (day.clicks || 0),
+            spend: (totals.spend || 0) + (day.spend || 0),
+            reach: Math.max(totals.reach || 0, day.reach || 0),
+            conversions: (totals.conversions || 0) + (day.conversions || 0),
+            conversion_values: (totals.conversion_values || 0) + (day.conversion_values || 0),
             ctr: 0, // Will be calculated below
             cpc: 0, // Will be calculated below
           }), { impressions: 0, clicks: 0, spend: 0, reach: 0, conversions: 0, conversion_values: 0, ctr: 0, cpc: 0 });
           
           // Calculate derived metrics
-          filteredInsights.ctr = filteredInsights.impressions > 0 ? (filteredInsights.clicks / filteredInsights.impressions) * 100 : 0;
-          filteredInsights.cpc = filteredInsights.clicks > 0 ? filteredInsights.spend / filteredInsights.clicks : 0;
+          dailyAggregated.ctr = dailyAggregated.impressions > 0 ? (dailyAggregated.clicks / dailyAggregated.impressions) * 100 : 0;
+          dailyAggregated.cpc = dailyAggregated.clicks > 0 ? dailyAggregated.spend / dailyAggregated.clicks : 0;
+          
+          filteredInsights = dailyAggregated;
+          
+          console.log('Recalculated insights from daily data:', filteredInsights);
         }
+      } else if (!dateRange) {
+        // No date range specified, use all data
+        filteredDailyInsights = facebookData.daily_insights || [];
       }
-    }
 
-    // Filter by date range
-    if (dateRange && filteredDailyInsights?.length > 0) {
-      filteredDailyInsights = filteredDailyInsights.filter(day => {
-        const dayDate = new Date(day.date + 'T00:00:00');
-        const fromDateInUserTz = toZonedTime(dateRange.from, userTimezone);
-        const toDateInUserTz = toZonedTime(dateRange.to, userTimezone);
-        
-        dayDate.setHours(0, 0, 0, 0);
-        fromDateInUserTz.setHours(0, 0, 0, 0);
-        toDateInUserTz.setHours(0, 0, 0, 0);
-        
-        return dayDate >= fromDateInUserTz && dayDate <= toDateInUserTz;
+      const result = {
+        ...facebookData,
+        insights: filteredInsights,
+        filteredCampaigns,
+        filteredAdSets,
+        daily_insights: filteredDailyInsights
+      };
+
+      console.log('Final filtered data result:', {
+        insights: result.insights,
+        dailyInsightsCount: result.daily_insights?.length || 0,
+        campaignsCount: result.filteredCampaigns?.length || 0,
+        adSetsCount: result.filteredAdSets?.length || 0
       });
 
-      // Recalculate insights from filtered daily data
-      if (filteredDailyInsights.length > 0) {
-        const dailyAggregated = filteredDailyInsights.reduce((totals, day) => ({
-          impressions: (totals.impressions || 0) + (day.impressions || 0),
-          clicks: (totals.clicks || 0) + (day.clicks || 0),
-          spend: (totals.spend || 0) + (day.spend || 0),
-          reach: Math.max(totals.reach || 0, day.reach || 0),
-          conversions: (totals.conversions || 0) + (day.conversions || 0),
-          conversion_values: (totals.conversion_values || 0) + (day.conversion_values || 0),
-          ctr: 0, // Will be calculated below
-          cpc: 0, // Will be calculated below
-        }), { impressions: 0, clicks: 0, spend: 0, reach: 0, conversions: 0, conversion_values: 0, ctr: 0, cpc: 0 });
-        
-        // Calculate derived metrics
-        dailyAggregated.ctr = dailyAggregated.impressions > 0 ? (dailyAggregated.clicks / dailyAggregated.impressions) * 100 : 0;
-        dailyAggregated.cpc = dailyAggregated.clicks > 0 ? dailyAggregated.spend / dailyAggregated.clicks : 0;
-        
-        filteredInsights = dailyAggregated;
-      }
-    }
-
-    // Filter ad sets by selected campaigns
-    let filteredAdSets = facebookData.adSets;
-    if (campaignIds && campaignIds.length > 0 && filteredAdSets?.length > 0) {
-      filteredAdSets = facebookData.adSets.filter(adSet => 
-        campaignIds.includes(adSet.campaign_id)
-      );
-    }
-
-    return {
-      ...facebookData,
-      insights: filteredInsights,
-      filteredCampaigns,
-      filteredAdSets,
-      daily_insights: filteredDailyInsights
-    };
-  }, [facebookData, campaignIds, dateRange, userTimezone]);
+      return result;
+    }, [facebookData, campaignIds, dateRange, userTimezone]);
 
   const returnData = {
     facebookData: filteredData,
