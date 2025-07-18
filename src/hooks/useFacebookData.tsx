@@ -145,11 +145,6 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
         .order('synced_at', { ascending: false })
         .limit(5); // Get last 5 syncs to find one with ad sets
 
-      console.log('useFacebookData - Synced data retrieved:', {
-        primary: syncedData,
-        fallbackOptions: fallbackData?.length || 0
-      });
-
       if (syncedData && syncedData.data) {
         const fbData = syncedData.data as any;
         
@@ -172,16 +167,6 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
           }
         }
         
-        console.log('useFacebookData - Facebook data structure:', {
-          campaigns: fbData.campaigns,
-          adSets: adSetsToUse,
-          adSetsSource: adSetsToUse.length > 0 ? (adSetsToUse === fbData.adsets ? 'current' : 'fallback') : 'none',
-          dailyInsightsCount: fbData.daily_insights?.length || 0,
-          firstDailyInsight: fbData.daily_insights?.[0],
-          hasAggregatedMetrics: !!fbData.aggregated_metrics,
-          campaignIds,
-          adSetIds
-        });
         
         // Filter data by campaign and date range
         let filteredCampaigns = fbData.campaigns || [];
@@ -190,13 +175,6 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
 
         // Filter by campaigns if provided
         if (campaignIds && campaignIds.length > 0) {
-          console.log('🔍 DEBUG: Campaign filtering in useFacebookData:', {
-            campaignIds,
-            campaignIdsType: typeof campaignIds[0],
-            availableCampaigns: fbData.campaigns?.map(c => ({ id: c.id, name: c.name, idType: typeof c.id })) || [],
-            availableAdSets: fbData.adsets?.map(a => ({ id: a.id, name: a.name, campaign_id: a.campaign_id, campaignIdType: typeof a.campaign_id })) || [],
-            timestamp: new Date().toISOString()
-          });
           
           filteredCampaigns = fbData.campaigns?.filter((campaign: any) => campaignIds.includes(campaign.id)) || [];
           

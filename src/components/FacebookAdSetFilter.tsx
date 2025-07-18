@@ -49,40 +49,11 @@ export const FacebookAdSetFilter = ({
     ? adSets // Show all ad sets when no campaigns selected
     : adSets.filter(adSet => selectedCampaignIds.includes(adSet.campaign_id)); // Show only ad sets from selected campaigns
 
-  console.log('🔍 DEBUG: AdSet Filter Details:', {
-    totalAdSets: adSets.length,
-    selectedCampaignIds: selectedCampaignIds,
-    selectedCampaignIdsType: typeof selectedCampaignIds[0],
-    filteredAdSetsCount: filteredAdSets.length,
-    sampleAdSet: adSets[0],
-    sampleAdSetCampaignId: adSets[0]?.campaign_id,
-    sampleAdSetCampaignIdType: typeof adSets[0]?.campaign_id,
-    campaignIdMatches: adSets.slice(0, 3).map(adSet => ({
-      adSetId: adSet.id,
-      adSetName: adSet.name,
-      campaignId: adSet.campaign_id,
-      campaignIdType: typeof adSet.campaign_id,
-      isIncluded: selectedCampaignIds.includes(adSet.campaign_id),
-      isIncludedString: selectedCampaignIds.includes(String(adSet.campaign_id)),
-      selectedCampaignIds: selectedCampaignIds
-    })),
-    timestamp: new Date().toISOString()
-  });
 
   // Update temp state when selectedAdSetIds changes (from external)
   useEffect(() => {
     setTempSelectedIds(selectedAdSetIds);
   }, [selectedAdSetIds]);
-
-  // Clear ad set selection when campaigns change
-  useEffect(() => {
-    const validAdSetIds = selectedAdSetIds.filter(adSetId => 
-      filteredAdSets.some(adSet => adSet.id === adSetId)
-    );
-    if (validAdSetIds.length !== selectedAdSetIds.length) {
-      onAdSetChange(validAdSetIds);
-    }
-  }, [selectedCampaignIds, filteredAdSets, selectedAdSetIds, onAdSetChange]);
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
