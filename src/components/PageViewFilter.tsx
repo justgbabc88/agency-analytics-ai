@@ -56,20 +56,16 @@ export const PageViewFilter = ({ trackingEvents, onFilterChange }: PageViewFilte
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Page View Filters</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div className="space-y-3">
+      <h3 className="text-sm font-medium text-muted-foreground">Connected Pages</h3>
+      <div className="flex flex-wrap gap-4">
         {uniquePages.map((pageUrl) => (
-          <div key={pageUrl} className="flex items-center justify-between space-x-4">
+          <div key={pageUrl} className="flex items-center space-x-3 bg-card border rounded-lg px-4 py-3">
             <div className="flex-1 min-w-0">
-              <Label htmlFor={`page-${pageUrl}`} className="text-sm font-medium">
+              <Label htmlFor={`page-${pageUrl}`} className="text-sm font-medium cursor-pointer">
                 {getPageName(pageUrl)}
               </Label>
-              <p className="text-xs text-muted-foreground truncate" title={pageUrl}>
-                {pageUrl}
-              </p>
+              <p className="text-xs text-muted-foreground">page view</p>
             </div>
             <Switch
               id={`page-${pageUrl}`}
@@ -78,7 +74,7 @@ export const PageViewFilter = ({ trackingEvents, onFilterChange }: PageViewFilte
             />
           </div>
         ))}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };
