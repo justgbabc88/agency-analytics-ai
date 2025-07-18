@@ -175,23 +175,35 @@ export const AttributionDashboard = ({ projectId, dateRange }: AttributionDashbo
   const selectedPixel = pixels?.find(p => p.id === selectedPixelId);
   const configuredPages = selectedPixel?.config?.funnelPages || [];
 
-  // Helper function to check if an event belongs to a specific page based on event name
-  const isEventForPage = (eventName: string | null, pageName: string): boolean => {
-    if (!eventName || !pageName) return false;
+  // Helper function to check if an event belongs to a specific page
+  const isEventForPage = (event: any, page: any): boolean => {
+    if (!event || !page) return false;
     
-    // Check if the event name starts with the page name
-    // Format: "PageName - Event Type" (e.g., "LP - Page View", "Web - Form Submission")
-    const normalizedEventName = eventName.toLowerCase();
-    const normalizedPageName = pageName.toLowerCase();
-    
-    // Direct match with page name prefix
-    if (normalizedEventName.startsWith(`${normalizedPageName} -`)) {
-      return true;
+    // Primary method: Match by page URL
+    if (event.page_url && page.url) {
+      // Extract base URL without query parameters for comparison
+      const eventBaseUrl = event.page_url.split('?')[0].split('#')[0];
+      const pageBaseUrl = page.url.split('?')[0].split('#')[0];
+      
+      if (eventBaseUrl === pageBaseUrl) {
+        return true;
+      }
     }
     
-    // Also check for exact page name match in event name
-    if (normalizedEventName.includes(normalizedPageName)) {
-      return true;
+    // Fallback method: Check event name for page name (for events with formatted names)
+    if (event.event_name && page.name) {
+      const normalizedEventName = event.event_name.toLowerCase();
+      const normalizedPageName = page.name.toLowerCase();
+      
+      // Direct match with page name prefix
+      if (normalizedEventName.startsWith(`${normalizedPageName} -`)) {
+        return true;
+      }
+      
+      // Also check for exact page name match in event name
+      if (normalizedEventName.includes(normalizedPageName)) {
+        return true;
+      }
     }
     
     return false;
@@ -220,11 +232,13 @@ export const AttributionDashboard = ({ projectId, dateRange }: AttributionDashbo
       console.log(`\n--- Processing page: ${page.name} (${page.url}) ---`);
       
       const pageEvents = eventStats.filter(event => {
-        const matches = isEventForPage(event.event_name, page.name);
+        const matches = isEventForPage(event, page);
         if (matches) {
           console.log(`✓ Event matches ${page.name}:`, { 
             eventName: event.event_name, 
+            eventPageUrl: event.page_url,
             pageName: page.name,
+            configuredPageUrl: page.url,
             eventType: event.event_type
           });
         }
