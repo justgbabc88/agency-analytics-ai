@@ -167,26 +167,25 @@ serve(async (req) => {
 
     if (existingData?.data?.daily_insights) {
       const existingInsights = existingData.data.daily_insights
+      const existingDates = new Set(existingInsights.map(i => i.date))
       
-      // Find the latest date in the new data from Facebook
-      const latestNewDate = sortedInsights.length > 0 
-        ? new Date(Math.max(...sortedInsights.map(i => new Date(i.date).getTime())))
-        : new Date(0)
+      // ONLY add new data for dates that don't already exist
+      // NEVER overwrite existing data
+      const newInsights = sortedInsights.filter(insight => !existingDates.has(insight.date))
       
-      console.log(`Latest date from Facebook: ${latestNewDate.toISOString().split('T')[0]}`)
+      console.log(`Data protection: ${existingInsights.length} existing insights preserved`)
+      console.log(`Adding ${newInsights.length} new insights for dates: ${newInsights.map(i => i.date).join(', ')}`)
       
-      // Keep ALL existing insights that are newer than Facebook's latest date
-      // and replace older insights with fresh Facebook data
-      const preservedInsights = existingInsights.filter(insight => {
-        const insightDate = new Date(insight.date)
-        return insightDate > latestNewDate
-      })
-      
-      // Combine: use fresh Facebook data + preserve newer existing data
-      mergedInsights = [...sortedInsights, ...preservedInsights]
+      // Combine: keep ALL existing data + add only truly new data
+      mergedInsights = [...existingInsights, ...newInsights]
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
       
-      console.log(`Merged insights: ${sortedInsights.length} from Facebook + ${preservedInsights.length} preserved newer = ${mergedInsights.length} total`)
+      // For campaign insights, also be conservative
+      const existingCampaignIds = new Set(existingData.data.campaign_insights?.map(c => c.campaign_id) || [])
+      const newCampaignInsights = campaignInsights.filter(c => !existingCampaignIds.has(c.campaign_id))
+      mergedCampaignInsights = [...(existingData.data.campaign_insights || []), ...newCampaignInsights]
+      
+      console.log(`Total after merge: ${mergedInsights.length} daily insights, ${mergedCampaignInsights.length} campaign insights`)
     }
 
     // Update sync result with merged data
