@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Target, ChevronDown, X } from "lucide-react";
+import { FacebookAdSetStatus } from "./FacebookAdSetStatus";
 
 interface FacebookAdSet {
   id: string;
@@ -19,13 +20,24 @@ interface FacebookAdSetFilterProps {
   selectedAdSetIds: string[];
   onAdSetChange: (adSetIds: string[]) => void;
   selectedCampaignIds: string[];
+  // Add metadata for better UX
+  meta?: {
+    adSetsAvailable: boolean;
+    rateLimitHit: boolean;
+    syncMethod: string;
+  };
+  onRetrySync?: () => void;
+  isRetrying?: boolean;
 }
 
 export const FacebookAdSetFilter = ({ 
   adSets, 
   selectedAdSetIds, 
   onAdSetChange,
-  selectedCampaignIds
+  selectedCampaignIds,
+  meta,
+  onRetrySync,
+  isRetrying = false
 }: FacebookAdSetFilterProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [tempSelectedIds, setTempSelectedIds] = useState<string[]>(selectedAdSetIds);
@@ -135,11 +147,23 @@ export const FacebookAdSetFilter = ({
   const isDisabled = filteredAdSets.length === 0;
 
   return (
-    <div className="flex items-center gap-3">
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Target className="h-4 w-4" />
-        Ad Sets:
-      </div>
+    <div className="w-full">
+      {/* Show status component when ad sets are not available */}
+      {meta && (
+        <FacebookAdSetStatus
+          adSetsAvailable={meta.adSetsAvailable}
+          rateLimitHit={meta.rateLimitHit}
+          syncMethod={meta.syncMethod}
+          onRetry={onRetrySync}
+          isRetrying={isRetrying}
+        />
+      )}
+      
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Target className="h-4 w-4" />
+          Ad Sets:
+        </div>
       
       <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>
@@ -289,6 +313,7 @@ export const FacebookAdSetFilter = ({
           )}
         </PopoverContent>
       </Popover>
+      </div>
     </div>
   );
 };

@@ -34,6 +34,12 @@ interface FacebookData {
   filteredAdSets?: any[];
   daily_insights?: any[];
   last_updated: string;
+  meta?: {
+    adSetsAvailable: boolean;
+    campaignInsightsAvailable: boolean;
+    rateLimitHit: boolean;
+    syncMethod: string;
+  };
 }
 
 interface UseFacebookDataProps {
@@ -295,14 +301,29 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
           } : null
         });
 
+        // Filter ad sets by selected campaigns if both are available
+        let filteredAdSets = fbData.adsets || [];
+        if (campaignIds && campaignIds.length > 0 && filteredAdSets.length > 0) {
+          filteredAdSets = filteredAdSets.filter((adSet: any) => 
+            campaignIds.includes(adSet.campaign_id)
+          );
+        }
+
         return {
           insights: filteredInsights,
           campaigns: fbData.campaigns || [], // Always return all campaigns for the filter
           filteredCampaigns: filteredCampaigns, // Filtered campaigns for display
-          adSets: fbData.adsets || [], // All ad sets for the filter - keep it simple
-          filteredAdSets: fbData.adsets || [], // Return all ad sets, let the component handle filtering
+          adSets: fbData.adsets || [], // All ad sets for the filter
+          filteredAdSets: filteredAdSets, // Properly filtered ad sets
           daily_insights: filteredDailyInsights,
           last_updated: syncedData.synced_at,
+          // Add metadata about data quality
+          meta: {
+            adSetsAvailable: (fbData.adsets || []).length > 0,
+            campaignInsightsAvailable: (fbData.campaign_insights || []).length > 0,
+            rateLimitHit: fbData.rate_limit_hit || false,
+            syncMethod: fbData.sync_method || 'unknown'
+          }
         } as FacebookData;
       }
 
@@ -344,12 +365,20 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
     adSets: facebookData?.adSets || [], // All ad sets for the filter
     filteredAdSets: facebookData?.filteredAdSets || [], // Filtered ad sets
     metrics: facebookData?.insights || defaultInsights,
+    // Include metadata for better UX
+    meta: facebookData?.meta || {
+      adSetsAvailable: false,
+      campaignInsightsAvailable: false,
+      rateLimitHit: false,
+      syncMethod: 'unknown'
+    }
   };
 
   // Log when ad sets data changes
   console.log('🔄 useFacebookData returning:', {
     adSetsLength: returnData.adSets.length,
     adSetsIds: returnData.adSets.map(a => a.id),
+    metaData: returnData.meta,
     timestamp: new Date().toISOString()
   });
 

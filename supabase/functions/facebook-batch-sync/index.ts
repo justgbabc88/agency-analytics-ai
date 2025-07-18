@@ -238,7 +238,14 @@ async function performBatchSync(accessToken: string, adAccountId: string): Promi
   const adSets = batchResults[1]?.code === 200 ? JSON.parse(batchResults[1].body).data || [] : [];
   const insights = batchResults[2]?.code === 200 ? JSON.parse(batchResults[2].body).data?.[0] || {} : {};
 
+  // Track if we hit rate limits
+  const rateLimitHit = batchResults[1]?.code === 400 || batchResults[1]?.code === 429;
+  
   console.log(`📊 Parsed data: ${campaigns.length} campaigns, ${adSets.length} ad sets`);
+  
+  if (rateLimitHit) {
+    console.log('⚠️  Rate limit detected for ad sets');
+  }
 
   // Enhance ad sets with campaign names
   const enhancedAdSets = adSets.map((adSet: any) => {
@@ -317,7 +324,15 @@ async function performBatchSync(accessToken: string, adAccountId: string): Promi
     aggregated_metrics: aggregatedMetrics,
     daily_insights: [], // We'll keep this for compatibility but won't fetch daily data in batch sync
     sync_method: 'batch_api',
-    synced_at: new Date().toISOString()
+    synced_at: new Date().toISOString(),
+    // Add metadata for better UX
+    rate_limit_hit: rateLimitHit,
+    meta: {
+      adSetsAvailable: enhancedAdSets.length > 0,
+      campaignInsightsAvailable: campaignInsights.length > 0,
+      rateLimitHit: rateLimitHit,
+      syncMethod: 'batch_api'
+    }
   };
 
   console.log(`✅ Batch sync completed for ad account ${adAccountId}`);
