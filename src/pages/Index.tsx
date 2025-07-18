@@ -188,7 +188,12 @@ const Index = () => {
     switch (selectedProject.funnel_type) {
       case "book_call":
         return (
-          <BookCallFunnel />
+          <BookCallFunnel 
+            projectId={selectedProjectId} 
+            dateRange={dateRange} 
+            selectedCampaignIds={selectedCampaignIds}
+            selectedFormIds={selectedFormIds}
+          />
         );
       case "high_ticket":
       case "webinar":
