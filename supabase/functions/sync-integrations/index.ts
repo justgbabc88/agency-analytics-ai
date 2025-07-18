@@ -187,16 +187,52 @@ async function syncFacebook(apiKeys: Record<string, string>) {
       `https://graph.facebook.com/v18.0/${adAccountId}/campaigns?access_token=${access_token}&fields=id,name,status,objective,created_time,updated_time`
     )
 
-    // Fetch ad sets with retry logic
+    // Fetch ad sets with insights to filter by spend
     let adSetsData = { data: [] }
     try {
-      adSetsData = await fetchFromFacebookWithRetry(
+      // First get all ad sets
+      const allAdSetsData = await fetchFromFacebookWithRetry(
         `https://graph.facebook.com/v18.0/${adAccountId}/adsets?access_token=${access_token}&fields=id,name,campaign_id,status,created_time,updated_time`
       )
-      console.log(`Successfully fetched ${adSetsData.data?.length || 0} ad sets`)
+      
+      console.log(`Fetched ${allAdSetsData.data?.length || 0} total ad sets, now filtering by spend...`)
+      
+      // Filter ad sets that have spend in the selected date range
+      const adSetsWithSpend = []
+      
+      for (const adSet of allAdSetsData.data || []) {
+        try {
+          // Fetch insights for this ad set with the selected date range
+          const insightsUrl = date_range?.since && date_range?.until 
+            ? `https://graph.facebook.com/v18.0/${adSet.id}/insights?access_token=${access_token}&fields=spend${sinceParam}${untilParam}`
+            : `https://graph.facebook.com/v18.0/${adSet.id}/insights?access_token=${access_token}&fields=spend${datePreset}`
+          
+          const insightsData = await fetchFromFacebookWithRetry(insightsUrl)
+          
+          // Check if ad set has spend in the date range
+          const totalSpend = insightsData.data?.reduce((sum: number, day: any) => sum + parseFloat(day.spend || 0), 0) || 0
+          
+          if (totalSpend > 0) {
+            adSetsWithSpend.push({
+              ...adSet,
+              total_spend: totalSpend
+            })
+          }
+          
+          // Add small delay between ad set requests to avoid rate limits
+          await new Promise(resolve => setTimeout(resolve, 100))
+          
+        } catch (adSetInsightsError) {
+          console.log(`Failed to fetch insights for ad set ${adSet.id}:`, adSetInsightsError)
+          // Skip this ad set if insights fail
+        }
+      }
+      
+      adSetsData = { data: adSetsWithSpend }
+      console.log(`Filtered to ${adSetsWithSpend.length} ad sets with spend > 0 in the selected date range`)
+      
     } catch (adSetsError) {
       console.error('Failed to fetch ad sets after retries:', adSetsError)
-      // Don't use mock data - return empty array and let user know
       console.log('Ad sets unavailable due to Facebook API rate limits. No mock data provided.')
       adSetsData = { data: [] }
     }
