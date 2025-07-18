@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { useFacebookData } from "@/hooks/useFacebookData";
 import { useCalendlyData } from "@/hooks/useCalendlyData";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -33,7 +32,7 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
   const handleCampaignChange = onCampaignChange || setInternalSelectedCampaignIds;
   const handleAdSetChange = onAdSetChange || setInternalSelectedAdSetIds;
   
-  const { facebookData, isLoading, insights, campaigns, allCampaigns, metrics, adSets, refreshData } = useFacebookData({ 
+  const { facebookData, isLoading, insights, campaigns, allCampaigns, metrics, adSets } = useFacebookData({ 
     dateRange, 
     campaignIds: activeCampaignIds,
     adSetIds: activeAdSetIds
@@ -163,28 +162,13 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
 
   // Generate chart data using real Facebook daily insights or fall back to mock data
   const generateChartData = () => {
-    console.log('generateChartData called with:', {
-      dateRange,
-      hasDailyInsights: !!dailyInsights,
-      dailyInsightsLength: dailyInsights?.length || 0,
-      dailyInsightsSample: dailyInsights?.slice(0, 2)
-    });
-
     // If no date range is selected, don't show any data
     if (!dateRange) {
-      console.log('No date range selected, returning empty array');
       return [];
     }
 
     // Use the already filtered daily insights data from the hook
     if (dailyInsights && dailyInsights.length > 0) {
-      console.log('Processing daily insights data:', {
-        count: dailyInsights.length,
-        dateRangeFrom: format(dateRange.from, 'yyyy-MM-dd'),
-        dateRangeTo: format(dateRange.to, 'yyyy-MM-dd'),
-        sampleDates: dailyInsights.slice(0, 3).map(d => d.date)
-      });
-
       // Group by date to ensure one data point per date
       const groupedByDate = dailyInsights.reduce((acc: any, dayData: any) => {
         const dateKey = dayData.date; // Use the date as-is from Facebook data
@@ -257,23 +241,9 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
           };
         });
       
-      console.log('Generated chart data from daily insights:', {
-        chartDataLength: chartData.length,
-        chartData: chartData.slice(0, 2)
-      });
-      
       return chartData;
     }
 
-    console.log('No daily insights data available, trying fallback data generation');
-    
-    // If no real Facebook daily insights, try to generate from dateRange and totals
-    if (dateRange && (insights.spend > 0 || insights.impressions > 0)) {
-      console.log('Generating fallback data from date range and insights');
-      return generateDataForRange(dateRange.from, dateRange.to);
-    }
-
-    console.log('No data available for chart generation');
     // If no real data available, return empty array
     return [];
   };
@@ -485,21 +455,11 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
 
           </div>
 
-          {facebookData && facebookData.last_updated && (
+          {facebookData.last_updated && (
             <div className="mt-3 pt-3 border-t">
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-gray-500">
-                  Last updated: {new Date(facebookData.last_updated).toLocaleString()}
-                </p>
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  onClick={refreshData}
-                  className="text-xs px-2 py-1 h-auto"
-                >
-                  Refresh Data
-                </Button>
-              </div>
+              <p className="text-xs text-gray-500">
+                Last updated: {new Date(facebookData.last_updated).toLocaleString()}
+              </p>
             </div>
           )}
         </CardContent>
