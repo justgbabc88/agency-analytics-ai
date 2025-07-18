@@ -136,14 +136,46 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
         throw syncError;
       }
 
-      console.log('useFacebookData - Synced data retrieved:', syncedData);
+      // Also try to get the most recent data that has ad sets as fallback
+      const { data: fallbackData } = await supabase
+        .from('integration_data')
+        .select('*')
+        .eq('agency_id', agency.id)
+        .eq('platform', 'facebook')
+        .order('synced_at', { ascending: false })
+        .limit(5); // Get last 5 syncs to find one with ad sets
+
+      console.log('useFacebookData - Synced data retrieved:', {
+        primary: syncedData,
+        fallbackOptions: fallbackData?.length || 0
+      });
 
       if (syncedData && syncedData.data) {
         const fbData = syncedData.data as any;
         
+        // If current sync has no ad sets, try to use ad sets from fallback data
+        let adSetsToUse = fbData.adsets || [];
+        if (adSetsToUse.length === 0 && fallbackData && fallbackData.length > 0) {
+          console.log('🔄 No ad sets in current sync, checking fallback data...');
+          
+          // Find the most recent sync that has ad sets
+          const dataWithAdSets = fallbackData.find(data => 
+            data.data && (data.data as any).adsets && (data.data as any).adsets.length > 0
+          );
+          
+          if (dataWithAdSets) {
+            adSetsToUse = (dataWithAdSets.data as any).adsets;
+            console.log('✅ Using ad sets from fallback data:', {
+              fallbackSyncDate: dataWithAdSets.synced_at,
+              adSetsCount: adSetsToUse.length
+            });
+          }
+        }
+        
         console.log('useFacebookData - Facebook data structure:', {
           campaigns: fbData.campaigns,
-          adSets: fbData.adsets,
+          adSets: adSetsToUse,
+          adSetsSource: adSetsToUse.length > 0 ? (adSetsToUse === fbData.adsets ? 'current' : 'fallback') : 'none',
           dailyInsightsCount: fbData.daily_insights?.length || 0,
           firstDailyInsight: fbData.daily_insights?.[0],
           hasAggregatedMetrics: !!fbData.aggregated_metrics,
@@ -310,9 +342,9 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
         });
 
         // Filter ad sets by selected campaigns if both are available
-        let filteredAdSets = fbData.adsets || [];
+        let filteredAdSets = adSetsToUse;
         if (campaignIds && campaignIds.length > 0 && filteredAdSets.length > 0) {
-          filteredAdSets = filteredAdSets.filter((adSet: any) => 
+          filteredAdSets = adSetsToUse.filter((adSet: any) => 
             campaignIds.includes(adSet.campaign_id)
           );
         }
@@ -321,13 +353,13 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
           insights: filteredInsights,
           campaigns: fbData.campaigns || [], // Always return all campaigns for the filter
           filteredCampaigns: filteredCampaigns, // Filtered campaigns for display
-          adSets: fbData.adsets || [], // All ad sets for the filter
+          adSets: adSetsToUse || [], // All ad sets for the filter (using fallback if needed)
           filteredAdSets: filteredAdSets, // Properly filtered ad sets
           daily_insights: filteredDailyInsights,
           last_updated: syncedData.synced_at,
           // Add metadata about data quality
           meta: {
-            adSetsAvailable: (fbData.adsets || []).length > 0,
+            adSetsAvailable: adSetsToUse.length > 0,
             campaignInsightsAvailable: (fbData.campaign_insights || []).length > 0,
             rateLimitHit: fbData.rate_limit_hit || false,
             syncMethod: fbData.sync_method || 'unknown'
