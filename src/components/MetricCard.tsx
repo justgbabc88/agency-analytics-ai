@@ -8,6 +8,7 @@ interface MetricCardProps {
   format?: 'currency' | 'percentage' | 'number';
   className?: string;
   description?: string;
+  isNegativeGood?: boolean;
 }
 
 export const MetricCard = ({ 
@@ -16,7 +17,8 @@ export const MetricCard = ({
   previousValue, 
   format = 'number',
   className = "",
-  description
+  description,
+  isNegativeGood = false
 }: MetricCardProps) => {
   const formatValue = (val: string | number) => {
     const numVal = typeof val === 'string' ? parseFloat(val) : val;
@@ -68,8 +70,8 @@ export const MetricCard = ({
 
   const getTrendColor = () => {
     const trend = getTrend();
-    if (trend === 'up') return 'text-analytics-secondary';
-    if (trend === 'down') return 'text-analytics-danger';
+    if (trend === 'up') return isNegativeGood ? 'text-analytics-danger' : 'text-analytics-secondary';
+    if (trend === 'down') return isNegativeGood ? 'text-analytics-secondary' : 'text-analytics-danger';
     return 'text-gray-400';
   };
 
