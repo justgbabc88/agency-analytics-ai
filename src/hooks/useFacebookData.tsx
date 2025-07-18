@@ -332,10 +332,12 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
     adSetsCount: facebookData?.adSets?.length || 0,
     filteredAdSetsCount: facebookData?.filteredAdSets?.length || 0,
     campaignIds,
-    adSetIds
+    adSetIds,
+    timestamp: new Date().toISOString(),
+    queryKey: ['facebook-integrations', agency?.id, dateRange?.from, dateRange?.to, campaignIds, adSetIds]
   });
 
-  return {
+  const returnData = {
     facebookData,
     isLoading,
     insights: facebookData?.insights || defaultInsights,
@@ -346,4 +348,13 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
     filteredAdSets: facebookData?.filteredAdSets || [], // Filtered ad sets
     metrics: facebookData?.insights || defaultInsights,
   };
+
+  // Log when ad sets data changes
+  console.log('🔄 useFacebookData returning:', {
+    adSetsLength: returnData.adSets.length,
+    adSetsIds: returnData.adSets.map(a => a.id),
+    timestamp: new Date().toISOString()
+  });
+
+  return returnData;
 };

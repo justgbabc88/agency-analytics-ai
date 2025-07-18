@@ -40,8 +40,27 @@ export const FacebookAdSetFilter = ({
     selectedCampaignIds,
     filteredAdSets: filteredAdSets.length,
     adSetsData: adSets,
-    filteredAdSetsData: filteredAdSets
+    filteredAdSetsData: filteredAdSets,
+    timestamp: new Date().toISOString()
   });
+
+  // Track when ad sets change
+  useEffect(() => {
+    console.log('📊 AdSets changed:', {
+      adSetsCount: adSets.length,
+      adSets: adSets.map(a => ({ id: a.id, name: a.name, campaign_id: a.campaign_id })),
+      timestamp: new Date().toISOString()
+    });
+  }, [adSets]);
+
+  // Track when campaigns change  
+  useEffect(() => {
+    console.log('🎯 Campaigns changed for ad set filter:', {
+      selectedCampaignIds,
+      filteredAdSetsCount: filteredAdSets.length,
+      timestamp: new Date().toISOString()
+    });
+  }, [selectedCampaignIds, filteredAdSets.length]);
 
   // Update temp state when selectedAdSetIds changes (from external)
   useEffect(() => {
