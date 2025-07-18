@@ -12,7 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useGHLFormSubmissions } from "@/hooks/useGHLFormSubmissions";
 import { useFacebookData } from "@/hooks/useFacebookData";
-import { PageViewFilter } from "./PageViewFilter";
+
 
 interface BookCallFunnelProps {
   projectId: string;
@@ -381,10 +381,6 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
         <h2 className="text-2xl font-bold">Book Call Funnel</h2>
       </div>
 
-      <PageViewFilter
-        trackingEvents={trackingEvents}
-        onFilterChange={setEnabledPages}
-      />
 
       <LandingPageMetrics
         totalPageViews={totalPageViews}

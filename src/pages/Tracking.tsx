@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { subDays, startOfDay, endOfDay } from 'date-fns';
+import { PageViewFilter } from '@/components/PageViewFilter';
 
 const Tracking = () => {
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
@@ -19,6 +20,7 @@ const Tracking = () => {
     from: startOfDay(subDays(new Date(), 30)),
     to: endOfDay(new Date())
   });
+  const [filteredPageViews, setFilteredPageViews] = useState<string[]>([]);
 
   const handleDateChange = (from: Date, to: Date) => {
     console.log('📅 Tracking page - Date range changed:', { from, to });
@@ -187,6 +189,12 @@ const Tracking = () => {
 
           <TabsContent value="events">
             <div className="space-y-6">
+              {/* Page View Filter */}
+              <PageViewFilter
+                trackingEvents={recentEvents || []}
+                onFilterChange={setFilteredPageViews}
+              />
+
               {/* Event Stats Overview */}
               <Card>
                 <CardHeader>
@@ -254,7 +262,9 @@ const Tracking = () => {
                     </div>
                   ) : recentEvents && recentEvents.length > 0 ? (
                     <div className="space-y-3 max-h-96 overflow-y-auto">
-                      {recentEvents.map((event, index) => (
+                      {recentEvents
+                        .filter(event => filteredPageViews.length === 0 || filteredPageViews.includes(event.page_url))
+                        .map((event, index) => (
                         <div key={event.id} className="flex items-center justify-between p-3 border rounded-lg">
                           <div className="flex items-center space-x-3">
                             <Badge className={getEventTypeColor(event.event_type)}>
