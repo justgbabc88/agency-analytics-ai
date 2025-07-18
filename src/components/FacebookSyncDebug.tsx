@@ -66,19 +66,79 @@ export const FacebookSyncDebug = () => {
     }
   };
 
+  const forceFullSync = async () => {
+    if (!agency) {
+      toast({
+        title: "Error",
+        description: "No agency found",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const facebookKeys = getApiKeys('facebook');
+    if (!facebookKeys.access_token || !facebookKeys.selected_ad_account_id) {
+      toast({
+        title: "Error", 
+        description: "Facebook API keys not found",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      console.log('Running forced full Facebook sync...');
+      
+      const { data, error } = await supabase.functions.invoke('facebook-force-sync', {
+        body: {
+          agencyId: agency.id,
+          accessToken: facebookKeys.access_token,
+          adAccountId: facebookKeys.selected_ad_account_id
+        }
+      });
+
+      if (error) {
+        console.error('Force sync error:', error);
+        toast({
+          title: "Force Sync Error",
+          description: error.message,
+          variant: "destructive"
+        });
+      } else {
+        console.log('Force sync completed:', data);
+        toast({
+          title: "Force Sync Complete",
+          description: `Successfully synced ${data.dailyInsightsCount} days of data`,
+        });
+      }
+    } catch (error) {
+      console.error('Force sync request failed:', error);
+      toast({
+        title: "Request Failed",
+        description: "Failed to run force sync",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader>
-        <CardTitle>Facebook Sync Debug</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <Button onClick={runDebug} className="w-full">
-          Run Debug Analysis
-        </Button>
-        <p className="text-sm text-muted-foreground mt-2">
-          This will analyze your Facebook integration and log detailed information about what's happening with the sync.
-        </p>
-      </CardContent>
-    </Card>
+    <div className="space-y-4">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>Facebook Sync Debug</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Button onClick={runDebug} className="w-full" variant="outline">
+            Run Debug Analysis
+          </Button>
+          <Button onClick={forceFullSync} className="w-full" variant="default">
+            Force Full Sync (30 days)
+          </Button>
+          <p className="text-sm text-muted-foreground">
+            Debug analyzes what's wrong. Force sync bypasses the smart logic and directly fetches all data from Facebook.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
