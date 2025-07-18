@@ -286,13 +286,25 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
       }
     }
 
-    // Filter by date range - simple string comparison since data is already in user timezone
+    // Filter by date range - add debugging and fix the logic
     if (dateRange && filteredDailyInsights?.length > 0) {
       const fromDateString = format(dateRange.from, 'yyyy-MM-dd');
       const toDateString = format(dateRange.to, 'yyyy-MM-dd');
       
+      console.log('🔍 Facebook date filtering:', {
+        dateRange: { from: fromDateString, to: toDateString },
+        totalDailyInsights: filteredDailyInsights.length,
+        sampleInsights: filteredDailyInsights.slice(0, 3).map(d => ({ date: d.date, spend: d.spend }))
+      });
+      
       filteredDailyInsights = filteredDailyInsights.filter(day => {
-        return day.date >= fromDateString && day.date <= toDateString;
+        const isIncluded = day.date >= fromDateString && day.date <= toDateString;
+        return isIncluded;
+      });
+      
+      console.log('🔍 After date filtering:', {
+        filteredCount: filteredDailyInsights.length,
+        sampleFiltered: filteredDailyInsights.slice(0, 3).map(d => ({ date: d.date, spend: d.spend }))
       });
 
       // Recalculate insights from filtered daily data
