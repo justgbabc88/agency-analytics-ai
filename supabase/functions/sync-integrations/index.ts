@@ -274,7 +274,7 @@ async function syncFacebook(apiKeys: Record<string, string>, agencyId?: string) 
               untilParam = `&time_range[until]=${today.toISOString().split('T')[0]}`
               console.log(`Incremental sync: fetching data from ${nextDay.toISOString().split('T')[0]} to ${today.toISOString().split('T')[0]}`)
             } else {
-              console.log('Data is up to date, skipping sync')
+              console.log('Data is up to date, skipping sync - returning existing data without API call')
               return existingData.data
             }
           } else {
@@ -412,6 +412,45 @@ async function syncFacebook(apiKeys: Record<string, string>, agencyId?: string) 
     overallInsights.cpc = overallInsights.clicks > 0 ? overallInsights.spend / overallInsights.clicks : 0
 
     console.log(`Facebook sync successful - ${campaignsData.data?.length || 0} campaigns, ${adSetsWithCampaignNames.length} ad sets, ${campaignDailyInsights.length} total daily insights fetched for date range: ${sinceParam || datePreset || 'custom range'}`)
+    
+    // If incremental sync returned no data but we expected some, try a broader range
+    if (campaignDailyInsights.length === 0 && (sinceParam || untilParam)) {
+      console.log('Incremental sync returned no data, falling back to last 7 days to capture any missing data')
+      datePreset = '&date_preset=last_7d'
+      sinceParam = ''
+      untilParam = ''
+      
+      // Retry with last 7 days
+      for (const campaign of campaignsData.data || []) {
+        try {
+          const fallbackUrl = `https://graph.facebook.com/v18.0/${campaign.id}/insights?access_token=${access_token}&fields=campaign_id,campaign_name,impressions,clicks,spend,reach,frequency,ctr,cpm,cpp,cpc,conversions,conversion_values,date_start,date_stop${datePreset}&time_increment=1`
+          
+          const fallbackResponse = await fetch(fallbackUrl)
+          
+          if (fallbackResponse.ok) {
+            const fallbackData = await fallbackResponse.json()
+            
+            console.log(`Fallback: Campaign ${campaign.id} insights: ${fallbackData.data?.length || 0} days of data`)
+            
+            // Process daily insights for this campaign
+            const dailyData = fallbackData.data || []
+            
+            // Add campaign info to daily insights
+            dailyData.forEach((day: any) => {
+              campaignDailyInsights.push({
+                ...day,
+                campaign_id: campaign.id,
+                campaign_name: campaign.name
+              })
+            })
+          }
+        } catch (error) {
+          console.error(`Error in fallback fetch for campaign ${campaign.id}:`, error)
+        }
+      }
+      
+      console.log(`Fallback sync completed - ${campaignDailyInsights.length} total daily insights`)
+    }
 
     return {
       campaigns: campaignsData.data || [],
