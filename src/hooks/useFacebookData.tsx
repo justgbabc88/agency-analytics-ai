@@ -299,11 +299,8 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
           insights: filteredInsights,
           campaigns: fbData.campaigns || [], // Always return all campaigns for the filter
           filteredCampaigns: filteredCampaigns, // Filtered campaigns for display
-          adSets: fbData.adsets || [], // All ad sets for the filter
-          filteredAdSets: fbData.adsets?.filter((adSet: any) => 
-            (campaignIds && campaignIds.length > 0 ? campaignIds.includes(adSet.campaign_id) : true) &&
-            (adSetIds && adSetIds.length > 0 ? adSetIds.includes(adSet.id) : true)
-          ) || [],
+          adSets: fbData.adsets || [], // All ad sets for the filter - keep it simple
+          filteredAdSets: fbData.adsets || [], // Return all ad sets, let the component handle filtering
           daily_insights: filteredDailyInsights,
           last_updated: syncedData.synced_at,
         } as FacebookData;

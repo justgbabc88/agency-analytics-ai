@@ -30,37 +30,29 @@ export const FacebookAdSetFilter = ({
   const [isOpen, setIsOpen] = useState(false);
   const [tempSelectedIds, setTempSelectedIds] = useState<string[]>(selectedAdSetIds);
 
-  // Filter ad sets by selected campaigns
-  const filteredAdSets = selectedCampaignIds.length > 0 
-    ? adSets.filter(adSet => selectedCampaignIds.includes(adSet.campaign_id))
-    : adSets;
+  // Simple filtering logic: 
+  // - If no campaigns selected OR all campaigns selected: show all ad sets
+  // - If specific campaigns selected: show only ad sets from those campaigns
+  const totalCampaigns = adSets.reduce((acc, adSet) => {
+    const uniqueCampaigns = new Set(acc);
+    uniqueCampaigns.add(adSet.campaign_id);
+    return Array.from(uniqueCampaigns);
+  }, [] as string[]).length;
 
-  console.log('🔍 AdSet Filter Debug:', {
+  const allCampaignsSelected = selectedCampaignIds.length === 0 || selectedCampaignIds.length === totalCampaigns;
+  
+  const filteredAdSets = allCampaignsSelected 
+    ? adSets // Show all ad sets
+    : adSets.filter(adSet => selectedCampaignIds.includes(adSet.campaign_id)); // Show only ad sets from selected campaigns
+
+  console.log('🔍 Simple AdSet Filter:', {
     totalAdSets: adSets.length,
-    selectedCampaignIds,
+    totalCampaigns,
+    selectedCampaignIds: selectedCampaignIds.length,
+    allCampaignsSelected,
     filteredAdSets: filteredAdSets.length,
-    adSetsData: adSets,
-    filteredAdSetsData: filteredAdSets,
     timestamp: new Date().toISOString()
   });
-
-  // Track when ad sets change
-  useEffect(() => {
-    console.log('📊 AdSets changed:', {
-      adSetsCount: adSets.length,
-      adSets: adSets.map(a => ({ id: a.id, name: a.name, campaign_id: a.campaign_id })),
-      timestamp: new Date().toISOString()
-    });
-  }, [adSets]);
-
-  // Track when campaigns change  
-  useEffect(() => {
-    console.log('🎯 Campaigns changed for ad set filter:', {
-      selectedCampaignIds,
-      filteredAdSetsCount: filteredAdSets.length,
-      timestamp: new Date().toISOString()
-    });
-  }, [selectedCampaignIds, filteredAdSets.length]);
 
   // Update temp state when selectedAdSetIds changes (from external)
   useEffect(() => {
