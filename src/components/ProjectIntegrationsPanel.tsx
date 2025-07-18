@@ -9,7 +9,8 @@ import { FacebookConnector } from "./FacebookConnector";
 import { ClickFunnelsOAuthConnector } from "./ClickFunnelsOAuthConnector";
 import { CalendlyConnector } from "./CalendlyConnector";
 import { GoHighLevelConnector } from "./GoHighLevelConnector";
-import { Settings, CheckCircle, XCircle, RefreshCw, FileSpreadsheet, BarChart3, ChevronDown, ChevronRight, Target, Calendar, FormInput } from "lucide-react";
+import { ZohoCRMConnector } from "./ZohoCRMConnector";
+import { Settings, CheckCircle, XCircle, RefreshCw, FileSpreadsheet, BarChart3, ChevronDown, ChevronRight, Target, Calendar, FormInput, Users } from "lucide-react";
 import { useState } from "react";
 
 const integrationPlatforms = [
@@ -47,6 +48,13 @@ const integrationPlatforms = [
     description: 'Track form submissions and leads',
     color: 'bg-cyan-100 text-cyan-700',
     icon: FormInput
+  },
+  { 
+    id: 'zoho_crm', 
+    name: 'Zoho CRM', 
+    description: 'Sync contacts, leads, and deals',
+    color: 'bg-red-100 text-red-700',
+    icon: Users
   },
 ];
 
@@ -177,6 +185,18 @@ export const ProjectIntegrationsPanel = ({ projectId, selectedFormIds = [], onFo
             }}
             selectedFormIds={selectedFormIds}
             onFormSelectionChange={onFormSelectionChange}
+          />
+        );
+      case 'zoho_crm':
+        return (
+          <ZohoCRMConnector
+            projectId={projectId}
+            isConnected={isConnected}
+            onConnectionChange={(connected) => {
+              if (connected) {
+                handleToggleIntegration(platform.id, true);
+              }
+            }}
           />
         );
       default:

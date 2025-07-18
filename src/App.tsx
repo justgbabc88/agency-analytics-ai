@@ -18,6 +18,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { GoogleOAuthCallback } from './components/GoogleOAuthCallback';
 import CalendlyOAuthCallback from "@/pages/CalendlyOAuthCallback";
+import { ZohoOAuthCallbackPage } from "@/pages/ZohoOAuthCallback";
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 const queryClient = new QueryClient()
@@ -32,6 +33,7 @@ function App() {
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/google-oauth-callback" element={<GoogleOAuthCallback />} />
             <Route path="/calendly-callback" element={<CalendlyOAuthCallback />} />
+            <Route path="/zoho-oauth-callback" element={<ZohoOAuthCallbackPage />} />
             <Route path="/" element={
               <ProtectedRoute>
                 <Index />
