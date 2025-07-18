@@ -10,6 +10,7 @@ import { useApiKeys } from "@/hooks/useApiKeys";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { BarChart3, ExternalLink, CheckCircle, AlertCircle, Link, Users, RefreshCw, ArrowUp, TestTube } from "lucide-react";
+import { FacebookBatchSyncButton } from "./FacebookBatchSyncButton";
 
 interface AdAccount {
   id: string;
@@ -536,14 +537,17 @@ export const FacebookConnector = () => {
                 {/* Sync Actions */}
                 <div className="flex gap-2">
                   {hasAdsPermissions && (
-                    <Button 
-                      onClick={handleSync}
-                      disabled={isSyncing || !selectedAccount}
-                      variant="outline"
-                      className="flex-1"
-                    >
-                      {isSyncing ? "Syncing..." : "Sync Data"}
-                    </Button>
+                    <>
+                      <Button 
+                        onClick={handleSync}
+                        disabled={isSyncing || !selectedAccount}
+                        variant="outline"
+                        className="flex-1"
+                      >
+                        {isSyncing ? "Syncing..." : "Sync Data"}
+                      </Button>
+                      <FacebookBatchSyncButton />
+                    </>
                   )}
                   
                   <Button 

@@ -4,10 +4,10 @@ CREATE EXTENSION IF NOT EXISTS pg_cron;
 -- Enable pg_net extension for HTTP requests
 CREATE EXTENSION IF NOT EXISTS pg_net;
 
--- Schedule Facebook batch sync to run every 2 hours
+-- Schedule Facebook batch sync to run every hour
 SELECT cron.schedule(
   'facebook-batch-sync',
-  '0 */2 * * *', -- Every 2 hours at minute 0
+  '0 * * * *', -- Every hour at minute 0
   $$
   SELECT
     net.http_post(
