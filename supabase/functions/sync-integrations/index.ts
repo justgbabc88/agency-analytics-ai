@@ -275,15 +275,17 @@ async function syncFacebook(apiKeys: Record<string, string>, agencyId?: string) 
             
             console.log(`Next day to sync: ${nextDay.toISOString().split('T')[0]}, Today: ${today.toISOString().split('T')[0]}`)
             
-            // Only sync if there are missing days
-            if (nextDay <= today) {
-              sinceParam = `&time_range[since]=${nextDay.toISOString().split('T')[0]}`
-              untilParam = `&time_range[until]=${today.toISOString().split('T')[0]}`
-              console.log(`Incremental sync: fetching data from ${nextDay.toISOString().split('T')[0]} to ${today.toISOString().split('T')[0]}`)
-            } else {
-              console.log('Data is up to date, skipping sync - returning existing data without API call')
-              return existingData.data
-            }
+          // Only sync if there are missing days
+          if (nextDay <= today) {
+            sinceParam = `&time_range[since]=${nextDay.toISOString().split('T')[0]}`
+            untilParam = `&time_range[until]=${today.toISOString().split('T')[0]}`
+            console.log(`Incremental sync: fetching data from ${nextDay.toISOString().split('T')[0]} to ${today.toISOString().split('T')[0]}`)
+          } else {
+            console.log('Data is up to date, skipping sync - returning existing data without API call')
+            // Don't return early - continue with full sync to ensure we have latest data
+            console.log('Actually, continuing with last 7 days sync to ensure we have all available data')
+            datePreset = '&date_preset=last_7d'
+          }
           } else {
             // Data is too old, sync last 30 days
             datePreset = '&date_preset=last_30d'
