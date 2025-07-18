@@ -4,7 +4,12 @@ import { formatInTimeZone } from "date-fns-tz";
 import { isEventCreatedOnDate, isEventCreatedToday, isEventScheduledOnDate, isEventScheduledToday, isEventCancelledOnDate } from "./dateFiltering";
 
 // Generate chart data based on real Calendly events with improved date filtering and timezone support
-export const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { from: Date; to: Date }, userTimezone?: string) => {
+export const generateCallDataFromEvents = (
+  calendlyEvents: any[], 
+  dateRange: { from: Date; to: Date }, 
+  userTimezone?: string,
+  trackingEvents?: any[]
+) => {
   const dates = [];
   const { from: startDate, to: endDate } = dateRange;
   
@@ -128,7 +133,15 @@ export const generateCallDataFromEvents = (calendlyEvents: any[], dateRange: { f
     const totalScheduledCalls = callsTaken + cancelled;
     const showUpRate = totalScheduledCalls > 0 ? Math.round((callsTaken / totalScheduledCalls) * 100) : 0;
     
-    const pageViews = Math.floor(Math.random() * 300) + 150;
+    // Calculate actual page views from tracking events for this day
+    const pageViewsThisDay = trackingEvents ? trackingEvents.filter(event => {
+      if (event.event_type !== 'page_view') return false;
+      
+      const eventDate = formatInTimeZone(new Date(event.created_at), timezone, 'yyyy-MM-dd');
+      return eventDate === currentDateStr;
+    }).length : Math.floor(Math.random() * 300) + 150; // Fallback to random if no tracking data
+    
+    const pageViews = pageViewsThisDay;
     
     const dayData = {
       date: format(currentDate, 'MMM d'),

@@ -27,6 +27,10 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
   const { metrics: formSubmissions, loading: formSubmissionsLoading } = useGHLFormSubmissions(projectId, dateRange, selectedFormIds);
   const { facebookData } = useFacebookData({ dateRange, campaignIds: selectedCampaignIds });
   
+  // State for tracking events
+  const [trackingEvents, setTrackingEvents] = useState<any[]>([]);
+  const [trackingEventsLoading, setTrackingEventsLoading] = useState(false);
+  
   const userTimezone = getUserTimezone();
   
   console.log('🔄 BookCallFunnel render - Project ID:', projectId);
@@ -39,6 +43,79 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
     toISO: dateRange.to.toISOString()
   });
   console.log('🔄 All Calendly events available:', calendlyEvents.length);
+
+  // Fetch tracking events for page views
+  const fetchTrackingEvents = async () => {
+    if (!projectId) return;
+    
+    setTrackingEventsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('tracking_events')
+        .select('*')
+        .eq('project_id', projectId)
+        .eq('event_type', 'page_view')
+        .gte('created_at', dateRange.from.toISOString())
+        .lte('created_at', dateRange.to.toISOString())
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching tracking events:', error);
+        return;
+      }
+
+      console.log('📊 Fetched tracking events:', data?.length || 0);
+      setTrackingEvents(data || []);
+    } catch (error) {
+      console.error('Error fetching tracking events:', error);
+    } finally {
+      setTrackingEventsLoading(false);
+    }
+  };
+
+  // Fetch tracking events when component mounts or dependencies change
+  useEffect(() => {
+    fetchTrackingEvents();
+  }, [projectId, dateRange.from, dateRange.to]);
+
+  // Real-time listener for new tracking events
+  useEffect(() => {
+    if (!projectId) return;
+
+    console.log('🎧 Setting up real-time listener for tracking events...');
+    
+    const trackingChannel = supabase
+      .channel('tracking-events-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'tracking_events',
+          filter: `project_id=eq.${projectId}`
+        },
+        (payload) => {
+          console.log('🆕 New tracking event received:', payload);
+          
+          // Show toast notification for new page views if it's a page view event
+          if (payload.new && payload.new.event_type === 'page_view') {
+            toast({
+              title: "New Page View! 👀",
+              description: `Landing page visited: ${payload.new.page_url}`,
+            });
+          }
+          
+          // Refresh tracking events data
+          fetchTrackingEvents();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('🎧 Cleaning up tracking events real-time listener...');
+      supabase.removeChannel(trackingChannel);
+    };
+  }, [projectId, toast]);
 
   // Real-time listener for new Calendly events
   useEffect(() => {
@@ -178,6 +255,7 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
     console.log('🔄 Recalculating chart data due to dependency change');
     console.log('🔄 Date range key:', dateRangeKey);
     console.log('🔄 Events available:', filteredEvents.length);
+    console.log('🔄 Tracking events available:', trackingEvents.length);
     console.log('🔄 Using timezone:', userTimezone);
     console.log('🔄 Profile loaded:', !!profile);
     
@@ -186,10 +264,10 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       return [];
     }
     
-    const data = generateCallDataFromEvents(filteredEvents, dateRange, userTimezone);
+    const data = generateCallDataFromEvents(filteredEvents, dateRange, userTimezone, trackingEvents);
     console.log('🎯 Generated chart data:', data);
     return data;
-  }, [filteredEvents, dateRangeKey, userTimezone]);
+  }, [filteredEvents, dateRangeKey, userTimezone, trackingEvents]);
 
   
   // Calculate stats using the same exact logic as CallsList for consistency
