@@ -286,36 +286,13 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
       }
     }
 
-    // Filter by date range - add comprehensive debugging
+    // Filter by date range - working correctly now
     if (dateRange && filteredDailyInsights?.length > 0) {
       const fromDateString = format(dateRange.from, 'yyyy-MM-dd');
       const toDateString = format(dateRange.to, 'yyyy-MM-dd');
       
-      console.log('🔍 Facebook date filtering DEBUG:', {
-        dateRange: { from: fromDateString, to: toDateString },
-        totalDailyInsights: filteredDailyInsights.length,
-        sampleInsightStructure: filteredDailyInsights.slice(0, 2).map(d => ({ 
-          fullObject: d,
-          dateField: d.date,
-          dateStartField: d.date_start,
-          spend: d.spend 
-        }))
-      });
-      
-      // Check which date field exists
-      const dateField = filteredDailyInsights[0]?.date ? 'date' : 'date_start';
-      console.log('🔍 Using date field:', dateField);
-      
       filteredDailyInsights = filteredDailyInsights.filter(day => {
-        const dayDate = day[dateField];
-        const isIncluded = dayDate >= fromDateString && dayDate <= toDateString;
-        console.log('🔍 Date filter check:', { dayDate, fromDateString, toDateString, isIncluded });
-        return isIncluded;
-      });
-      
-      console.log('🔍 After date filtering:', {
-        filteredCount: filteredDailyInsights.length,
-        sampleFiltered: filteredDailyInsights.slice(0, 3).map(d => ({ date: d[dateField], spend: d.spend }))
+        return day.date >= fromDateString && day.date <= toDateString;
       });
 
       // Recalculate insights from filtered daily data
