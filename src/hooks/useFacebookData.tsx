@@ -161,9 +161,9 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
         return null;
       }
 
-      // Check if data is stale (older than 10 minutes)
+      // Check if data is stale (older than 30 minutes to reduce API calls)
       const dataAge = Date.now() - new Date(facebookData.last_updated).getTime();
-      const isStale = dataAge > 10 * 60 * 1000;
+      const isStale = dataAge > 30 * 60 * 1000;
 
       if (!isStale) {
         console.log('Facebook data is fresh, skipping sync');
@@ -180,8 +180,8 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
             selected_ad_account_id: apiKeys.selected_ad_account_id,
             ...(dateRange && {
               date_range: {
-                since: format(toZonedTime(dateRange.from, userTimezone), 'yyyy-MM-dd'),
-                until: format(toZonedTime(dateRange.to, userTimezone), 'yyyy-MM-dd')
+                since: format(fromZonedTime(dateRange.from, userTimezone), 'yyyy-MM-dd'),
+                until: format(fromZonedTime(dateRange.to, userTimezone), 'yyyy-MM-dd')
               }
             })
           },
@@ -205,7 +205,7 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
       }
     },
     enabled: !!agency && !!facebookData,
-    staleTime: 5 * 60 * 1000, // Check for sync every 5 minutes
+    staleTime: 15 * 60 * 1000, // Check for sync every 15 minutes
     retry: 1, // Only retry once to avoid overwhelming the API
   });
 
@@ -357,5 +357,54 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
     }
   };
 
-  return returnData;
+  // Manual refresh function to force immediate sync
+  const refreshData = React.useCallback(async () => {
+    console.log('Manual Facebook data refresh triggered');
+    
+    const apiKeys = getApiKeys('facebook');
+    if (!apiKeys.selected_ad_account_id || !apiKeys.access_token || !agency) {
+      console.log('Cannot refresh: missing API keys or agency');
+      return;
+    }
+
+    try {
+      const syncPayload = {
+        platform: 'facebook',
+        apiKeys: {
+          access_token: apiKeys.access_token,
+          selected_ad_account_id: apiKeys.selected_ad_account_id,
+          ...(dateRange && {
+            date_range: {
+              since: format(fromZonedTime(dateRange.from, userTimezone), 'yyyy-MM-dd'),
+              until: format(fromZonedTime(dateRange.to, userTimezone), 'yyyy-MM-dd')
+            }
+          })
+        },
+        agencyId: agency.id
+      };
+
+      console.log('Manual sync payload:', syncPayload);
+
+      const syncResponse = await supabase.functions.invoke('sync-integrations', {
+        body: syncPayload
+      });
+
+      if (syncResponse.error) {
+        console.error('Manual sync error:', syncResponse.error);
+        return;
+      }
+
+      console.log('Manual sync completed, invalidating cache');
+      
+      // Invalidate and refetch immediately
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['facebook-integrations', agency.id] });
+      }, 1000);
+
+    } catch (error) {
+      console.error('Manual refresh failed:', error);
+    }
+  }, [agency, dateRange, userTimezone, getApiKeys, queryClient]);
+
+  return { ...returnData, refreshData };
 };

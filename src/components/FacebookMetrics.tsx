@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useFacebookData } from "@/hooks/useFacebookData";
 import { useCalendlyData } from "@/hooks/useCalendlyData";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -32,7 +33,7 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
   const handleCampaignChange = onCampaignChange || setInternalSelectedCampaignIds;
   const handleAdSetChange = onAdSetChange || setInternalSelectedAdSetIds;
   
-  const { facebookData, isLoading, insights, campaigns, allCampaigns, metrics, adSets } = useFacebookData({ 
+  const { facebookData, isLoading, insights, campaigns, allCampaigns, metrics, adSets, refreshData } = useFacebookData({ 
     dateRange, 
     campaignIds: activeCampaignIds,
     adSetIds: activeAdSetIds
@@ -455,11 +456,21 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
 
           </div>
 
-          {facebookData.last_updated && (
+          {facebookData && facebookData.last_updated && (
             <div className="mt-3 pt-3 border-t">
-              <p className="text-xs text-gray-500">
-                Last updated: {new Date(facebookData.last_updated).toLocaleString()}
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-gray-500">
+                  Last updated: {new Date(facebookData.last_updated).toLocaleString()}
+                </p>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={refreshData}
+                  className="text-xs px-2 py-1 h-auto"
+                >
+                  Refresh Data
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>
