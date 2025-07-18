@@ -157,32 +157,36 @@ async function syncFacebook(apiKeys: Record<string, string>) {
       })
       
       // Use mock ad sets data for testing when API fails
-      adSetsData = {
-        data: [
-          {
-            id: "23851234567890",
-            name: "Interest Targeting - Lookalike", 
-            campaign_id: campaignsData.data?.[0]?.id || "23851234567891",
-            status: "ACTIVE",
-            created_time: "2024-01-15T10:00:00+0000"
-          },
-          {
-            id: "23851234567892", 
-            name: "Retargeting - Website Visitors",
-            campaign_id: campaignsData.data?.[0]?.id || "23851234567891",
-            status: "ACTIVE", 
-            created_time: "2024-01-16T10:00:00+0000"
-          },
-          {
-            id: "23851234567893",
-            name: "Broad Targeting Test",
-            campaign_id: campaignsData.data?.[1]?.id || "23851234567894", 
-            status: "PAUSED",
-            created_time: "2024-01-17T10:00:00+0000"
-          }
-        ]
-      }
-      console.log('Using mock ad sets data for testing')
+      // Generate 2-4 ad sets per campaign for realistic testing
+      const mockAdSets: any[] = []
+      
+      campaignsData.data?.forEach((campaign: any, campaignIndex: number) => {
+        const adSetsPerCampaign = 2 + (campaignIndex % 3) // 2-4 ad sets per campaign
+        
+        for (let i = 0; i < adSetsPerCampaign; i++) {
+          const adSetTypes = [
+            'Interest Targeting',
+            'Lookalike Audience',
+            'Retargeting - Website Visitors', 
+            'Custom Audience',
+            'Broad Targeting',
+            'Behavior Targeting'
+          ]
+          
+          const statuses = ['ACTIVE', 'ACTIVE', 'ACTIVE', 'PAUSED'] // 75% active
+          
+          mockAdSets.push({
+            id: `mock_adset_${campaignIndex}_${i}_${Date.now()}`,
+            name: `${adSetTypes[i % adSetTypes.length]} ${i + 1}`,
+            campaign_id: campaign.id,
+            status: statuses[i % statuses.length],
+            created_time: new Date(Date.now() - (campaignIndex * 86400000) - (i * 3600000)).toISOString()
+          })
+        }
+      })
+      
+      adSetsData = { data: mockAdSets }
+      console.log(`Using mock ad sets data for testing: ${mockAdSets.length} ad sets across ${campaignsData.data?.length || 0} campaigns`)
     }
 
     // Add campaign names to ad sets
