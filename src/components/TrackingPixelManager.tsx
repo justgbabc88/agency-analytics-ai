@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Eye, Trash2, Copy, Globe, ShoppingCart, CheckCircle, Video, Calendar, FileText, Settings, ChevronDown, ChevronUp, ExternalLink, AlertTriangle } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from "@/hooks/use-toast";
@@ -300,35 +299,6 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
       const newSet = new Set(prev);
       newSet.delete(pixelId);
       return newSet;
-    });
-  };
-
-  const handlePageMetricToggle = async (pixelId: string, pageId: string, includeInMetrics: boolean) => {
-    console.log('TrackingPixelManager: Toggling page metrics for pixel:', pixelId, 'page:', pageId, 'include:', includeInMetrics);
-    const pixel = pixels?.find(p => p.id === pixelId);
-    if (!pixel) {
-      console.error('TrackingPixelManager: Pixel not found:', pixelId);
-      return;
-    }
-
-    const funnelPages = getFunnelPages(pixel.config);
-    const updatedPages = funnelPages.map((page: any) => {
-      if (page.id === pageId) {
-        return { ...page, includeInPageViewMetrics: includeInMetrics };
-      }
-      return page;
-    });
-
-    const updatedConfig = {
-      ...(pixel.config && typeof pixel.config === 'object' ? pixel.config : {}),
-      funnelPages: updatedPages
-    };
-
-    console.log('TrackingPixelManager: Updated config with metric toggle:', updatedConfig);
-
-    await updatePixelConfig.mutateAsync({
-      pixelId: pixelId,
-      config: updatedConfig
     });
   };
 
@@ -671,41 +641,16 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
                                       <ExternalLink className="h-3 w-3 ml-1 flex-shrink-0" />
                                     </a>
                                   </div>
-                                   
-                                   <div className="space-y-2">
-                                     <div className="flex flex-wrap gap-1">
-                                       {(page.events || []).map((event: string) => (
-                                         <Badge key={event} variant="secondary" className="text-xs px-1 py-0">
-                                           {event.replace(/_/g, ' ')}
-                                         </Badge>
-                                       ))}
-                                     </div>
-                                     
-                                     {/* Page View Metrics Toggle */}
-                                     <div className="flex items-center justify-between pt-2 border-t">
-                                        <div className="flex items-center space-x-2">
-                                          <Switch
-                                            id={`${pixel.id}-${page.id}-metrics`}
-                                            checked={page.includeInPageViewMetrics !== false}
-                                            onCheckedChange={(checked) => 
-                                              handlePageMetricToggle(pixel.id, page.id, checked)
-                                            }
-                                          />
-                                          <label 
-                                            htmlFor={`${pixel.id}-${page.id}-metrics`}
-                                            className="text-xs text-gray-600 cursor-pointer"
-                                          >
-                                            Include in funnel metrics
-                                          </label>
-                                        </div>
-                                       <Badge 
-                                         variant={page.includeInPageViewMetrics !== false ? "default" : "secondary"}
-                                         className="text-xs px-2 py-0"
-                                       >
-                                         {page.includeInPageViewMetrics !== false ? "In Metrics" : "Not in Metrics"}
-                                       </Badge>
-                                     </div>
-                                   </div>
+                                  
+                                  <div className="space-y-2">
+                                    <div className="flex flex-wrap gap-1">
+                                      {(page.events || []).map((event: string) => (
+                                        <Badge key={event} variant="secondary" className="text-xs px-1 py-0">
+                                          {event.replace(/_/g, ' ')}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  </div>
                                 </div>
                               </Card>
                             );
