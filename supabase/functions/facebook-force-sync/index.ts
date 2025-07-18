@@ -167,16 +167,26 @@ serve(async (req) => {
 
     if (existingData?.data?.daily_insights) {
       const existingInsights = existingData.data.daily_insights
-      const newDates = new Set(sortedInsights.map(i => i.date))
       
-      // Keep existing insights for dates not in the new data
-      const preservedInsights = existingInsights.filter(insight => !newDates.has(insight.date))
+      // Find the latest date in the new data from Facebook
+      const latestNewDate = sortedInsights.length > 0 
+        ? new Date(Math.max(...sortedInsights.map(i => new Date(i.date).getTime())))
+        : new Date(0)
       
-      // Combine and sort all insights
+      console.log(`Latest date from Facebook: ${latestNewDate.toISOString().split('T')[0]}`)
+      
+      // Keep ALL existing insights that are newer than Facebook's latest date
+      // and replace older insights with fresh Facebook data
+      const preservedInsights = existingInsights.filter(insight => {
+        const insightDate = new Date(insight.date)
+        return insightDate > latestNewDate
+      })
+      
+      // Combine: use fresh Facebook data + preserve newer existing data
       mergedInsights = [...sortedInsights, ...preservedInsights]
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
       
-      console.log(`Merged insights: ${sortedInsights.length} new + ${preservedInsights.length} preserved = ${mergedInsights.length} total`)
+      console.log(`Merged insights: ${sortedInsights.length} from Facebook + ${preservedInsights.length} preserved newer = ${mergedInsights.length} total`)
     }
 
     // Update sync result with merged data
