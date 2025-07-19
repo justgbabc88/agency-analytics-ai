@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
-import { TrendingUp, Users, MousePointer, Activity, Globe, ShoppingCart, CheckCircle, Video, Calendar, FileText, ArrowUpRight, ArrowDownRight, RefreshCw, Filter } from "lucide-react";
+import { TrendingUp, Users, MousePointer, Activity, Globe, ShoppingCart, CheckCircle, Video, Calendar, FileText, ArrowUpRight, ArrowDownRight, RefreshCw, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface AttributionDashboardProps {
@@ -44,7 +46,6 @@ export const AttributionDashboard = ({ projectId, dateRange }: AttributionDashbo
   const [timeRange, setTimeRange] = useState('7d');
   const [selectedPixelId, setSelectedPixelId] = useState<string>('');
   const [forceRefreshKey, setForceRefreshKey] = useState(0);
-  const [pageFilters, setPageFilters] = useState<Record<string, string>>({});
   const queryClient = useQueryClient();
 
   // Helper functions
@@ -526,48 +527,49 @@ export const AttributionDashboard = ({ projectId, dateRange }: AttributionDashbo
                 <div className="space-y-4">
                   {pageAnalytics.pageMetrics.map((page: any, index: number) => {
                     const PageIcon = getPageIcon(page.type);
-                    const pageFilterKey = `page-${page.name}`;
-                    const currentFilter = pageFilters[pageFilterKey] || 'all';
                     
-                    // Filter page events based on selected filter
-                    const getFilteredPageEvents = () => {
-                      if (!eventStats) return [];
+                    // Find the corresponding page in pixel config
+                    const configPage = configuredPages.find(p => p.name === page.name);
+                    const isIncludedInFunnel = configPage?.includeInPageViewMetrics !== false;
+                    
+                    const handleTogglePageTracking = async (enabled: boolean) => {
+                      if (!selectedPixel) return;
                       
-                      const pageEvents = eventStats.filter(event => isEventForPage(event, page));
+                      console.log(`Toggling page tracking for ${page.name}: ${enabled}`);
                       
-                      switch (currentFilter) {
-                        case 'page_views':
-                          return pageEvents.filter(event => event.event_type === 'page_view');
-                        case 'conversions':
-                          return pageEvents.filter(event => event.event_type !== 'page_view');
-                        case 'form_submissions':
-                          return pageEvents.filter(event => event.event_type === 'form_submission');
-                        case 'clicks':
-                          return pageEvents.filter(event => event.event_type === 'click');
-                        default:
-                          return pageEvents;
+                      // Update the pixel configuration
+                      const updatedConfig = { ...selectedPixel.config };
+                      if (!updatedConfig.funnelPages) {
+                        updatedConfig.funnelPages = [];
+                      }
+                      
+                      // Update the specific page
+                      const pageIndex = updatedConfig.funnelPages.findIndex(p => p.name === page.name);
+                      if (pageIndex >= 0) {
+                        updatedConfig.funnelPages[pageIndex] = {
+                          ...updatedConfig.funnelPages[pageIndex],
+                          includeInPageViewMetrics: enabled
+                        };
+                      }
+                      
+                      try {
+                        const { error } = await supabase
+                          .from('tracking_pixels')
+                          .update({ config: updatedConfig })
+                          .eq('id', selectedPixel.id);
+                          
+                        if (error) {
+                          console.error('Error updating pixel config:', error);
+                          return;
+                        }
+                        
+                        console.log('Successfully updated pixel config');
+                        // Refresh the pixel data
+                        queryClient.invalidateQueries({ queryKey: ['tracking-pixels', projectId] });
+                      } catch (error) {
+                        console.error('Error updating pixel config:', error);
                       }
                     };
-                    
-                    const filteredEvents = getFilteredPageEvents();
-                    const filteredTotalEvents = filteredEvents.length;
-                    
-                    // Calculate filtered metrics
-                    const filteredUniqueVisitorIds = new Set();
-                    filteredEvents.forEach(event => {
-                      const visitorId = event.session_id || 
-                                     event.contact_email || 
-                                     `${event.page_url}-${event.created_at.split('T')[0]}`;
-                      filteredUniqueVisitorIds.add(visitorId);
-                    });
-                    const filteredUniqueVisitors = filteredUniqueVisitorIds.size;
-                    
-                    const filteredConversions = filteredEvents.filter(e => 
-                      e.event_type !== 'page_view'
-                    ).length;
-                    
-                    const filteredConversionRate = filteredTotalEvents > 0 ? 
-                      (filteredConversions / filteredTotalEvents) * 100 : 0;
                     
                     return (
                       <div key={index} className="border rounded-lg p-4">
@@ -582,44 +584,38 @@ export const AttributionDashboard = ({ projectId, dateRange }: AttributionDashbo
                               </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-3">
-                            <Select 
-                              value={currentFilter} 
-                              onValueChange={(value) => 
-                                setPageFilters(prev => ({ ...prev, [pageFilterKey]: value }))
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2">
+                              <Label htmlFor={`toggle-${page.name}`} className="text-sm font-medium">
+                                Track in Funnel
+                              </Label>
+                              <Switch
+                                id={`toggle-${page.name}`}
+                                checked={isIncludedInFunnel}
+                                onCheckedChange={handleTogglePageTracking}
+                              />
+                              {isIncludedInFunnel ? 
+                                <Eye className="h-4 w-4 text-green-600" /> : 
+                                <EyeOff className="h-4 w-4 text-gray-400" />
                               }
-                            >
-                              <SelectTrigger className="w-40">
-                                <div className="flex items-center gap-2">
-                                  <Filter className="h-4 w-4" />
-                                  <SelectValue />
-                                </div>
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="all">All Events</SelectItem>
-                                <SelectItem value="page_views">Page Views</SelectItem>
-                                <SelectItem value="conversions">Conversions</SelectItem>
-                                <SelectItem value="form_submissions">Form Submissions</SelectItem>
-                                <SelectItem value="clicks">Clicks</SelectItem>
-                              </SelectContent>
-                            </Select>
+                            </div>
                             <div className="text-right">
-                              <div className="text-lg font-bold">{filteredConversionRate.toFixed(1)}%</div>
+                              <div className="text-lg font-bold">{page.conversionRate.toFixed(1)}%</div>
                               <div className="text-sm text-gray-600">Conv. Rate</div>
                             </div>
                           </div>
                         </div>
                         <div className="grid grid-cols-3 gap-4 text-sm">
                           <div className="text-center">
-                            <div className="font-medium">{filteredTotalEvents}</div>
+                            <div className="font-medium">{page.totalEvents}</div>
                             <div className="text-gray-600">Events</div>
                           </div>
                           <div className="text-center">
-                            <div className="font-medium">{filteredUniqueVisitors}</div>
+                            <div className="font-medium">{page.uniqueVisitors}</div>
                             <div className="text-gray-600">Visitors</div>
                           </div>
                           <div className="text-center">
-                            <div className="font-medium">{filteredConversions}</div>
+                            <div className="font-medium">{page.conversions}</div>
                             <div className="text-gray-600">Conversions</div>
                           </div>
                         </div>
