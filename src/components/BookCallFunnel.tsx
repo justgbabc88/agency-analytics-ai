@@ -361,9 +361,9 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       return trackingEvents;
     }
 
-    // Get URLs from pages that should be included in metrics
+    // Get URLs from pages that should be included in metrics (default to true if not set)
     const includedPageUrls = pixelConfig.funnelPages
-      .filter((page: any) => page.includeInPageViewMetrics !== false)
+      .filter((page: any) => page.includeInPageViewMetrics !== false) // undefined defaults to true
       .map((page: any) => page.url);
 
     console.log('📊 Pages included in metrics:', includedPageUrls);
@@ -378,12 +378,32 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       if (!event.page_url) return false;
       
       return includedPageUrls.some((url: string) => {
-        // Clean both URLs for comparison
-        const cleanEventUrl = event.page_url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
-        const cleanConfigUrl = url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
+        // Clean both URLs for comparison (remove protocol, www, trailing slash)
+        const cleanEventUrl = event.page_url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '').toLowerCase();
+        const cleanConfigUrl = url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '').toLowerCase();
         
-        // Check if the event URL matches or contains the configured URL
-        return cleanEventUrl === cleanConfigUrl || cleanEventUrl.includes(cleanConfigUrl);
+        // Exact match
+        if (cleanEventUrl === cleanConfigUrl) {
+          return true;
+        }
+        
+        // Check if either URL contains the other (for subdirectories)
+        if (cleanEventUrl.includes(cleanConfigUrl) || cleanConfigUrl.includes(cleanEventUrl)) {
+          return true;
+        }
+        
+        // Check pathname only (for cases where domain differs but path matches)
+        try {
+          const eventUrl = new URL(event.page_url);
+          const configUrl = new URL(url);
+          if (eventUrl.pathname === configUrl.pathname) {
+            return true;
+          }
+        } catch (e) {
+          // URL parsing failed, continue with string matching
+        }
+        
+        return false;
       });
     });
 
