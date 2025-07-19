@@ -355,98 +355,99 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
   const recentBookings = getRecentBookings(7);
   const monthlyComparison = getMonthlyComparison();
 
-  // Filter page views based on pixel configuration
+  // Helper function to check if an event belongs to a specific page (same logic as AttributionDashboard)
+  const isEventForPage = (event: any, page: any): boolean => {
+    if (!event || !page) return false;
+    
+    // Primary method: Match by page URL (most reliable)
+    if (event.page_url && page.url) {
+      // Extract base URL without query parameters for comparison
+      const eventBaseUrl = event.page_url.split('?')[0].split('#')[0].toLowerCase();
+      const pageBaseUrl = page.url.split('?')[0].split('#')[0].toLowerCase();
+      
+      // Exact URL match
+      if (eventBaseUrl === pageBaseUrl) {
+        return true;
+      }
+      
+      // Check if the event URL contains the page URL (for subdirectories)
+      if (eventBaseUrl.includes(pageBaseUrl) || pageBaseUrl.includes(eventBaseUrl)) {
+        return true;
+      }
+      
+      // Extract domain and path for more flexible matching
+      try {
+        const eventUrlObj = new URL(event.page_url);
+        const pageUrlObj = new URL(page.url);
+        
+        // Match by pathname if domains are similar
+        if (eventUrlObj.pathname === pageUrlObj.pathname) {
+          return true;
+        }
+      } catch (e) {
+        // URL parsing failed, continue with other methods
+      }
+    }
+    
+    // Secondary method: Check event name for page name (for events with formatted names)
+    if (event.event_name && page.name) {
+      const normalizedEventName = event.event_name.toLowerCase();
+      const normalizedPageName = page.name.toLowerCase();
+      
+      // Direct match with page name prefix
+      if (normalizedEventName.startsWith(`${normalizedPageName} -`)) {
+        return true;
+      }
+      
+      // Also check for exact page name match in event name
+      if (normalizedEventName.includes(normalizedPageName)) {
+        return true;
+      }
+    }
+    
+    // Tertiary method: For page_view events without proper names, match by URL pattern
+    if (event.event_type === 'page_view' && page.url) {
+      const pageUrlPattern = page.url.toLowerCase();
+      const eventUrl = (event.page_url || '').toLowerCase();
+      
+      // Check if URL patterns match (useful for dynamic URLs)
+      if (eventUrl.includes(pageUrlPattern) || pageUrlPattern.includes(eventUrl)) {
+        return true;
+      }
+    }
+    
+    return false;
+  };
+
+  // Filter page views based on pixel configuration using the same logic as AttributionDashboard
   const filteredPageViews = useMemo(() => {
     if (!pixelConfig?.funnelPages || !trackingEvents.length) {
       console.log('📊 No pixel config or tracking events, returning all events');
       return trackingEvents;
     }
 
-    // Get URLs from pages that should be included in metrics (default to true if not set)
-    const includedPageUrls = pixelConfig.funnelPages
-      .filter((page: any) => page.includeInPageViewMetrics !== false) // undefined defaults to true
-      .map((page: any) => page.url);
+    // Get pages that should be included in metrics (default to true if not set)
+    const enabledPages = pixelConfig.funnelPages.filter((page: any) => page.includeInPageViewMetrics !== false);
 
-    console.log('📊 Pages included in metrics:', includedPageUrls);
-    console.log('📊 All configured pages:', pixelConfig.funnelPages.map((p: any) => ({
-      name: p.name,
-      url: p.url,
-      includeInPageViewMetrics: p.includeInPageViewMetrics
-    })));
+    console.log('📊 Pages enabled for funnel metrics:', enabledPages.map((p: any) => ({ name: p.name, url: p.url })));
 
-    // If no pages are configured to be included, include all
-    if (includedPageUrls.length === 0) {
-      console.log('📊 No pages included in metrics, returning all events');
-      return trackingEvents;
+    // If no pages are enabled, return empty array
+    if (enabledPages.length === 0) {
+      console.log('📊 No pages enabled for metrics, returning empty array');
+      return [];
     }
 
-    // Sample some tracking events to see what URLs we're working with
-    const sampleEventUrls = trackingEvents.slice(0, 5).map(e => e.page_url);
-    console.log('📊 Sample event URLs:', sampleEventUrls);
-
-    // Filter tracking events to only include those from included pages
+    // Filter tracking events using the same isEventForPage logic as AttributionDashboard
     const filtered = trackingEvents.filter((event: any) => {
-      if (!event.page_url) return false;
-      
-      const matchResult = includedPageUrls.some((url: string) => {
-        // Clean both URLs for comparison (remove protocol, www, trailing slash)
-        const cleanEventUrl = event.page_url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '').toLowerCase();
-        const cleanConfigUrl = url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '').toLowerCase();
-        
-        // Log detailed comparison for 250k PDF events
-        if (event.page_url.includes('landing-page') || event.page_url.includes('pdf')) {
-          console.log('📊 250k PDF URL comparison:', {
-            eventUrl: event.page_url,
-            cleanEventUrl,
-            configUrl: url,
-            cleanConfigUrl,
-            exactMatch: cleanEventUrl === cleanConfigUrl,
-            eventContainsConfig: cleanEventUrl.includes(cleanConfigUrl),
-            configContainsEvent: cleanConfigUrl.includes(cleanEventUrl)
-          });
-        }
-        
-        // Exact match
-        if (cleanEventUrl === cleanConfigUrl) {
-          return true;
-        }
-        
-        // Check if either URL contains the other (for subdirectories)
-        if (cleanEventUrl.includes(cleanConfigUrl) || cleanConfigUrl.includes(cleanEventUrl)) {
-          return true;
-        }
-        
-        // Check pathname only (for cases where domain differs but path matches)
-        try {
-          const eventUrl = new URL(event.page_url);
-          const configUrl = new URL(url);
-          if (eventUrl.pathname === configUrl.pathname) {
-            return true;
-          }
-        } catch (e) {
-          // URL parsing failed, continue with string matching
-        }
-        
-        return false;
-      });
-      
-      // Log when 250k PDF events are filtered out
-      if ((event.page_url.includes('landing-page') || event.page_url.includes('pdf')) && !matchResult) {
-        console.log('📊 250k PDF event EXCLUDED:', {
-          eventUrl: event.page_url,
-          eventName: event.event_name,
-          configuredUrls: includedPageUrls
-        });
-      }
-      
-      return matchResult;
+      return enabledPages.some((page: any) => isEventForPage(event, page));
     });
 
     console.log('📊 Filtered page views:', filtered.length, 'from', trackingEvents.length, 'total');
     
-    // Count how many 250k PDF events made it through
-    const pdfEvents = filtered.filter(e => e.page_url.includes('landing-page') || e.page_url.includes('pdf') || (e.event_name && e.event_name.includes('250k')));
-    console.log('📊 250k PDF events included in filtered results:', pdfEvents.length);
+    // Count specific page events for debugging
+    const pdfEvents = filtered.filter(e => e.event_name && e.event_name.includes('250k'));
+    const courseEvents = filtered.filter(e => e.event_name && e.event_name.includes('Course'));
+    console.log('📊 Events included - 250k PDF:', pdfEvents.length, 'Course:', courseEvents.length);
     
     return filtered;
   }, [pixelConfig, trackingEvents]);
