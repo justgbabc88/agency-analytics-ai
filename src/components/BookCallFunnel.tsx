@@ -358,6 +358,7 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
   // Filter page views based on pixel configuration
   const filteredPageViews = useMemo(() => {
     if (!pixelConfig?.funnelPages || !trackingEvents.length) {
+      console.log('📊 No pixel config or tracking events, returning all events');
       return trackingEvents;
     }
 
@@ -367,20 +368,43 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       .map((page: any) => page.url);
 
     console.log('📊 Pages included in metrics:', includedPageUrls);
+    console.log('📊 All configured pages:', pixelConfig.funnelPages.map((p: any) => ({
+      name: p.name,
+      url: p.url,
+      includeInPageViewMetrics: p.includeInPageViewMetrics
+    })));
 
     // If no pages are configured to be included, include all
     if (includedPageUrls.length === 0) {
+      console.log('📊 No pages included in metrics, returning all events');
       return trackingEvents;
     }
+
+    // Sample some tracking events to see what URLs we're working with
+    const sampleEventUrls = trackingEvents.slice(0, 5).map(e => e.page_url);
+    console.log('📊 Sample event URLs:', sampleEventUrls);
 
     // Filter tracking events to only include those from included pages
     const filtered = trackingEvents.filter((event: any) => {
       if (!event.page_url) return false;
       
-      return includedPageUrls.some((url: string) => {
+      const matchResult = includedPageUrls.some((url: string) => {
         // Clean both URLs for comparison (remove protocol, www, trailing slash)
         const cleanEventUrl = event.page_url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '').toLowerCase();
         const cleanConfigUrl = url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '').toLowerCase();
+        
+        // Log detailed comparison for 250k PDF events
+        if (event.page_url.includes('landing-page') || event.page_url.includes('pdf')) {
+          console.log('📊 250k PDF URL comparison:', {
+            eventUrl: event.page_url,
+            cleanEventUrl,
+            configUrl: url,
+            cleanConfigUrl,
+            exactMatch: cleanEventUrl === cleanConfigUrl,
+            eventContainsConfig: cleanEventUrl.includes(cleanConfigUrl),
+            configContainsEvent: cleanConfigUrl.includes(cleanEventUrl)
+          });
+        }
         
         // Exact match
         if (cleanEventUrl === cleanConfigUrl) {
@@ -405,9 +429,25 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
         
         return false;
       });
+      
+      // Log when 250k PDF events are filtered out
+      if ((event.page_url.includes('landing-page') || event.page_url.includes('pdf')) && !matchResult) {
+        console.log('📊 250k PDF event EXCLUDED:', {
+          eventUrl: event.page_url,
+          eventName: event.event_name,
+          configuredUrls: includedPageUrls
+        });
+      }
+      
+      return matchResult;
     });
 
     console.log('📊 Filtered page views:', filtered.length, 'from', trackingEvents.length, 'total');
+    
+    // Count how many 250k PDF events made it through
+    const pdfEvents = filtered.filter(e => e.page_url.includes('landing-page') || e.page_url.includes('pdf') || (e.event_name && e.event_name.includes('250k')));
+    console.log('📊 250k PDF events included in filtered results:', pdfEvents.length);
+    
     return filtered;
   }, [pixelConfig, trackingEvents]);
 
