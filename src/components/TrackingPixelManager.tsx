@@ -303,34 +303,6 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
     });
   };
 
-  const handlePageMetricToggle = async (pixelId: string, pageId: string, includeInMetrics: boolean) => {
-    console.log('TrackingPixelManager: Toggling page metrics for pixel:', pixelId, 'page:', pageId, 'include:', includeInMetrics);
-    const pixel = pixels?.find(p => p.id === pixelId);
-    if (!pixel) {
-      console.error('TrackingPixelManager: Pixel not found:', pixelId);
-      return;
-    }
-
-    const funnelPages = getFunnelPages(pixel.config);
-    const updatedPages = funnelPages.map((page: any) => {
-      if (page.id === pageId) {
-        return { ...page, includeInPageViewMetrics: includeInMetrics };
-      }
-      return page;
-    });
-
-    const updatedConfig = {
-      ...(pixel.config && typeof pixel.config === 'object' ? pixel.config : {}),
-      funnelPages: updatedPages
-    };
-
-    console.log('TrackingPixelManager: Updated config with metric toggle:', updatedConfig);
-
-    await updatePixelConfig.mutateAsync({
-      pixelId: pixelId,
-      config: updatedConfig
-    });
-  };
 
   const generatePageScript = (page: any, pixelId: string) => {
     const supabaseUrl = "https://iqxvtfupjjxjkbajgcve.supabase.co";
@@ -680,31 +652,19 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
                                          </Badge>
                                        ))}
                                      </div>
-                                     
-                                     {/* Page View Metrics Toggle */}
-                                     <div className="flex items-center justify-between pt-2 border-t">
-                                        <div className="flex items-center space-x-2">
-                                          <Switch
-                                            id={`${pixel.id}-${page.id}-metrics`}
-                                            checked={page.includeInPageViewMetrics !== false}
-                                            onCheckedChange={(checked) => 
-                                              handlePageMetricToggle(pixel.id, page.id, checked)
-                                            }
-                                          />
-                                          <label 
-                                            htmlFor={`${pixel.id}-${page.id}-metrics`}
-                                            className="text-xs text-gray-600 cursor-pointer"
-                                          >
-                                            Include in funnel metrics
-                                          </label>
-                                        </div>
-                                       <Badge 
-                                         variant={page.includeInPageViewMetrics !== false ? "default" : "secondary"}
-                                         className="text-xs px-2 py-0"
-                                       >
-                                         {page.includeInPageViewMetrics !== false ? "In Metrics" : "Not in Metrics"}
-                                       </Badge>
-                                     </div>
+                                      
+                                      {/* Page View Metrics Status */}
+                                      <div className="flex items-center justify-between pt-2 border-t">
+                                         <div className="text-xs text-gray-600">
+                                           Funnel metrics status
+                                         </div>
+                                        <Badge 
+                                          variant={page.includeInPageViewMetrics !== false ? "default" : "secondary"}
+                                          className="text-xs px-2 py-0"
+                                        >
+                                          {page.includeInPageViewMetrics !== false ? "In Metrics" : "Not in Metrics"}
+                                        </Badge>
+                                      </div>
                                    </div>
                                 </div>
                               </Card>
