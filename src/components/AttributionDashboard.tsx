@@ -179,18 +179,37 @@ export const AttributionDashboard = ({ projectId, dateRange }: AttributionDashbo
   const isEventForPage = (event: any, page: any): boolean => {
     if (!event || !page) return false;
     
-    // Primary method: Match by page URL
+    // Primary method: Match by page URL (most reliable)
     if (event.page_url && page.url) {
       // Extract base URL without query parameters for comparison
-      const eventBaseUrl = event.page_url.split('?')[0].split('#')[0];
-      const pageBaseUrl = page.url.split('?')[0].split('#')[0];
+      const eventBaseUrl = event.page_url.split('?')[0].split('#')[0].toLowerCase();
+      const pageBaseUrl = page.url.split('?')[0].split('#')[0].toLowerCase();
       
+      // Exact URL match
       if (eventBaseUrl === pageBaseUrl) {
         return true;
       }
+      
+      // Check if the event URL contains the page URL (for subdirectories)
+      if (eventBaseUrl.includes(pageBaseUrl) || pageBaseUrl.includes(eventBaseUrl)) {
+        return true;
+      }
+      
+      // Extract domain and path for more flexible matching
+      try {
+        const eventUrlObj = new URL(event.page_url);
+        const pageUrlObj = new URL(page.url);
+        
+        // Match by pathname if domains are similar
+        if (eventUrlObj.pathname === pageUrlObj.pathname) {
+          return true;
+        }
+      } catch (e) {
+        // URL parsing failed, continue with other methods
+      }
     }
     
-    // Fallback method: Check event name for page name (for events with formatted names)
+    // Secondary method: Check event name for page name (for events with formatted names)
     if (event.event_name && page.name) {
       const normalizedEventName = event.event_name.toLowerCase();
       const normalizedPageName = page.name.toLowerCase();
@@ -202,6 +221,17 @@ export const AttributionDashboard = ({ projectId, dateRange }: AttributionDashbo
       
       // Also check for exact page name match in event name
       if (normalizedEventName.includes(normalizedPageName)) {
+        return true;
+      }
+    }
+    
+    // Tertiary method: For page_view events without proper names, match by URL pattern
+    if (event.event_type === 'page_view' && page.url) {
+      const pageUrlPattern = page.url.toLowerCase();
+      const eventUrl = (event.page_url || '').toLowerCase();
+      
+      // Check if URL patterns match (useful for dynamic URLs)
+      if (eventUrl.includes(pageUrlPattern) || pageUrlPattern.includes(eventUrl)) {
         return true;
       }
     }
