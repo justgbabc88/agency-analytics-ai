@@ -412,7 +412,21 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
   }, [pixelConfig, trackingEvents]);
 
   const totalPageViews = filteredPageViews.length;
-  const bookingRate = totalPageViews > 0 ? ((callStatsData.totalBookings / totalPageViews) * 100) : 0;
+  
+  // Calculate unique visitors from filtered page views
+  const uniqueVisitors = useMemo(() => {
+    const uniqueVisitorIds = new Set();
+    filteredPageViews.forEach((event: any) => {
+      // Create a visitor ID from session, email, or page/date combination
+      const visitorId = event.session_id || 
+                       event.contact_email || 
+                       `${event.page_url}-${event.created_at.split('T')[0]}`;
+      uniqueVisitorIds.add(visitorId);
+    });
+    console.log('📊 Unique visitors calculated:', uniqueVisitorIds.size, 'from', filteredPageViews.length, 'page views');
+    return uniqueVisitorIds.size;
+  }, [filteredPageViews]);
+  const bookingRate = uniqueVisitors > 0 ? ((callStatsData.totalBookings / uniqueVisitors) * 100) : 0;
   const previousBookingRate = 0; // Simplified for now since we're focusing on current period accuracy
   
   const totalSpend = facebookData?.insights?.spend || 1500; // Use actual Facebook spend or fallback
@@ -458,7 +472,7 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       </div>
 
       <LandingPageMetrics
-        totalPageViews={totalPageViews}
+        totalPageViews={uniqueVisitors}
         bookingRate={bookingRate}
         previousBookingRate={previousBookingRate}
         totalBookings={callStatsData.totalBookings}
