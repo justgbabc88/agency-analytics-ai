@@ -348,8 +348,8 @@ serve(async (req) => {
 
         console.log(`📋 Found ${existingEventIds.size} existing events in database`)
 
-        // Process events in smaller batches to avoid timeouts
-        const batchSize = 10
+        // Process events in even smaller batches to avoid timeouts and database limits
+        const batchSize = 5  // Reduced batch size for better reliability
         for (let i = 0; i < filteredEvents.length; i += batchSize) {
           const batch = filteredEvents.slice(i, i + batchSize)
           console.log(`🔄 Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(filteredEvents.length/batchSize)} (${batch.length} events)`)
@@ -442,9 +442,10 @@ serve(async (req) => {
             }
           }
 
-          // Small delay between batches to avoid overwhelming the system
+          // Add progress logging and small delay between batches
           if (i + batchSize < filteredEvents.length) {
-            await new Promise(resolve => setTimeout(resolve, 100))
+            console.log(`⚡ Progress: ${Math.min(i + batchSize, filteredEvents.length)}/${filteredEvents.length} events processed`)
+            await new Promise(resolve => setTimeout(resolve, 200))  // Slightly longer delay
           }
         }
 
