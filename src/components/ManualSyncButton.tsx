@@ -66,6 +66,29 @@ export const ManualSyncButton = () => {
       </Button>
       <Button 
         onClick={async () => {
+          console.log('🔍 Running debug sync...');
+          try {
+            const { data, error } = await supabase.functions.invoke('debug-calendly-sync');
+            if (error) {
+              console.error('❌ Debug error:', error);
+              toast.error('Debug failed');
+            } else {
+              console.log('✅ Debug result:', data);
+              toast.success(`Debug: ${data.totalEvents} total, ${data.filteredEvents} filtered events`);
+            }
+          } catch (error) {
+            console.error('❌ Debug error:', error);
+            toast.error('Debug failed');
+          }
+        }}
+        variant="outline"
+        size="sm"
+        className="flex items-center gap-2"
+      >
+        🔍 Debug Sync
+      </Button>
+      <Button 
+        onClick={async () => {
           console.log('🔍 Running comprehensive diagnostics...');
           
           // Check current DB count
