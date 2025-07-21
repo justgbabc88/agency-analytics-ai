@@ -347,7 +347,7 @@ serve(async (req) => {
             // Check if event already exists in our database
             const { data: existingEvent, error: checkError } = await supabaseClient
               .from('calendly_events')
-              .select('id')
+              .select('id, status')
               .eq('calendly_event_id', event.uri)
               .eq('project_id', integration.project_id)
               .maybeSingle()
@@ -358,11 +358,20 @@ serve(async (req) => {
             }
 
             let isNewEvent = !existingEvent
+            const calendlyStatus = event.status || 'scheduled'
+            const dbStatus = existingEvent?.status
+            
+            // Skip update if both DB and Calendly show the event as canceled
+            if (existingEvent && dbStatus === 'canceled' && calendlyStatus === 'canceled') {
+              console.log('⏭️ Skipping canceled event (already canceled in DB):', event.uri)
+              continue
+            }
             
             if (existingEvent) {
-              console.log('🔄 Event exists, checking for status updates:', event.uri, 'Status:', event.status)
+              console.log('🔄 Event exists, checking for status updates:', event.uri, 
+                         'DB Status:', dbStatus, '→ Calendly Status:', calendlyStatus)
             } else {
-              console.log('➕ New event to insert:', event.uri, 'Status:', event.status)
+              console.log('➕ New event to insert:', event.uri, 'Status:', calendlyStatus)
             }
 
             // Get invitee information

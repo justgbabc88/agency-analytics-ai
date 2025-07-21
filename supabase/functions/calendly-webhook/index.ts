@@ -403,6 +403,12 @@ serve(async (req) => {
         existingStatus: existingEvent?.status
       });
 
+      // Skip if event is already canceled and webhook is not about cancellation
+      if (existingEvent && existingEvent.status === 'canceled' && status !== 'cancelled') {
+        console.log('⏭️ Skipping update - event already canceled in DB, not overriding with:', status);
+        continue;
+      }
+
       // ENSURE CREATED_AT IS NEVER NULL
       let createdAt = invitee?.created_at || webhookData.created_at || new Date().toISOString();
       console.log('📅 Using created_at:', createdAt);
@@ -424,7 +430,7 @@ serve(async (req) => {
       try {
         if (existingEvent) {
           // Update existing event
-          console.log('🔄 Updating existing event:', existingEvent.id);
+          console.log('🔄 Updating existing event:', existingEvent.id, 'Status:', existingEvent.status, '→', status);
           const { error: updateError } = await supabase
             .from('calendly_events')
             .update(eventData)
