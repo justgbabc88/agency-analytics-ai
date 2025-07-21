@@ -396,6 +396,17 @@ serve(async (req) => {
                 }
               }
 
+              // Debug logging for events missing created_at
+              if (!event.created_at) {
+                console.log('⚠️ Event missing created_at:', {
+                  uri: event.uri,
+                  status: event.status,
+                  start_time: event.start_time,
+                  updated_at: event.updated_at,
+                  availableFields: Object.keys(event)
+                })
+              }
+
               const eventData = {
                 project_id: integration.project_id,
                 calendly_event_id: event.uri,
