@@ -4,20 +4,35 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useProjectIntegrations } from "@/hooks/useProjectIntegrations";
+import { GoogleSheetsConnector } from "./GoogleSheetsConnector";
 import { FacebookConnector } from "./FacebookConnector";
+import { ClickFunnelsOAuthConnector } from "./ClickFunnelsOAuthConnector";
 import { CalendlyConnector } from "./CalendlyConnector";
 import { GoHighLevelConnector } from "./GoHighLevelConnector";
-import { ZohoCRMConnector } from "./ZohoCRMConnector";
-import { Settings, CheckCircle, XCircle, RefreshCw, BarChart3, ChevronDown, ChevronRight, Calendar, FormInput, Users } from "lucide-react";
+import { Settings, CheckCircle, XCircle, RefreshCw, FileSpreadsheet, BarChart3, ChevronDown, ChevronRight, Target, Calendar, FormInput } from "lucide-react";
 import { useState } from "react";
 
 const integrationPlatforms = [
+  { 
+    id: 'google_sheets', 
+    name: 'Google Sheets', 
+    description: 'Import custom data and reports',
+    color: 'bg-green-100 text-green-700',
+    icon: FileSpreadsheet
+  },
   { 
     id: 'facebook', 
     name: 'Facebook Ads', 
     description: 'Facebook advertising data and analytics',
     color: 'bg-blue-100 text-blue-700',
     icon: BarChart3
+  },
+  { 
+    id: 'clickfunnels', 
+    name: 'ClickFunnels', 
+    description: 'Funnel analytics and conversions',
+    color: 'bg-orange-100 text-orange-700',
+    icon: Target
   },
   { 
     id: 'calendly', 
@@ -32,13 +47,6 @@ const integrationPlatforms = [
     description: 'Track form submissions and leads',
     color: 'bg-cyan-100 text-cyan-700',
     icon: FormInput
-  },
-  { 
-    id: 'zoho_crm', 
-    name: 'Zoho CRM', 
-    description: 'Sync contacts, leads, and deals',
-    color: 'bg-red-100 text-red-700',
-    icon: Users
   },
 ];
 
@@ -129,8 +137,22 @@ export const ProjectIntegrationsPanel = ({ projectId, selectedFormIds = [], onFo
     const isConnected = getIntegrationStatus(platform.id);
     
     switch (platform.id) {
+      case 'google_sheets':
+        return <GoogleSheetsConnector />;
       case 'facebook':
         return <FacebookConnector />;
+      case 'clickfunnels':
+        return (
+          <ClickFunnelsOAuthConnector
+            projectId={projectId}
+            isConnected={isConnected}
+            onConnectionChange={(connected) => {
+              if (connected) {
+                handleToggleIntegration(platform.id, true);
+              }
+            }}
+          />
+        );
       case 'calendly':
         return (
           <CalendlyConnector
@@ -155,18 +177,6 @@ export const ProjectIntegrationsPanel = ({ projectId, selectedFormIds = [], onFo
             }}
             selectedFormIds={selectedFormIds}
             onFormSelectionChange={onFormSelectionChange}
-          />
-        );
-      case 'zoho_crm':
-        return (
-          <ZohoCRMConnector
-            projectId={projectId}
-            isConnected={isConnected}
-            onConnectionChange={(connected) => {
-              if (connected) {
-                handleToggleIntegration(platform.id, true);
-              }
-            }}
           />
         );
       default:

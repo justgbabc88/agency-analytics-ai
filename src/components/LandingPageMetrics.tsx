@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { FormSubmissionMetrics } from "@/hooks/useGHLFormSubmissions";
 
 interface LandingPageMetricsProps {
-  totalPageViews: number; // This will represent unique visitors from toggled pages
+  totalPageViews: number;
   bookingRate: number;
   previousBookingRate: number;
   totalBookings: number;
@@ -61,10 +61,9 @@ export const LandingPageMetrics = ({
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-4">
           <MetricCard 
-            title="Visitors" 
+            title="Page Views" 
             value={totalPageViews} 
             previousValue={Math.floor(totalPageViews * 0.9)} 
-            description="Unique visitors from enabled pages"
           />
           <MetricCard 
             title="Leads" 
@@ -77,7 +76,7 @@ export const LandingPageMetrics = ({
             value={leadConversionRate} 
             previousValue={previousLeadConversionRate} 
             format="percentage"
-            description="Leads per unique visitor"
+            description="Leads per page view"
           />
           <MetricCard 
             title="Total Bookings" 
@@ -90,7 +89,7 @@ export const LandingPageMetrics = ({
             value={bookingRate} 
             previousValue={previousBookingRate} 
             format="percentage"
-            description="Bookings per unique visitor"
+            description="Bookings per page view"
           />
           <MetricCard 
             title="Cost Per Lead" 

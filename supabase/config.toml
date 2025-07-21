@@ -59,8 +59,5 @@ verify_jwt = false
 [functions.integration-sync]
 verify_jwt = true
 
-[functions.track-event]
-verify_jwt = false
-
 [edge-runtime]
 policy = "per_request"

@@ -12,7 +12,6 @@ import { AttributionDashboard } from '@/components/AttributionDashboard';
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { FacebookSyncDebug } from "@/components/FacebookSyncDebug";
 import { Button } from "@/components/ui/button";
 import { BarChart3, Settings, MessageSquare, Target, TrendingUp, Facebook, Activity, Zap, RefreshCw } from "lucide-react";
 import { useProjects } from "@/hooks/useProjects";
@@ -426,7 +425,6 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-6">
-            <FacebookSyncDebug />
             <ProjectIntegrationsPanel 
               projectId={selectedProjectId} 
               selectedFormIds={selectedFormIds}

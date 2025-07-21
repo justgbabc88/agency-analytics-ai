@@ -410,17 +410,7 @@ export const ExistingPixelManager = ({ projectId }: ExistingPixelManagerProps) =
               <div className="space-y-1">
                 {funnelPages.map((page: any, index: number) => (
                   <div key={page.id || index} className="text-sm border rounded p-2">
-                    <div className="flex items-center justify-between">
-                      <div className="font-medium">{page.name}</div>
-                      <div className="flex items-center gap-2">
-                        <Badge 
-                          variant={page.includeInPageViewMetrics !== false ? "default" : "secondary"} 
-                          className="text-xs px-1 py-0"
-                        >
-                          {page.includeInPageViewMetrics !== false ? "In Metrics" : "Not in Metrics"}
-                        </Badge>
-                      </div>
-                    </div>
+                    <div className="font-medium">{page.name}</div>
                     <div className="text-gray-600 text-xs">{page.url}</div>
                     <div className="flex flex-wrap gap-1 mt-1">
                       {(page.events || []).map((event: string) => (

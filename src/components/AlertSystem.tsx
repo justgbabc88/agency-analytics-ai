@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertTriangle, Bell, Plus, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
-
+import { useGoogleSheetsData } from "@/hooks/useGoogleSheetsData";
 
 interface Alert {
   id: string;
@@ -30,7 +30,7 @@ const availableMetrics = [
 ];
 
 export const AlertSystem = () => {
-  
+  const { calculateMetricsFromSyncedData } = useGoogleSheetsData();
   const [alerts, setAlerts] = useState<Alert[]>([
     {
       id: '1',
@@ -56,7 +56,7 @@ export const AlertSystem = () => {
   });
 
   // Get current metrics and check alerts
-  const currentMetrics = null;
+  const currentMetrics = calculateMetricsFromSyncedData();
 
   // Update alerts with current values and trigger status
   useEffect(() => {

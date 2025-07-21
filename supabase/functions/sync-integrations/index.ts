@@ -31,7 +31,7 @@ serve(async (req) => {
 
     switch (platform) {
       case 'facebook':
-        syncResult = await syncFacebook(apiKeys, agencyId)
+        syncResult = await syncFacebook(apiKeys)
         break
       case 'clickfunnels':
         syncResult = await syncClickFunnels(apiKeys)
@@ -49,70 +49,13 @@ serve(async (req) => {
         throw new Error(`Unsupported platform: ${platform}`)
     }
 
-    // Handle data merging for incremental syncs
-    let finalData = syncResult
-    if (platform === 'facebook' && syncResult?.daily_insights?.length > 0) {
-      // Get existing data to merge with new incremental data
-      const { data: existingRecord, error: mergeQueryError } = await supabase
-        .from('integration_data')
-        .select('data')
-        .eq('agency_id', agencyId)
-        .eq('platform', 'facebook')
-        .order('synced_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      if (mergeQueryError) {
-        console.error('Error querying existing data for merge:', mergeQueryError)
-      } else if (existingRecord?.data?.daily_insights) {
-        const existingDailyInsights = existingRecord.data.daily_insights as any[]
-        const newDailyInsights = syncResult.daily_insights as any[]
-        
-        // Create a map of existing data by date and campaign
-        const existingMap = new Map()
-        existingDailyInsights.forEach((insight: any) => {
-          const key = `${insight.date}-${insight.campaign_id}`
-          existingMap.set(key, insight)
-        })
-        
-        // Add new insights, replacing any existing ones for the same date/campaign
-        newDailyInsights.forEach((insight: any) => {
-          const key = `${insight.date}-${insight.campaign_id}`
-          existingMap.set(key, insight)
-        })
-        
-        // Convert back to array and sort by date
-        const mergedDailyInsights = Array.from(existingMap.values())
-          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-        
-        // Keep only last 30 days of data
-        const thirtyDaysAgo = new Date()
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-        
-        const filteredInsights = mergedDailyInsights.filter(insight => 
-          new Date(insight.date) >= thirtyDaysAgo
-        )
-        
-        console.log(`Merged data: ${existingDailyInsights.length} existing + ${newDailyInsights.length} new = ${filteredInsights.length} total insights`)
-        
-        // Update the final data with merged insights
-        finalData = {
-          ...existingRecord.data,
-          ...syncResult,
-          daily_insights: filteredInsights,
-          last_updated: new Date().toISOString(),
-          synced_at: new Date().toISOString()
-        }
-      }
-    }
-
     // Store the synced data in the database using upsert
     const { error: insertError } = await supabase
       .from('integration_data')
       .upsert({
         agency_id: agencyId,
         platform,
-        data: finalData,
+        data: syncResult,
         synced_at: new Date().toISOString()
       }, {
         onConflict: 'agency_id,platform'
@@ -159,196 +102,41 @@ serve(async (req) => {
   }
 })
 
-// Helper function to handle Facebook API calls with rate limiting and retries
-async function fetchFromFacebookWithRetry(url: string, maxRetries = 3): Promise<any> {
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      console.log(`Facebook API call attempt ${attempt}/${maxRetries}: ${url}`)
-      
-      const response = await fetch(url)
-      
-      if (response.ok) {
-        return await response.json()
-      }
-      
-      // Check if it's a rate limit error
-      if (response.status === 400) {
-        const errorText = await response.text()
-        const errorData = JSON.parse(errorText)
-        
-        if (errorData?.error?.code === 17 || errorData?.error?.error_subcode === 2446079) {
-          // Rate limit error - wait before retrying
-          const waitTime = Math.min(1000 * Math.pow(2, attempt), 10000) // Exponential backoff, max 10 seconds
-          console.log(`Rate limit hit. Waiting ${waitTime}ms before retry ${attempt}/${maxRetries}`)
-          await new Promise(resolve => setTimeout(resolve, waitTime))
-          
-          if (attempt === maxRetries) {
-            console.error('Max retries reached for rate limited request:', { url, error: errorData })
-            throw new Error(`Facebook API rate limit exceeded after ${maxRetries} attempts`)
-          }
-          continue
-        }
-      }
-      
-      // Other errors - don't retry
-      const errorText = await response.text()
-      console.error(`Facebook API error (attempt ${attempt}):`, {
-        status: response.status,
-        statusText: response.statusText,
-        error: errorText,
-        url
-      })
-      throw new Error(`Facebook API error: ${response.status} ${response.statusText}`)
-      
-    } catch (error) {
-      if (attempt === maxRetries) {
-        console.error(`Final attempt failed for ${url}:`, error)
-        throw error
-      }
-      
-      // Wait before retrying on network errors
-      const waitTime = 1000 * attempt
-      console.log(`Network error on attempt ${attempt}. Waiting ${waitTime}ms before retry:`, error)
-      await new Promise(resolve => setTimeout(resolve, waitTime))
-    }
-  }
-}
-
-async function syncFacebook(apiKeys: Record<string, string>, agencyId?: string) {
+async function syncFacebook(apiKeys: Record<string, string>) {
   const { access_token, selected_ad_account_id, date_range } = apiKeys
   
   if (!access_token) {
     throw new Error('Facebook access token is required')
   }
 
-  console.log('Facebook sync initiated - checking for existing data')
+  console.log('Facebook sync initiated - fetching ad data')
 
-  const adAccountId = selected_ad_account_id || 'act_123456789'
+  const adAccountId = selected_ad_account_id || 'act_123456789' // fallback for demo
 
-  // Check existing data to determine what date range to sync
+  // Determine date range - use custom range if provided, otherwise default to last 30 days
+  let datePreset = 'last_30d'
   let sinceParam = ''
   let untilParam = ''
-  let datePreset = ''
   
-  if (agencyId) {
-    try {
-      const supabase = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-      )
-
-      // Get the most recent data to find gaps
-      const { data: existingData, error: queryError } = await supabase
-        .from('integration_data')
-        .select('data')
-        .eq('agency_id', agencyId)
-        .eq('platform', 'facebook')
-        .order('synced_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      if (queryError) {
-        console.error('Error querying existing data:', queryError)
-        // Continue with full sync as fallback
-        datePreset = '&date_preset=last_30d'
-        console.log('Query error, defaulting to last 30 days sync')
-      } else if (existingData?.data?.daily_insights) {
-        const dailyInsights = existingData.data.daily_insights as any[]
-        
-        console.log(`Existing data count: ${dailyInsights.length}`)
-        
-        // Calculate 30-day date range
-        const today = new Date()
-        const thirtyDaysAgo = new Date()
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-        
-        console.log(`Checking for missing data in range: ${thirtyDaysAgo.toISOString().split('T')[0]} to ${today.toISOString().split('T')[0]}`)
-        
-        // Get all existing dates within the last 30 days
-        const existingDates = new Set(
-          dailyInsights
-            .map(d => d.date)
-            .filter(date => {
-              const dateObj = new Date(date)
-              return dateObj >= thirtyDaysAgo && dateObj <= today
-            })
-        )
-        
-        // Generate all dates in the last 30 days (excluding weekends for now, can adjust later)
-        const allDatesInRange: string[] = []
-        for (let d = new Date(thirtyDaysAgo); d <= today; d.setDate(d.getDate() + 1)) {
-          allDatesInRange.push(d.toISOString().split('T')[0])
-        }
-        
-        // Find missing dates
-        const missingDates = allDatesInRange.filter(date => !existingDates.has(date))
-        
-        console.log(`Existing dates count: ${existingDates.size}`)
-        console.log(`Total possible dates in 30-day range: ${allDatesInRange.length}`) 
-        console.log(`Missing dates: ${missingDates.length} - ${missingDates.slice(0, 5).join(', ')}${missingDates.length > 5 ? '...' : ''}`)
-        
-        if (missingDates.length === 0) {
-          console.log('No missing dates found, data is complete for last 30 days')
-          return existingData.data
-        }
-        
-        // For efficiency, if we're missing more than 10 days, just sync the whole last 30 days
-        if (missingDates.length > 10) {
-          console.log(`Missing ${missingDates.length} dates, syncing full last 30 days`)
-          datePreset = '&date_preset=last_30d'
-        } else {
-          // Sync from earliest missing date to today to capture all gaps
-          const earliestMissing = missingDates.sort()[0]
-          sinceParam = `&time_range[since]=${earliestMissing}`
-          untilParam = `&time_range[until]=${today.toISOString().split('T')[0]}`
-          console.log(`Targeted gap-fill sync: fetching from ${earliestMissing} to ${today.toISOString().split('T')[0]} to fill ${missingDates.length} missing dates`)
-        }
-      } else {
-        // No existing data, sync last 30 days
-        datePreset = '&date_preset=last_30d'
-        console.log('No existing data found, syncing last 30 days')
-      }
-    } catch (error) {
-      console.log('Error checking existing data, defaulting to last 30 days:', error)
-      datePreset = '&date_preset=last_30d'
-    }
-  }
-  
-  // Override with custom date range if provided
   if (date_range?.since && date_range?.until) {
     sinceParam = `&time_range[since]=${date_range.since}`
     untilParam = `&time_range[until]=${date_range.until}`
-    datePreset = ''
-    console.log(`Using custom date range: ${date_range.since} to ${date_range.until}`)
+    datePreset = '' // Don't use preset when custom range is provided
+  } else {
+    datePreset = '&date_preset=last_30d'
   }
 
   try {
-    // Fetch campaigns with retry logic
-    const campaignsData = await fetchFromFacebookWithRetry(
+    // Fetch campaigns
+    const campaignsResponse = await fetch(
       `https://graph.facebook.com/v18.0/${adAccountId}/campaigns?access_token=${access_token}&fields=id,name,status,objective,created_time,updated_time`
     )
-
-    // Fetch ad sets with simple retry logic (no expensive filtering)
-    let adSetsData = { data: [] }
-    try {
-      adSetsData = await fetchFromFacebookWithRetry(
-        `https://graph.facebook.com/v18.0/${adAccountId}/adsets?access_token=${access_token}&fields=id,name,campaign_id,status,created_time,updated_time`
-      )
-      console.log(`Successfully fetched ${adSetsData.data?.length || 0} ad sets`)
-    } catch (adSetsError) {
-      console.error('Failed to fetch ad sets after retries:', adSetsError)
-      console.log('Ad sets unavailable due to Facebook API rate limits. No mock data provided.')
-      adSetsData = { data: [] }
+    
+    if (!campaignsResponse.ok) {
+      throw new Error('Failed to fetch campaigns from Facebook')
     }
-
-    // Add campaign names to ad sets
-    const adSetsWithCampaignNames = (adSetsData.data || []).map((adSet: any) => {
-      const campaign = campaignsData.data?.find((c: any) => c.id === adSet.campaign_id)
-      return {
-        ...adSet,
-        campaign_name: campaign?.name || 'Unknown Campaign'
-      }
-    })
+    
+    const campaignsData = await campaignsResponse.json()
 
     // Fetch insights for each campaign individually
     const campaignInsights: any[] = []
@@ -365,8 +153,6 @@ async function syncFacebook(apiKeys: Record<string, string>, agencyId?: string) 
         
         if (campaignResponse.ok) {
           const campaignData = await campaignResponse.json()
-          
-          console.log(`Campaign ${campaign.id} insights: ${campaignData.data?.length || 0} days of data`)
           
           // Process daily insights for this campaign
           const dailyData = campaignData.data || []
@@ -427,50 +213,10 @@ async function syncFacebook(apiKeys: Record<string, string>, agencyId?: string) 
     overallInsights.cpm = overallInsights.impressions > 0 ? (overallInsights.spend / overallInsights.impressions) * 1000 : 0
     overallInsights.cpc = overallInsights.clicks > 0 ? overallInsights.spend / overallInsights.clicks : 0
 
-    console.log(`Facebook sync successful - ${campaignsData.data?.length || 0} campaigns, ${adSetsWithCampaignNames.length} ad sets, ${campaignDailyInsights.length} total daily insights fetched for date range: ${sinceParam || datePreset || 'custom range'}`)
-    
-    // If incremental sync returned no data but we expected some, try a broader range
-    if (campaignDailyInsights.length === 0 && (sinceParam || untilParam)) {
-      console.log('Incremental sync returned no data, falling back to last 7 days to capture any missing data')
-      datePreset = '&date_preset=last_7d'
-      sinceParam = ''
-      untilParam = ''
-      
-      // Retry with last 7 days
-      for (const campaign of campaignsData.data || []) {
-        try {
-          const fallbackUrl = `https://graph.facebook.com/v18.0/${campaign.id}/insights?access_token=${access_token}&fields=campaign_id,campaign_name,impressions,clicks,spend,reach,frequency,ctr,cpm,cpp,cpc,conversions,conversion_values,date_start,date_stop${datePreset}&time_increment=1`
-          
-          const fallbackResponse = await fetch(fallbackUrl)
-          
-          if (fallbackResponse.ok) {
-            const fallbackData = await fallbackResponse.json()
-            
-            console.log(`Fallback: Campaign ${campaign.id} insights: ${fallbackData.data?.length || 0} days of data`)
-            
-            // Process daily insights for this campaign
-            const dailyData = fallbackData.data || []
-            
-            // Add campaign info to daily insights
-            dailyData.forEach((day: any) => {
-              campaignDailyInsights.push({
-                ...day,
-                campaign_id: campaign.id,
-                campaign_name: campaign.name
-              })
-            })
-          }
-        } catch (error) {
-          console.error(`Error in fallback fetch for campaign ${campaign.id}:`, error)
-        }
-      }
-      
-      console.log(`Fallback sync completed - ${campaignDailyInsights.length} total daily insights`)
-    }
+    console.log(`Facebook sync successful - ${campaignsData.data?.length || 0} campaigns, insights fetched for date range: ${date_range?.since || 'last 30 days'} to ${date_range?.until || 'today'}`)
 
     return {
       campaigns: campaignsData.data || [],
-      adsets: adSetsWithCampaignNames,
       campaign_insights: campaignInsights,
       insights: {
         impressions: parseInt(overallInsights.impressions || '0'),
@@ -521,7 +267,6 @@ async function syncFacebook(apiKeys: Record<string, string>, agencyId?: string) 
     // Return mock data for demo purposes if API fails
     return {
       campaigns: [],
-      adsets: [], // No mock ad sets
       insights: {
         impressions: 150000,
         clicks: 3200,

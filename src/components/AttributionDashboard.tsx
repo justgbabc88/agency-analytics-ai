@@ -2,12 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
-import { TrendingUp, Users, MousePointer, Activity, Globe, ShoppingCart, CheckCircle, Video, Calendar, FileText, ArrowUpRight, ArrowDownRight, RefreshCw, Eye, EyeOff } from "lucide-react";
+import { TrendingUp, Users, MousePointer, Activity, Globe, ShoppingCart, CheckCircle, Video, Calendar, FileText, ArrowUpRight, ArrowDownRight, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface AttributionDashboardProps {
@@ -177,65 +175,23 @@ export const AttributionDashboard = ({ projectId, dateRange }: AttributionDashbo
   const selectedPixel = pixels?.find(p => p.id === selectedPixelId);
   const configuredPages = selectedPixel?.config?.funnelPages || [];
 
-  // Helper function to check if an event belongs to a specific page
-  const isEventForPage = (event: any, page: any): boolean => {
-    if (!event || !page) return false;
+  // Helper function to check if an event belongs to a specific page based on event name
+  const isEventForPage = (eventName: string | null, pageName: string): boolean => {
+    if (!eventName || !pageName) return false;
     
-    // Primary method: Match by page URL (most reliable)
-    if (event.page_url && page.url) {
-      // Extract base URL without query parameters for comparison
-      const eventBaseUrl = event.page_url.split('?')[0].split('#')[0].toLowerCase();
-      const pageBaseUrl = page.url.split('?')[0].split('#')[0].toLowerCase();
-      
-      // Exact URL match
-      if (eventBaseUrl === pageBaseUrl) {
-        return true;
-      }
-      
-      // Check if the event URL contains the page URL (for subdirectories)
-      if (eventBaseUrl.includes(pageBaseUrl) || pageBaseUrl.includes(eventBaseUrl)) {
-        return true;
-      }
-      
-      // Extract domain and path for more flexible matching
-      try {
-        const eventUrlObj = new URL(event.page_url);
-        const pageUrlObj = new URL(page.url);
-        
-        // Match by pathname if domains are similar
-        if (eventUrlObj.pathname === pageUrlObj.pathname) {
-          return true;
-        }
-      } catch (e) {
-        // URL parsing failed, continue with other methods
-      }
+    // Check if the event name starts with the page name
+    // Format: "PageName - Event Type" (e.g., "LP - Page View", "Web - Form Submission")
+    const normalizedEventName = eventName.toLowerCase();
+    const normalizedPageName = pageName.toLowerCase();
+    
+    // Direct match with page name prefix
+    if (normalizedEventName.startsWith(`${normalizedPageName} -`)) {
+      return true;
     }
     
-    // Secondary method: Check event name for page name (for events with formatted names)
-    if (event.event_name && page.name) {
-      const normalizedEventName = event.event_name.toLowerCase();
-      const normalizedPageName = page.name.toLowerCase();
-      
-      // Direct match with page name prefix
-      if (normalizedEventName.startsWith(`${normalizedPageName} -`)) {
-        return true;
-      }
-      
-      // Also check for exact page name match in event name
-      if (normalizedEventName.includes(normalizedPageName)) {
-        return true;
-      }
-    }
-    
-    // Tertiary method: For page_view events without proper names, match by URL pattern
-    if (event.event_type === 'page_view' && page.url) {
-      const pageUrlPattern = page.url.toLowerCase();
-      const eventUrl = (event.page_url || '').toLowerCase();
-      
-      // Check if URL patterns match (useful for dynamic URLs)
-      if (eventUrl.includes(pageUrlPattern) || pageUrlPattern.includes(eventUrl)) {
-        return true;
-      }
+    // Also check for exact page name match in event name
+    if (normalizedEventName.includes(normalizedPageName)) {
+      return true;
     }
     
     return false;
@@ -264,13 +220,11 @@ export const AttributionDashboard = ({ projectId, dateRange }: AttributionDashbo
       console.log(`\n--- Processing page: ${page.name} (${page.url}) ---`);
       
       const pageEvents = eventStats.filter(event => {
-        const matches = isEventForPage(event, page);
+        const matches = isEventForPage(event.event_name, page.name);
         if (matches) {
           console.log(`✓ Event matches ${page.name}:`, { 
             eventName: event.event_name, 
-            eventPageUrl: event.page_url,
             pageName: page.name,
-            configuredPageUrl: page.url,
             eventType: event.event_type
           });
         }
@@ -527,50 +481,6 @@ export const AttributionDashboard = ({ projectId, dateRange }: AttributionDashbo
                 <div className="space-y-4">
                   {pageAnalytics.pageMetrics.map((page: any, index: number) => {
                     const PageIcon = getPageIcon(page.type);
-                    
-                    // Find the corresponding page in pixel config
-                    const configPage = configuredPages.find(p => p.name === page.name);
-                    const isIncludedInFunnel = configPage?.includeInPageViewMetrics !== false;
-                    
-                    const handleTogglePageTracking = async (enabled: boolean) => {
-                      if (!selectedPixel) return;
-                      
-                      console.log(`Toggling page tracking for ${page.name}: ${enabled}`);
-                      
-                      // Update the pixel configuration
-                      const updatedConfig = { ...selectedPixel.config };
-                      if (!updatedConfig.funnelPages) {
-                        updatedConfig.funnelPages = [];
-                      }
-                      
-                      // Update the specific page
-                      const pageIndex = updatedConfig.funnelPages.findIndex(p => p.name === page.name);
-                      if (pageIndex >= 0) {
-                        updatedConfig.funnelPages[pageIndex] = {
-                          ...updatedConfig.funnelPages[pageIndex],
-                          includeInPageViewMetrics: enabled
-                        };
-                      }
-                      
-                      try {
-                        const { error } = await supabase
-                          .from('tracking_pixels')
-                          .update({ config: updatedConfig })
-                          .eq('id', selectedPixel.id);
-                          
-                        if (error) {
-                          console.error('Error updating pixel config:', error);
-                          return;
-                        }
-                        
-                        console.log('Successfully updated pixel config');
-                        // Refresh the pixel data
-                        queryClient.invalidateQueries({ queryKey: ['tracking-pixels', projectId] });
-                      } catch (error) {
-                        console.error('Error updating pixel config:', error);
-                      }
-                    };
-                    
                     return (
                       <div key={index} className="border rounded-lg p-4">
                         <div className="flex items-center justify-between mb-3">
@@ -584,25 +494,9 @@ export const AttributionDashboard = ({ projectId, dateRange }: AttributionDashbo
                               </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-2">
-                              <Label htmlFor={`toggle-${page.name}`} className="text-sm font-medium">
-                                Track in Funnel
-                              </Label>
-                              <Switch
-                                id={`toggle-${page.name}`}
-                                checked={isIncludedInFunnel}
-                                onCheckedChange={handleTogglePageTracking}
-                              />
-                              {isIncludedInFunnel ? 
-                                <Eye className="h-4 w-4 text-green-600" /> : 
-                                <EyeOff className="h-4 w-4 text-gray-400" />
-                              }
-                            </div>
-                            <div className="text-right">
-                              <div className="text-lg font-bold">{page.conversionRate.toFixed(1)}%</div>
-                              <div className="text-sm text-gray-600">Conv. Rate</div>
-                            </div>
+                          <div className="text-right">
+                            <div className="text-lg font-bold">{page.conversionRate.toFixed(1)}%</div>
+                            <div className="text-sm text-gray-600">Conv. Rate</div>
                           </div>
                         </div>
                         <div className="grid grid-cols-3 gap-4 text-sm">

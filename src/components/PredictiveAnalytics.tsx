@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Brain, RefreshCw, Target } from "lucide-react";
 import { useState } from "react";
-
+import { useGoogleSheetsData } from "@/hooks/useGoogleSheetsData";
 import { generateForecast, generateScenarioForecasts, parseDateFromSheetData, ForecastResult, calculateLinearTrend } from "@/utils/timeSeriesUtils";
 import { format, addDays } from "date-fns";
 import { MetricCustomizer } from "./MetricCustomizer";
@@ -30,9 +30,9 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
   const [forecastPeriod, setForecastPeriod] = useState('30days');
   const [showPredictions, setShowPredictions] = useState(true);
   const [selectedProducts, setSelectedProducts] = useState<FunnelProductConfig[]>([]);
-  
+  const { syncedData, calculateMetricsFromSyncedData } = useGoogleSheetsData();
 
-  const currentMetrics = null;
+  const currentMetrics = calculateMetricsFromSyncedData();
   
   const forecastDays = {
     '30days': 30,
@@ -46,51 +46,175 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
 
   // Helper function to calculate funnel rates from raw data
   const calculateFunnelRates = () => {
+    if (!syncedData || !syncedData.data.length) {
+      return {
+        mainOfferRate: 2.5,
+        bumpRate: 45,
+        upsell1Rate: 35,
+        downsell1Rate: 25,
+        upsell2Rate: 20,
+        downsell2Rate: 15,
+      };
+    }
+
+    const data = syncedData.data;
+    let totalPageViews = 0;
+    let totalMainOffer = 0;
+    let totalBump = 0;
+    let totalUpsell1 = 0;
+    let totalUpsell2 = 0;
+
+    // Calculate totals from the data
+    data.forEach(row => {
+      const pageViews = parseInt(row['Page Views']?.toString().replace(/[^\d]/g, '') || '0');
+      const mainOffer = parseInt(row['Main Offer']?.toString().replace(/[^\d]/g, '') || '0');
+      const bump = parseInt(row['Bump']?.toString().replace(/[^\d]/g, '') || '0');
+      const upsell1 = parseInt(row['Upsell 1']?.toString().replace(/[^\d]/g, '') || '0');
+      const upsell2 = parseInt(row['Upsell 2']?.toString().replace(/[^\d]/g, '') || '0');
+
+      totalPageViews += pageViews;
+      totalMainOffer += mainOffer;
+      totalBump += bump;
+      totalUpsell1 += upsell1;
+      totalUpsell2 += upsell2;
+    });
+
     return {
-      mainOfferRate: 2.5,
-      bumpRate: 45,
-      upsell1Rate: 35,
-      downsell1Rate: 25,
-      upsell2Rate: 20,
-      downsell2Rate: 15,
+      mainOfferRate: totalPageViews > 0 ? (totalMainOffer / totalPageViews) * 100 : 2.5,
+      bumpRate: totalMainOffer > 0 ? (totalBump / totalMainOffer) * 100 : 45,
+      upsell1Rate: totalMainOffer > 0 ? (totalUpsell1 / totalMainOffer) * 100 : 35,
+      downsell1Rate: totalMainOffer > 0 ? ((totalMainOffer - totalUpsell1) * 0.25 / totalMainOffer) * 100 : 25,
+      upsell2Rate: totalUpsell1 > 0 ? (totalUpsell2 / totalUpsell1) * 100 : 20,
+      downsell2Rate: totalUpsell1 > 0 ? ((totalUpsell1 - totalUpsell2) * 0.15 / totalUpsell1) * 100 : 15,
     };
   };
 
   // Generate forecast data based on actual historical data
   const generateEnhancedForecastData = (): ForecastResult => {
-    // Generate sample forecast if no data
-    const sampleData = Array.from({ length: 15 }, (_, i) => {
-      const date = format(addDays(new Date(), i - 10), 'M/d/yyyy');
-      const isActual = i < 10;
-      let value;
-      
-      if (selectedMetric === 'revenue') {
-        value = isActual ? 85000 + (i * 2000) + (Math.random() * 5000) : 
-                          95000 + (i * 1500) + (Math.random() * 3000);
-      } else if (selectedMetric === 'conversions') {
-        value = isActual ? 180 + (i * 5) + (Math.random() * 15) : 
-                          220 + (i * 4) + (Math.random() * 10);
-      } else if (selectedMetric.includes('Rate')) {
-        value = isActual ? 15 + (i * 0.5) + (Math.random() * 3) : 
-                          18 + (i * 0.3) + (Math.random() * 2);
-      } else {
-        value = isActual ? 8500 + (i * 200) + (Math.random() * 500) : 
-                          9500 + (i * 150) + (Math.random() * 300);
-      }
+    if (!syncedData || !syncedData.data.length) {
+      // Generate sample forecast if no data
+      const sampleData = Array.from({ length: 15 }, (_, i) => {
+        const date = format(addDays(new Date(), i - 10), 'M/d/yyyy');
+        const isActual = i < 10;
+        let value;
+        
+        if (selectedMetric === 'revenue') {
+          value = isActual ? 85000 + (i * 2000) + (Math.random() * 5000) : 
+                            95000 + (i * 1500) + (Math.random() * 3000);
+        } else if (selectedMetric === 'conversions') {
+          value = isActual ? 180 + (i * 5) + (Math.random() * 15) : 
+                            220 + (i * 4) + (Math.random() * 10);
+        } else if (selectedMetric.includes('Rate')) {
+          value = isActual ? 15 + (i * 0.5) + (Math.random() * 3) : 
+                            18 + (i * 0.3) + (Math.random() * 2);
+        } else {
+          value = isActual ? 8500 + (i * 200) + (Math.random() * 500) : 
+                            9500 + (i * 150) + (Math.random() * 300);
+        }
+        
+        return {
+          date,
+          value: Math.round(value * 100) / 100,
+          isActual,
+          confidence: isActual ? 100 : Math.max(60, 90 - (i - 9) * 3),
+        };
+      });
       
       return {
-        date,
-        value: Math.round(value * 100) / 100,
-        isActual,
-        confidence: isActual ? 100 : Math.max(60, 90 - (i - 9) * 3),
+        data: sampleData,
+        trend: 'increasing' as const,
+        accuracy: 78,
       };
-    });
+    }
+
+    const data = syncedData.data;
     
-    return {
-      data: sampleData,
-      trend: 'increasing' as const,
-      accuracy: 78,
-    };
+    // Extract historical values for the selected metric
+    const historicalData = data.map(row => {
+      const dateField = row['Date'] || row['date'] || 'Unknown';
+      let value = 0;
+      
+      if (selectedMetric === 'revenue') {
+        const roasFields = ['ROAS', 'roas'];
+        const costFields = ['Cost', 'cost', 'Spend', 'spend'];
+        
+        let roas = 0;
+        let cost = 0;
+        
+        for (const field of roasFields) {
+          if (row[field]) {
+            roas = parseFloat(row[field].toString().replace(/[^\d.]/g, '') || '0');
+            if (roas > 0) break;
+          }
+        }
+        
+        for (const field of costFields) {
+          if (row[field]) {
+            cost = parseFloat(row[field].toString().replace(/[$,]/g, '') || '0');
+            if (cost > 0) break;
+          }
+        }
+        
+        if (roas > 0 && cost > 0) {
+          value = roas * cost;
+        } else {
+          const revenueFields = ['Revenue', 'revenue'];
+          for (const field of revenueFields) {
+            if (row[field]) {
+              value = parseFloat(row[field].toString().replace(/[$,]/g, '') || '0');
+              if (value > 0) break;
+            }
+          }
+        }
+      } else if (selectedMetric === 'conversions') {
+        const conversionFields = ['Main Offer', 'Conversions', 'conversions', 'Opt-Ins'];
+        for (const field of conversionFields) {
+          if (row[field]) {
+            value = parseInt(row[field].toString().replace(/[^\d]/g, '') || '0');
+            if (value > 0) break;
+          }
+        }
+      } else if (selectedMetric === 'mainOfferRate') {
+        const pageViews = parseInt(row['Page Views']?.toString().replace(/[^\d]/g, '') || '0');
+        const mainOffer = parseInt(row['Main Offer']?.toString().replace(/[^\d]/g, '') || '0');
+        if (pageViews > 0) {
+          value = (mainOffer / pageViews) * 100;
+        }
+      } else if (selectedMetric === 'bumpRate') {
+        const mainOffer = parseInt(row['Main Offer']?.toString().replace(/[^\d]/g, '') || '0');
+        const bump = parseInt(row['Bump']?.toString().replace(/[^\d]/g, '') || '0');
+        if (mainOffer > 0) {
+          value = (bump / mainOffer) * 100;
+        }
+      } else if (selectedMetric === 'upsell1Rate') {
+        const mainOffer = parseInt(row['Main Offer']?.toString().replace(/[^\d]/g, '') || '0');
+        const upsell1 = parseInt(row['Upsell 1']?.toString().replace(/[^\d]/g, '') || '0');
+        if (mainOffer > 0) {
+          value = (upsell1 / mainOffer) * 100;
+        }
+      } else if (selectedMetric === 'upsell2Rate') {
+        const upsell1 = parseInt(row['Upsell 1']?.toString().replace(/[^\d]/g, '') || '0');
+        const upsell2 = parseInt(row['Upsell 2']?.toString().replace(/[^\d]/g, '') || '0');
+        if (upsell1 > 0) {
+          value = (upsell2 / upsell1) * 100;
+        }
+      } else {
+        const trafficFields = ['Page Views', 'Impressions', 'impressions', 'pageViews'];
+        for (const field of trafficFields) {
+          if (row[field]) {
+            value = parseInt(row[field].toString().replace(/[^\d]/g, '') || '0');
+            if (value > 0) break;
+          }
+        }
+      }
+
+      return {
+        date: dateField.toString(),
+        value: value || 0
+      };
+    }).filter(d => d.value > 0);
+
+    return generateForecast(historicalData, forecastDays);
   };
 
   const forecastResult = generateEnhancedForecastData();
@@ -248,9 +372,9 @@ export const PredictiveAnalytics = ({ className }: PredictiveAnalyticsProps) => 
           <CardTitle className="flex items-center gap-2">
             <Brain className="h-5 w-5 text-purple-600" />
             Advanced Predictive Analytics
-            {false && (
+            {syncedData && (
               <Badge variant="secondary" className="ml-2">
-                0 data points • {forecastResult.accuracy.toFixed(1)}% accuracy
+                {syncedData.data.length} data points • {forecastResult.accuracy.toFixed(1)}% accuracy
               </Badge>
             )}
           </CardTitle>
