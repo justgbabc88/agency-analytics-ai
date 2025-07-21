@@ -90,22 +90,31 @@ export const useCallStatsCalculations = (
     console.log('📊 Events created in date range:', eventsCreatedInRange.length);
     console.log('📊 Events scheduled in date range:', eventsScheduledInRange.length);
 
+    // Create 3 filtered arrays to count the different types of calls
+    const cancelledCalls = eventsScheduledInRange.filter(event =>
+      event.status === 'cancelled' || event.status === 'canceled'
+    );
+
+    const completedCalls = eventsScheduledInRange.filter(event =>
+      (event.status !== 'cancelled' && event.status !== 'canceled') &&
+      new Date(event.scheduled_at) < new Date()
+    );
+
+    const upcomingCalls = eventsScheduledInRange.filter(event =>
+      (event.status !== 'cancelled' && event.status !== 'canceled') &&
+      new Date(event.scheduled_at) >= new Date()
+    );
+
+    console.log('❌ Cancelled calls:', cancelledCalls.length);
+    console.log('✅ Completed calls:', completedCalls.length);
+    console.log('📅 Upcoming calls:', upcomingCalls.length);
+
     // Total bookings = all unique events created in the date range (when people actually booked)
     const totalBookings = eventsCreatedInRange.length;
 
-    // Create 3 categories for events scheduled in range
-    const cancelledCalls = eventsScheduledInRange.filter(e => e.status === 'cancelled' || e.status === 'canceled');
-    const completedCalls = eventsScheduledInRange.filter(e => e.status !== 'cancelled' && e.status !== 'canceled' && new Date(e.scheduled_at) < new Date());
-    const upcomingCalls = eventsScheduledInRange.filter(e => e.status !== 'cancelled' && new Date(e.scheduled_at) >= new Date());
-
-    // Log the counts for all three categories
-    console.log("📞 Cancelled:", cancelledCalls.length);
-    console.log("✅ Completed:", completedCalls.length);
-    console.log("📅 Upcoming:", upcomingCalls.length);
-
-    // Use the new categories for calculations (maintaining exact same functionality)
-    const callsTaken = completedCalls.length; // This replaces the old active + past logic
-    const cancelled = cancelledCalls.length; // This replaces the old cancelled logic
+    // Use the filtered arrays for calculations (maintaining exact same functionality)
+    const callsTaken = completedCalls.length; // Use completedCalls instead of the old logic
+    const cancelled = cancelledCalls.length; // Use cancelledCalls instead of the old logic
 
     // Show up rate = (calls taken / total scheduled calls) * 100
     // Only count past calls (taken + cancelled) for show up rate calculation
@@ -155,14 +164,24 @@ export const useCallStatsCalculations = (
       });
     });
 
-    // Calculate previous period stats using the same 3-category approach
-    const previousCancelledCalls = previousPeriodEventsScheduled.filter(e => e.status === 'cancelled' || e.status === 'canceled');
-    const previousCompletedCalls = previousPeriodEventsScheduled.filter(e => e.status !== 'cancelled' && e.status !== 'canceled' && new Date(e.scheduled_at) < new Date());
-    const previousUpcomingCalls = previousPeriodEventsScheduled.filter(e => e.status !== 'cancelled' && new Date(e.scheduled_at) >= new Date());
+    // Calculate previous period stats using the same filtering approach
+    const previousCancelledCalls = previousPeriodEventsScheduled.filter(event =>
+      event.status === 'cancelled' || event.status === 'canceled'
+    );
+
+    const previousCompletedCalls = previousPeriodEventsScheduled.filter(event =>
+      (event.status !== 'cancelled' && event.status !== 'canceled') &&
+      new Date(event.scheduled_at) < new Date()
+    );
+
+    const previousUpcomingCalls = previousPeriodEventsScheduled.filter(event =>
+      (event.status !== 'cancelled' && event.status !== 'canceled') &&
+      new Date(event.scheduled_at) >= new Date()
+    );
 
     const previousTotalBookings = previousPeriodEventsCreated.length;
-    const previousCallsTaken = previousCompletedCalls.length; // Using new category logic
-    const previousCancelled = previousCancelledCalls.length; // Using new category logic
+    const previousCallsTaken = previousCompletedCalls.length; // Using completedCalls logic
+    const previousCancelled = previousCancelledCalls.length; // Using cancelledCalls logic
 
     const previousPastCalls = previousCallsTaken + previousCancelled;
     const previousShowUpRate = previousPastCalls > 0 ? 
@@ -173,7 +192,7 @@ export const useCallStatsCalculations = (
       previousCallsTaken,
       previousCancelled,
       previousShowUpRate,
-      previousCategoryBreakdown: {
+      previousCallBreakdown: {
         cancelled: previousCancelledCalls.length,
         completed: previousCompletedCalls.length,
         upcoming: previousUpcomingCalls.length
@@ -195,23 +214,21 @@ export const useCallStatsCalculations = (
       showUpRate,
       previousCallsTaken,
       previousShowUpRate,
-      // Expose the new categories for UI components that need them
-      categories: {
-        cancelled: cancelledCalls,
-        completed: completedCalls,
-        upcoming: upcomingCalls
-      },
-      categoryCounts: {
+      // Expose the filtered arrays for UI components
+      cancelledCalls,
+      completedCalls,
+      upcomingCalls,
+      // Expose counts for easier access
+      callCounts: {
         cancelled: cancelledCalls.length,
         completed: completedCalls.length,
         upcoming: upcomingCalls.length
       },
-      previousCategories: {
-        cancelled: previousCancelledCalls,
-        completed: previousCompletedCalls,
-        upcoming: previousUpcomingCalls
-      },
-      previousCategoryCounts: {
+      // Previous period arrays and counts
+      previousCancelledCalls,
+      previousCompletedCalls,
+      previousUpcomingCalls,
+      previousCallCounts: {
         cancelled: previousCancelledCalls.length,
         completed: previousCompletedCalls.length,
         upcoming: previousUpcomingCalls.length
