@@ -201,7 +201,9 @@ serve(async (req) => {
       async function fetchEventsByStatus(eventsList, orgUri, fromDate, toDate, accessToken, status) {
         let nextPageToken = null
         let pageCount = 0
-        const maxPages = 100
+        const maxPages = 200  // Increased to handle more events
+        let retryCount = 0
+        const maxRetries = 3
         
         console.log(`🔄 Fetching ${status.toUpperCase()} events from Calendly`)
         
@@ -226,17 +228,27 @@ serve(async (req) => {
             if (!eventsResponse.ok) {
               const errorText = await eventsResponse.text()
               
-              // Handle rate limiting specifically
+              // Handle rate limiting with retry logic
               if (eventsResponse.status === 429) {
-                const retryAfter = eventsResponse.headers.get('Retry-After') || '60'
-                console.log(`⏰ Rate limited for ${status} events. Retry after: ${retryAfter} seconds`)
-                // For now, log the rate limit and continue - in production you'd want to implement proper retry
-                return
+                const retryAfter = parseInt(eventsResponse.headers.get('Retry-After') || '60')
+                console.log(`⏰ Rate limited for ${status} events. Retry attempt ${retryCount + 1}/${maxRetries}. Waiting ${retryAfter} seconds...`)
+                
+                if (retryCount < maxRetries) {
+                  retryCount++
+                  await new Promise(resolve => setTimeout(resolve, retryAfter * 1000))
+                  continue // Retry the same page
+                } else {
+                  console.log(`❌ Max retries reached for ${status} events. Stopping pagination.`)
+                  break
+                }
               }
               
               console.error(`❌ Calendly API error (${status}): ${eventsResponse.status} ${errorText}`)
               break
             }
+
+            // Reset retry count on successful request
+            retryCount = 0
 
             const eventsData = await eventsResponse.json()
             const events = eventsData.collection || []
@@ -256,10 +268,10 @@ serve(async (req) => {
             nextPageToken = eventsData.pagination?.next_page_token
             console.log(`🔄 ${status} - Page ${pageCount} complete. Next page available: ${!!nextPageToken}`)
             
-            // Add small delay between requests to be respectful to API
+            // Add longer delay between requests to be more respectful to API and avoid rate limits
             if (nextPageToken) {
-              console.log(`⏳ ${status} - Waiting 200ms before next page...`)
-              await new Promise(resolve => setTimeout(resolve, 200))
+              console.log(`⏳ ${status} - Waiting 500ms before next page...`)
+              await new Promise(resolve => setTimeout(resolve, 500))
             }
           } catch (fetchError) {
             console.error(`❌ Error fetching ${status} events from Calendly:`, fetchError)
