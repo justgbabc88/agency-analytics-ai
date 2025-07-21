@@ -19,9 +19,12 @@ Deno.serve(async (req) => {
 
     console.log('🔧 Manual Calendly sync triggered')
 
-    // Call the calendly-sync-gaps function
+    // Call the calendly-sync-gaps function with the correct parameters
     const { data, error } = await supabaseClient.functions.invoke('calendly-sync-gaps', {
-      body: { manual_trigger: true }
+      body: { 
+        triggerReason: 'manual_sync',
+        specificProjectId: '382c6666-c24d-4de1-b449-3858a46fbed3'
+      }
     })
 
     if (error) {
