@@ -405,12 +405,8 @@ serve(async (req) => {
                 invitee_name: inviteeName,
                 invitee_email: inviteeEmail,
                 status: event.status || 'scheduled',
+                created_at: event.created_at || new Date().toISOString(),
                 updated_at: event.updated_at || event.created_at || new Date().toISOString()
-              }
-
-              // Always ensure created_at has a value to avoid constraint violations
-              if (isNewEvent) {
-                eventData.created_at = event.created_at || new Date().toISOString()
               }
 
               eventsToUpsert.push(eventData)
