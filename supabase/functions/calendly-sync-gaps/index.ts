@@ -242,16 +242,23 @@ serve(async (req) => {
             const events = eventsData.collection || []
             
             console.log(`📊 ${status} events from page ${pageCount}:`, events.length)
+            console.log(`🔍 Pagination info:`, {
+              hasNextPage: !!eventsData.pagination?.next_page_token,
+              nextPageToken: eventsData.pagination?.next_page_token?.substring(0, 20) + '...',
+              totalCount: eventsData.pagination?.count,
+              currentPageEvents: events.length
+            })
             
             // Add events to our collection
             eventsList.push(...events)
             
             // Check if there's a next page
             nextPageToken = eventsData.pagination?.next_page_token
-            console.log(`🔄 ${status} next page token:`, nextPageToken)
+            console.log(`🔄 ${status} - Page ${pageCount} complete. Next page available: ${!!nextPageToken}`)
             
             // Add small delay between requests to be respectful to API
             if (nextPageToken) {
+              console.log(`⏳ ${status} - Waiting 200ms before next page...`)
               await new Promise(resolve => setTimeout(resolve, 200))
             }
           } catch (fetchError) {
@@ -261,7 +268,10 @@ serve(async (req) => {
           
         } while (nextPageToken && pageCount < maxPages)
         
-        console.log(`🏁 ${status.toUpperCase()} PAGINATION COMPLETE: ${pageCount} pages fetched`)
+        console.log(`🏁 ${status.toUpperCase()} PAGINATION COMPLETE:`)
+        console.log(`   📄 Pages fetched: ${pageCount}`)
+        console.log(`   📊 Total events: ${eventsList.length}`)
+        console.log(`   🚫 Stopped because: ${nextPageToken ? 'Max pages reached' : 'No more pages'}`)
       }
       
       // Fetch all event statuses separately to ensure we get everything
