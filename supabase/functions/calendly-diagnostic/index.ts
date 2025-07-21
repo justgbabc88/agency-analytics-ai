@@ -21,22 +21,12 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Get access token directly from integrations table
-    const { data: integrationData } = await supabase
-      .from('integrations')
-      .select('*')
-      .eq('platform', 'calendly')
-      .single()
-    
-    if (!integrationData) {
-      throw new Error('No Calendly integration found')
-    }
-
-    // Get integration data to find access token
+    // Get access token from project_integration_data
     const { data: tokenRecord } = await supabase
-      .from('integration_data')
+      .from('project_integration_data')
       .select('data')
       .eq('platform', 'calendly')
+      .eq('project_id', projectId)
       .order('created_at', { ascending: false })
       .limit(1)
       .single()
@@ -44,7 +34,7 @@ Deno.serve(async (req) => {
     const accessToken = tokenRecord?.data?.access_token
     
     if (!accessToken) {
-      throw new Error('No access token found in integration data')
+      throw new Error('No access token found in project integration data')
     }
 
     console.log('✅ Access token retrieved successfully')
