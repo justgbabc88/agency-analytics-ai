@@ -108,41 +108,77 @@ export const ManualSyncButton = () => {
       </Button>
       <Button 
         onClick={async () => {
-          console.log('🔍 Running July 20th Calendly diagnostic...');
+          console.log('🔍 Testing Calendly API directly for July 20th events...');
           
           try {
-            const { data, error } = await supabase.functions.invoke('calendly-diagnostic');
+            // Call the OAuth function to get access token
+            const { data: tokenData, error: tokenError } = await supabase.functions.invoke('calendly-oauth', {
+              body: {
+                action: 'get_access_token',
+                projectId: '382c6666-c24d-4de1-b449-3858a46fbed3'
+              }
+            });
             
-            if (error) {
-              console.error('❌ Diagnostic error:', error);
-              toast.error('Diagnostic failed');
+            if (tokenError || !tokenData?.access_token) {
+              console.error('❌ Could not get access token:', tokenError);
+              toast.error('Could not get Calendly access token');
               return;
             }
             
-            console.log('📊 Diagnostic results:', data);
+            console.log('✅ Got access token');
             
-            if (data.july20Focus) {
-              const focus = data.july20Focus;
-              console.log(`🎯 API shows ${focus.eventsCreatedOnJuly20thFromAPI} events CREATED on July 20th`);
-              console.log(`🎯 DB has ${focus.eventsCreatedOnJuly20thInDB} events CREATED on July 20th`);
-              console.log(`📋 Missing events: ${focus.missingCreatedEvents}`);
-              
-              if (focus.createdEventDetails.length > 0) {
-                console.log('📋 Events created on July 20th from API:', focus.createdEventDetails);
+            // Test direct API call for broad date range to catch events created on July 20th
+            const broadStart = '2025-07-15T00:00:00.000Z';
+            const broadEnd = '2025-07-25T23:59:59.999Z';
+            
+            const response = await fetch(`https://api.calendly.com/scheduled_events?organization=${encodeURIComponent(tokenData.organization_uri)}&min_start_time=${broadStart}&max_start_time=${broadEnd}&count=100`, {
+              headers: {
+                'Authorization': `Bearer ${tokenData.access_token}`,
+                'Content-Type': 'application/json'
               }
-              
-              toast.success(`API: ${focus.eventsCreatedOnJuly20thFromAPI} created, DB: ${focus.eventsCreatedOnJuly20thInDB} created. Missing: ${focus.missingCreatedEvents}`);
+            });
+            
+            if (!response.ok) {
+              const errorText = await response.text();
+              console.error('❌ Calendly API error:', response.status, errorText);
+              toast.error(`Calendly API error: ${response.status}`);
+              return;
             }
+            
+            const data = await response.json();
+            console.log('📊 Total events in broad range:', data.collection?.length || 0);
+            
+            // Filter for events created on July 20th and Property Advantage Call type
+            const july20CreatedEvents = data.collection?.filter(event => {
+              const createdOnJuly20 = event.created_at && event.created_at.startsWith('2025-07-20');
+              const isPropertyAdvantage = event.event_type === 'https://api.calendly.com/event_types/c6fa8f5f-9cdd-40b7-98ae-90c6caed9b6f';
+              return createdOnJuly20 && isPropertyAdvantage;
+            }) || [];
+            
+            console.log(`🎯 Property Advantage Call events CREATED on July 20th: ${july20CreatedEvents.length}`);
+            
+            if (july20CreatedEvents.length > 0) {
+              console.log('📋 Events created on July 20th:');
+              july20CreatedEvents.forEach((event, index) => {
+                console.log(`   ${index + 1}. Created: ${event.created_at}, Scheduled: ${event.start_time}, Status: ${event.status}`);
+                console.log(`      URI: ${event.uri}`);
+              });
+              
+              toast.success(`🎯 Found ${july20CreatedEvents.length} Property Advantage Call events created on July 20th in Calendly API!`);
+            } else {
+              toast.error('❌ No Property Advantage Call events created on July 20th found in Calendly API');
+            }
+            
           } catch (error) {
-            console.error('❌ Diagnostic error:', error);
-            toast.error('Diagnostic failed');
+            console.error('❌ API test error:', error);
+            toast.error('API test failed');
           }
         }}
         variant="outline"
         size="sm"
         className="flex items-center gap-2"
       >
-        July 20th Diagnostic
+        Test July 20th API
       </Button>
     </div>
   );
