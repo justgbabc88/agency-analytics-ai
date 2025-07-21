@@ -51,6 +51,28 @@ serve(async (req) => {
 
     console.log('📊 Found integrations:', integrations?.length || 0)
     console.log('🎯 Processing', integrations?.length || 0, 'projects for sync')
+    
+    // Debug: Show all integrations found
+    if (integrations?.length) {
+      integrations.forEach(integration => {
+        console.log(`   📍 Project ID: ${integration.project_id}`)
+      })
+    } else {
+      console.log('⚠️  No Calendly integrations found! Checking what exists...')
+      
+      // Let's check what integrations exist
+      const { data: allIntegrations } = await supabaseClient
+        .from('project_integrations')
+        .select('project_id, platform, is_connected')
+        .eq('platform', 'calendly')
+      
+      console.log(`   📊 Total calendly records: ${allIntegrations?.length || 0}`)
+      if (allIntegrations?.length) {
+        allIntegrations.forEach(integration => {
+          console.log(`     - Project ${integration.project_id}: connected=${integration.is_connected}`)
+        })
+      }
+    }
 
     if (!integrations || integrations.length === 0) {
       return new Response(JSON.stringify({
