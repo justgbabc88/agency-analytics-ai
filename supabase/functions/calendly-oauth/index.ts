@@ -361,14 +361,14 @@ serve(async (req) => {
             }
           }
 
-          // Remove integration data
+          // Remove integration data (tokens/credentials only)
           await supabase
             .from('project_integration_data')
             .delete()
             .eq('project_id', projectId)
             .eq('platform', 'calendly');
 
-          // Update integration status
+          // Update integration status (preserve mappings and events)
           await supabase
             .from('project_integrations')
             .update({
@@ -378,17 +378,8 @@ serve(async (req) => {
             .eq('project_id', projectId)
             .eq('platform', 'calendly');
 
-          // Remove event mappings
-          await supabase
-            .from('calendly_event_mappings')
-            .delete()
-            .eq('project_id', projectId);
-
-          // Remove stored events
-          await supabase
-            .from('calendly_events')
-            .delete()
-            .eq('project_id', projectId);
+          // NOTE: Preserving event mappings and stored events for data continuity
+          // When reconnecting, the user will retain their historical data and settings
 
           console.log('✅ Calendly integration disconnected successfully');
 
