@@ -185,11 +185,17 @@ serve(async (req) => {
       // Get tomorrow's date to ensure we capture all of today's events
       const tomorrow = new Date(now.getTime() + (24 * 60 * 60 * 1000))
       
-      // Convert to user timezone for proper day boundaries - start from 30 days ago, end tomorrow
-      const syncFrom = new Date(thirtyDaysAgo.toLocaleDateString('en-CA', { timeZone: effectiveTimezone }) + 'T00:00:00.000Z')
-      const syncTo = new Date(tomorrow.toLocaleDateString('en-CA', { timeZone: effectiveTimezone }) + 'T23:59:59.999Z')
+      // FIXED: Properly handle timezone conversion for Calendly API
+      // Calendly API expects UTC timestamps, so we need to convert timezone boundaries to UTC properly
+      const userTimezoneDayStart = new Date(thirtyDaysAgo.toLocaleDateString('en-CA', { timeZone: effectiveTimezone }) + 'T00:00:00')
+      const userTimezoneDayEnd = new Date(tomorrow.toLocaleDateString('en-CA', { timeZone: effectiveTimezone }) + 'T23:59:59')
+      
+      // Convert timezone-aware dates to UTC for Calendly API
+      const tzOffset = userTimezoneDayStart.getTimezoneOffset() * 60 * 1000
+      const syncFrom = new Date(userTimezoneDayStart.getTime() + tzOffset)
+      const syncTo = new Date(userTimezoneDayEnd.getTime() + tzOffset)
 
-      console.log('📅 Timezone-aware sync date range:')
+      console.log('📅 FIXED Timezone-aware sync date range:')
       console.log('  User timezone:', effectiveTimezone)
       console.log('  From (UTC):', syncFrom.toISOString())
       console.log('  To (UTC):', syncTo.toISOString())
