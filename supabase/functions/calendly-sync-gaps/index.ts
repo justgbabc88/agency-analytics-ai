@@ -51,28 +51,6 @@ serve(async (req) => {
 
     console.log('📊 Found integrations:', integrations?.length || 0)
     console.log('🎯 Processing', integrations?.length || 0, 'projects for sync')
-    
-    // Debug: Show all integrations found
-    if (integrations?.length) {
-      integrations.forEach(integration => {
-        console.log(`   📍 Project ID: ${integration.project_id}`)
-      })
-    } else {
-      console.log('⚠️  No Calendly integrations found! Checking what exists...')
-      
-      // Let's check what integrations exist
-      const { data: allIntegrations } = await supabaseClient
-        .from('project_integrations')
-        .select('project_id, platform, is_connected')
-        .eq('platform', 'calendly')
-      
-      console.log(`   📊 Total calendly records: ${allIntegrations?.length || 0}`)
-      if (allIntegrations?.length) {
-        allIntegrations.forEach(integration => {
-          console.log(`     - Project ${integration.project_id}: connected=${integration.is_connected}`)
-        })
-      }
-    }
 
     if (!integrations || integrations.length === 0) {
       return new Response(JSON.stringify({
@@ -184,15 +162,14 @@ serve(async (req) => {
         continue
       }
 
-      // Sync events from the last 7 days for focused recent data
-      const now = new Date()
-      const syncFrom = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000)) // 7 days ago
-      const syncTo = new Date(now.getTime() + (1 * 24 * 60 * 60 * 1000))   // 1 day from now
+      // Focus on July 1-11, 2025 to get the missing 254 events
+      const syncFrom = new Date('2025-07-01T00:00:00.000Z')
+      const syncTo = new Date('2025-07-11T23:59:59.999Z')
 
       console.log('📅 Sync date range:')
       console.log('  From:', syncFrom.toISOString())
       console.log('  To:', syncTo.toISOString())
-      console.log('  Target period: Last 7 days + 1 day future (focused sync)')
+      console.log('  Target period: July 1-11, 2025')
 
       // Use pagination to get all events (Calendly API has a limit of 100 events per request)
       let allEvents = []
@@ -201,9 +178,7 @@ serve(async (req) => {
       async function fetchEventsByStatus(eventsList, orgUri, fromDate, toDate, accessToken, status) {
         let nextPageToken = null
         let pageCount = 0
-        const maxPages = 500  // Increased significantly to handle more events
-        let retryCount = 0
-        const maxRetries = 3
+        const maxPages = 100
         
         console.log(`🔄 Fetching ${status.toUpperCase()} events from Calendly`)
         
@@ -228,53 +203,33 @@ serve(async (req) => {
             if (!eventsResponse.ok) {
               const errorText = await eventsResponse.text()
               
-              // Handle rate limiting with extended retry logic for Calendly's 100 events/minute limit
+              // Handle rate limiting specifically
               if (eventsResponse.status === 429) {
-                const retryAfter = parseInt(eventsResponse.headers.get('Retry-After') || '60')
-                console.log(`⏰ Rate limited for ${status} events (Calendly: 100 events/minute). Retry attempt ${retryCount + 1}/${maxRetries}. Waiting ${retryAfter} seconds...`)
-                
-                if (retryCount < maxRetries) {
-                  retryCount++
-                  // Wait for rate limit reset + small buffer
-                  await new Promise(resolve => setTimeout(resolve, (retryAfter + 5) * 1000))
-                  continue // Retry the same page
-                } else {
-                  console.log(`⚠️ Rate limit exceeded for ${status} events. This is expected with Calendly's 100 events/minute limit.`)
-                  console.log(`📊 Successfully fetched ${eventsList.length} events before hitting rate limit.`)
-                  console.log(`🔄 Run sync again in 1 minute to fetch more events.`)
-                  break
-                }
+                const retryAfter = eventsResponse.headers.get('Retry-After') || '60'
+                console.log(`⏰ Rate limited for ${status} events. Retry after: ${retryAfter} seconds`)
+                // For now, log the rate limit and continue - in production you'd want to implement proper retry
+                return
               }
               
               console.error(`❌ Calendly API error (${status}): ${eventsResponse.status} ${errorText}`)
               break
             }
 
-            // Reset retry count on successful request
-            retryCount = 0
-
             const eventsData = await eventsResponse.json()
             const events = eventsData.collection || []
             
             console.log(`📊 ${status} events from page ${pageCount}:`, events.length)
-            console.log(`🔍 Pagination info:`, {
-              hasNextPage: !!eventsData.pagination?.next_page_token,
-              nextPageToken: eventsData.pagination?.next_page_token?.substring(0, 20) + '...',
-              totalCount: eventsData.pagination?.count,
-              currentPageEvents: events.length
-            })
             
             // Add events to our collection
             eventsList.push(...events)
             
             // Check if there's a next page
             nextPageToken = eventsData.pagination?.next_page_token
-            console.log(`🔄 ${status} - Page ${pageCount} complete. Next page available: ${!!nextPageToken}`)
+            console.log(`🔄 ${status} next page token:`, nextPageToken)
             
-            // Reduce delay to get events faster and avoid timeouts
+            // Add small delay between requests to be respectful to API
             if (nextPageToken) {
-              console.log(`⏳ ${status} - Waiting 100ms before next page...`)
-              await new Promise(resolve => setTimeout(resolve, 100))
+              await new Promise(resolve => setTimeout(resolve, 200))
             }
           } catch (fetchError) {
             console.error(`❌ Error fetching ${status} events from Calendly:`, fetchError)
@@ -283,10 +238,7 @@ serve(async (req) => {
           
         } while (nextPageToken && pageCount < maxPages)
         
-        console.log(`🏁 ${status.toUpperCase()} PAGINATION COMPLETE:`)
-        console.log(`   📄 Pages fetched: ${pageCount}`)
-        console.log(`   📊 Total events: ${eventsList.length}`)
-        console.log(`   🚫 Stopped because: ${nextPageToken ? 'Max pages reached' : 'No more pages'}`)
+        console.log(`🏁 ${status.toUpperCase()} PAGINATION COMPLETE: ${pageCount} pages fetched`)
       }
       
       // Fetch all event statuses separately to ensure we get everything
@@ -316,8 +268,8 @@ serve(async (req) => {
         const activeEventTypeIds = new Set(mappings.map(m => m.calendly_event_type_id))
         console.log('🎯 Active event type IDs for filtering:', Array.from(activeEventTypeIds))
 
-        // Filter events based on event type, then sort by date and take 100 most recent
-        const matchingEvents = allEvents.filter(event => {
+        // Filter events based on event type - using the correct property from API
+        const filteredEvents = allEvents.filter(event => {
           // Based on our test, the correct property is event.event_type (which contains the URI)
           const eventTypeUri = event.event_type
           const isMatched = activeEventTypeIds.has(eventTypeUri)
@@ -331,18 +283,7 @@ serve(async (req) => {
           return isMatched
         })
         
-        // Sort by start_time (most recent first) and take only 100 most recent
-        const filteredEvents = matchingEvents
-          .sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime())
-          .slice(0, 100)
-        
-        console.log(`🎯 Found ${matchingEvents.length} matching events, processing ${filteredEvents.length} most recent`)
-        
-        if (filteredEvents.length > 0) {
-          console.log('📋 Date range of selected events:')
-          console.log(`  Most recent: ${filteredEvents[0].start_time}`)
-          console.log(`  Oldest: ${filteredEvents[filteredEvents.length - 1].start_time}`)
-        }
+        console.log('🎯 Events matching active mappings:', filteredEvents.length)
 
         if (filteredEvents.length > 0) {
           console.log('📋 Sample filtered events:')
@@ -351,77 +292,64 @@ serve(async (req) => {
           })
         }
 
-        // First, get all existing events in a single query for efficiency
-        const existingEventIds = filteredEvents.length > 0 ? await supabaseClient
-          .from('calendly_events')
-          .select('calendly_event_id, status')
-          .eq('project_id', integration.project_id)
-          .in('calendly_event_id', filteredEvents.map(e => e.uri))
-          .then(({ data }) => new Map(data?.map(e => [e.calendly_event_id, e.status]) || [])) 
-          : new Map()
+        // Process each filtered event
+        for (const event of filteredEvents) {
+          try {
+            // Check if event already exists in our database
+            const { data: existingEvent, error: checkError } = await supabaseClient
+              .from('calendly_events')
+              .select('id')
+              .eq('calendly_event_id', event.uri)
+              .eq('project_id', integration.project_id)
+              .maybeSingle()
 
-        console.log(`📋 Found ${existingEventIds.size} existing events in database`)
+            if (checkError) {
+              console.error('❌ Error checking existing event:', checkError)
+              continue
+            }
 
-        // Process events in even smaller batches to avoid timeouts and database limits
-        const batchSize = 5  // Reduced batch size for better reliability
-        for (let i = 0; i < filteredEvents.length; i += batchSize) {
-          const batch = filteredEvents.slice(i, i + batchSize)
-          console.log(`🔄 Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(filteredEvents.length/batchSize)} (${batch.length} events)`)
-          
-          const eventsToUpsert = []
-          
-          for (const event of batch) {
-            try {
-              const eventTypeUri = event.event_type?.uri || 
-                                  event.event_type_uri || 
-                                  event.event_type_id ||
-                                  event.event_type
+            let isNewEvent = !existingEvent
+            
+            if (existingEvent) {
+              console.log('🔄 Event exists, checking for status updates:', event.uri, 'Status:', event.status)
+            } else {
+              console.log('➕ New event to insert:', event.uri, 'Status:', event.status)
+            }
 
-              const existingStatus = existingEventIds.get(event.uri)
-              const isNewEvent = !existingStatus
-              
-              // Find the event type name from our mappings
-              const mapping = mappings.find(m => m.calendly_event_type_id === eventTypeUri)
-              const eventTypeName = mapping?.event_type_name || event.event_type?.name || event.name || 'Unknown Event Type'
-
-              // Only fetch invitee info for new events to reduce API calls
-              let inviteeName = null
-              let inviteeEmail = null
-
-              if (isNewEvent) {
-                try {
-                  const inviteesResponse = await fetch(`${event.uri}/invitees`, {
-                    headers: {
-                      'Authorization': `Bearer ${tokenData.access_token}`,
-                      'Content-Type': 'application/json'
-                    }
-                  })
-
-                  if (inviteesResponse.ok) {
-                    const inviteesData = await inviteesResponse.json()
-                    if (inviteesData.collection && inviteesData.collection.length > 0) {
-                      const invitee = inviteesData.collection[0]
-                      inviteeName = invitee.name
-                      inviteeEmail = invitee.email
-                    }
-                  }
-                } catch (inviteeError) {
-                  console.log('⚠️ Could not fetch invitee info for:', event.uri)
-                }
+            // Get invitee information
+            const inviteesResponse = await fetch(`${event.uri}/invitees`, {
+              headers: {
+                'Authorization': `Bearer ${tokenData.access_token}`,
+                'Content-Type': 'application/json'
               }
+            })
 
-              // Debug logging for events missing created_at
-              if (!event.created_at) {
-                console.log('⚠️ Event missing created_at:', {
-                  uri: event.uri,
-                  status: event.status,
-                  start_time: event.start_time,
-                  updated_at: event.updated_at,
-                  availableFields: Object.keys(event)
-                })
+            let inviteeName = null
+            let inviteeEmail = null
+
+            if (inviteesResponse.ok) {
+              const inviteesData = await inviteesResponse.json()
+              if (inviteesData.collection && inviteesData.collection.length > 0) {
+                const invitee = inviteesData.collection[0]
+                inviteeName = invitee.name
+                inviteeEmail = invitee.email
               }
+            }
 
-              const eventData = {
+            // Get the event type URI using the same logic as filtering
+            const eventTypeUri = event.event_type?.uri || 
+                               event.event_type_uri || 
+                               event.event_type_id ||
+                               event.event_type
+
+            // Find the event type name from our mappings
+            const mapping = mappings.find(m => m.calendly_event_type_id === eventTypeUri)
+            const eventTypeName = mapping?.event_type_name || event.event_type?.name || event.name || 'Unknown Event Type'
+
+            // Upsert the event (insert new or update existing)
+            const { error: upsertError } = await supabaseClient
+              .from('calendly_events')
+              .upsert({
                 project_id: integration.project_id,
                 calendly_event_id: event.uri,
                 calendly_event_type_id: eventTypeUri,
@@ -430,44 +358,30 @@ serve(async (req) => {
                 invitee_name: inviteeName,
                 invitee_email: inviteeEmail,
                 status: event.status || 'scheduled',
-                // Ensure created_at is never null - use event.created_at, fallback to now
-                created_at: event.created_at ? new Date(event.created_at).toISOString() : new Date().toISOString(),
-                updated_at: event.updated_at ? new Date(event.updated_at).toISOString() : (event.created_at ? new Date(event.created_at).toISOString() : new Date().toISOString())
-              }
-
-              eventsToUpsert.push(eventData)
-
-              if (isNewEvent) {
-                console.log('➕ New event to insert:', event.uri, 'Status:', event.status)
-              } else if (existingStatus !== event.status) {
-                console.log('🔄 Event status changed:', event.uri, `${existingStatus} → ${event.status}`)
-              }
-
-            } catch (eventError) {
-              console.error('❌ Error processing event:', event.uri, eventError)
-            }
-          }
-
-          // Batch upsert all events in this batch
-          if (eventsToUpsert.length > 0) {
-            const { error: batchUpsertError } = await supabaseClient
-              .from('calendly_events')
-              .upsert(eventsToUpsert, {
+                created_at: isNewEvent ? event.created_at : undefined, // Only set created_at for new events
+                updated_at: event.updated_at || event.created_at // Always update the updated_at timestamp
+              }, {
                 onConflict: 'project_id,calendly_event_id'
               })
 
-            if (batchUpsertError) {
-              console.error('❌ Error batch upserting events:', batchUpsertError)
-            } else {
-              totalEvents += eventsToUpsert.length
-              console.log(`✅ Successfully processed batch of ${eventsToUpsert.length} events`)
+            if (upsertError) {
+              console.error('❌ Error upserting event:', upsertError)
+              continue
             }
-          }
 
-          // Add progress logging and small delay between batches
-          if (i + batchSize < filteredEvents.length) {
-            console.log(`⚡ Progress: ${Math.min(i + batchSize, filteredEvents.length)}/${filteredEvents.length} events processed`)
-            await new Promise(resolve => setTimeout(resolve, 200))  // Slightly longer delay
+            totalEvents++
+            const actionText = isNewEvent ? 'Inserted new' : 'Updated existing'
+            console.log(`✅ ${actionText} event:`, {
+              id: event.uri,
+              name: eventTypeName,
+              status: event.status,
+              scheduled_at: event.start_time,
+              event_type_uri: eventTypeUri
+            })
+
+          } catch (eventError) {
+            console.error('❌ Error processing individual event:', eventError)
+            continue
           }
         }
 
