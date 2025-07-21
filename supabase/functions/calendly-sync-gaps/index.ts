@@ -365,7 +365,7 @@ serve(async (req) => {
               }
 
               // Only include created_at for new events to avoid NULL constraint violations
-              if (isNewEvent) {
+              if (isNewEvent && event.created_at) {
                 eventData.created_at = event.created_at
               }
 
