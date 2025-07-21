@@ -89,6 +89,14 @@ export const useCallStatsCalculations = (
 
     console.log('📊 Events created in date range:', eventsCreatedInRange.length);
     console.log('📊 Events scheduled in date range:', eventsScheduledInRange.length);
+    
+    // Debug: Log all events with their statuses
+    console.log('🔍 All events scheduled in range with statuses:', eventsScheduledInRange.map(e => ({
+      id: e.calendly_event_id,
+      status: e.status,
+      scheduled_at: e.scheduled_at,
+      event_type: e.event_type_name
+    })));
 
     // Create 3 filtered arrays to count the different types of calls
     const cancelledCalls = eventsScheduledInRange.filter(event =>
