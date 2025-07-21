@@ -293,64 +293,66 @@ serve(async (req) => {
           })
         }
 
-        // Process each filtered event
-        for (const event of filteredEvents) {
-          try {
-            // Check if event already exists in our database
-            const { data: existingEvent, error: checkError } = await supabaseClient
-              .from('calendly_events')
-              .select('id')
-              .eq('calendly_event_id', event.uri)
-              .eq('project_id', integration.project_id)
-              .maybeSingle()
+        // First, get all existing events in a single query for efficiency
+        const existingEventIds = filteredEvents.length > 0 ? await supabaseClient
+          .from('calendly_events')
+          .select('calendly_event_id, status')
+          .eq('project_id', integration.project_id)
+          .in('calendly_event_id', filteredEvents.map(e => e.uri))
+          .then(({ data }) => new Map(data?.map(e => [e.calendly_event_id, e.status]) || [])) 
+          : new Map()
 
-            if (checkError) {
-              console.error('❌ Error checking existing event:', checkError)
-              continue
-            }
+        console.log(`📋 Found ${existingEventIds.size} existing events in database`)
 
-            let isNewEvent = !existingEvent
-            
-            if (existingEvent) {
-              console.log('🔄 Event exists, checking for status updates:', event.uri, 'Status:', event.status)
-            } else {
-              console.log('➕ New event to insert:', event.uri, 'Status:', event.status)
-            }
+        // Process events in smaller batches to avoid timeouts
+        const batchSize = 10
+        for (let i = 0; i < filteredEvents.length; i += batchSize) {
+          const batch = filteredEvents.slice(i, i + batchSize)
+          console.log(`🔄 Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(filteredEvents.length/batchSize)} (${batch.length} events)`)
+          
+          const eventsToUpsert = []
+          
+          for (const event of batch) {
+            try {
+              const eventTypeUri = event.event_type?.uri || 
+                                  event.event_type_uri || 
+                                  event.event_type_id ||
+                                  event.event_type
 
-            // Get invitee information
-            const inviteesResponse = await fetch(`${event.uri}/invitees`, {
-              headers: {
-                'Authorization': `Bearer ${tokenData.access_token}`,
-                'Content-Type': 'application/json'
+              const existingStatus = existingEventIds.get(event.uri)
+              const isNewEvent = !existingStatus
+              
+              // Find the event type name from our mappings
+              const mapping = mappings.find(m => m.calendly_event_type_id === eventTypeUri)
+              const eventTypeName = mapping?.event_type_name || event.event_type?.name || event.name || 'Unknown Event Type'
+
+              // Only fetch invitee info for new events to reduce API calls
+              let inviteeName = null
+              let inviteeEmail = null
+
+              if (isNewEvent) {
+                try {
+                  const inviteesResponse = await fetch(`${event.uri}/invitees`, {
+                    headers: {
+                      'Authorization': `Bearer ${tokenData.access_token}`,
+                      'Content-Type': 'application/json'
+                    }
+                  })
+
+                  if (inviteesResponse.ok) {
+                    const inviteesData = await inviteesResponse.json()
+                    if (inviteesData.collection && inviteesData.collection.length > 0) {
+                      const invitee = inviteesData.collection[0]
+                      inviteeName = invitee.name
+                      inviteeEmail = invitee.email
+                    }
+                  }
+                } catch (inviteeError) {
+                  console.log('⚠️ Could not fetch invitee info for:', event.uri)
+                }
               }
-            })
 
-            let inviteeName = null
-            let inviteeEmail = null
-
-            if (inviteesResponse.ok) {
-              const inviteesData = await inviteesResponse.json()
-              if (inviteesData.collection && inviteesData.collection.length > 0) {
-                const invitee = inviteesData.collection[0]
-                inviteeName = invitee.name
-                inviteeEmail = invitee.email
-              }
-            }
-
-            // Get the event type URI using the same logic as filtering
-            const eventTypeUri = event.event_type?.uri || 
-                               event.event_type_uri || 
-                               event.event_type_id ||
-                               event.event_type
-
-            // Find the event type name from our mappings
-            const mapping = mappings.find(m => m.calendly_event_type_id === eventTypeUri)
-            const eventTypeName = mapping?.event_type_name || event.event_type?.name || event.name || 'Unknown Event Type'
-
-            // Upsert the event (insert new or update existing)
-            const { error: upsertError } = await supabaseClient
-              .from('calendly_events')
-              .upsert({
+              eventsToUpsert.push({
                 project_id: integration.project_id,
                 calendly_event_id: event.uri,
                 calendly_event_type_id: eventTypeUri,
@@ -359,30 +361,40 @@ serve(async (req) => {
                 invitee_name: inviteeName,
                 invitee_email: inviteeEmail,
                 status: event.status || 'scheduled',
-                created_at: isNewEvent ? event.created_at : undefined, // Only set created_at for new events
-                updated_at: event.updated_at || event.created_at // Always update the updated_at timestamp
-              }, {
+                created_at: isNewEvent ? event.created_at : undefined,
+                updated_at: event.updated_at || event.created_at
+              })
+
+              if (isNewEvent) {
+                console.log('➕ New event to insert:', event.uri, 'Status:', event.status)
+              } else if (existingStatus !== event.status) {
+                console.log('🔄 Event status changed:', event.uri, `${existingStatus} → ${event.status}`)
+              }
+
+            } catch (eventError) {
+              console.error('❌ Error processing event:', event.uri, eventError)
+            }
+          }
+
+          // Batch upsert all events in this batch
+          if (eventsToUpsert.length > 0) {
+            const { error: batchUpsertError } = await supabaseClient
+              .from('calendly_events')
+              .upsert(eventsToUpsert, {
                 onConflict: 'project_id,calendly_event_id'
               })
 
-            if (upsertError) {
-              console.error('❌ Error upserting event:', upsertError)
-              continue
+            if (batchUpsertError) {
+              console.error('❌ Error batch upserting events:', batchUpsertError)
+            } else {
+              totalEvents += eventsToUpsert.length
+              console.log(`✅ Successfully processed batch of ${eventsToUpsert.length} events`)
             }
+          }
 
-            totalEvents++
-            const actionText = isNewEvent ? 'Inserted new' : 'Updated existing'
-            console.log(`✅ ${actionText} event:`, {
-              id: event.uri,
-              name: eventTypeName,
-              status: event.status,
-              scheduled_at: event.start_time,
-              event_type_uri: eventTypeUri
-            })
-
-          } catch (eventError) {
-            console.error('❌ Error processing individual event:', eventError)
-            continue
+          // Small delay between batches to avoid overwhelming the system
+          if (i + batchSize < filteredEvents.length) {
+            await new Promise(resolve => setTimeout(resolve, 100))
           }
         }
 
