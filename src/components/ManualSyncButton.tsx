@@ -106,6 +106,44 @@ export const ManualSyncButton = () => {
       >
         Check Count
       </Button>
+      <Button 
+        onClick={async () => {
+          console.log('🔍 Running July 20th Calendly diagnostic...');
+          
+          try {
+            const { data, error } = await supabase.functions.invoke('calendly-diagnostic');
+            
+            if (error) {
+              console.error('❌ Diagnostic error:', error);
+              toast.error('Diagnostic failed');
+              return;
+            }
+            
+            console.log('📊 Diagnostic results:', data);
+            
+            if (data.july20Focus) {
+              const focus = data.july20Focus;
+              console.log(`🎯 API shows ${focus.eventsCreatedOnJuly20thFromAPI} events CREATED on July 20th`);
+              console.log(`🎯 DB has ${focus.eventsCreatedOnJuly20thInDB} events CREATED on July 20th`);
+              console.log(`📋 Missing events: ${focus.missingCreatedEvents}`);
+              
+              if (focus.createdEventDetails.length > 0) {
+                console.log('📋 Events created on July 20th from API:', focus.createdEventDetails);
+              }
+              
+              toast.success(`API: ${focus.eventsCreatedOnJuly20thFromAPI} created, DB: ${focus.eventsCreatedOnJuly20thInDB} created. Missing: ${focus.missingCreatedEvents}`);
+            }
+          } catch (error) {
+            console.error('❌ Diagnostic error:', error);
+            toast.error('Diagnostic failed');
+          }
+        }}
+        variant="outline"
+        size="sm"
+        className="flex items-center gap-2"
+      >
+        July 20th Diagnostic
+      </Button>
     </div>
   );
 };
