@@ -148,26 +148,58 @@ export const ManualSyncButton = () => {
             const data = await response.json();
             console.log('📊 Total events in broad range:', data.collection?.length || 0);
             
-            // Filter for events created on July 20th and Property Advantage Call type
-            const july20CreatedEvents = data.collection?.filter(event => {
-              const createdOnJuly20 = event.created_at && event.created_at.startsWith('2025-07-20');
-              const isPropertyAdvantage = event.event_type === 'https://api.calendly.com/event_types/c6fa8f5f-9cdd-40b7-98ae-90c6caed9b6f';
-              return createdOnJuly20 && isPropertyAdvantage;
+            // Get all Property Advantage Call events and show their creation dates
+            const propertyAdvantageEvents = data.collection?.filter(event => {
+              return event.event_type === 'https://api.calendly.com/event_types/c6fa8f5f-9cdd-40b7-98ae-90c6caed9b6f';
             }) || [];
             
-            console.log(`🎯 Property Advantage Call events CREATED on July 20th: ${july20CreatedEvents.length}`);
+            console.log(`🎯 Total Property Advantage Call events in range: ${propertyAdvantageEvents.length}`);
             
-            if (july20CreatedEvents.length > 0) {
-              console.log('📋 Events created on July 20th:');
-              july20CreatedEvents.forEach((event, index) => {
-                console.log(`   ${index + 1}. Created: ${event.created_at}, Scheduled: ${event.start_time}, Status: ${event.status}`);
-                console.log(`      URI: ${event.uri}`);
+            // Group by creation date and show details
+            const creationDateGroups = {};
+            propertyAdvantageEvents.forEach(event => {
+              const createdDate = event.created_at ? event.created_at.split('T')[0] : 'no-date';
+              if (!creationDateGroups[createdDate]) {
+                creationDateGroups[createdDate] = [];
+              }
+              creationDateGroups[createdDate].push({
+                uri: event.uri,
+                created_at: event.created_at,
+                start_time: event.start_time,
+                status: event.status
+              });
+            });
+            
+            console.log('📅 Property Advantage Call events grouped by CREATION DATE:');
+            Object.keys(creationDateGroups).sort().forEach(date => {
+              const events = creationDateGroups[date];
+              console.log(`   ${date}: ${events.length} events`);
+              
+              // Show first few events for each date
+              events.slice(0, 3).forEach((event, index) => {
+                console.log(`     ${index + 1}. Created: ${event.created_at}, Scheduled: ${event.start_time}, Status: ${event.status}`);
               });
               
-              toast.success(`🎯 Found ${july20CreatedEvents.length} Property Advantage Call events created on July 20th in Calendly API!`);
-            } else {
-              toast.error('❌ No Property Advantage Call events created on July 20th found in Calendly API');
-            }
+              if (events.length > 3) {
+                console.log(`     ... and ${events.length - 3} more events`);
+              }
+            });
+            
+            // Specifically look for July 20th in different formats/timezones
+            const july20Variants = propertyAdvantageEvents.filter(event => {
+              const createdAt = event.created_at || '';
+              return createdAt.includes('2025-07-20') || 
+                     createdAt.includes('07-20') ||
+                     createdAt.includes('20-07');
+            });
+            
+            console.log(`🔍 Events with July 20th in created_at (any timezone): ${july20Variants.length}`);
+            july20Variants.forEach((event, index) => {
+              console.log(`   ${index + 1}. Full created_at: ${event.created_at}`);
+            });
+            
+            const summary = `Found ${propertyAdvantageEvents.length} Property Advantage Call events. Creation dates: ${Object.keys(creationDateGroups).sort().join(', ')}`;
+            toast.success(summary);
             
           } catch (error) {
             console.error('❌ API test error:', error);
