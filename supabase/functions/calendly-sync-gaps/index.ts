@@ -178,16 +178,16 @@ serve(async (req) => {
         continue
       }
 
-      // Use timezone-aware date range - sync last 30 days from user's perspective
+      // Use timezone-aware date range - sync last 7 days for troubleshooting
       const now = new Date()
-      const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000))
+      const sevenDaysAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000))
       
       // Get tomorrow's date to ensure we capture all of today's events
       const tomorrow = new Date(now.getTime() + (24 * 60 * 60 * 1000))
       
       // FIXED: Properly handle timezone conversion for Calendly API
       // Calendly API expects UTC timestamps, so we need to convert timezone boundaries to UTC properly
-      const userTimezoneDayStart = new Date(thirtyDaysAgo.toLocaleDateString('en-CA', { timeZone: effectiveTimezone }) + 'T00:00:00')
+      const userTimezoneDayStart = new Date(sevenDaysAgo.toLocaleDateString('en-CA', { timeZone: effectiveTimezone }) + 'T00:00:00')
       const userTimezoneDayEnd = new Date(tomorrow.toLocaleDateString('en-CA', { timeZone: effectiveTimezone }) + 'T23:59:59')
       
       // Convert timezone-aware dates to UTC for Calendly API
@@ -195,7 +195,7 @@ serve(async (req) => {
       const syncFrom = new Date(userTimezoneDayStart.getTime() + tzOffset)
       const syncTo = new Date(userTimezoneDayEnd.getTime() + tzOffset)
 
-      console.log('📅 FIXED Timezone-aware sync date range:')
+      console.log('📅 7-DAY SYNC - Timezone-aware sync date range:')
       console.log('  User timezone:', effectiveTimezone)
       console.log('  From (UTC):', syncFrom.toISOString())
       console.log('  To (UTC):', syncTo.toISOString())
