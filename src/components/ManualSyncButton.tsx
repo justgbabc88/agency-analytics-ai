@@ -1,14 +1,11 @@
-
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useUserProfile } from "@/hooks/useUserProfile";
 
 export const ManualSyncButton = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const { getUserTimezone } = useUserProfile();
 
   const handleManualSync = async () => {
     setIsLoading(true);
@@ -29,38 +26,18 @@ export const ManualSyncButton = () => {
       console.log('✅ Event types mapped:', mapData);
       toast.success(`Mapped ${mapData.mappingsCreated} event types`);
       
-      console.log('🔧 Now triggering comprehensive Calendly sync...');
+      console.log('🔧 Now triggering Calendly sync...');
       
-      const userTimezone = getUserTimezone();
-      const { data, error } = await supabase.functions.invoke('calendly-sync-gaps', {
-        body: { 
-          userTimezone,
-          triggerReason: 'manual_comprehensive_sync',
-          specificProjectId: '382c6666-c24d-4de1-b449-3858a46fbed3'
-        }
-      });
+      const { data, error } = await supabase.functions.invoke('manual-calendly-sync');
       
       if (error) {
-        console.error('❌ Comprehensive sync error:', error);
-        toast.error('Failed to trigger comprehensive sync');
+        console.error('❌ Manual sync error:', error);
+        toast.error('Failed to trigger sync');
         return;
       }
       
-      console.log('✅ Comprehensive sync response:', data);
-      
-      // Show detailed results
-      if (data.syncStats) {
-        const stats = data.syncStats;
-        toast.success(
-          `Comprehensive sync complete! 
-          🔍 API calls: ${stats.totalApiCalls}
-          📊 Events: Active(${stats.activeEventsFetched}) + Completed(${stats.completedEventsFetched}) + Canceled(${stats.canceledEventsFetched})
-          💾 DB: ${stats.eventsInserted} new, ${stats.eventsUpdated} updated`,
-          { duration: 10000 }
-        );
-      } else {
-        toast.success(`Comprehensive sync complete! ${data.events} events processed`);
-      }
+      console.log('✅ Manual sync response:', data);
+      toast.success('Calendly sync triggered successfully');
       
       // Refresh the page after a short delay to see updated data
       setTimeout(() => {
@@ -68,49 +45,10 @@ export const ManualSyncButton = () => {
       }, 3000);
       
     } catch (error) {
-      console.error('❌ Comprehensive sync error:', error);
-      toast.error('Failed to trigger comprehensive sync');
+      console.error('❌ Manual sync error:', error);
+      toast.error('Failed to trigger sync');
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleDiagnosticCheck = async () => {
-    console.log('🔍 Running API diagnostic to see what Calendly is returning...');
-    
-    try {
-      const userTimezone = getUserTimezone();
-      const { data, error } = await supabase.functions.invoke('calendly-diagnostic', {
-        body: { 
-          userTimezone,
-          projectId: '382c6666-c24d-4de1-b449-3858a46fbed3',
-          dates: ['2025-07-16', '2025-07-17'] // Focus on the problematic dates
-        }
-      });
-      
-      if (error) {
-        console.error('❌ Diagnostic error:', error);
-        toast.error('Diagnostic check failed');
-        return;
-      }
-      
-      console.log('🔍 Calendly API diagnostic results:', data);
-      
-      // Show results
-      if (data.summary) {
-        toast.success(
-          `API Diagnostic Results:
-          July 16th - API: ${data.summary.july16?.apiCount || 0}, DB: ${data.summary.july16?.dbCount || 0}
-          July 17th - API: ${data.summary.july17?.apiCount || 0}, DB: ${data.summary.july17?.dbCount || 0}
-          
-          Missing events identified: ${data.summary.missingEvents || 0}`,
-          { duration: 20000 }
-        );
-      }
-      
-    } catch (error) {
-      console.error('❌ Diagnostic error:', error);
-      toast.error('Diagnostic check failed');
     }
   };
 
@@ -124,15 +62,49 @@ export const ManualSyncButton = () => {
         className="flex items-center gap-2"
       >
         <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-        {isLoading ? 'Comprehensive Sync...' : 'Comprehensive Sync'}
+        {isLoading ? 'Syncing...' : 'Manual Sync'}
       </Button>
       <Button 
-        onClick={handleDiagnosticCheck}
+        onClick={async () => {
+          console.log('🔍 Running comprehensive diagnostics...');
+          
+          // Check current DB count
+          const { count: dbCount } = await supabase
+            .from('calendly_events')
+            .select('*', { count: 'exact', head: true })
+            .eq('project_id', '382c6666-c24d-4de1-b449-3858a46fbed3')
+            .eq('event_type_name', 'Property Advantage Call')
+            .gte('scheduled_at', '2025-07-01T00:00:00.000Z')
+            .lte('scheduled_at', '2025-07-11T23:59:59.999Z');
+          
+          // Check by status
+          const { data: byStatus } = await supabase
+            .from('calendly_events')
+            .select('status')
+            .eq('project_id', '382c6666-c24d-4de1-b449-3858a46fbed3')
+            .eq('event_type_name', 'Property Advantage Call')
+            .gte('scheduled_at', '2025-07-01T00:00:00.000Z')
+            .lte('scheduled_at', '2025-07-11T23:59:59.999Z');
+          
+          // Get status breakdown
+          const statusCounts = byStatus?.reduce((acc, event) => {
+            acc[event.status] = (acc[event.status] || 0) + 1;
+            return acc;
+          }, {} as Record<string, number>) || {};
+          
+          console.log(`📊 Current DB count for July 1-11: ${dbCount}`);
+          console.log(`📈 Status breakdown:`, statusCounts);
+          console.log(`🎯 Target: 254 events (131 created + 123 completed)`);
+          console.log(`📉 Missing: ${254 - (dbCount || 0)} events`);
+          
+          const statusText = Object.entries(statusCounts).map(([status, count]) => `${status}: ${count}`).join(', ');
+          toast.success(`DB: ${dbCount || 0}/254 events. Status: ${statusText || 'none'}`);
+        }}
         variant="outline"
         size="sm"
         className="flex items-center gap-2"
       >
-        🔍 Diagnostic Check
+        Check Count
       </Button>
     </div>
   );

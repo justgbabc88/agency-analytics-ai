@@ -41,9 +41,6 @@ verify_jwt = false
 [functions.calendly-sync-gaps]
 verify_jwt = true
 
-[functions.calendly-diagnostic]
-verify_jwt = true
-
 [functions.calendly-oauth]
 verify_jwt = true
 
@@ -61,6 +58,9 @@ verify_jwt = false
 
 [functions.integration-sync]
 verify_jwt = true
+
+[functions.track-event]
+verify_jwt = false
 
 [edge-runtime]
 policy = "per_request"

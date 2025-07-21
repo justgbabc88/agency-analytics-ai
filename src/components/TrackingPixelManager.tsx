@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Eye, Trash2, Copy, Globe, ShoppingCart, CheckCircle, Video, Calendar, FileText, Settings, ChevronDown, ChevronUp, ExternalLink, AlertTriangle } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from "@/hooks/use-toast";
@@ -301,6 +302,7 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
       return newSet;
     });
   };
+
 
   const generatePageScript = (page: any, pixelId: string) => {
     const supabaseUrl = "https://iqxvtfupjjxjkbajgcve.supabase.co";
@@ -641,16 +643,29 @@ export const TrackingPixelManager = ({ projectId }: TrackingPixelManagerProps) =
                                       <ExternalLink className="h-3 w-3 ml-1 flex-shrink-0" />
                                     </a>
                                   </div>
-                                  
-                                  <div className="space-y-2">
-                                    <div className="flex flex-wrap gap-1">
-                                      {(page.events || []).map((event: string) => (
-                                        <Badge key={event} variant="secondary" className="text-xs px-1 py-0">
-                                          {event.replace(/_/g, ' ')}
+                                   
+                                   <div className="space-y-2">
+                                     <div className="flex flex-wrap gap-1">
+                                       {(page.events || []).map((event: string) => (
+                                         <Badge key={event} variant="secondary" className="text-xs px-1 py-0">
+                                           {event.replace(/_/g, ' ')}
+                                         </Badge>
+                                       ))}
+                                     </div>
+                                      
+                                      {/* Page View Metrics Status */}
+                                      <div className="flex items-center justify-between pt-2 border-t">
+                                         <div className="text-xs text-gray-600">
+                                           Funnel metrics status
+                                         </div>
+                                        <Badge 
+                                          variant={page.includeInPageViewMetrics !== false ? "default" : "secondary"}
+                                          className="text-xs px-2 py-0"
+                                        >
+                                          {page.includeInPageViewMetrics !== false ? "In Metrics" : "Not in Metrics"}
                                         </Badge>
-                                      ))}
-                                    </div>
-                                  </div>
+                                      </div>
+                                   </div>
                                 </div>
                               </Card>
                             );

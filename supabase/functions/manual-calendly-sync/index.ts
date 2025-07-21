@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
@@ -18,22 +17,11 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Get request body to extract timezone if provided
-    const body = await req.json().catch(() => ({}));
-    const { userTimezone, projectId } = body;
+    console.log('🔧 Manual Calendly sync triggered')
 
-    console.log('🔧 Manual Calendly sync triggered with timezone awareness:', {
-      userTimezone: userTimezone || 'UTC (default)',
-      projectId: projectId || 'all projects'
-    });
-
-    // Call the calendly-sync-gaps function with timezone
+    // Call the calendly-sync-gaps function
     const { data, error } = await supabaseClient.functions.invoke('calendly-sync-gaps', {
-      body: { 
-        manual_trigger: true,
-        userTimezone: userTimezone || 'UTC',
-        specificProjectId: projectId
-      }
+      body: { manual_trigger: true }
     })
 
     if (error) {
@@ -44,13 +32,12 @@ Deno.serve(async (req) => {
       )
     }
 
-    console.log('✅ Timezone-aware sync function response:', data)
+    console.log('✅ Sync function response:', data)
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: 'Calendly sync triggered successfully with timezone support',
-        timezone: userTimezone || 'UTC',
+        message: 'Calendly sync triggered successfully',
         result: data 
       }),
       { 

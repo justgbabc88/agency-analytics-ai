@@ -102,7 +102,7 @@ export const BookCallAIAssistant = ({ projectId, dateRange, selectedCampaignIds 
     };
   }, [calendlyEvents, formSubmissions, facebookData, dateRange, userTimezone]);
 
-  const ghlIntegration = integrations.find(i => i.platform === 'ghl');
+  const ghlIntegration = integrations?.find(i => i.platform === 'ghl');
   const isGHLConnected = ghlIntegration?.is_connected || false;
 
   if (!projectId) {

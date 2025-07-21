@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConversionChart } from "./ConversionChart";
-import { useGoogleSheetsData } from "@/hooks/useGoogleSheetsData";
+
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -37,44 +37,15 @@ interface LowTicketFunnelProps {
 }
 
 export const LowTicketFunnel = ({ dateRange, selectedProducts, onProductsChange, selectedCampaignIds = [] }: LowTicketFunnelProps) => {
-  const { syncedData, calculateMetricsFromSyncedData } = useGoogleSheetsData();
+  
   const [isFunnelOpen, setIsFunnelOpen] = useState(true);
   const [isCustomizerExpanded, setIsCustomizerExpanded] = useState(false);
   
   // Calculate metrics from Google Sheets data
-  const calculatedMetrics = calculateMetricsFromSyncedData();
+  const calculatedMetrics = null;
   
   // Generate funnel data from Google Sheets if available, otherwise use mock data
   const generateFunnelData = () => {
-    if (syncedData && syncedData.data && syncedData.data.length > 0) {
-      return syncedData.data.map((row, index) => ({
-        date: row.Date || `Day ${index + 1}`,
-        pageViews: parseInt(row['Page Views']?.replace(/[^\d]/g, '') || '0') || 0,
-        optins: parseInt(row['Opt-Ins']?.replace(/[^\d]/g, '') || '0') || 0,
-        mainProductSales: parseInt(row['Main Offer']?.replace(/[^\d]/g, '') || '0') || 0,
-        bumpSales: parseInt(row['Bump']?.replace(/[^\d]/g, '') || '0') || 0,
-        upsell1Sales: parseInt(row['Upsell 1']?.replace(/[^\d]/g, '') || '0') || 0,
-        downsell1Sales: parseInt(row['Downsell 1']?.replace(/[^\d]/g, '') || '0') || 0,
-        upsell2Sales: parseInt(row['Upsell 2']?.replace(/[^\d]/g, '') || '0') || 0,
-        downsell2Sales: parseInt(row['Downsell 2']?.replace(/[^\d]/g, '') || '0') || 0,
-        roas: parseFloat(row['ROAS']?.replace(/[^\d.]/g, '') || '0') || 0,
-        optinRate: row['Page Views'] && row['Opt-Ins'] ? 
-          (parseInt(row['Opt-Ins']?.replace(/[^\d]/g, '') || '0') / parseInt(row['Page Views']?.replace(/[^\d]/g, '') || '1')) * 100 : 0,
-        mainProduct: row['Page Views'] && row['Main Offer'] ? 
-          (parseInt(row['Main Offer']?.replace(/[^\d]/g, '') || '0') / parseInt(row['Page Views']?.replace(/[^\d]/g, '') || '1')) * 100 : 0,
-        bump: row['Main Offer'] && row['Bump'] ? 
-          (parseInt(row['Bump']?.replace(/[^\d]/g, '') || '0') / parseInt(row['Main Offer']?.replace(/[^\d]/g, '') || '1')) * 100 : 0,
-        upsell1: row['Main Offer'] && row['Upsell 1'] ? 
-          (parseInt(row['Upsell 1']?.replace(/[^\d]/g, '') || '0') / parseInt(row['Main Offer']?.replace(/[^\d]/g, '') || '1')) * 100 : 0,
-        downsell1: row['Main Offer'] && row['Downsell 1'] ? 
-          (parseInt(row['Downsell 1']?.replace(/[^\d]/g, '') || '0') / parseInt(row['Main Offer']?.replace(/[^\d]/g, '') || '1')) * 100 : 0,
-        upsell2: row['Upsell 1'] && row['Upsell 2'] ? 
-          (parseInt(row['Upsell 2']?.replace(/[^\d]/g, '') || '0') / parseInt(row['Upsell 1']?.replace(/[^\d]/g, '') || '1')) * 100 : 0,
-        downsell2: row['Upsell 1'] && row['Downsell 2'] ? 
-          (parseInt(row['Downsell 2']?.replace(/[^\d]/g, '') || '0') / parseInt(row['Upsell 1']?.replace(/[^\d]/g, '') || '1')) * 100 : 0
-      }));
-    }
-    
     // Fallback mock data
     return [
       { date: "Nov 1", pageViews: 10000, optins: 2500, mainProduct: 6.25, bump: 30, upsell1: 20, downsell1: 24, upsell2: 60, downsell2: 40, roas: 3.2 },

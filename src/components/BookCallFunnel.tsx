@@ -1,13 +1,13 @@
-
 import { useCalendlyData } from "@/hooks/useCalendlyData";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
-import { toZonedTime } from "date-fns-tz";
+import { fromZonedTime, toZonedTime } from "date-fns-tz";
 import { LandingPageMetrics } from "./LandingPageMetrics";
 import { CallStatsMetrics } from "./CallStatsMetrics";
 import { CallsList } from "./CallsList";
 import { useState, useEffect, useMemo } from "react";
 import { generateCallDataFromEvents } from "@/utils/chartDataGeneration";
+import { useCallStatsCalculations } from "@/hooks/useCallStatsCalculations";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useGHLFormSubmissions } from "@/hooks/useGHLFormSubmissions";
@@ -21,35 +21,131 @@ interface BookCallFunnelProps {
 }
 
 export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [], selectedFormIds = [] }: BookCallFunnelProps) => {
-  const { 
-    calendlyEvents, 
-    getRecentBookings, 
-    getMonthlyComparison, 
-    refetch,
-    userTimezone,
-    filterEventsByDateRangeWithTimezone,
-    filterEventsByScheduledDateRangeWithTimezone,
-    filterCancelledEventsByDateRangeWithTimezone
-  } = useCalendlyData(projectId);
-  
+  const { calendlyEvents, getRecentBookings, getMonthlyComparison, refetch } = useCalendlyData(projectId);
   const { getUserTimezone, profile } = useUserProfile();
   const { toast } = useToast();
   const { metrics: formSubmissions, loading: formSubmissionsLoading } = useGHLFormSubmissions(projectId, dateRange, selectedFormIds);
   const { facebookData } = useFacebookData({ dateRange, campaignIds: selectedCampaignIds });
   
-  const effectiveTimezone = userTimezone || getUserTimezone();
+  // State for tracking events
+  const [trackingEvents, setTrackingEvents] = useState<any[]>([]);
+  const [trackingEventsLoading, setTrackingEventsLoading] = useState(false);
+  
+  const userTimezone = getUserTimezone();
   
   console.log('🔄 BookCallFunnel render - Project ID:', projectId);
-  console.log('🌍 BookCallFunnel - User timezone:', effectiveTimezone);
+  console.log('🔄 User timezone from profile:', userTimezone);
   console.log('🔄 Profile timezone setting:', profile?.timezone);
   console.log('🔄 Received date range from parent:', {
     from: format(dateRange.from, 'yyyy-MM-dd HH:mm:ss'),
     to: format(dateRange.to, 'yyyy-MM-dd HH:mm:ss'),
     fromISO: dateRange.from.toISOString(),
-    toISO: dateRange.to.toISOString(),
-    timezone: effectiveTimezone
+    toISO: dateRange.to.toISOString()
   });
   console.log('🔄 All Calendly events available:', calendlyEvents.length);
+
+  // State for tracking pixel configuration
+  const [pixelConfig, setPixelConfig] = useState<any>(null);
+  
+  // Fetch pixel configuration to get page settings
+  useEffect(() => {
+    const fetchPixelConfig = async () => {
+      if (!projectId) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('tracking_pixels')
+          .select('config')
+          .eq('project_id', projectId)
+          .eq('is_active', true)
+          .single();
+
+        if (error) {
+          console.error('Error fetching pixel config:', error);
+          return;
+        }
+
+        setPixelConfig(data?.config || null);
+      } catch (error) {
+        console.error('Error fetching pixel config:', error);
+      }
+    };
+
+    fetchPixelConfig();
+  }, [projectId]);
+
+  // Fetch tracking events for page views
+  const fetchTrackingEvents = async () => {
+    if (!projectId) return;
+    
+    setTrackingEventsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('tracking_events')
+        .select('*')
+        .eq('project_id', projectId)
+        .eq('event_type', 'page_view')
+        .gte('created_at', dateRange.from.toISOString())
+        .lte('created_at', dateRange.to.toISOString())
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching tracking events:', error);
+        return;
+      }
+
+      console.log('📊 Fetched tracking events:', data?.length || 0);
+      setTrackingEvents(data || []);
+    } catch (error) {
+      console.error('Error fetching tracking events:', error);
+    } finally {
+      setTrackingEventsLoading(false);
+    }
+  };
+
+  // Fetch tracking events when component mounts or dependencies change
+  useEffect(() => {
+    fetchTrackingEvents();
+  }, [projectId, dateRange.from, dateRange.to]);
+
+  // Real-time listener for new tracking events
+  useEffect(() => {
+    if (!projectId) return;
+
+    console.log('🎧 Setting up real-time listener for tracking events...');
+    
+    const trackingChannel = supabase
+      .channel('tracking-events-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'tracking_events',
+          filter: `project_id=eq.${projectId}`
+        },
+        (payload) => {
+          console.log('🆕 New tracking event received:', payload);
+          
+          // Show toast notification for new page views if it's a page view event
+          if (payload.new && payload.new.event_type === 'page_view') {
+            toast({
+              title: "New Page View! 👀",
+              description: `Landing page visited: ${payload.new.page_url}`,
+            });
+          }
+          
+          // Refresh tracking events data
+          fetchTrackingEvents();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('🎧 Cleaning up tracking events real-time listener...');
+      supabase.removeChannel(trackingChannel);
+    };
+  }, [projectId, toast]);
 
   // Real-time listener for new Calendly events
   useEffect(() => {
@@ -70,6 +166,7 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
         (payload) => {
           console.log('🆕 New Calendly event received:', payload);
           
+          // Show toast notification for new bookings
           if (payload.new) {
             toast({
               title: "New Booking! 🎉",
@@ -77,6 +174,7 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
             });
           }
           
+          // Refresh data to show the new event
           refetch();
         }
       )
@@ -91,6 +189,7 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
         (payload) => {
           console.log('📝 Calendly event updated:', payload);
           
+          // Show notification for status changes
           if (payload.new && payload.old) {
             const oldStatus = payload.old.status;
             const newStatus = payload.new.status;
@@ -114,26 +213,26 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
             }
           }
           
+          // Refresh data to show the updated event
           refetch();
         }
       )
       .subscribe();
 
-    // Trigger timezone-aware manual gap sync when component loads
+    // Trigger manual gap sync when component loads
     const triggerManualSync = async () => {
       try {
-        console.log('🔄 Triggering timezone-aware manual gap sync for missing events...');
+        console.log('🔄 Triggering manual gap sync for missing events...');
         await supabase.functions.invoke('calendly-sync-gaps', {
           body: { 
             triggerReason: 'manual_component_sync',
-            projectId,
-            userTimezone: effectiveTimezone
+            projectId 
           }
         });
         
         // Refresh data after gap sync
         setTimeout(() => {
-          console.log('🔄 Refreshing data after timezone-aware manual sync...');
+          console.log('🔄 Refreshing data after manual sync...');
           refetch();
         }, 2000);
       } catch (error) {
@@ -145,7 +244,7 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
     triggerManualSync();
     
     const syncInterval = setInterval(() => {
-      console.log('🔄 Periodic timezone-aware sync check...');
+      console.log('🔄 Periodic sync check...');
       triggerManualSync();
     }, 5 * 60 * 1000); // Every 5 minutes
 
@@ -154,92 +253,96 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       supabase.removeChannel(channel);
       clearInterval(syncInterval);
     };
-  }, [projectId, refetch, toast, effectiveTimezone]);
+  }, [projectId, refetch, toast]);
 
-  // Filter events using timezone-aware functions
+  // Create a more specific dependency key that includes both timezone sources
+  const dateRangeKey = useMemo(() => {
+    const fromISO = dateRange.from.toISOString();
+    const toISO = dateRange.to.toISOString();
+    const profileTimezone = profile?.timezone || 'UTC';
+    const effectiveTimezone = userTimezone || 'UTC';
+    return `${fromISO}-${toISO}-${profileTimezone}-${effectiveTimezone}-${calendlyEvents.length}`;
+  }, [dateRange.from, dateRange.to, userTimezone, profile?.timezone, calendlyEvents.length]);
+  
+  // Filter events to match the date range filtering used in CallsList
   const filteredEvents = useMemo(() => {
-    if (!calendlyEvents.length || !effectiveTimezone) return [];
-    
-    console.log('\n=== TIMEZONE-AWARE EVENT FILTERING ===');
-    console.log('🌍 Using timezone:', effectiveTimezone);
-    console.log('📅 Date range:', {
-      from: dateRange.from.toISOString(),
-      to: dateRange.to.toISOString(),
-      from_user_tz: dateRange.from.toLocaleString('en-US', { timeZone: effectiveTimezone }),
-      to_user_tz: dateRange.to.toLocaleString('en-US', { timeZone: effectiveTimezone })
+    return calendlyEvents.filter(event => {
+      // Convert the event's created_at to user's timezone for comparison
+      const eventCreatedInUserTz = toZonedTime(new Date(event.created_at), userTimezone);
+      const selectedFromDate = toZonedTime(dateRange.from, userTimezone);
+      const selectedToDate = toZonedTime(dateRange.to, userTimezone);
+      
+      // Get the date part only (year, month, day) for comparison
+      const eventDate = startOfDay(eventCreatedInUserTz);
+      const fromDate = startOfDay(selectedFromDate);
+      const toDate = startOfDay(selectedToDate);
+      
+      return eventDate >= fromDate && eventDate <= toDate;
     });
-    
-    const filtered = filterEventsByDateRangeWithTimezone(dateRange);
-    
-    console.log('📊 Filtered events result:', {
-      total_events: calendlyEvents.length,
-      filtered_events: filtered.length,
-      timezone: effectiveTimezone
-    });
-    
-    if (filtered.length > 0) {
-      console.log('📋 Sample filtered events:', filtered.slice(0, 3).map(e => ({
-        id: e.calendly_event_id,
-        event_type: e.event_type_name,
-        created_utc: e.created_at,
-        created_user_tz: new Date(e.created_at).toLocaleString('en-US', { timeZone: effectiveTimezone }),
-        status: e.status
-      })));
-    }
-    
-    return filtered;
-  }, [calendlyEvents, dateRange, effectiveTimezone, filterEventsByDateRangeWithTimezone]);
+  }, [calendlyEvents, dateRange, userTimezone]);
   
   const chartData = useMemo(() => {
-    console.log('🔄 Recalculating timezone-aware chart data');
+    console.log('🔄 Recalculating chart data due to dependency change');
+    console.log('🔄 Date range key:', dateRangeKey);
     console.log('🔄 Events available:', filteredEvents.length);
-    console.log('🔄 Using timezone:', effectiveTimezone);
+    console.log('🔄 Tracking events available:', trackingEvents.length);
+    console.log('🔄 Using timezone:', userTimezone);
+    console.log('🔄 Profile loaded:', !!profile);
     
     if (filteredEvents.length === 0) {
       console.log('⚠️ No events available for chart generation');
       return [];
     }
     
-    const data = generateCallDataFromEvents(filteredEvents, dateRange, effectiveTimezone);
-    console.log('🎯 Generated timezone-aware chart data:', data);
+    const data = generateCallDataFromEvents(filteredEvents, dateRange, userTimezone, trackingEvents);
+    console.log('🎯 Generated chart data:', data);
     return data;
-  }, [filteredEvents, dateRange, effectiveTimezone]);
+  }, [filteredEvents, dateRangeKey, userTimezone, trackingEvents]);
 
   
-  // Calculate stats using timezone-aware filtering
+  // Calculate stats using the same exact logic as CallsList for consistency
   const callStatsData = useMemo(() => {
-    if (!calendlyEvents.length || !effectiveTimezone) {
-      return { totalBookings: 0, callsTaken: 0, callsCancelled: 0, showUpRate: 0 };
-    }
+    // Helper functions matching CallsList exactly
+    const isCallCreatedInDateRange = (call: any): boolean => {
+      if (!dateRange) return true;
+      
+      const callCreatedInUserTz = toZonedTime(new Date(call.created_at), userTimezone);
+      const selectedFromDate = toZonedTime(dateRange.from, userTimezone);
+      const selectedToDate = toZonedTime(dateRange.to, userTimezone);
+      
+      const callDate = startOfDay(callCreatedInUserTz);
+      const fromDate = startOfDay(selectedFromDate);
+      const toDate = startOfDay(selectedToDate);
+      
+      return callDate >= fromDate && callDate <= toDate;
+    };
 
-    console.log('\n=== TIMEZONE-AWARE STATS CALCULATION ===');
-    
-    // Total bookings created in the date range (timezone-aware)
-    const totalBookings = filterEventsByDateRangeWithTimezone(dateRange).length;
-    
-    // Calls taken (scheduled in the date range, not cancelled)
-    const scheduledEvents = filterEventsByScheduledDateRangeWithTimezone(dateRange);
-    const callsTaken = scheduledEvents.filter(call => 
-      call.status.toLowerCase() !== 'cancelled'
+    const isCallScheduledInDateRange = (call: any): boolean => {
+      if (!dateRange) return true;
+      
+      const callScheduledInUserTz = toZonedTime(new Date(call.scheduled_at), userTimezone);
+      const selectedFromDate = toZonedTime(dateRange.from, userTimezone);
+      const selectedToDate = toZonedTime(dateRange.to, userTimezone);
+      
+      const callDate = startOfDay(callScheduledInUserTz);
+      const fromDate = startOfDay(selectedFromDate);
+      const toDate = startOfDay(selectedToDate);
+      
+      return callDate >= fromDate && callDate <= toDate;
+    };
+
+    // Calculate the exact same numbers as CallsList filter buttons
+    const totalBookings = calendlyEvents.filter(call => isCallCreatedInDateRange(call)).length;
+    const callsTaken = calendlyEvents.filter(call => 
+      isCallScheduledInDateRange(call) && call.status.toLowerCase() !== 'cancelled'
     ).length;
-    
-    // Calls cancelled (cancelled events scheduled in the date range)
-    const callsCancelled = scheduledEvents.filter(call => 
-      call.status.toLowerCase() === 'cancelled'
+    const callsCancelled = calendlyEvents.filter(c => 
+      c.status.toLowerCase() === 'cancelled' && isCallScheduledInDateRange(c)
     ).length;
 
     // Calculate show up rate
     const totalScheduled = callsTaken + callsCancelled;
     const showUpRate = totalScheduled > 0 ? Math.round((callsTaken / totalScheduled) * 100) : 0;
-
-    console.log('📊 Timezone-aware stats:', {
-      totalBookings,
-      callsTaken,
-      callsCancelled,
-      totalScheduled,
-      showUpRate,
-      timezone: effectiveTimezone
-    });
 
     return {
       totalBookings,
@@ -247,26 +350,137 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       callsCancelled,
       showUpRate
     };
-  }, [calendlyEvents, dateRange, effectiveTimezone, filterEventsByDateRangeWithTimezone, filterEventsByScheduledDateRangeWithTimezone]);
+  }, [calendlyEvents, dateRange, userTimezone]);
 
   const recentBookings = getRecentBookings(7);
   const monthlyComparison = getMonthlyComparison();
 
-  const totalPageViews = chartData.reduce((sum, day) => sum + day.pageViews, 0);
-  const bookingRate = totalPageViews > 0 ? ((callStatsData.totalBookings / totalPageViews) * 100) : 0;
+  // Helper function to check if an event belongs to a specific page (same logic as AttributionDashboard)
+  const isEventForPage = (event: any, page: any): boolean => {
+    if (!event || !page) return false;
+    
+    // Primary method: Match by page URL (most reliable)
+    if (event.page_url && page.url) {
+      // Extract base URL without query parameters for comparison
+      const eventBaseUrl = event.page_url.split('?')[0].split('#')[0].toLowerCase();
+      const pageBaseUrl = page.url.split('?')[0].split('#')[0].toLowerCase();
+      
+      // Exact URL match
+      if (eventBaseUrl === pageBaseUrl) {
+        return true;
+      }
+      
+      // Check if the event URL contains the page URL (for subdirectories)
+      if (eventBaseUrl.includes(pageBaseUrl) || pageBaseUrl.includes(eventBaseUrl)) {
+        return true;
+      }
+      
+      // Extract domain and path for more flexible matching
+      try {
+        const eventUrlObj = new URL(event.page_url);
+        const pageUrlObj = new URL(page.url);
+        
+        // Match by pathname if domains are similar
+        if (eventUrlObj.pathname === pageUrlObj.pathname) {
+          return true;
+        }
+      } catch (e) {
+        // URL parsing failed, continue with other methods
+      }
+    }
+    
+    // Secondary method: Check event name for page name (for events with formatted names)
+    if (event.event_name && page.name) {
+      const normalizedEventName = event.event_name.toLowerCase();
+      const normalizedPageName = page.name.toLowerCase();
+      
+      // Direct match with page name prefix
+      if (normalizedEventName.startsWith(`${normalizedPageName} -`)) {
+        return true;
+      }
+      
+      // Also check for exact page name match in event name
+      if (normalizedEventName.includes(normalizedPageName)) {
+        return true;
+      }
+    }
+    
+    // Tertiary method: For page_view events without proper names, match by URL pattern
+    if (event.event_type === 'page_view' && page.url) {
+      const pageUrlPattern = page.url.toLowerCase();
+      const eventUrl = (event.page_url || '').toLowerCase();
+      
+      // Check if URL patterns match (useful for dynamic URLs)
+      if (eventUrl.includes(pageUrlPattern) || pageUrlPattern.includes(eventUrl)) {
+        return true;
+      }
+    }
+    
+    return false;
+  };
+
+  // Filter page views based on pixel configuration using the same logic as AttributionDashboard
+  const filteredPageViews = useMemo(() => {
+    if (!pixelConfig?.funnelPages || !trackingEvents.length) {
+      console.log('📊 No pixel config or tracking events, returning all events');
+      return trackingEvents;
+    }
+
+    // Get pages that should be included in metrics (default to true if not set)
+    const enabledPages = pixelConfig.funnelPages.filter((page: any) => page.includeInPageViewMetrics !== false);
+
+    console.log('📊 Pages enabled for funnel metrics:', enabledPages.map((p: any) => ({ name: p.name, url: p.url })));
+
+    // If no pages are enabled, return empty array
+    if (enabledPages.length === 0) {
+      console.log('📊 No pages enabled for metrics, returning empty array');
+      return [];
+    }
+
+    // Filter tracking events using the same isEventForPage logic as AttributionDashboard
+    const filtered = trackingEvents.filter((event: any) => {
+      return enabledPages.some((page: any) => isEventForPage(event, page));
+    });
+
+    console.log('📊 Filtered page views:', filtered.length, 'from', trackingEvents.length, 'total');
+    
+    // Count specific page events for debugging
+    const pdfEvents = filtered.filter(e => e.event_name && e.event_name.includes('250k'));
+    const courseEvents = filtered.filter(e => e.event_name && e.event_name.includes('Course'));
+    console.log('📊 Events included - 250k PDF:', pdfEvents.length, 'Course:', courseEvents.length);
+    
+    return filtered;
+  }, [pixelConfig, trackingEvents]);
+
+  const totalPageViews = filteredPageViews.length;
+  
+  // Calculate unique visitors from filtered page views
+  const uniqueVisitors = useMemo(() => {
+    const uniqueVisitorIds = new Set();
+    filteredPageViews.forEach((event: any) => {
+      // Create a visitor ID from session, email, or page/date combination
+      const visitorId = event.session_id || 
+                       event.contact_email || 
+                       `${event.page_url}-${event.created_at.split('T')[0]}`;
+      uniqueVisitorIds.add(visitorId);
+    });
+    console.log('📊 Unique visitors calculated:', uniqueVisitorIds.size, 'from', filteredPageViews.length, 'page views');
+    return uniqueVisitorIds.size;
+  }, [filteredPageViews]);
+  const bookingRate = uniqueVisitors > 0 ? ((callStatsData.totalBookings / uniqueVisitors) * 100) : 0;
   const previousBookingRate = 0; // Simplified for now since we're focusing on current period accuracy
   
   const totalSpend = facebookData?.insights?.spend || 1500; // Use actual Facebook spend or fallback
   const costPerBooking = callStatsData.totalBookings > 0 ? (totalSpend / callStatsData.totalBookings) : 0;
   const previousCostPerBooking = 0; // Simplified for now
 
-  console.log('\n=== FINAL TIMEZONE-AWARE COMPONENT STATE ===');
+  console.log('\n=== FINAL COMPONENT STATE ===');
   console.log('Chart data length:', chartData.length);
   console.log('Total bookings for metrics:', callStatsData.totalBookings);
-  console.log('Effective timezone being used:', effectiveTimezone);
-  console.log('Profile timezone:', profile?.timezone);
+  console.log('Date range key:', dateRangeKey);
+  console.log('User timezone being used:', userTimezone);
 
-  const chartKey = `${dateRange.from.toISOString()}-${dateRange.to.toISOString()}-${effectiveTimezone}-${callStatsData.totalBookings}`;
+  const chartKey = `${dateRangeKey}-${callStatsData.totalBookings}`;
 
   if (!projectId) {
     return (
@@ -278,12 +492,11 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
   }
 
   // Debug logging
-  console.log('🔍 [BookCallFunnel] Passing timezone-aware data to LandingPageMetrics:', {
+  console.log('🔍 [BookCallFunnel] Passing to LandingPageMetrics:', {
     dateRange: {
       from: dateRange.from.toISOString(),
       to: dateRange.to.toISOString()
     },
-    timezone: effectiveTimezone,
     formSubmissions: formSubmissions ? {
       totalSubmissions: formSubmissions.totalSubmissions,
       totalForms: formSubmissions.totalForms,
@@ -297,13 +510,10 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       {/* Header without date picker */}
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Book Call Funnel</h2>
-        <div className="text-sm text-gray-500">
-          Timezone: {effectiveTimezone}
-        </div>
       </div>
 
       <LandingPageMetrics
-        totalPageViews={totalPageViews}
+        totalPageViews={uniqueVisitors}
         bookingRate={bookingRate}
         previousBookingRate={previousBookingRate}
         totalBookings={callStatsData.totalBookings}

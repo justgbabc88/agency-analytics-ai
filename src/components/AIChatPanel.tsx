@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MessageSquare, Send, Bot, User, Lightbulb, TrendingUp, AlertTriangle, Brain } from "lucide-react";
 import { useState } from "react";
-import { useGoogleSheetsData } from "@/hooks/useGoogleSheetsData";
+
 import { useProjects } from "@/hooks/useProjects";
 import { supabase } from "@/integrations/supabase/client";
 import { subDays, startOfDay, endOfDay } from "date-fns";
@@ -39,7 +39,7 @@ export const AIChatPanel = ({ className, dateRange, metrics }: AIChatPanelProps)
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const { syncedData, calculateMetricsFromSyncedData } = useGoogleSheetsData();
+  
   const { selectedProjectId } = useProjects();
 
   // Default date range to last 7 days if not provided
@@ -86,8 +86,8 @@ export const AIChatPanel = ({ className, dateRange, metrics }: AIChatPanelProps)
           ],
           context: {
             type: 'marketing_analysis',
-            hasGoogleSheets: !!syncedData,
-            currentMetrics: calculateMetricsFromSyncedData(),
+            hasGoogleSheets: false,
+            currentMetrics: null,
             bookCallMetrics: metrics // Pass the comprehensive metrics
           },
           projectId: selectedProjectId,
