@@ -352,7 +352,7 @@ serve(async (req) => {
                 }
               }
 
-              eventsToUpsert.push({
+              const eventData = {
                 project_id: integration.project_id,
                 calendly_event_id: event.uri,
                 calendly_event_type_id: eventTypeUri,
@@ -361,9 +361,15 @@ serve(async (req) => {
                 invitee_name: inviteeName,
                 invitee_email: inviteeEmail,
                 status: event.status || 'scheduled',
-                created_at: isNewEvent ? event.created_at : undefined,
                 updated_at: event.updated_at || event.created_at
-              })
+              }
+
+              // Only include created_at for new events to avoid NULL constraint violations
+              if (isNewEvent) {
+                eventData.created_at = event.created_at
+              }
+
+              eventsToUpsert.push(eventData)
 
               if (isNewEvent) {
                 console.log('➕ New event to insert:', event.uri, 'Status:', event.status)
