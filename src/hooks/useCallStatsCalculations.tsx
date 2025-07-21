@@ -93,10 +93,12 @@ export const useCallStatsCalculations = (
     // Total bookings = all unique events created in the date range (when people actually booked)
     const totalBookings = eventsCreatedInRange.length;
 
-    // Calls taken = events scheduled for the date range that are actually completed
-    const callsTaken = eventsScheduledInRange.filter(event => 
-      event.status === 'completed'
-    ).length;
+    // Calls taken = active events scheduled for the date range that are in the past (calls that actually happened)
+    const now = new Date();
+    const callsTaken = eventsScheduledInRange.filter(event => {
+      const scheduledTime = new Date(event.scheduled_at);
+      return event.status === 'active' && scheduledTime < now;
+    }).length;
 
     // Cancelled calls = events that are cancelled/canceled
     const cancelled = eventsScheduledInRange.filter(event => 
@@ -104,8 +106,9 @@ export const useCallStatsCalculations = (
     ).length;
 
     // Show up rate = (calls taken / total scheduled calls) * 100
-    const totalScheduledCalls = callsTaken + cancelled;
-    const showUpRate = totalScheduledCalls > 0 ? Math.round((callsTaken / totalScheduledCalls) * 100) : 0;
+    // Only count past calls (taken + cancelled) for show up rate calculation
+    const pastCalls = callsTaken + cancelled;
+    const showUpRate = pastCalls > 0 ? Math.round((callsTaken / pastCalls) * 100) : 0;
 
     console.log('📈 Current period stats:', {
       totalBookings,
@@ -146,16 +149,17 @@ export const useCallStatsCalculations = (
     });
 
     const previousTotalBookings = previousPeriodEventsCreated.length;
-    const previousCallsTaken = previousPeriodEventsScheduled.filter(event => 
-      event.status === 'completed'
-    ).length;
+    const previousCallsTaken = previousPeriodEventsScheduled.filter(event => {
+      const scheduledTime = new Date(event.scheduled_at);
+      return event.status === 'active' && scheduledTime < now;
+    }).length;
     const previousCancelled = previousPeriodEventsScheduled.filter(event => 
       event.status === 'cancelled' || event.status === 'canceled'
     ).length;
 
-    const previousTotalScheduledCalls = previousCallsTaken + previousCancelled;
-    const previousShowUpRate = previousTotalScheduledCalls > 0 ? 
-      Math.round((previousCallsTaken / previousTotalScheduledCalls) * 100) : 0;
+    const previousPastCalls = previousCallsTaken + previousCancelled;
+    const previousShowUpRate = previousPastCalls > 0 ? 
+      Math.round((previousCallsTaken / previousPastCalls) * 100) : 0;
 
     console.log('📉 Previous period stats:', {
       previousTotalBookings,
