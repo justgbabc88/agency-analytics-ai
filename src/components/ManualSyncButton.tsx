@@ -76,58 +76,37 @@ export const ManualSyncButton = () => {
   };
 
   const handleDiagnosticCheck = async () => {
-    console.log('🔍 Running comprehensive diagnostics...');
+    console.log('🔍 Running API diagnostic to see what Calendly is returning...');
     
     try {
-      // Check current DB count for recent dates
-      const recentDates = ['2025-07-16', '2025-07-17', '2025-07-18', '2025-07-19', '2025-07-20', '2025-07-21'];
-      
-      let diagnosticResults = [];
-      
-      for (const date of recentDates) {
-        const { count: dbCount } = await supabase
-          .from('calendly_events')
-          .select('*', { count: 'exact', head: true })
-          .eq('project_id', '382c6666-c24d-4de1-b449-3858a46fbed3')
-          .eq('event_type_name', 'Property Advantage Call')
-          .gte('created_at', `${date}T00:00:00.000Z`)
-          .lte('created_at', `${date}T23:59:59.999Z`);
-        
-        // Get status breakdown
-        const { data: byStatus } = await supabase
-          .from('calendly_events')
-          .select('status')
-          .eq('project_id', '382c6666-c24d-4de1-b449-3858a46fbed3')
-          .eq('event_type_name', 'Property Advantage Call')
-          .gte('created_at', `${date}T00:00:00.000Z`)
-          .lte('created_at', `${date}T23:59:59.999Z`);
-        
-        const statusCounts = byStatus?.reduce((acc, event) => {
-          acc[event.status] = (acc[event.status] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>) || {};
-        
-        const statusText = Object.entries(statusCounts).map(([status, count]) => `${status}: ${count}`).join(', ');
-        
-        diagnosticResults.push(`${date}: ${dbCount || 0} events (${statusText || 'none'})`);
-        console.log(`📊 ${date}: ${dbCount || 0} Property Advantage Call events - ${statusText || 'none'}`);
-      }
-      
-      // Expected vs actual for key dates
-      const expected = {
-        '2025-07-16': { created: 19, completed: 13 },
-        '2025-07-17': { created: 16, completed: 16 }
-      };
-      
-      console.log('\n🎯 Expected vs Actual:');
-      Object.entries(expected).forEach(([date, exp]) => {
-        console.log(`${date}: Expected ${exp.created} created + ${exp.completed} completed = ${exp.created + exp.completed} total`);
+      const userTimezone = getUserTimezone();
+      const { data, error } = await supabase.functions.invoke('calendly-diagnostic', {
+        body: { 
+          userTimezone,
+          projectId: '382c6666-c24d-4de1-b449-3858a46fbed3',
+          dates: ['2025-07-16', '2025-07-17'] // Focus on the problematic dates
+        }
       });
       
-      toast.success(
-        `Diagnostic Results:\n${diagnosticResults.join('\n')}`,
-        { duration: 15000 }
-      );
+      if (error) {
+        console.error('❌ Diagnostic error:', error);
+        toast.error('Diagnostic check failed');
+        return;
+      }
+      
+      console.log('🔍 Calendly API diagnostic results:', data);
+      
+      // Show results
+      if (data.summary) {
+        toast.success(
+          `API Diagnostic Results:
+          July 16th - API: ${data.summary.july16?.apiCount || 0}, DB: ${data.summary.july16?.dbCount || 0}
+          July 17th - API: ${data.summary.july17?.apiCount || 0}, DB: ${data.summary.july17?.dbCount || 0}
+          
+          Missing events identified: ${data.summary.missingEvents || 0}`,
+          { duration: 20000 }
+        );
+      }
       
     } catch (error) {
       console.error('❌ Diagnostic error:', error);

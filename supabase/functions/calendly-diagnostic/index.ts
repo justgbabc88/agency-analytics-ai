@@ -5,191 +5,218 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+interface CalendlyEvent {
+  uri: string;
+  name: string;
+  status: string;
+  start_time: string;
+  created_at: string;
+  event_type: string;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    const supabaseClient = createClient(
+    const { userTimezone, projectId, dates } = await req.json()
+    
+    console.log(`🔍 Starting Calendly API diagnostic for project: ${projectId}`)
+    console.log(`📅 Target dates: ${dates.join(', ')}`)
+    console.log(`🌍 User timezone: ${userTimezone}`)
+    
+    const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    console.log('🔍 COMPREHENSIVE CALENDLY DIAGNOSTIC - July 1-11, 2025')
-    
-    const projectId = '382c6666-c24d-4de1-b449-3858a46fbed3'
-    
-    // Get token
-    const { data: tokenData, error: tokenError } = await supabaseClient
-      .from('project_integration_data')
-      .select('data')
-      .eq('project_id', projectId)
-      .eq('platform', 'calendly')
-      .single()
+    // Get access token for this project
+    const { data: tokenData } = await supabase.functions.invoke('calendly-oauth', {
+      body: { 
+        action: 'get_access_token',
+        projectId: projectId
+      }
+    })
 
-    if (tokenError || !tokenData?.data?.access_token) {
-      return new Response(JSON.stringify({ error: 'No access token' }), { 
-        status: 400, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      })
+    if (!tokenData?.access_token) {
+      throw new Error('No access token available')
     }
 
-    const accessToken = tokenData.data.access_token
+    console.log('✅ Access token retrieved successfully')
 
-    // Get organization
+    // Get organization URI
     const userResponse = await fetch('https://api.calendly.com/users/me', {
-      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' }
+      headers: {
+        'Authorization': `Bearer ${tokenData.access_token}`,
+        'Content-Type': 'application/json'
+      }
     })
+    
     const userData = await userResponse.json()
     const organizationUri = userData.resource.current_organization
+    
+    console.log(`🏢 Organization URI: ${organizationUri}`)
 
-    console.log('🏢 Organization:', organizationUri)
-
-    // Test multiple date ranges and status combinations
-    const fromDate = '2025-07-01T00:00:00.000Z'
-    const toDate = '2025-07-11T23:59:59.999Z'
-    const targetEventType = 'https://api.calendly.com/event_types/c6fa8f5f-9cdd-40b7-98ae-90c6caed9b6f'
-
-    console.log(`🎯 Target event type: ${targetEventType}`)
-    console.log(`📅 Date range: ${fromDate} to ${toDate}`)
-
-    // Test 1: Get ALL events (default API call)
-    console.log('\n🧪 TEST 1: Default API call (all events)')
-    let allEventsCollected = []
-    let pageCount = 0
+    // Fetch all events from Calendly API with expanded date range
+    const minTime = '2025-07-15T00:00:00.000000Z' // Start earlier to catch all events
+    const maxTime = '2025-07-19T23:59:59.999999Z' // End later to catch all events
+    
+    console.log(`🔍 Fetching events from ${minTime} to ${maxTime}`)
+    
+    let allEvents: CalendlyEvent[] = []
     let nextPageToken = null
+    let apiCallCount = 0
     
     do {
-      pageCount++
-      let url = `https://api.calendly.com/scheduled_events?organization=${organizationUri}&min_start_time=${fromDate}&max_start_time=${toDate}&count=100`
-      if (nextPageToken) url += `&page_token=${nextPageToken}`
+      apiCallCount++
+      let apiUrl = `https://api.calendly.com/scheduled_events?organization=${encodeURIComponent(organizationUri)}&min_start_time=${minTime}&max_start_time=${maxTime}&count=100&sort=created_at:asc`
       
-      console.log(`📄 Fetching page ${pageCount}...`)
-      
-      const response = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' }
-      })
-      
-      if (!response.ok) {
-        console.error(`❌ API error on page ${pageCount}:`, await response.text())
-        break
+      if (nextPageToken) {
+        apiUrl += `&page_token=${nextPageToken}`
       }
       
-      const data = await response.json()
-      const events = data.collection || []
-      allEventsCollected.push(...events)
+      console.log(`📡 API Call ${apiCallCount}: ${apiUrl}`)
       
-      // Filter for our target event type
-      const targetEvents = events.filter(e => e.event_type === targetEventType)
-      console.log(`   Page ${pageCount}: ${events.length} total events, ${targetEvents.length} Property Advantage Call events`)
-      
-      nextPageToken = data.pagination?.next_page_token
-      
-      // Add delay to avoid rate limits
-      if (nextPageToken) await new Promise(resolve => setTimeout(resolve, 200))
-      
-    } while (nextPageToken && pageCount < 20) // Limit to prevent infinite loops
-
-    console.log(`\n📊 SUMMARY - Pages fetched: ${pageCount}`)
-    console.log(`📊 Total events collected: ${allEventsCollected.length}`)
-    
-    // Analyze our target events
-    const propertyAdvantageEvents = allEventsCollected.filter(e => e.event_type === targetEventType)
-    console.log(`🎯 Property Advantage Call events found: ${propertyAdvantageEvents.length}`)
-    
-    // Analyze by status
-    const statusBreakdown = {}
-    propertyAdvantageEvents.forEach(event => {
-      statusBreakdown[event.status] = (statusBreakdown[event.status] || 0) + 1
-    })
-    console.log(`📊 Status breakdown:`, statusBreakdown)
-    
-    // Analyze by date
-    const dateBreakdown = {}
-    propertyAdvantageEvents.forEach(event => {
-      const date = event.start_time.split('T')[0]
-      dateBreakdown[date] = (dateBreakdown[date] || 0) + 1
-    })
-    console.log(`📅 Date breakdown:`, dateBreakdown)
-
-    // Test 2: Try different status parameters
-    console.log('\n🧪 TEST 2: Trying specific status filters...')
-    
-    const statusTests = ['active', 'canceled']
-    const statusResults = {}
-    
-    for (const status of statusTests) {
-      const statusUrl = `https://api.calendly.com/scheduled_events?organization=${organizationUri}&min_start_time=${fromDate}&max_start_time=${toDate}&status=${status}&count=100`
-      console.log(`Testing status: ${status}`)
-      
-      const statusResponse = await fetch(statusUrl, {
-        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' }
-      })
-      
-      if (statusResponse.ok) {
-        const statusData = await statusResponse.json()
-        const statusEvents = (statusData.collection || []).filter(e => e.event_type === targetEventType)
-        statusResults[status] = statusEvents.length
-        console.log(`   Status '${status}': ${statusEvents.length} Property Advantage Call events`)
-      }
-      
-      await new Promise(resolve => setTimeout(resolve, 200))
-    }
-
-    // Compare with database
-    const { data: dbEvents, error: dbError } = await supabaseClient
-      .from('calendly_events')
-      .select('*')
-      .eq('project_id', projectId)
-      .eq('event_type_name', 'Property Advantage Call')
-      .gte('scheduled_at', '2025-07-01T00:00:00.000Z')
-      .lte('scheduled_at', '2025-07-11T23:59:59.999Z')
-
-    const dbCount = dbEvents?.length || 0
-    const dbStatusBreakdown = {}
-    if (dbEvents) {
-      dbEvents.forEach(event => {
-        dbStatusBreakdown[event.status] = (dbStatusBreakdown[event.status] || 0) + 1
-      })
-    }
-
-    console.log(`\n🗃️ DATABASE COMPARISON:`)
-    console.log(`   Events in DB: ${dbCount}`)
-    console.log(`   DB status breakdown:`, dbStatusBreakdown)
-
-    return new Response(JSON.stringify({ 
-      success: true,
-      summary: {
-        pagesFetched: pageCount,
-        totalEventsFromAPI: allEventsCollected.length,
-        propertyAdvantageCallFromAPI: propertyAdvantageEvents.length,
-        expectedTotal: 254,
-        missing: 254 - propertyAdvantageEvents.length,
-        statusBreakdownAPI: statusBreakdown,
-        statusResults,
-        dateBreakdown,
-        eventsInDatabase: dbCount,
-        dbStatusBreakdown,
-        analysis: {
-          apiLimitReached: pageCount >= 20,
-          possibleRateLimit: false,
-          statusFilterNeeded: Object.keys(statusBreakdown).length > 1
+      const eventsResponse = await fetch(apiUrl, {
+        headers: {
+          'Authorization': `Bearer ${tokenData.access_token}`,
+          'Content-Type': 'application/json'
         }
+      })
+      
+      if (!eventsResponse.ok) {
+        throw new Error(`API call failed: ${eventsResponse.status} ${eventsResponse.statusText}`)
       }
-    }), { 
-      status: 200, 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-    })
+      
+      const eventsData = await eventsResponse.json()
+      console.log(`📊 Page ${apiCallCount} returned ${eventsData.collection?.length || 0} events`)
+      
+      if (eventsData.collection) {
+        allEvents = allEvents.concat(eventsData.collection)
+      }
+      
+      nextPageToken = eventsData.pagination?.next_page_token
+      console.log(`🔄 Next page token: ${nextPageToken ? 'exists' : 'none'}`)
+      
+    } while (nextPageToken && apiCallCount < 50) // Safety limit
+    
+    console.log(`📊 Total events fetched from API: ${allEvents.length}`)
+    console.log(`🔍 Total API calls made: ${apiCallCount}`)
+
+    // Filter for Property Advantage Call events and analyze by creation date
+    const propertyAdvantageEvents = allEvents.filter(event => 
+      event.name === 'Property Advantage Call'
+    )
+    
+    console.log(`🎯 Property Advantage Call events found: ${propertyAdvantageEvents.length}`)
+
+    // Analyze events by creation date in user timezone
+    const eventAnalysis: Record<string, {
+      apiCount: number;
+      dbCount: number;
+      missingEvents: CalendlyEvent[];
+      apiEvents: CalendlyEvent[];
+    }> = {}
+    
+    for (const targetDate of dates) {
+      const startOfDay = new Date(`${targetDate}T00:00:00+10:00`) // AEST
+      const endOfDay = new Date(`${targetDate}T23:59:59.999+10:00`) // AEST
+      
+      // Filter API events by creation date
+      const apiEventsForDate = propertyAdvantageEvents.filter(event => {
+        const createdAt = new Date(event.created_at)
+        return createdAt >= startOfDay && createdAt <= endOfDay
+      })
+      
+      console.log(`📅 ${targetDate}: Found ${apiEventsForDate.length} events created on this date`)
+      
+      // Get DB count for this date
+      const { count: dbCount } = await supabase
+        .from('calendly_events')
+        .select('*', { count: 'exact', head: true })
+        .eq('project_id', projectId)
+        .eq('event_type_name', 'Property Advantage Call')
+        .gte('created_at', startOfDay.toISOString())
+        .lte('created_at', endOfDay.toISOString())
+      
+      // Get existing events from DB
+      const { data: existingEvents } = await supabase
+        .from('calendly_events')
+        .select('calendly_event_id')
+        .eq('project_id', projectId)
+        .eq('event_type_name', 'Property Advantage Call')
+        .gte('created_at', startOfDay.toISOString())
+        .lte('created_at', endOfDay.toISOString())
+      
+      const existingEventIds = new Set(existingEvents?.map(e => e.calendly_event_id) || [])
+      
+      // Find missing events
+      const missingEvents = apiEventsForDate.filter(event => 
+        !existingEventIds.has(event.uri)
+      )
+      
+      eventAnalysis[targetDate] = {
+        apiCount: apiEventsForDate.length,
+        dbCount: dbCount || 0,
+        missingEvents,
+        apiEvents: apiEventsForDate
+      }
+      
+      console.log(`📊 ${targetDate} Analysis:`)
+      console.log(`   📡 API Events: ${apiEventsForDate.length}`)
+      console.log(`   💾 DB Events: ${dbCount || 0}`)
+      console.log(`   ❌ Missing: ${missingEvents.length}`)
+      
+      if (missingEvents.length > 0) {
+        console.log(`   🔍 Missing Event IDs:`)
+        missingEvents.forEach(event => {
+          console.log(`      - ${event.uri} (${event.status}) created: ${event.created_at}`)
+        })
+      }
+    }
+
+    const summary = {
+      july16: eventAnalysis['2025-07-16'],
+      july17: eventAnalysis['2025-07-17'],
+      missingEvents: Object.values(eventAnalysis).reduce((sum, analysis) => sum + analysis.missingEvents.length, 0),
+      totalApiCalls: apiCallCount,
+      totalEventsFromApi: allEvents.length,
+      propertyAdvantageEvents: propertyAdvantageEvents.length
+    }
+    
+    console.log('✅ Diagnostic complete:', summary)
+
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        summary,
+        eventAnalysis,
+        message: `Found ${summary.missingEvents} missing events across ${dates.length} dates`
+      }),
+      { 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        } 
+      }
+    )
 
   } catch (error) {
-    console.error('❌ Diagnostic error:', error)
-    return new Response(JSON.stringify({ 
-      error: 'Diagnostic failed', 
-      details: error.message 
-    }), { 
-      status: 500, 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-    })
+    console.error('❌ Calendly diagnostic error:', error)
+    
+    return new Response(
+      JSON.stringify({ 
+        error: error.message,
+        success: false
+      }),
+      { 
+        status: 500,
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        } 
+      }
+    )
   }
 })

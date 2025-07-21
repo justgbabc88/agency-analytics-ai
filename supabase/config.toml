@@ -41,6 +41,9 @@ verify_jwt = false
 [functions.calendly-sync-gaps]
 verify_jwt = true
 
+[functions.calendly-diagnostic]
+verify_jwt = true
+
 [functions.calendly-oauth]
 verify_jwt = true
 
