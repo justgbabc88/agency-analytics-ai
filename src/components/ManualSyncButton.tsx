@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
 import { useState } from "react";
@@ -28,21 +29,38 @@ export const ManualSyncButton = () => {
       console.log('✅ Event types mapped:', mapData);
       toast.success(`Mapped ${mapData.mappingsCreated} event types`);
       
-      console.log('🔧 Now triggering Calendly sync with timezone...');
+      console.log('🔧 Now triggering comprehensive Calendly sync...');
       
       const userTimezone = getUserTimezone();
-      const { data, error } = await supabase.functions.invoke('manual-calendly-sync', {
-        body: { userTimezone }
+      const { data, error } = await supabase.functions.invoke('calendly-sync-gaps', {
+        body: { 
+          userTimezone,
+          triggerReason: 'manual_comprehensive_sync',
+          specificProjectId: '382c6666-c24d-4de1-b449-3858a46fbed3'
+        }
       });
       
       if (error) {
-        console.error('❌ Manual sync error:', error);
-        toast.error('Failed to trigger sync');
+        console.error('❌ Comprehensive sync error:', error);
+        toast.error('Failed to trigger comprehensive sync');
         return;
       }
       
-      console.log('✅ Manual sync response:', data);
-      toast.success('Calendly sync triggered successfully');
+      console.log('✅ Comprehensive sync response:', data);
+      
+      // Show detailed results
+      if (data.syncStats) {
+        const stats = data.syncStats;
+        toast.success(
+          `Comprehensive sync complete! 
+          🔍 API calls: ${stats.totalApiCalls}
+          📊 Events: Active(${stats.activeEventsFetched}) + Completed(${stats.completedEventsFetched}) + Canceled(${stats.canceledEventsFetched})
+          💾 DB: ${stats.eventsInserted} new, ${stats.eventsUpdated} updated`,
+          { duration: 10000 }
+        );
+      } else {
+        toast.success(`Comprehensive sync complete! ${data.events} events processed`);
+      }
       
       // Refresh the page after a short delay to see updated data
       setTimeout(() => {
@@ -50,10 +68,70 @@ export const ManualSyncButton = () => {
       }, 3000);
       
     } catch (error) {
-      console.error('❌ Manual sync error:', error);
-      toast.error('Failed to trigger sync');
+      console.error('❌ Comprehensive sync error:', error);
+      toast.error('Failed to trigger comprehensive sync');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleDiagnosticCheck = async () => {
+    console.log('🔍 Running comprehensive diagnostics...');
+    
+    try {
+      // Check current DB count for recent dates
+      const recentDates = ['2025-07-16', '2025-07-17', '2025-07-18', '2025-07-19', '2025-07-20', '2025-07-21'];
+      
+      let diagnosticResults = [];
+      
+      for (const date of recentDates) {
+        const { count: dbCount } = await supabase
+          .from('calendly_events')
+          .select('*', { count: 'exact', head: true })
+          .eq('project_id', '382c6666-c24d-4de1-b449-3858a46fbed3')
+          .eq('event_type_name', 'Property Advantage Call')
+          .gte('created_at', `${date}T00:00:00.000Z`)
+          .lte('created_at', `${date}T23:59:59.999Z`);
+        
+        // Get status breakdown
+        const { data: byStatus } = await supabase
+          .from('calendly_events')
+          .select('status')
+          .eq('project_id', '382c6666-c24d-4de1-b449-3858a46fbed3')
+          .eq('event_type_name', 'Property Advantage Call')
+          .gte('created_at', `${date}T00:00:00.000Z`)
+          .lte('created_at', `${date}T23:59:59.999Z`);
+        
+        const statusCounts = byStatus?.reduce((acc, event) => {
+          acc[event.status] = (acc[event.status] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>) || {};
+        
+        const statusText = Object.entries(statusCounts).map(([status, count]) => `${status}: ${count}`).join(', ');
+        
+        diagnosticResults.push(`${date}: ${dbCount || 0} events (${statusText || 'none'})`);
+        console.log(`📊 ${date}: ${dbCount || 0} Property Advantage Call events - ${statusText || 'none'}`);
+      }
+      
+      // Expected vs actual for key dates
+      const expected = {
+        '2025-07-16': { created: 19, completed: 13 },
+        '2025-07-17': { created: 16, completed: 16 }
+      };
+      
+      console.log('\n🎯 Expected vs Actual:');
+      Object.entries(expected).forEach(([date, exp]) => {
+        console.log(`${date}: Expected ${exp.created} created + ${exp.completed} completed = ${exp.created + exp.completed} total`);
+      });
+      
+      toast.success(
+        `Diagnostic Results:\n${diagnosticResults.join('\n')}`,
+        { duration: 15000 }
+      );
+      
+    } catch (error) {
+      console.error('❌ Diagnostic error:', error);
+      toast.error('Diagnostic check failed');
     }
   };
 
@@ -67,49 +145,15 @@ export const ManualSyncButton = () => {
         className="flex items-center gap-2"
       >
         <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-        {isLoading ? 'Syncing...' : 'Manual Sync'}
+        {isLoading ? 'Comprehensive Sync...' : 'Comprehensive Sync'}
       </Button>
       <Button 
-        onClick={async () => {
-          console.log('🔍 Running comprehensive diagnostics...');
-          
-          // Check current DB count
-          const { count: dbCount } = await supabase
-            .from('calendly_events')
-            .select('*', { count: 'exact', head: true })
-            .eq('project_id', '382c6666-c24d-4de1-b449-3858a46fbed3')
-            .eq('event_type_name', 'Property Advantage Call')
-            .gte('scheduled_at', '2025-07-01T00:00:00.000Z')
-            .lte('scheduled_at', '2025-07-11T23:59:59.999Z');
-          
-          // Check by status
-          const { data: byStatus } = await supabase
-            .from('calendly_events')
-            .select('status')
-            .eq('project_id', '382c6666-c24d-4de1-b449-3858a46fbed3')
-            .eq('event_type_name', 'Property Advantage Call')
-            .gte('scheduled_at', '2025-07-01T00:00:00.000Z')
-            .lte('scheduled_at', '2025-07-11T23:59:59.999Z');
-          
-          // Get status breakdown
-          const statusCounts = byStatus?.reduce((acc, event) => {
-            acc[event.status] = (acc[event.status] || 0) + 1;
-            return acc;
-          }, {} as Record<string, number>) || {};
-          
-          console.log(`📊 Current DB count for July 1-11: ${dbCount}`);
-          console.log(`📈 Status breakdown:`, statusCounts);
-          console.log(`🎯 Target: 254 events (131 created + 123 completed)`);
-          console.log(`📉 Missing: ${254 - (dbCount || 0)} events`);
-          
-          const statusText = Object.entries(statusCounts).map(([status, count]) => `${status}: ${count}`).join(', ');
-          toast.success(`DB: ${dbCount || 0}/254 events. Status: ${statusText || 'none'}`);
-        }}
+        onClick={handleDiagnosticCheck}
         variant="outline"
         size="sm"
         className="flex items-center gap-2"
       >
-        Check Count
+        🔍 Diagnostic Check
       </Button>
     </div>
   );

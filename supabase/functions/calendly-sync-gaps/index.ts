@@ -20,7 +20,7 @@ serve(async (req) => {
 
     const { triggerReason, eventTypeUri, specificProjectId, userTimezone } = await req.json()
     
-    console.log('🔍 TIMEZONE-AWARE SYNC - Starting comprehensive sync:', {
+    console.log('🔍 COMPREHENSIVE SYNC - Starting enhanced sync with debugging:', {
       triggerReason,
       eventTypeUri,
       specificProjectId,
@@ -31,6 +31,16 @@ serve(async (req) => {
     let totalGaps = 0
     let totalEvents = 0
     let totalProjects = 0
+    let syncStats = {
+      activeEventsFetched: 0,
+      completedEventsFetched: 0,
+      canceledEventsFetched: 0,
+      totalApiCalls: 0,
+      totalPagesProcessed: 0,
+      eventsProcessed: 0,
+      eventsInserted: 0,
+      eventsUpdated: 0
+    }
 
     // Get integrations to process
     let integrationsQuery = supabaseClient
@@ -58,7 +68,8 @@ serve(async (req) => {
         message: 'No Calendly integrations found',
         gaps: 0,
         events: 0,
-        projects: 0
+        projects: 0,
+        syncStats
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -97,7 +108,7 @@ serve(async (req) => {
 
       console.log('✅ Access token retrieved for project:', integration.project_id)
 
-      // Get user info
+      // Get user info and organization
       const userResponse = await fetch('https://api.calendly.com/users/me', {
         headers: {
           'Authorization': `Bearer ${tokenData.access_token}`,
@@ -114,7 +125,7 @@ serve(async (req) => {
       const organizationUri = userData.resource.current_organization
       console.log('🏢 Organization URI:', organizationUri)
 
-      // First, fetch all available event types from Calendly and auto-create mappings
+      // Auto-create mappings for all event types
       console.log('🔍 Fetching all event types from Calendly to ensure complete mappings...')
       
       const eventTypesResponse = await fetch(`https://api.calendly.com/event_types?organization=${organizationUri}&count=100`, {
@@ -130,9 +141,13 @@ serve(async (req) => {
       }
       
       const eventTypesData = await eventTypesResponse.json()
-      console.log(`📋 Found ${eventTypesData.collection.length} event types in Calendly:`, eventTypesData.collection.map(et => et.name))
+      console.log(`📋 Found ${eventTypesData.collection.length} event types in Calendly:`)
+      eventTypesData.collection.forEach((et: any) => {
+        console.log(`  - ${et.name} (${et.uri})`)
+      })
       
       // Auto-create mappings for any missing event types
+      let propertyAdvantageCallTypes = []
       for (const eventType of eventTypesData.collection) {
         if (eventType.status === 'active') {
           const { error: mappingError } = await supabaseClient
@@ -150,9 +165,19 @@ serve(async (req) => {
             console.error('❌ Error creating event type mapping:', mappingError)
           } else {
             console.log(`✅ Ensured mapping exists for event type: ${eventType.name}`)
+            
+            // Track Property Advantage Call variations
+            if (eventType.name.toLowerCase().includes('property advantage call')) {
+              propertyAdvantageCallTypes.push(eventType)
+            }
           }
         }
       }
+
+      console.log(`🎯 Found ${propertyAdvantageCallTypes.length} "Property Advantage Call" event types:`)
+      propertyAdvantageCallTypes.forEach((et: any) => {
+        console.log(`  - ${et.name} (${et.uri})`)
+      })
 
       // Get active event type mappings for this project
       const { data: mappings, error: mappingsError } = await supabaseClient
@@ -178,50 +203,48 @@ serve(async (req) => {
         continue
       }
 
-      // Use timezone-aware date range - sync last 7 days for troubleshooting
+      // ENHANCED: Use much broader date range to capture all events
       const now = new Date()
-      const sevenDaysAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000))
-      
-      // Get tomorrow's date to ensure we capture all of today's events
-      const tomorrow = new Date(now.getTime() + (24 * 60 * 60 * 1000))
-      
-      // FIXED: Properly handle timezone conversion for Calendly API
-      // Calendly API expects UTC timestamps, so we need to convert timezone boundaries to UTC properly
-      const userTimezoneDayStart = new Date(sevenDaysAgo.toLocaleDateString('en-CA', { timeZone: effectiveTimezone }) + 'T00:00:00')
-      const userTimezoneDayEnd = new Date(tomorrow.toLocaleDateString('en-CA', { timeZone: effectiveTimezone }) + 'T23:59:59')
+      const ninetyDaysAgo = new Date(now.getTime() - (90 * 24 * 60 * 60 * 1000))
+      const oneYearFromNow = new Date(now.getTime() + (365 * 24 * 60 * 60 * 1000))
       
       // Convert timezone-aware dates to UTC for Calendly API
+      const userTimezoneDayStart = new Date(ninetyDaysAgo.toLocaleDateString('en-CA', { timeZone: effectiveTimezone }) + 'T00:00:00')
+      const userTimezoneDayEnd = new Date(oneYearFromNow.toLocaleDateString('en-CA', { timeZone: effectiveTimezone }) + 'T23:59:59')
+      
       const tzOffset = userTimezoneDayStart.getTimezoneOffset() * 60 * 1000
       const syncFrom = new Date(userTimezoneDayStart.getTime() + tzOffset)
       const syncTo = new Date(userTimezoneDayEnd.getTime() + tzOffset)
 
-      console.log('📅 7-DAY SYNC - Timezone-aware sync date range:')
+      console.log('📅 COMPREHENSIVE SYNC - Enhanced date range:')
       console.log('  User timezone:', effectiveTimezone)
       console.log('  From (UTC):', syncFrom.toISOString())
       console.log('  To (UTC):', syncTo.toISOString())
       console.log('  From (User TZ):', syncFrom.toLocaleString('en-US', { timeZone: effectiveTimezone }))
       console.log('  To (User TZ):', syncTo.toLocaleString('en-US', { timeZone: effectiveTimezone }))
 
-      // Use pagination to get all events
+      // Enhanced pagination function with comprehensive logging
       let allEvents = []
       
-      // Define function to fetch events by status
-      async function fetchEventsByStatus(eventsList, orgUri, fromDate, toDate, accessToken, status) {
+      async function fetchEventsByStatusEnhanced(eventsList: any[], orgUri: string, fromDate: Date, toDate: Date, accessToken: string, status: string) {
         let nextPageToken = null
         let pageCount = 0
-        const maxPages = 100
+        const maxPages = 200 // Increased from 100
+        let eventsInThisStatus = 0
         
-        console.log(`🔄 Fetching ${status.toUpperCase()} events from Calendly`)
+        console.log(`\n🔄 === FETCHING ${status.toUpperCase()} EVENTS ===`)
         
         do {
           pageCount++
+          syncStats.totalApiCalls++
           let calendlyUrl = `https://api.calendly.com/scheduled_events?organization=${encodeURIComponent(orgUri)}&min_start_time=${fromDate.toISOString()}&max_start_time=${toDate.toISOString()}&count=100&status=${status}`
           
           if (nextPageToken) {
             calendlyUrl += `&page_token=${nextPageToken}`
           }
           
-          console.log(`🌐 ${status} Events - Page ${pageCount}:`, calendlyUrl)
+          console.log(`🌐 ${status} Events - API Call ${syncStats.totalApiCalls}, Page ${pageCount}:`)
+          console.log(`  URL: ${calendlyUrl}`)
 
           try {
             const eventsResponse = await fetch(calendlyUrl, {
@@ -237,7 +260,8 @@ serve(async (req) => {
               if (eventsResponse.status === 429) {
                 const retryAfter = eventsResponse.headers.get('Retry-After') || '60'
                 console.log(`⏰ Rate limited for ${status} events. Retry after: ${retryAfter} seconds`)
-                return
+                await new Promise(resolve => setTimeout(resolve, parseInt(retryAfter) * 1000))
+                continue // Retry the same page
               }
               
               console.error(`❌ Calendly API error (${status}): ${eventsResponse.status} ${errorText}`)
@@ -247,15 +271,26 @@ serve(async (req) => {
             const eventsData = await eventsResponse.json()
             const events = eventsData.collection || []
             
-            console.log(`📊 ${status} events from page ${pageCount}:`, events.length)
+            console.log(`📊 ${status} events from page ${pageCount}: ${events.length}`)
+            
+            // Log sample events for debugging
+            if (events.length > 0) {
+              console.log(`📋 Sample ${status} events on page ${pageCount}:`)
+              events.slice(0, 3).forEach((event: any, index: number) => {
+                console.log(`  ${index + 1}. ${event.name || 'unnamed'} - Created: ${event.created_at} - Scheduled: ${event.start_time}`)
+              })
+            }
             
             eventsList.push(...events)
+            eventsInThisStatus += events.length
+            syncStats.totalPagesProcessed++
             
             nextPageToken = eventsData.pagination?.next_page_token
-            console.log(`🔄 ${status} next page token:`, nextPageToken)
+            console.log(`🔄 ${status} next page token:`, nextPageToken ? 'Present' : 'None')
             
             if (nextPageToken) {
-              await new Promise(resolve => setTimeout(resolve, 200))
+              // Add delay between requests to avoid rate limiting
+              await new Promise(resolve => setTimeout(resolve, 300))
             }
           } catch (fetchError) {
             console.error(`❌ Error fetching ${status} events from Calendly:`, fetchError)
@@ -264,30 +299,62 @@ serve(async (req) => {
           
         } while (nextPageToken && pageCount < maxPages)
         
-        console.log(`🏁 ${status.toUpperCase()} PAGINATION COMPLETE: ${pageCount} pages fetched`)
+        console.log(`🏁 ${status.toUpperCase()} FETCH COMPLETE:`)
+        console.log(`  Pages processed: ${pageCount}`)
+        console.log(`  Events fetched: ${eventsInThisStatus}`)
+        
+        // Update stats
+        if (status === 'active') syncStats.activeEventsFetched = eventsInThisStatus
+        if (status === 'completed') syncStats.completedEventsFetched = eventsInThisStatus
+        if (status === 'canceled') syncStats.canceledEventsFetched = eventsInThisStatus
+        
+        return eventsInThisStatus
       }
       
-      // Fetch all event statuses separately
-      await fetchEventsByStatus(allEvents, organizationUri, syncFrom, syncTo, tokenData.access_token, 'active')
-      await fetchEventsByStatus(allEvents, organizationUri, syncFrom, syncTo, tokenData.access_token, 'completed')
-      await fetchEventsByStatus(allEvents, organizationUri, syncFrom, syncTo, tokenData.access_token, 'canceled')
+      // Fetch all event statuses with enhanced logging
+      console.log('\n🚀 Starting comprehensive event fetch...')
+      await fetchEventsByStatusEnhanced(allEvents, organizationUri, syncFrom, syncTo, tokenData.access_token, 'active')
+      await fetchEventsByStatusEnhanced(allEvents, organizationUri, syncFrom, syncTo, tokenData.access_token, 'completed')
+      await fetchEventsByStatusEnhanced(allEvents, organizationUri, syncFrom, syncTo, tokenData.access_token, 'canceled')
       
-      console.log(`📊 Total events collected:`, allEvents.length)
+      console.log(`\n📊 === FETCH SUMMARY ===`)
+      console.log(`Total events collected: ${allEvents.length}`)
+      console.log(`Active events: ${syncStats.activeEventsFetched}`)
+      console.log(`Completed events: ${syncStats.completedEventsFetched}`)
+      console.log(`Canceled events: ${syncStats.canceledEventsFetched}`)
+      console.log(`Total API calls made: ${syncStats.totalApiCalls}`)
+      console.log(`Total pages processed: ${syncStats.totalPagesProcessed}`)
 
-      if (allEvents.length > 0) {
-        console.log('🔍 TIMEZONE DEBUG - First few events:')
-        allEvents.slice(0, 3).forEach(event => {
-          console.log(`  Event: ${event.name}`)
-          console.log(`    Created (UTC): ${event.created_at}`)
-          console.log(`    Created (${effectiveTimezone}): ${new Date(event.created_at).toLocaleString('en-US', { timeZone: effectiveTimezone })}`)
-          console.log(`    Scheduled (UTC): ${event.start_time}`)
-          console.log(`    Scheduled (${effectiveTimezone}): ${new Date(event.start_time).toLocaleString('en-US', { timeZone: effectiveTimezone })}`)
+      // Analyze events by creation date for recent days
+      const recentDays = ['2025-07-16', '2025-07-17', '2025-07-18', '2025-07-19', '2025-07-20', '2025-07-21']
+      console.log('\n📅 === CREATION DATE ANALYSIS ===')
+      
+      for (const date of recentDays) {
+        const eventsCreatedOnDate = allEvents.filter(event => {
+          if (!event.created_at) return false
+          const createdDate = new Date(event.created_at)
+          const dateInUserTz = createdDate.toLocaleDateString('en-CA', { timeZone: effectiveTimezone })
+          return dateInUserTz === date
         })
+        
+        const propertyAdvantageCreatedOnDate = eventsCreatedOnDate.filter(event => 
+          event.name && event.name.toLowerCase().includes('property advantage call')
+        )
+        
+        console.log(`${date} (AEST): ${eventsCreatedOnDate.length} total events created, ${propertyAdvantageCreatedOnDate.length} Property Advantage Call events`)
+        
+        if (propertyAdvantageCreatedOnDate.length > 0) {
+          const statusBreakdown = propertyAdvantageCreatedOnDate.reduce((acc: any, event: any) => {
+            acc[event.status] = (acc[event.status] || 0) + 1
+            return acc
+          }, {})
+          console.log(`  Status breakdown:`, statusBreakdown)
+        }
       }
 
       // Create set of active event type IDs for filtering
       const activeEventTypeIds = new Set(mappings.map(m => m.calendly_event_type_id))
-      console.log('🎯 Active event type IDs for filtering:', Array.from(activeEventTypeIds))
+      console.log('\n🎯 Active event type IDs for filtering:', Array.from(activeEventTypeIds))
 
       // Filter events based on event type
       const filteredEvents = allEvents.filter(event => {
@@ -295,23 +362,31 @@ serve(async (req) => {
         const isMatched = activeEventTypeIds.has(eventTypeUri)
         
         if (!isMatched) {
-          console.log(`🔍 Skipping event: ${event.name || 'unnamed'} - type: ${eventTypeUri}`)
-        } else {
-          console.log(`✅ Including event: ${event.name || 'unnamed'} - type: ${eventTypeUri}`)
+          // Only log first few mismatches to avoid spam
+          if (Math.random() < 0.1) { // Log 10% of mismatches
+            console.log(`🔍 Skipping event: ${event.name || 'unnamed'} - type: ${eventTypeUri}`)
+          }
         }
         
         return isMatched
       })
       
-      console.log('🎯 Events matching active mappings:', filteredEvents.length)
+      console.log(`\n🎯 === FILTERING RESULTS ===`)
+      console.log(`Events matching active mappings: ${filteredEvents.length}`)
+      console.log(`Events filtered out: ${allEvents.length - filteredEvents.length}`)
 
-      // Process each filtered event
+      // Process each filtered event with enhanced tracking
+      let newEventsCount = 0
+      let updatedEventsCount = 0
+      
       for (const event of filteredEvents) {
         try {
+          syncStats.eventsProcessed++
+          
           // Check if event already exists
           const { data: existingEvent, error: checkError } = await supabaseClient
             .from('calendly_events')
-            .select('id')
+            .select('id, status, updated_at')
             .eq('calendly_event_id', event.uri)
             .eq('project_id', integration.project_id)
             .maybeSingle()
@@ -322,11 +397,14 @@ serve(async (req) => {
           }
 
           let isNewEvent = !existingEvent
+          let statusChanged = existingEvent && existingEvent.status !== event.status
           
           if (existingEvent) {
-            console.log('🔄 Event exists, checking for status updates:', event.uri, 'Status:', event.status)
+            if (statusChanged) {
+              console.log(`🔄 Event status changed: ${event.uri} ${existingEvent.status} → ${event.status}`)
+            }
           } else {
-            console.log('➕ New event to insert:', event.uri, 'Status:', event.status)
+            console.log(`➕ New event to insert: ${event.uri} Status: ${event.status}`)
           }
 
           // Get invitee information
@@ -349,10 +427,8 @@ serve(async (req) => {
             }
           }
 
-          // Get the event type URI
+          // Get the event type URI and name
           const eventTypeUri = event.event_type
-
-          // Find the event type name from our mappings
           const mapping = mappings.find(m => m.calendly_event_type_id === eventTypeUri)
           const eventTypeName = mapping?.event_type_name || event.event_type?.name || event.name || 'Unknown Event Type'
 
@@ -384,21 +460,38 @@ serve(async (req) => {
           }
 
           totalEvents++
+          if (isNewEvent) {
+            newEventsCount++
+            syncStats.eventsInserted++
+          } else {
+            updatedEventsCount++
+            syncStats.eventsUpdated++
+          }
+          
           const actionText = isNewEvent ? 'Inserted new' : 'Updated existing'
-          console.log(`✅ ${actionText} event:`, {
-            id: event.uri,
-            name: eventTypeName,
-            status: event.status,
-            scheduled_at: event.start_time,
-            created_at: createdAt,
-            timezone_context: `Created ${new Date(createdAt).toLocaleString('en-US', { timeZone: effectiveTimezone })} in ${effectiveTimezone}`
-          })
+          
+          // Only log every 10th event to avoid spam, but log all Property Advantage Call events
+          if (eventTypeName.toLowerCase().includes('property advantage call') || syncStats.eventsProcessed % 10 === 0) {
+            console.log(`✅ ${actionText} event:`, {
+              id: event.uri,
+              name: eventTypeName,
+              status: event.status,
+              scheduled_at: event.start_time,
+              created_at: createdAt,
+              created_in_user_tz: new Date(createdAt).toLocaleString('en-US', { timeZone: effectiveTimezone })
+            })
+          }
 
         } catch (eventError) {
           console.error('❌ Error processing individual event:', eventError)
           continue
         }
       }
+
+      console.log(`\n📊 === PROJECT PROCESSING COMPLETE ===`)
+      console.log(`New events inserted: ${newEventsCount}`)
+      console.log(`Existing events updated: ${updatedEventsCount}`)
+      console.log(`Total events processed: ${syncStats.eventsProcessed}`)
 
       // Update the last sync timestamp
       const { error: updateError } = await supabaseClient
@@ -410,14 +503,37 @@ serve(async (req) => {
       if (updateError) {
         console.error('❌ Error updating last sync:', updateError)
       }
+
+      // Final verification: Check database counts for recent dates
+      console.log('\n🔍 === DATABASE VERIFICATION ===')
+      for (const date of recentDays.slice(-3)) { // Check last 3 days
+        const { count: dbCount } = await supabaseClient
+          .from('calendly_events')
+          .select('*', { count: 'exact', head: true })
+          .eq('project_id', integration.project_id)
+          .eq('event_type_name', 'Property Advantage Call')
+          .gte('created_at', `${date}T00:00:00.000Z`)
+          .lte('created_at', `${date}T23:59:59.999Z`)
+
+        console.log(`Database count for ${date}: ${dbCount || 0} Property Advantage Call events`)
+      }
     }
 
-    console.log('\n🎉 === FINAL TIMEZONE-AWARE SYNC RESULTS ===')
+    console.log('\n🎉 === COMPREHENSIVE SYNC RESULTS ===')
     console.log('🎯 Gaps found:', totalGaps)
     console.log('📊 Events synced:', totalEvents)
     console.log('🏢 Projects processed:', totalProjects)
-    console.log('🌍 Timezone used:', userTimezone || 'UTC (default)')
+    console.log('🌍 Timezone used:', userTimezone || 'UTC')
     console.log('⏰ Completed at:', new Date().toISOString())
+    console.log('\n📈 === DETAILED SYNC STATISTICS ===')
+    console.log(`Active events fetched: ${syncStats.activeEventsFetched}`)
+    console.log(`Completed events fetched: ${syncStats.completedEventsFetched}`)
+    console.log(`Canceled events fetched: ${syncStats.canceledEventsFetched}`)
+    console.log(`Total API calls made: ${syncStats.totalApiCalls}`)
+    console.log(`Total pages processed: ${syncStats.totalPagesProcessed}`)
+    console.log(`Events processed: ${syncStats.eventsProcessed}`)
+    console.log(`Events inserted: ${syncStats.eventsInserted}`)
+    console.log(`Events updated: ${syncStats.eventsUpdated}`)
 
     return new Response(JSON.stringify({
       success: true,
@@ -425,7 +541,8 @@ serve(async (req) => {
       events: totalEvents,
       projects: totalProjects,
       timezone: userTimezone || 'UTC',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      syncStats
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
