@@ -184,15 +184,15 @@ serve(async (req) => {
         continue
       }
 
-      // Sync events from 90 days ago to 30 days in the future for comprehensive coverage
+      // Sync events from 14 days ago to 7 days in the future
       const now = new Date()
-      const syncFrom = new Date(now.getTime() - (90 * 24 * 60 * 60 * 1000)) // 90 days ago
-      const syncTo = new Date(now.getTime() + (30 * 24 * 60 * 60 * 1000))   // 30 days from now
+      const syncFrom = new Date(now.getTime() - (14 * 24 * 60 * 60 * 1000)) // 14 days ago
+      const syncTo = new Date(now.getTime() + (7 * 24 * 60 * 60 * 1000))   // 7 days from now
 
       console.log('📅 Sync date range:')
       console.log('  From:', syncFrom.toISOString())
       console.log('  To:', syncTo.toISOString())
-      console.log('  Target period: 90 days ago to 30 days from now (120-day window)')
+      console.log('  Target period: 14 days ago to 7 days from now (21-day window)')
 
       // Use pagination to get all events (Calendly API has a limit of 100 events per request)
       let allEvents = []
