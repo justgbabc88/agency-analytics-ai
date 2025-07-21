@@ -1,13 +1,13 @@
+
 import { useCalendlyData } from "@/hooks/useCalendlyData";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
-import { fromZonedTime, toZonedTime } from "date-fns-tz";
+import { toZonedTime } from "date-fns-tz";
 import { LandingPageMetrics } from "./LandingPageMetrics";
 import { CallStatsMetrics } from "./CallStatsMetrics";
 import { CallsList } from "./CallsList";
 import { useState, useEffect, useMemo } from "react";
 import { generateCallDataFromEvents } from "@/utils/chartDataGeneration";
-import { useCallStatsCalculations } from "@/hooks/useCallStatsCalculations";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useGHLFormSubmissions } from "@/hooks/useGHLFormSubmissions";
@@ -21,22 +21,33 @@ interface BookCallFunnelProps {
 }
 
 export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [], selectedFormIds = [] }: BookCallFunnelProps) => {
-  const { calendlyEvents, getRecentBookings, getMonthlyComparison, refetch } = useCalendlyData(projectId);
+  const { 
+    calendlyEvents, 
+    getRecentBookings, 
+    getMonthlyComparison, 
+    refetch,
+    userTimezone,
+    filterEventsByDateRangeWithTimezone,
+    filterEventsByScheduledDateRangeWithTimezone,
+    filterCancelledEventsByDateRangeWithTimezone
+  } = useCalendlyData(projectId);
+  
   const { getUserTimezone, profile } = useUserProfile();
   const { toast } = useToast();
   const { metrics: formSubmissions, loading: formSubmissionsLoading } = useGHLFormSubmissions(projectId, dateRange, selectedFormIds);
   const { facebookData } = useFacebookData({ dateRange, campaignIds: selectedCampaignIds });
   
-  const userTimezone = getUserTimezone();
+  const effectiveTimezone = userTimezone || getUserTimezone();
   
   console.log('🔄 BookCallFunnel render - Project ID:', projectId);
-  console.log('🔄 User timezone from profile:', userTimezone);
+  console.log('🌍 BookCallFunnel - User timezone:', effectiveTimezone);
   console.log('🔄 Profile timezone setting:', profile?.timezone);
   console.log('🔄 Received date range from parent:', {
     from: format(dateRange.from, 'yyyy-MM-dd HH:mm:ss'),
     to: format(dateRange.to, 'yyyy-MM-dd HH:mm:ss'),
     fromISO: dateRange.from.toISOString(),
-    toISO: dateRange.to.toISOString()
+    toISO: dateRange.to.toISOString(),
+    timezone: effectiveTimezone
   });
   console.log('🔄 All Calendly events available:', calendlyEvents.length);
 
@@ -59,7 +70,6 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
         (payload) => {
           console.log('🆕 New Calendly event received:', payload);
           
-          // Show toast notification for new bookings
           if (payload.new) {
             toast({
               title: "New Booking! 🎉",
@@ -67,7 +77,6 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
             });
           }
           
-          // Refresh data to show the new event
           refetch();
         }
       )
@@ -82,7 +91,6 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
         (payload) => {
           console.log('📝 Calendly event updated:', payload);
           
-          // Show notification for status changes
           if (payload.new && payload.old) {
             const oldStatus = payload.old.status;
             const newStatus = payload.new.status;
@@ -106,26 +114,26 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
             }
           }
           
-          // Refresh data to show the updated event
           refetch();
         }
       )
       .subscribe();
 
-    // Trigger manual gap sync when component loads
+    // Trigger timezone-aware manual gap sync when component loads
     const triggerManualSync = async () => {
       try {
-        console.log('🔄 Triggering manual gap sync for missing events...');
+        console.log('🔄 Triggering timezone-aware manual gap sync for missing events...');
         await supabase.functions.invoke('calendly-sync-gaps', {
           body: { 
             triggerReason: 'manual_component_sync',
-            projectId 
+            projectId,
+            userTimezone: effectiveTimezone
           }
         });
         
         // Refresh data after gap sync
         setTimeout(() => {
-          console.log('🔄 Refreshing data after manual sync...');
+          console.log('🔄 Refreshing data after timezone-aware manual sync...');
           refetch();
         }, 2000);
       } catch (error) {
@@ -137,7 +145,7 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
     triggerManualSync();
     
     const syncInterval = setInterval(() => {
-      console.log('🔄 Periodic sync check...');
+      console.log('🔄 Periodic timezone-aware sync check...');
       triggerManualSync();
     }, 5 * 60 * 1000); // Every 5 minutes
 
@@ -146,95 +154,92 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       supabase.removeChannel(channel);
       clearInterval(syncInterval);
     };
-  }, [projectId, refetch, toast]);
+  }, [projectId, refetch, toast, effectiveTimezone]);
 
-  // Create a more specific dependency key that includes both timezone sources
-  const dateRangeKey = useMemo(() => {
-    const fromISO = dateRange.from.toISOString();
-    const toISO = dateRange.to.toISOString();
-    const profileTimezone = profile?.timezone || 'UTC';
-    const effectiveTimezone = userTimezone || 'UTC';
-    return `${fromISO}-${toISO}-${profileTimezone}-${effectiveTimezone}-${calendlyEvents.length}`;
-  }, [dateRange.from, dateRange.to, userTimezone, profile?.timezone, calendlyEvents.length]);
-  
-  // Filter events to match the date range filtering used in CallsList
+  // Filter events using timezone-aware functions
   const filteredEvents = useMemo(() => {
-    return calendlyEvents.filter(event => {
-      // Convert the event's created_at to user's timezone for comparison
-      const eventCreatedInUserTz = toZonedTime(new Date(event.created_at), userTimezone);
-      const selectedFromDate = toZonedTime(dateRange.from, userTimezone);
-      const selectedToDate = toZonedTime(dateRange.to, userTimezone);
-      
-      // Get the date part only (year, month, day) for comparison
-      const eventDate = startOfDay(eventCreatedInUserTz);
-      const fromDate = startOfDay(selectedFromDate);
-      const toDate = startOfDay(selectedToDate);
-      
-      return eventDate >= fromDate && eventDate <= toDate;
+    if (!calendlyEvents.length || !effectiveTimezone) return [];
+    
+    console.log('\n=== TIMEZONE-AWARE EVENT FILTERING ===');
+    console.log('🌍 Using timezone:', effectiveTimezone);
+    console.log('📅 Date range:', {
+      from: dateRange.from.toISOString(),
+      to: dateRange.to.toISOString(),
+      from_user_tz: dateRange.from.toLocaleString('en-US', { timeZone: effectiveTimezone }),
+      to_user_tz: dateRange.to.toLocaleString('en-US', { timeZone: effectiveTimezone })
     });
-  }, [calendlyEvents, dateRange, userTimezone]);
+    
+    const filtered = filterEventsByDateRangeWithTimezone(dateRange);
+    
+    console.log('📊 Filtered events result:', {
+      total_events: calendlyEvents.length,
+      filtered_events: filtered.length,
+      timezone: effectiveTimezone
+    });
+    
+    if (filtered.length > 0) {
+      console.log('📋 Sample filtered events:', filtered.slice(0, 3).map(e => ({
+        id: e.calendly_event_id,
+        event_type: e.event_type_name,
+        created_utc: e.created_at,
+        created_user_tz: new Date(e.created_at).toLocaleString('en-US', { timeZone: effectiveTimezone }),
+        status: e.status
+      })));
+    }
+    
+    return filtered;
+  }, [calendlyEvents, dateRange, effectiveTimezone, filterEventsByDateRangeWithTimezone]);
   
   const chartData = useMemo(() => {
-    console.log('🔄 Recalculating chart data due to dependency change');
-    console.log('🔄 Date range key:', dateRangeKey);
+    console.log('🔄 Recalculating timezone-aware chart data');
     console.log('🔄 Events available:', filteredEvents.length);
-    console.log('🔄 Using timezone:', userTimezone);
-    console.log('🔄 Profile loaded:', !!profile);
+    console.log('🔄 Using timezone:', effectiveTimezone);
     
     if (filteredEvents.length === 0) {
       console.log('⚠️ No events available for chart generation');
       return [];
     }
     
-    const data = generateCallDataFromEvents(filteredEvents, dateRange, userTimezone);
-    console.log('🎯 Generated chart data:', data);
+    const data = generateCallDataFromEvents(filteredEvents, dateRange, effectiveTimezone);
+    console.log('🎯 Generated timezone-aware chart data:', data);
     return data;
-  }, [filteredEvents, dateRangeKey, userTimezone]);
+  }, [filteredEvents, dateRange, effectiveTimezone]);
 
   
-  // Calculate stats using the same exact logic as CallsList for consistency
+  // Calculate stats using timezone-aware filtering
   const callStatsData = useMemo(() => {
-    // Helper functions matching CallsList exactly
-    const isCallCreatedInDateRange = (call: any): boolean => {
-      if (!dateRange) return true;
-      
-      const callCreatedInUserTz = toZonedTime(new Date(call.created_at), userTimezone);
-      const selectedFromDate = toZonedTime(dateRange.from, userTimezone);
-      const selectedToDate = toZonedTime(dateRange.to, userTimezone);
-      
-      const callDate = startOfDay(callCreatedInUserTz);
-      const fromDate = startOfDay(selectedFromDate);
-      const toDate = startOfDay(selectedToDate);
-      
-      return callDate >= fromDate && callDate <= toDate;
-    };
+    if (!calendlyEvents.length || !effectiveTimezone) {
+      return { totalBookings: 0, callsTaken: 0, callsCancelled: 0, showUpRate: 0 };
+    }
 
-    const isCallScheduledInDateRange = (call: any): boolean => {
-      if (!dateRange) return true;
-      
-      const callScheduledInUserTz = toZonedTime(new Date(call.scheduled_at), userTimezone);
-      const selectedFromDate = toZonedTime(dateRange.from, userTimezone);
-      const selectedToDate = toZonedTime(dateRange.to, userTimezone);
-      
-      const callDate = startOfDay(callScheduledInUserTz);
-      const fromDate = startOfDay(selectedFromDate);
-      const toDate = startOfDay(selectedToDate);
-      
-      return callDate >= fromDate && callDate <= toDate;
-    };
-
-    // Calculate the exact same numbers as CallsList filter buttons
-    const totalBookings = calendlyEvents.filter(call => isCallCreatedInDateRange(call)).length;
-    const callsTaken = calendlyEvents.filter(call => 
-      isCallScheduledInDateRange(call) && call.status.toLowerCase() !== 'cancelled'
+    console.log('\n=== TIMEZONE-AWARE STATS CALCULATION ===');
+    
+    // Total bookings created in the date range (timezone-aware)
+    const totalBookings = filterEventsByDateRangeWithTimezone(dateRange).length;
+    
+    // Calls taken (scheduled in the date range, not cancelled)
+    const scheduledEvents = filterEventsByScheduledDateRangeWithTimezone(dateRange);
+    const callsTaken = scheduledEvents.filter(call => 
+      call.status.toLowerCase() !== 'cancelled'
     ).length;
-    const callsCancelled = calendlyEvents.filter(c => 
-      c.status.toLowerCase() === 'cancelled' && isCallScheduledInDateRange(c)
+    
+    // Calls cancelled (cancelled events scheduled in the date range)
+    const callsCancelled = scheduledEvents.filter(call => 
+      call.status.toLowerCase() === 'cancelled'
     ).length;
 
     // Calculate show up rate
     const totalScheduled = callsTaken + callsCancelled;
     const showUpRate = totalScheduled > 0 ? Math.round((callsTaken / totalScheduled) * 100) : 0;
+
+    console.log('📊 Timezone-aware stats:', {
+      totalBookings,
+      callsTaken,
+      callsCancelled,
+      totalScheduled,
+      showUpRate,
+      timezone: effectiveTimezone
+    });
 
     return {
       totalBookings,
@@ -242,7 +247,7 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       callsCancelled,
       showUpRate
     };
-  }, [calendlyEvents, dateRange, userTimezone]);
+  }, [calendlyEvents, dateRange, effectiveTimezone, filterEventsByDateRangeWithTimezone, filterEventsByScheduledDateRangeWithTimezone]);
 
   const recentBookings = getRecentBookings(7);
   const monthlyComparison = getMonthlyComparison();
@@ -255,13 +260,13 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
   const costPerBooking = callStatsData.totalBookings > 0 ? (totalSpend / callStatsData.totalBookings) : 0;
   const previousCostPerBooking = 0; // Simplified for now
 
-  console.log('\n=== FINAL COMPONENT STATE ===');
+  console.log('\n=== FINAL TIMEZONE-AWARE COMPONENT STATE ===');
   console.log('Chart data length:', chartData.length);
   console.log('Total bookings for metrics:', callStatsData.totalBookings);
-  console.log('Date range key:', dateRangeKey);
-  console.log('User timezone being used:', userTimezone);
+  console.log('Effective timezone being used:', effectiveTimezone);
+  console.log('Profile timezone:', profile?.timezone);
 
-  const chartKey = `${dateRangeKey}-${callStatsData.totalBookings}`;
+  const chartKey = `${dateRange.from.toISOString()}-${dateRange.to.toISOString()}-${effectiveTimezone}-${callStatsData.totalBookings}`;
 
   if (!projectId) {
     return (
@@ -273,11 +278,12 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
   }
 
   // Debug logging
-  console.log('🔍 [BookCallFunnel] Passing to LandingPageMetrics:', {
+  console.log('🔍 [BookCallFunnel] Passing timezone-aware data to LandingPageMetrics:', {
     dateRange: {
       from: dateRange.from.toISOString(),
       to: dateRange.to.toISOString()
     },
+    timezone: effectiveTimezone,
     formSubmissions: formSubmissions ? {
       totalSubmissions: formSubmissions.totalSubmissions,
       totalForms: formSubmissions.totalForms,
@@ -291,6 +297,9 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       {/* Header without date picker */}
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Book Call Funnel</h2>
+        <div className="text-sm text-gray-500">
+          Timezone: {effectiveTimezone}
+        </div>
       </div>
 
       <LandingPageMetrics
