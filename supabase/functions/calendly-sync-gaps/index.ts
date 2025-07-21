@@ -1,4 +1,5 @@
 
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.8'
 
@@ -162,16 +163,14 @@ serve(async (req) => {
         continue
       }
 
-      // Sync events from the last 30 days to ensure we capture recent events
-      const syncFrom = new Date()
-      syncFrom.setDate(syncFrom.getDate() - 30) // 30 days ago
-      const syncTo = new Date()
-      syncTo.setDate(syncTo.getDate() + 90) // 90 days in the future for scheduled events
+      // Use the specific date range for July 20-21, 2025 AEST (converted to UTC)
+      const syncFrom = new Date("2025-07-19T14:00:00Z")
+      const syncTo = new Date("2025-07-21T13:59:59Z")
 
-      console.log('📅 Sync date range:')
+      console.log('📅 Sync date range (CUSTOM FOR JULY 20-21 AEST):')
       console.log('  From:', syncFrom.toISOString())
       console.log('  To:', syncTo.toISOString())
-      console.log('  Coverage: Last 30 days + next 90 days')
+      console.log('  Target: Events created July 20-21, 2025 AEST')
 
       // Use pagination to get all events (Calendly API has a limit of 100 events per request)
       let allEvents = []
@@ -474,3 +473,4 @@ serve(async (req) => {
     })
   }
 })
+
