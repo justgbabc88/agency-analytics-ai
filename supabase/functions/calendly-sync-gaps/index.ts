@@ -228,17 +228,20 @@ serve(async (req) => {
             if (!eventsResponse.ok) {
               const errorText = await eventsResponse.text()
               
-              // Handle rate limiting with retry logic
+              // Handle rate limiting with extended retry logic for Calendly's 100 events/minute limit
               if (eventsResponse.status === 429) {
                 const retryAfter = parseInt(eventsResponse.headers.get('Retry-After') || '60')
-                console.log(`⏰ Rate limited for ${status} events. Retry attempt ${retryCount + 1}/${maxRetries}. Waiting ${retryAfter} seconds...`)
+                console.log(`⏰ Rate limited for ${status} events (Calendly: 100 events/minute). Retry attempt ${retryCount + 1}/${maxRetries}. Waiting ${retryAfter} seconds...`)
                 
                 if (retryCount < maxRetries) {
                   retryCount++
-                  await new Promise(resolve => setTimeout(resolve, retryAfter * 1000))
+                  // Wait for rate limit reset + small buffer
+                  await new Promise(resolve => setTimeout(resolve, (retryAfter + 5) * 1000))
                   continue // Retry the same page
                 } else {
-                  console.log(`❌ Max retries reached for ${status} events. Stopping pagination.`)
+                  console.log(`⚠️ Rate limit exceeded for ${status} events. This is expected with Calendly's 100 events/minute limit.`)
+                  console.log(`📊 Successfully fetched ${eventsList.length} events before hitting rate limit.`)
+                  console.log(`🔄 Run sync again in 1 minute to fetch more events.`)
                   break
                 }
               }
