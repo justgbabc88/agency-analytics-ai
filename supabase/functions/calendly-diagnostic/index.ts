@@ -6,121 +6,82 @@ const corsHeaders = {
 }
 
 Deno.serve(async (req) => {
+  console.log(`🚀 Diagnostic function started - ${new Date().toISOString()}`)
+  
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    const { userTimezone, projectId, dates } = await req.json()
+    console.log('📥 Parsing request body...')
+    const body = await req.json()
+    console.log('✅ Request body:', JSON.stringify(body))
     
-    console.log(`🔍 Starting Calendly API diagnostic for project: ${projectId}`)
-    console.log(`📅 Target dates: ${dates.join(', ')}`)
+    const { userTimezone, projectId, dates } = body
+    
+    if (!projectId) {
+      throw new Error('Missing projectId in request')
+    }
+    
+    console.log(`🔍 Starting diagnostic for project: ${projectId}`)
     
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
+    
+    console.log('✅ Supabase client created')
 
-    // Get access token from project_integration_data
-    const { data: tokenRecord } = await supabase
+    // First, let's see if we can query the database at all
+    console.log('🔍 Testing database connection...')
+    const { count: testCount, error: testError } = await supabase
+      .from('calendly_events')
+      .select('*', { count: 'exact', head: true })
+      .eq('project_id', projectId)
+    
+    if (testError) {
+      console.error('❌ Database test failed:', testError)
+      throw new Error(`Database test failed: ${testError.message}`)
+    }
+    
+    console.log(`✅ Database connection OK. Total events in DB: ${testCount}`)
+
+    // Try to get integration data
+    console.log('🔍 Getting access token...')
+    const { data: tokenRecord, error: tokenError } = await supabase
       .from('project_integration_data')
       .select('data')
       .eq('platform', 'calendly')
       .eq('project_id', projectId)
       .order('created_at', { ascending: false })
       .limit(1)
-      .single()
+      .maybeSingle()
+    
+    if (tokenError) {
+      console.error('❌ Token query failed:', tokenError)
+      throw new Error(`Token query failed: ${tokenError.message}`)
+    }
+    
+    if (!tokenRecord) {
+      throw new Error('No token record found in project_integration_data')
+    }
     
     const accessToken = tokenRecord?.data?.access_token
     
     if (!accessToken) {
+      console.error('❌ No access token in data:', tokenRecord.data)
       throw new Error('No access token found in project integration data')
     }
 
     console.log('✅ Access token retrieved successfully')
 
-    // Get organization URI first
-    const userResponse = await fetch('https://api.calendly.com/users/me', {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      }
-    })
-    
-    if (!userResponse.ok) {
-      throw new Error(`Failed to get user info: ${userResponse.status}`)
-    }
-    
-    const userData = await userResponse.json()
-    const organizationUri = userData.resource.current_organization
-    
-    console.log(`🏢 Organization URI: ${organizationUri}`)
-
-    // Simple API call to get events for July 16-17
-    const minTime = '2025-07-16T00:00:00.000Z'
-    const maxTime = '2025-07-17T23:59:59.999Z'
-    
-    console.log(`🔍 Fetching events from ${minTime} to ${maxTime}`)
-    
-    const apiUrl = `https://api.calendly.com/scheduled_events?organization=${encodeURIComponent(organizationUri)}&min_start_time=${minTime}&max_start_time=${maxTime}&count=100&sort=created_at:asc`
-    
-    console.log(`📡 Making API call to: ${apiUrl}`)
-    
-    const eventsResponse = await fetch(apiUrl, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      }
-    })
-    
-    if (!eventsResponse.ok) {
-      const errorText = await eventsResponse.text()
-      console.log(`❌ API Error: ${eventsResponse.status} ${errorText}`)
-      throw new Error(`API call failed: ${eventsResponse.status} ${errorText}`)
-    }
-    
-    const eventsData = await eventsResponse.json()
-    console.log(`📊 API returned ${eventsData.collection?.length || 0} events`)
-    
-    // Filter Property Advantage Call events
-    const propertyAdvantageEvents = eventsData.collection?.filter((event: any) => 
-      event.name === 'Property Advantage Call'
-    ) || []
-    
-    console.log(`🎯 Property Advantage Call events: ${propertyAdvantageEvents.length}`)
-
-    // Count by creation date (simplified)
-    let july16Created = 0
-    let july17Created = 0
-    
-    for (const event of propertyAdvantageEvents) {
-      const createdDate = new Date(event.created_at).toISOString().split('T')[0]
-      if (createdDate === '2025-07-16') july16Created++
-      if (createdDate === '2025-07-17') july17Created++
-    }
-
-    // Get DB counts
-    const { count: db16Count } = await supabase
-      .from('calendly_events')
-      .select('*', { count: 'exact', head: true })
-      .eq('project_id', projectId)
-      .eq('event_type_name', 'Property Advantage Call')
-      .gte('created_at', '2025-07-16T00:00:00.000Z')
-      .lte('created_at', '2025-07-16T23:59:59.999Z')
-    
-    const { count: db17Count } = await supabase
-      .from('calendly_events')
-      .select('*', { count: 'exact', head: true })
-      .eq('project_id', projectId)
-      .eq('event_type_name', 'Property Advantage Call')
-      .gte('created_at', '2025-07-17T00:00:00.000Z')
-      .lte('created_at', '2025-07-17T23:59:59.999Z')
-
+    // Just return database stats for now to see if the function works
     const summary = {
-      july16: { apiCount: july16Created, dbCount: db16Count || 0 },
-      july17: { apiCount: july17Created, dbCount: db17Count || 0 },
-      missingEvents: (july16Created - (db16Count || 0)) + (july17Created - (db17Count || 0)),
-      totalApiEvents: propertyAdvantageEvents.length
+      july16: { apiCount: 'N/A', dbCount: testCount || 0 },
+      july17: { apiCount: 'N/A', dbCount: testCount || 0 },
+      missingEvents: 0,
+      totalApiEvents: 'N/A',
+      message: 'Basic diagnostic complete - function working'
     }
     
     console.log('✅ Diagnostic complete:', summary)
@@ -129,7 +90,7 @@ Deno.serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         summary,
-        message: `API vs DB comparison complete`
+        message: `Basic diagnostic complete - DB has ${testCount} total events`
       }),
       { 
         headers: { 
@@ -141,10 +102,12 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('❌ Calendly diagnostic error:', error)
+    console.error('❌ Error stack:', error.stack)
     
     return new Response(
       JSON.stringify({ 
-        error: error.message,
+        error: `Diagnostic failed: ${error.message}`,
+        stack: error.stack,
         success: false
       }),
       { 
