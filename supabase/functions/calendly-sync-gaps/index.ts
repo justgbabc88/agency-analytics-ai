@@ -201,7 +201,7 @@ serve(async (req) => {
       async function fetchEventsByStatus(eventsList, orgUri, fromDate, toDate, accessToken, status) {
         let nextPageToken = null
         let pageCount = 0
-        const maxPages = 200  // Increased to handle more events
+        const maxPages = 500  // Increased significantly to handle more events
         let retryCount = 0
         const maxRetries = 3
         
@@ -268,10 +268,10 @@ serve(async (req) => {
             nextPageToken = eventsData.pagination?.next_page_token
             console.log(`🔄 ${status} - Page ${pageCount} complete. Next page available: ${!!nextPageToken}`)
             
-            // Add longer delay between requests to be more respectful to API and avoid rate limits
+            // Reduce delay to get events faster and avoid timeouts
             if (nextPageToken) {
-              console.log(`⏳ ${status} - Waiting 500ms before next page...`)
-              await new Promise(resolve => setTimeout(resolve, 500))
+              console.log(`⏳ ${status} - Waiting 100ms before next page...`)
+              await new Promise(resolve => setTimeout(resolve, 100))
             }
           } catch (fetchError) {
             console.error(`❌ Error fetching ${status} events from Calendly:`, fetchError)
