@@ -270,11 +270,52 @@ serve(async (req) => {
         const activeEventTypeIds = new Set(mappings.map(m => m.calendly_event_type_id))
         console.log('🎯 Active event type IDs for filtering:', Array.from(activeEventTypeIds))
 
+        // DEBUG: Log all events by date to identify July 20-21 issues
+        console.log('\n🗓️ === EVENTS BY DATE ANALYSIS ===')
+        const eventsByDate = {}
+        allEvents.forEach(event => {
+          const dateKey = new Date(event.start_time).toDateString()
+          if (!eventsByDate[dateKey]) eventsByDate[dateKey] = { total: 0, matched: 0, unmatched: 0 }
+          eventsByDate[dateKey].total++
+        })
+        
+        Object.keys(eventsByDate).sort().forEach(date => {
+          console.log(`📅 ${date}: ${eventsByDate[date].total} total events`)
+        })
+
         // Filter events based on event type - using the correct property from API
         const filteredEvents = allEvents.filter(event => {
           // Based on our test, the correct property is event.event_type (which contains the URI)
           const eventTypeUri = event.event_type
           const isMatched = activeEventTypeIds.has(eventTypeUri)
+          
+          // Update date analysis
+          const dateKey = new Date(event.start_time).toDateString()
+          if (eventsByDate[dateKey]) {
+            if (isMatched) {
+              eventsByDate[dateKey].matched++
+            } else {
+              eventsByDate[dateKey].unmatched++
+            }
+          }
+          
+          // Log more details for July 20-21 events specifically
+          const eventDate = new Date(event.start_time)
+          const isJuly20or21 = (eventDate.getMonth() === 6 && (eventDate.getDate() === 20 || eventDate.getDate() === 21))
+          
+          if (isJuly20or21) {
+            console.log(`🔍 JULY 20-21 EVENT ANALYSIS:`)
+            console.log(`  - Event: ${event.name || 'unnamed'}`)
+            console.log(`  - Date: ${event.start_time}`)
+            console.log(`  - Status: ${event.status}`)
+            console.log(`  - Event Type URI: ${eventTypeUri}`)
+            console.log(`  - Created: ${event.created_at}`)
+            console.log(`  - Updated: ${event.updated_at}`)
+            console.log(`  - Matched: ${isMatched ? 'YES' : 'NO'}`)
+            if (!isMatched) {
+              console.log(`  - Available mappings: ${Array.from(activeEventTypeIds).join(', ')}`)
+            }
+          }
           
           if (!isMatched) {
             console.log(`🔍 Skipping event: ${event.name || 'unnamed'} - type: ${eventTypeUri}`)
@@ -283,6 +324,13 @@ serve(async (req) => {
           }
           
           return isMatched
+        })
+        
+        // Final date analysis summary
+        console.log('\n📊 === FINAL FILTERING RESULTS BY DATE ===')
+        Object.keys(eventsByDate).sort().forEach(date => {
+          const stats = eventsByDate[date]
+          console.log(`📅 ${date}: ${stats.matched} matched / ${stats.total} total (${stats.unmatched} filtered out)`)
         })
         
         console.log('🎯 Events matching active mappings:', filteredEvents.length)
