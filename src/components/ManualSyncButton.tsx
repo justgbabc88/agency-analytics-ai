@@ -127,31 +127,56 @@ export const ManualSyncButton = () => {
             
             console.log('✅ Got access token');
             
-            // Test direct API call for broad date range to catch events created on July 20th
+            // Test direct API call with PAGINATION to get ALL events
             const broadStart = '2025-07-15T00:00:00.000Z';
             const broadEnd = '2025-07-25T23:59:59.999Z';
             
-            const response = await fetch(`https://api.calendly.com/scheduled_events?organization=${encodeURIComponent(tokenData.organization_uri)}&min_start_time=${broadStart}&max_start_time=${broadEnd}&count=100`, {
-              headers: {
-                'Authorization': `Bearer ${tokenData.access_token}`,
-                'Content-Type': 'application/json'
+            console.log('📊 Fetching ALL events with pagination...');
+            let allEvents = [];
+            let pageCount = 0;
+            let nextPageToken = null;
+            
+            do {
+              pageCount++;
+              console.log(`📄 Fetching page ${pageCount}...`);
+              
+              let url = `https://api.calendly.com/scheduled_events?organization=${encodeURIComponent(tokenData.organization_uri)}&min_start_time=${broadStart}&max_start_time=${broadEnd}&count=100`;
+              if (nextPageToken) url += `&page_token=${nextPageToken}`;
+              
+              const response = await fetch(url, {
+                headers: {
+                  'Authorization': `Bearer ${tokenData.access_token}`,
+                  'Content-Type': 'application/json'
+                }
+              });
+              
+              if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`❌ Calendly API error on page ${pageCount}:`, response.status, errorText);
+                break;
               }
-            });
+              
+              const data = await response.json();
+              const events = data.collection || [];
+              allEvents.push(...events);
+              
+              console.log(`   Page ${pageCount}: ${events.length} events (total so far: ${allEvents.length})`);
+              
+              nextPageToken = data.pagination?.next_page_token;
+              
+              // Small delay to avoid rate limits
+              if (nextPageToken) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+              }
+              
+            } while (nextPageToken && pageCount < 10); // Limit to prevent infinite loops
             
-            if (!response.ok) {
-              const errorText = await response.text();
-              console.error('❌ Calendly API error:', response.status, errorText);
-              toast.error(`Calendly API error: ${response.status}`);
-              return;
-            }
-            
-            const data = await response.json();
-            console.log('📊 Total events in broad range:', data.collection?.length || 0);
+            console.log(`📊 TOTAL events collected across ${pageCount} pages: ${allEvents.length}`);
             
             // Get all Property Advantage Call events and show their creation dates
-            const propertyAdvantageEvents = data.collection?.filter(event => {
+            const propertyAdvantageEvents = allEvents.filter(event => {
               return event.event_type === 'https://api.calendly.com/event_types/c6fa8f5f-9cdd-40b7-98ae-90c6caed9b6f';
-            }) || [];
+            });
             
             console.log(`🎯 Total Property Advantage Call events in range: ${propertyAdvantageEvents.length}`);
             
