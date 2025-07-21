@@ -93,17 +93,19 @@ export const useCallStatsCalculations = (
     // Total bookings = all unique events created in the date range (when people actually booked)
     const totalBookings = eventsCreatedInRange.length;
 
-    // Calls taken = active events scheduled for the date range that are in the past (calls that actually happened)
-    const now = new Date();
-    const callsTaken = eventsScheduledInRange.filter(event => {
-      const scheduledTime = new Date(event.scheduled_at);
-      return event.status === 'active' && scheduledTime < now;
-    }).length;
+    // Create 3 categories for events scheduled in range
+    const cancelledCalls = eventsScheduledInRange.filter(e => e.status === 'cancelled' || e.status === 'canceled');
+    const completedCalls = eventsScheduledInRange.filter(e => e.status !== 'cancelled' && e.status !== 'canceled' && new Date(e.scheduled_at) < new Date());
+    const upcomingCalls = eventsScheduledInRange.filter(e => e.status !== 'cancelled' && new Date(e.scheduled_at) >= new Date());
 
-    // Cancelled calls = events that are cancelled/canceled
-    const cancelled = eventsScheduledInRange.filter(event => 
-      event.status === 'cancelled' || event.status === 'canceled'
-    ).length;
+    // Log the counts for all three categories
+    console.log("📞 Cancelled:", cancelledCalls.length);
+    console.log("✅ Completed:", completedCalls.length);
+    console.log("📅 Upcoming:", upcomingCalls.length);
+
+    // Use the new categories for calculations (maintaining exact same functionality)
+    const callsTaken = completedCalls.length; // This replaces the old active + past logic
+    const cancelled = cancelledCalls.length; // This replaces the old cancelled logic
 
     // Show up rate = (calls taken / total scheduled calls) * 100
     // Only count past calls (taken + cancelled) for show up rate calculation
@@ -115,6 +117,11 @@ export const useCallStatsCalculations = (
       callsTaken,
       cancelled,
       showUpRate,
+      categoryBreakdown: {
+        cancelled: cancelledCalls.length,
+        completed: completedCalls.length,
+        upcoming: upcomingCalls.length
+      },
       eventsCreatedInRange: eventsCreatedInRange.map(e => ({
         name: e.event_type_name,
         status: e.status,
@@ -148,14 +155,14 @@ export const useCallStatsCalculations = (
       });
     });
 
+    // Calculate previous period stats using the same 3-category approach
+    const previousCancelledCalls = previousPeriodEventsScheduled.filter(e => e.status === 'cancelled' || e.status === 'canceled');
+    const previousCompletedCalls = previousPeriodEventsScheduled.filter(e => e.status !== 'cancelled' && e.status !== 'canceled' && new Date(e.scheduled_at) < new Date());
+    const previousUpcomingCalls = previousPeriodEventsScheduled.filter(e => e.status !== 'cancelled' && new Date(e.scheduled_at) >= new Date());
+
     const previousTotalBookings = previousPeriodEventsCreated.length;
-    const previousCallsTaken = previousPeriodEventsScheduled.filter(event => {
-      const scheduledTime = new Date(event.scheduled_at);
-      return event.status === 'active' && scheduledTime < now;
-    }).length;
-    const previousCancelled = previousPeriodEventsScheduled.filter(event => 
-      event.status === 'cancelled' || event.status === 'canceled'
-    ).length;
+    const previousCallsTaken = previousCompletedCalls.length; // Using new category logic
+    const previousCancelled = previousCancelledCalls.length; // Using new category logic
 
     const previousPastCalls = previousCallsTaken + previousCancelled;
     const previousShowUpRate = previousPastCalls > 0 ? 
@@ -166,6 +173,11 @@ export const useCallStatsCalculations = (
       previousCallsTaken,
       previousCancelled,
       previousShowUpRate,
+      previousCategoryBreakdown: {
+        cancelled: previousCancelledCalls.length,
+        completed: previousCompletedCalls.length,
+        upcoming: previousUpcomingCalls.length
+      },
       periodStart: previousPeriodStart.toISOString(),
       periodEnd: previousPeriodEnd.toISOString()
     });
@@ -182,7 +194,28 @@ export const useCallStatsCalculations = (
       callsTaken,
       showUpRate,
       previousCallsTaken,
-      previousShowUpRate
+      previousShowUpRate,
+      // Expose the new categories for UI components that need them
+      categories: {
+        cancelled: cancelledCalls,
+        completed: completedCalls,
+        upcoming: upcomingCalls
+      },
+      categoryCounts: {
+        cancelled: cancelledCalls.length,
+        completed: completedCalls.length,
+        upcoming: upcomingCalls.length
+      },
+      previousCategories: {
+        cancelled: previousCancelledCalls,
+        completed: previousCompletedCalls,
+        upcoming: previousUpcomingCalls
+      },
+      previousCategoryCounts: {
+        cancelled: previousCancelledCalls.length,
+        completed: previousCompletedCalls.length,
+        upcoming: previousUpcomingCalls.length
+      }
     };
   }, [calendlyEvents, dateRange.from, dateRange.to, userTimezone]);
 
