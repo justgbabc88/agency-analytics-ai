@@ -160,17 +160,28 @@ serve(async (req) => {
         }
       }
 
-      // Skip event type filtering - we'll get the 100 most recent events regardless of type
-      console.log('📋 Fetching 100 most recent events (ignoring event type filters)')
-      
-      // Get all event type mappings for name lookup purposes
+      // Get active event type mappings for this project (including newly created ones)
       const { data: mappings, error: mappingsError } = await supabaseClient
         .from('calendly_event_mappings')
         .select('calendly_event_type_id, event_type_name')
         .eq('project_id', integration.project_id)
+        .eq('is_active', true)
 
       if (mappingsError) {
-        console.error('❌ Error fetching mappings for name lookup:', mappingsError)
+        console.error('❌ Error fetching mappings:', mappingsError)
+        continue
+      }
+
+      console.log('📋 Active event type mappings:', mappings?.length || 0)
+      if (mappings && mappings.length > 0) {
+        mappings.forEach(mapping => {
+          console.log(`  - ${mapping.event_type_name}: ${mapping.calendly_event_type_id}`)
+        })
+      }
+
+      if (!mappings || mappings.length === 0) {
+        console.log('⚠️ No active event type mappings found for project')
+        continue
       }
 
       // Sync events from the last 7 days for focused recent data
@@ -301,20 +312,37 @@ serve(async (req) => {
           console.log('  - event.uri itself:', firstEvent.uri)
         }
 
-        // Sort events by start_time (most recent first) and take only 100 most recent
-        const sortedEvents = allEvents
+        // Create set of active event type IDs for filtering
+        const activeEventTypeIds = new Set(mappings.map(m => m.calendly_event_type_id))
+        console.log('🎯 Active event type IDs for filtering:', Array.from(activeEventTypeIds))
+
+        // Filter events based on event type, then sort by date and take 100 most recent
+        const matchingEvents = allEvents.filter(event => {
+          // Based on our test, the correct property is event.event_type (which contains the URI)
+          const eventTypeUri = event.event_type
+          const isMatched = activeEventTypeIds.has(eventTypeUri)
+          
+          if (!isMatched) {
+            console.log(`🔍 Skipping event: ${event.name || 'unnamed'} - type: ${eventTypeUri}`)
+          } else {
+            console.log(`✅ Including event: ${event.name || 'unnamed'} - type: ${eventTypeUri}`)
+          }
+          
+          return isMatched
+        })
+        
+        // Sort by start_time (most recent first) and take only 100 most recent
+        const filteredEvents = matchingEvents
           .sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime())
           .slice(0, 100)
         
-        console.log(`🎯 Processing ${sortedEvents.length} most recent events (out of ${allEvents.length} total)`)
+        console.log(`🎯 Found ${matchingEvents.length} matching events, processing ${filteredEvents.length} most recent`)
         
-        if (sortedEvents.length > 0) {
+        if (filteredEvents.length > 0) {
           console.log('📋 Date range of selected events:')
-          console.log(`  Most recent: ${sortedEvents[0].start_time}`)
-          console.log(`  Oldest: ${sortedEvents[sortedEvents.length - 1].start_time}`)
+          console.log(`  Most recent: ${filteredEvents[0].start_time}`)
+          console.log(`  Oldest: ${filteredEvents[filteredEvents.length - 1].start_time}`)
         }
-        
-        const filteredEvents = sortedEvents
 
         if (filteredEvents.length > 0) {
           console.log('📋 Sample filtered events:')
