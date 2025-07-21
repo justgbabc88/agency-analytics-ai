@@ -162,14 +162,16 @@ serve(async (req) => {
         continue
       }
 
-      // Focus on July 1-11, 2025 to get the missing 254 events
-      const syncFrom = new Date('2025-07-01T00:00:00.000Z')
-      const syncTo = new Date('2025-07-11T23:59:59.999Z')
+      // Sync events from the last 30 days to ensure we capture recent events
+      const syncFrom = new Date()
+      syncFrom.setDate(syncFrom.getDate() - 30) // 30 days ago
+      const syncTo = new Date()
+      syncTo.setDate(syncTo.getDate() + 90) // 90 days in the future for scheduled events
 
       console.log('📅 Sync date range:')
       console.log('  From:', syncFrom.toISOString())
       console.log('  To:', syncTo.toISOString())
-      console.log('  Target period: July 1-11, 2025')
+      console.log('  Coverage: Last 30 days + next 90 days')
 
       // Use pagination to get all events (Calendly API has a limit of 100 events per request)
       let allEvents = []
