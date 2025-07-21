@@ -182,9 +182,12 @@ serve(async (req) => {
       const now = new Date()
       const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000))
       
-      // Convert to user timezone for proper day boundaries
+      // Get tomorrow's date to ensure we capture all of today's events
+      const tomorrow = new Date(now.getTime() + (24 * 60 * 60 * 1000))
+      
+      // Convert to user timezone for proper day boundaries - start from 30 days ago, end tomorrow
       const syncFrom = new Date(thirtyDaysAgo.toLocaleDateString('en-CA', { timeZone: effectiveTimezone }) + 'T00:00:00.000Z')
-      const syncTo = new Date(now.toLocaleDateString('en-CA', { timeZone: effectiveTimezone }) + 'T23:59:59.999Z')
+      const syncTo = new Date(tomorrow.toLocaleDateString('en-CA', { timeZone: effectiveTimezone }) + 'T23:59:59.999Z')
 
       console.log('📅 Timezone-aware sync date range:')
       console.log('  User timezone:', effectiveTimezone)
