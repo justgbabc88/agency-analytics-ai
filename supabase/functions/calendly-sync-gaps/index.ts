@@ -184,15 +184,15 @@ serve(async (req) => {
         continue
       }
 
-      // Sync events from 14 days ago to 7 days in the future
+      // Sync events from 6 months ago to 3 months in the future for comprehensive historical data
       const now = new Date()
-      const syncFrom = new Date(now.getTime() - (14 * 24 * 60 * 60 * 1000)) // 14 days ago
-      const syncTo = new Date(now.getTime() + (7 * 24 * 60 * 60 * 1000))   // 7 days from now
+      const syncFrom = new Date(now.getTime() - (180 * 24 * 60 * 60 * 1000)) // 6 months ago
+      const syncTo = new Date(now.getTime() + (90 * 24 * 60 * 60 * 1000))   // 3 months from now
 
       console.log('📅 Sync date range:')
       console.log('  From:', syncFrom.toISOString())
       console.log('  To:', syncTo.toISOString())
-      console.log('  Target period: 14 days ago to 7 days from now (21-day window)')
+      console.log('  Target period: 6 months ago to 3 months from now (9-month window)')
 
       // Use pagination to get all events (Calendly API has a limit of 100 events per request)
       let allEvents = []
