@@ -127,21 +127,18 @@ export const ManualSyncButton = () => {
             
             console.log('✅ Got access token');
             
-            // Test direct API call with PAGINATION to get ALL events
+            // Test different event statuses since pagination is failing
             const broadStart = '2025-07-15T00:00:00.000Z';
             const broadEnd = '2025-07-25T23:59:59.999Z';
             
-            console.log('📊 Fetching ALL events with pagination...');
+            console.log('📊 Testing different event statuses...');
+            const statuses = ['active', 'canceled']; // Try both active and canceled
             let allEvents = [];
-            let pageCount = 0;
-            let nextPageToken = null;
             
-            do {
-              pageCount++;
-              console.log(`📄 Fetching page ${pageCount}...`);
+            for (const status of statuses) {
+              console.log(`\n🔍 Checking ${status} events...`);
               
-              let url = `https://api.calendly.com/scheduled_events?organization=${encodeURIComponent(tokenData.organization_uri)}&min_start_time=${broadStart}&max_start_time=${broadEnd}&count=100`;
-              if (nextPageToken) url += `&page_token=${nextPageToken}`;
+              const url = `https://api.calendly.com/scheduled_events?organization=${encodeURIComponent(tokenData.organization_uri)}&min_start_time=${broadStart}&max_start_time=${broadEnd}&status=${status}&count=100`;
               
               const response = await fetch(url, {
                 headers: {
@@ -152,26 +149,32 @@ export const ManualSyncButton = () => {
               
               if (!response.ok) {
                 const errorText = await response.text();
-                console.error(`❌ Calendly API error on page ${pageCount}:`, response.status, errorText);
-                break;
+                console.error(`❌ Error fetching ${status} events:`, response.status, errorText);
+                continue;
               }
               
               const data = await response.json();
               const events = data.collection || [];
               allEvents.push(...events);
               
-              console.log(`   Page ${pageCount}: ${events.length} events (total so far: ${allEvents.length})`);
+              console.log(`   ${status} events: ${events.length}`);
               
-              nextPageToken = data.pagination?.next_page_token;
+              // Show creation dates for this status
+              const statusPropertyEvents = events.filter(e => e.event_type === 'https://api.calendly.com/event_types/c6fa8f5f-9cdd-40b7-98ae-90c6caed9b6f');
+              const statusDates = {};
+              statusPropertyEvents.forEach(event => {
+                const createdDate = event.created_at ? event.created_at.split('T')[0] : 'no-date';
+                statusDates[createdDate] = (statusDates[createdDate] || 0) + 1;
+              });
               
-              // Small delay to avoid rate limits
-              if (nextPageToken) {
-                await new Promise(resolve => setTimeout(resolve, 500));
-              }
+              console.log(`   Property Advantage Call (${status}): ${statusPropertyEvents.length} events`);
+              console.log(`   Creation dates for ${status}:`, statusDates);
               
-            } while (nextPageToken && pageCount < 10); // Limit to prevent infinite loops
+              // Wait between requests
+              await new Promise(resolve => setTimeout(resolve, 500));
+            }
             
-            console.log(`📊 TOTAL events collected across ${pageCount} pages: ${allEvents.length}`);
+            console.log(`\n📊 TOTAL events collected across all statuses: ${allEvents.length}`);
             
             // Get all Property Advantage Call events and show their creation dates
             const propertyAdvantageEvents = allEvents.filter(event => {
