@@ -430,8 +430,9 @@ serve(async (req) => {
                 invitee_name: inviteeName,
                 invitee_email: inviteeEmail,
                 status: event.status || 'scheduled',
-                created_at: event.created_at || new Date().toISOString(),
-                updated_at: event.updated_at || event.created_at || new Date().toISOString()
+                // Ensure created_at is never null - use event.created_at, fallback to now
+                created_at: event.created_at ? new Date(event.created_at).toISOString() : new Date().toISOString(),
+                updated_at: event.updated_at ? new Date(event.updated_at).toISOString() : (event.created_at ? new Date(event.created_at).toISOString() : new Date().toISOString())
               }
 
               eventsToUpsert.push(eventData)
