@@ -3,9 +3,11 @@ import { RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useUserProfile } from "@/hooks/useUserProfile";
 
 export const ManualSyncButton = () => {
   const [isLoading, setIsLoading] = useState(false);
+  const { getUserTimezone } = useUserProfile();
 
   const handleManualSync = async () => {
     setIsLoading(true);
@@ -26,9 +28,12 @@ export const ManualSyncButton = () => {
       console.log('✅ Event types mapped:', mapData);
       toast.success(`Mapped ${mapData.mappingsCreated} event types`);
       
-      console.log('🔧 Now triggering Calendly sync...');
+      console.log('🔧 Now triggering Calendly sync with timezone...');
       
-      const { data, error } = await supabase.functions.invoke('manual-calendly-sync');
+      const userTimezone = getUserTimezone();
+      const { data, error } = await supabase.functions.invoke('manual-calendly-sync', {
+        body: { userTimezone }
+      });
       
       if (error) {
         console.error('❌ Manual sync error:', error);
