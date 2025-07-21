@@ -379,15 +379,24 @@ serve(async (req) => {
       const projectId = mapping.project_id;
       console.log('🔄 Processing event for project:', projectId);
       
-      // Determine event status based on webhook event type
-      let status = 'scheduled';
-      if (webhookData.event === 'invitee.canceled') {
+      // Get the actual event status from Calendly event data
+      let status = scheduledEvent.status || 'scheduled';
+      
+      // Normalize canceled/cancelled to 'cancelled' for consistency
+      if (status === 'canceled' || status === 'cancelled') {
         status = 'cancelled';
-      } else if (webhookData.event === 'invitee.created') {
-        status = 'active';
+      }
+      
+      // For webhook event types, override with appropriate status if needed
+      if (webhookData.event === 'invitee.canceled') {
+        status = 'cancelled'; // Always mark as cancelled if it's a cancellation webhook
       }
 
-      console.log('📊 Event status determined:', status);
+      console.log('📊 Event status determined from Calendly:', {
+        calendlyStatus: scheduledEvent.status,
+        webhookEvent: webhookData.event,
+        finalStatus: status
+      });
 
       // Check if event already exists to prevent duplicates
       const { data: existingEvent } = await supabase
