@@ -551,29 +551,26 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
         });
       }
       
-      // Sum unique visitors from aggregated metrics by date to avoid double-counting
+      // For aggregated metrics, we need to handle cross-page visitor overlap
+      // Since we don't have session IDs in aggregated data, we need to estimate
+      // by taking the maximum unique visitors per date (conservative approach)
       const visitorsByDate = new Map();
       filteredMetrics.forEach((metric: any) => {
         const dateKey = metric.date;
-        if (!visitorsByDate.has(dateKey)) {
-          visitorsByDate.set(dateKey, new Set());
-        }
-        // Add unique visitors for this metric (page) on this date
-        for (let i = 0; i < metric.unique_visitors; i++) {
-          visitorsByDate.get(dateKey).add(`${metric.landing_page_name}-${i}`);
-        }
+        const currentMax = visitorsByDate.get(dateKey) || 0;
+        // Take the maximum unique visitors for any single page on this date
+        // This is conservative but avoids double-counting
+        visitorsByDate.set(dateKey, Math.max(currentMax, metric.unique_visitors));
       });
       
-      // Calculate total unique visitors across all dates
-      const allVisitors = new Set();
-      visitorsByDate.forEach((visitors, date) => {
-        visitors.forEach((visitor: string) => allVisitors.add(`${date}-${visitor}`));
-      });
+      // Sum the maximum unique visitors across all dates
+      const totalUniqueVisitors = Array.from(visitorsByDate.values()).reduce((sum, count) => sum + count, 0);
       
-      console.log('📊 Unique visitors from aggregated metrics:', allVisitors.size);
+      console.log('📊 Unique visitors from aggregated metrics:', totalUniqueVisitors);
       console.log('📊 Aggregated metrics used:', filteredMetrics.length, 'metrics for', filteredMetrics.map(m => `${m.date}: ${m.landing_page_name} (${m.unique_visitors} visitors)`));
+      console.log('📊 Unique visitors by date:', Object.fromEntries(visitorsByDate));
       
-      return allVisitors.size;
+      return totalUniqueVisitors;
     }
     
     // Fallback to event-level calculation if no aggregated metrics available
