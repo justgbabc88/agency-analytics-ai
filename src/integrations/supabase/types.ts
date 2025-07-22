@@ -573,50 +573,6 @@ export type Database = {
         }
         Relationships: []
       }
-      project_daily_metrics: {
-        Row: {
-          created_at: string
-          date: string
-          id: string
-          landing_page_name: string
-          landing_page_url: string
-          project_id: string
-          total_page_views: number
-          unique_visitors: number
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          date: string
-          id?: string
-          landing_page_name: string
-          landing_page_url: string
-          project_id: string
-          total_page_views?: number
-          unique_visitors?: number
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          date?: string
-          id?: string
-          landing_page_name?: string
-          landing_page_url?: string
-          project_id?: string
-          total_page_views?: number
-          unique_visitors?: number
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "project_daily_metrics_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       project_integration_data: {
         Row: {
           created_at: string
@@ -950,7 +906,28 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      project_daily_metrics: {
+        Row: {
+          created_at: string | null
+          date: string | null
+          id: string | null
+          landing_page_name: string | null
+          landing_page_url: string | null
+          project_id: string | null
+          total_page_views: number | null
+          unique_visitors: number | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tracking_events_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       aggregate_project_daily_metrics: {
