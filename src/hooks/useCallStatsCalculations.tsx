@@ -99,9 +99,16 @@ export const useCallStatsCalculations = (
     })));
 
     // Create 3 filtered arrays to count the different types of calls
-    const cancelledCalls = eventsScheduledInRange.filter(event =>
-      event.status === 'cancelled' || event.status === 'canceled'
-    );
+    const cancelledCalls = eventsScheduledInRange.filter(event => {
+      const isCancelled = event.status === 'cancelled' || event.status === 'canceled';
+      console.log('🚫 Checking event for cancellation:', {
+        id: event.calendly_event_id,
+        status: event.status,
+        isCancelled,
+        scheduled_at: event.scheduled_at
+      });
+      return isCancelled;
+    });
 
     const completedCalls = eventsScheduledInRange.filter(event =>
       (event.status !== 'cancelled' && event.status !== 'canceled') &&
