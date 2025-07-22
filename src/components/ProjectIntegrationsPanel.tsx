@@ -46,9 +46,10 @@ interface ProjectIntegrationsPanelProps {
   projectId?: string;
   selectedFormIds?: string[];
   onFormSelectionChange?: (formIds: string[]) => void;
+  onGHLDataRefresh?: () => void; // Add GHL data refresh function
 }
 
-export const ProjectIntegrationsPanel = ({ projectId, selectedFormIds = [], onFormSelectionChange }: ProjectIntegrationsPanelProps) => {
+export const ProjectIntegrationsPanel = ({ projectId, selectedFormIds = [], onFormSelectionChange, onGHLDataRefresh }: ProjectIntegrationsPanelProps) => {
   const { integrations, updateIntegration } = useProjectIntegrations(projectId);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
 
@@ -155,6 +156,7 @@ export const ProjectIntegrationsPanel = ({ projectId, selectedFormIds = [], onFo
             }}
             selectedFormIds={selectedFormIds}
             onFormSelectionChange={onFormSelectionChange}
+            onDataRefresh={onGHLDataRefresh}
           />
         );
       case 'zoho_crm':

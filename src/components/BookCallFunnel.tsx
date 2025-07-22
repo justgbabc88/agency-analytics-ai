@@ -24,7 +24,7 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
   const { calendlyEvents, getRecentBookings, getMonthlyComparison, refetch } = useCalendlyData(projectId);
   const { getUserTimezone, profile } = useUserProfile();
   const { toast } = useToast();
-  const { metrics: formSubmissions, loading: formSubmissionsLoading } = useGHLFormSubmissions(projectId, dateRange, selectedFormIds);
+  const { metrics: formSubmissions, loading: formSubmissionsLoading, refetch: refetchGHLData } = useGHLFormSubmissions(projectId, dateRange, selectedFormIds);
   const { facebookData } = useFacebookData({ dateRange, campaignIds: selectedCampaignIds });
   
   // State for tracking events

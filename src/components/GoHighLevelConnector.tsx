@@ -15,6 +15,7 @@ interface GoHighLevelConnectorProps {
   onConnectionChange: (connected: boolean) => void;
   selectedFormIds?: string[];
   onFormSelectionChange?: (formIds: string[]) => void;
+  onDataRefresh?: () => void; // Add this to refresh external data
 }
 
 interface GHLForm {
@@ -39,7 +40,8 @@ export const GoHighLevelConnector = ({
   isConnected, 
   onConnectionChange,
   selectedFormIds = [],
-  onFormSelectionChange
+  onFormSelectionChange,
+  onDataRefresh
 }: GoHighLevelConnectorProps) => {
   const [forms, setForms] = useState<GHLForm[]>([]);
   const [submissions, setSubmissions] = useState<GHLFormSubmission[]>([]);
@@ -209,6 +211,11 @@ export const GoHighLevelConnector = ({
       await loadForms();
       await loadSubmissions();
       await loadLastSync();
+      
+      // Refresh external data cache (like useGHLFormSubmissions hook)
+      if (onDataRefresh) {
+        onDataRefresh();
+      }
 
       toast({
         title: "Sync Complete",

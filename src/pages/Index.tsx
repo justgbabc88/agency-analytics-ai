@@ -19,6 +19,7 @@ import { useProjects } from "@/hooks/useProjects";
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { subDays, startOfDay, endOfDay } from "date-fns";
+import { useGHLFormSubmissions } from "@/hooks/useGHLFormSubmissions";
 
 interface FunnelProductConfig {
   id: string;
@@ -100,6 +101,9 @@ const Index = () => {
     enabled: !!selectedProjectId,
     refetchInterval: 10000,
   });
+
+  // GHL form submissions data for refresh functionality
+  const { refetch: refetchGHLData } = useGHLFormSubmissions(selectedProjectId || '', dateRange, selectedFormIds);
 
   // Derived state
   const selectedProject = projects?.find(p => p.id === selectedProjectId);
@@ -431,6 +435,7 @@ const Index = () => {
               projectId={selectedProjectId} 
               selectedFormIds={selectedFormIds}
               onFormSelectionChange={setSelectedFormIds}
+              onGHLDataRefresh={refetchGHLData}
             />
           </TabsContent>
         </Tabs>

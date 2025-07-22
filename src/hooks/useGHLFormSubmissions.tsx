@@ -118,8 +118,9 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
       return allSubmissions;
     },
     enabled: !!projectId,
-    staleTime: 2 * 60 * 1000, // Submissions data is fresh for 2 minutes
-    gcTime: 15 * 60 * 1000, // Keep in cache for 15 minutes
+    staleTime: 1 * 60 * 1000, // Submissions data is fresh for 1 minute (was 2 minutes)
+    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes (was 15 minutes)
+    refetchInterval: 2 * 60 * 1000, // Auto-refetch every 2 minutes
   });
 
   // Background sync for fresh data
@@ -153,7 +154,7 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
       return { synced: true, timestamp: new Date().toISOString() };
     },
     enabled: !!projectId && !!submissionsData,
-    staleTime: 3 * 60 * 1000, // Check for refresh every 3 minutes
+    staleTime: 1 * 60 * 1000, // Check for refresh every 1 minute (was 3 minutes)
     retry: 1,
   });
 
