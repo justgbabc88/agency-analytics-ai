@@ -453,9 +453,58 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
     return filtered;
   }, [pixelConfig, trackingEvents]);
 
+  // Calculate daily page view aggregations by landing page
+  const dailyPageViewData = useMemo(() => {
+    if (!filteredPageViews.length) return [];
+
+    const dailyAggregates = new Map();
+
+    filteredPageViews.forEach((event: any) => {
+      const eventDate = event.created_at.split('T')[0]; // Get YYYY-MM-DD
+      const landingPage = event.page_url?.split('?')[0] || 'Unknown'; // Remove query params for cleaner grouping
+
+      const dayKey = eventDate;
+      if (!dailyAggregates.has(dayKey)) {
+        dailyAggregates.set(dayKey, {
+          date: eventDate,
+          totalPageViews: 0,
+          landingPages: new Map(),
+          uniqueVisitors: new Set()
+        });
+      }
+
+      const dayData = dailyAggregates.get(dayKey);
+      dayData.totalPageViews++;
+
+      // Track by landing page
+      if (!dayData.landingPages.has(landingPage)) {
+        dayData.landingPages.set(landingPage, 0);
+      }
+      dayData.landingPages.set(landingPage, dayData.landingPages.get(landingPage) + 1);
+
+      // Track unique visitors
+      const visitorId = event.session_id || event.contact_email || `${event.page_url}-${eventDate}`;
+      dayData.uniqueVisitors.add(visitorId);
+    });
+
+    // Convert to array and format for display
+    const result = Array.from(dailyAggregates.values()).map(dayData => ({
+      date: dayData.date,
+      totalPageViews: dayData.totalPageViews,
+      uniqueVisitors: dayData.uniqueVisitors.size,
+      landingPageBreakdown: Array.from(dayData.landingPages.entries()).map(([url, count]) => ({
+        url,
+        count
+      })).sort((a, b) => b.count - a.count) // Sort by count descending
+    })).sort((a, b) => a.date.localeCompare(b.date)); // Sort by date ascending
+
+    console.log('📊 Daily page view aggregates:', result);
+    return result;
+  }, [filteredPageViews]);
+
   const totalPageViews = filteredPageViews.length;
   
-  // Calculate unique visitors from filtered page views
+  // Calculate unique visitors from filtered page views with better deduplication
   const uniqueVisitors = useMemo(() => {
     const uniqueVisitorIds = new Set();
     filteredPageViews.forEach((event: any) => {
@@ -466,8 +515,9 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       uniqueVisitorIds.add(visitorId);
     });
     console.log('📊 Unique visitors calculated:', uniqueVisitorIds.size, 'from', filteredPageViews.length, 'page views');
+    console.log('📊 Daily breakdown available:', dailyPageViewData.length, 'days');
     return uniqueVisitorIds.size;
-  }, [filteredPageViews]);
+  }, [filteredPageViews, dailyPageViewData.length]);
   const bookingRate = uniqueVisitors > 0 ? ((callStatsData.totalBookings / uniqueVisitors) * 100) : 0;
   const previousBookingRate = 0; // Simplified for now since we're focusing on current period accuracy
   
@@ -514,7 +564,8 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       </div>
 
       <LandingPageMetrics
-        totalPageViews={uniqueVisitors}
+        totalPageViews={totalPageViews}
+        uniqueVisitors={uniqueVisitors}
         bookingRate={bookingRate}
         previousBookingRate={previousBookingRate}
         totalBookings={callStatsData.totalBookings}
@@ -523,6 +574,7 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
         previousCostPerBooking={previousCostPerBooking}
         formSubmissions={formSubmissions}
         totalSpend={totalSpend}
+        dailyPageViewData={dailyPageViewData}
       />
 
       <CallStatsMetrics
