@@ -108,7 +108,10 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
     }
   };
 
-  // Fetch aggregated metrics instead of raw tracking events
+  // Store aggregated metrics separately from individual events
+  const [aggregatedMetrics, setAggregatedMetrics] = useState<any[]>([]);
+
+  // Fetch aggregated metrics for visitor calculations
   const fetchAggregatedMetrics = async () => {
     if (!projectId) return;
     
@@ -117,10 +120,9 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       const startDate = dateRange.from.toISOString().split('T')[0];
       const endDate = dateRange.to.toISOString().split('T')[0];
       
-      // First, trigger aggregation to ensure data is up to date
-      await triggerDailyAggregation();
+      console.log('📊 Fetching aggregated metrics for date range:', startDate, 'to', endDate);
       
-      // Then fetch the aggregated data
+      // Fetch the aggregated data directly
       const { data, error } = await supabase.rpc('get_project_daily_metrics', {
         p_project_id: projectId,
         p_start_date: startDate,
@@ -134,27 +136,13 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
         return;
       }
 
-      console.log('📊 Fetched aggregated metrics:', data?.length || 0);
+      console.log('📊 Fetched aggregated metrics:', data?.length || 0, 'records');
+      console.log('📊 Sample aggregated data:', data?.slice(0, 3));
       
-      // Convert aggregated data back to event-like format for compatibility
-      const eventLikeData = data?.flatMap((metric: any) => {
-        // Create individual event entries for each page view to maintain compatibility
-        return Array.from({ length: metric.total_page_views }, (_, index) => ({
-          id: `${metric.date}-${metric.landing_page_name}-${index}`,
-          project_id: projectId,
-          event_type: 'page_view',
-          event_name: metric.landing_page_name,
-          page_url: metric.landing_page_url,
-          session_id: `session_${metric.date}_${metric.landing_page_name}_${index}`,
-          created_at: `${metric.date}T12:00:00.000Z`, // Use midday for aggregated data
-          // Include unique visitors info in metadata
-          _aggregated: true,
-          _date: metric.date,
-          _unique_visitors: metric.unique_visitors
-        }));
-      }) || [];
+      setAggregatedMetrics(data || []);
       
-      setTrackingEvents(eventLikeData);
+      // Also fetch raw events for other purposes (chart generation, etc.)
+      await fetchRawTrackingEvents();
     } catch (error) {
       console.error('Error fetching aggregated metrics:', error);
       // Fallback to raw events
@@ -191,7 +179,7 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
     }
   };
 
-  // Fetch tracking events when component mounts or dependencies change
+  // Fetch aggregated metrics when component mounts or dependencies change
   useEffect(() => {
     fetchAggregatedMetrics();
   }, [projectId, dateRange.from, dateRange.to]);
@@ -542,8 +530,53 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
 
   const totalPageViews = filteredPageViews.length;
   
-  // Calculate unique visitors from filtered page views
+  // Calculate unique visitors from aggregated metrics (more accurate than event-level calculation)
   const uniqueVisitors = useMemo(() => {
+    if (aggregatedMetrics.length > 0) {
+      // Use aggregated metrics for accurate unique visitor count
+      const enabledPages = pixelConfig?.funnelPages?.filter((page: any) => page.includeInPageViewMetrics !== false) || [];
+      
+      // If no pages configured, include all metrics
+      let filteredMetrics = aggregatedMetrics;
+      
+      if (enabledPages.length > 0) {
+        // Filter metrics to only include enabled pages
+        filteredMetrics = aggregatedMetrics.filter((metric: any) => {
+          return enabledPages.some((page: any) => {
+            // Check if metric matches the page by name or URL
+            const pageNameMatch = metric.landing_page_name?.toLowerCase().includes(page.name?.toLowerCase() || '');
+            const pageUrlMatch = metric.landing_page_url?.toLowerCase().includes(page.url?.toLowerCase() || '');
+            return pageNameMatch || pageUrlMatch;
+          });
+        });
+      }
+      
+      // Sum unique visitors from aggregated metrics by date to avoid double-counting
+      const visitorsByDate = new Map();
+      filteredMetrics.forEach((metric: any) => {
+        const dateKey = metric.date;
+        if (!visitorsByDate.has(dateKey)) {
+          visitorsByDate.set(dateKey, new Set());
+        }
+        // Add unique visitors for this metric (page) on this date
+        for (let i = 0; i < metric.unique_visitors; i++) {
+          visitorsByDate.get(dateKey).add(`${metric.landing_page_name}-${i}`);
+        }
+      });
+      
+      // Calculate total unique visitors across all dates
+      const allVisitors = new Set();
+      visitorsByDate.forEach((visitors, date) => {
+        visitors.forEach((visitor: string) => allVisitors.add(`${date}-${visitor}`));
+      });
+      
+      console.log('📊 Unique visitors from aggregated metrics:', allVisitors.size);
+      console.log('📊 Aggregated metrics used:', filteredMetrics.length, 'metrics for', filteredMetrics.map(m => `${m.date}: ${m.landing_page_name} (${m.unique_visitors} visitors)`));
+      
+      return allVisitors.size;
+    }
+    
+    // Fallback to event-level calculation if no aggregated metrics available
     const uniqueVisitorIds = new Set();
     filteredPageViews.forEach((event: any) => {
       // Create a visitor ID from session, email, or page/date combination
@@ -552,9 +585,9 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
                        `${event.page_url}-${event.created_at.split('T')[0]}`;
       uniqueVisitorIds.add(visitorId);
     });
-    console.log('📊 Unique visitors calculated:', uniqueVisitorIds.size, 'from', filteredPageViews.length, 'page views');
+    console.log('📊 Unique visitors calculated from events (fallback):', uniqueVisitorIds.size, 'from', filteredPageViews.length, 'page views');
     return uniqueVisitorIds.size;
-  }, [filteredPageViews]);
+  }, [aggregatedMetrics, pixelConfig, filteredPageViews]);
   const bookingRate = uniqueVisitors > 0 ? ((callStatsData.totalBookings / uniqueVisitors) * 100) : 0;
   const previousBookingRate = 0; // Simplified for now since we're focusing on current period accuracy
   
