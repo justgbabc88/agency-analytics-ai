@@ -573,6 +573,50 @@ export type Database = {
         }
         Relationships: []
       }
+      project_daily_metrics: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          landing_page_name: string
+          landing_page_url: string
+          project_id: string
+          total_page_views: number
+          unique_visitors: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          id?: string
+          landing_page_name: string
+          landing_page_url: string
+          project_id: string
+          total_page_views?: number
+          unique_visitors?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          landing_page_name?: string
+          landing_page_url?: string
+          project_id?: string
+          total_page_views?: number
+          unique_visitors?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_daily_metrics_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_integration_data: {
         Row: {
           created_at: string
@@ -909,6 +953,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      aggregate_project_daily_metrics: {
+        Args: { p_project_id: string; target_date?: string }
+        Returns: undefined
+      }
+      get_project_daily_metrics: {
+        Args: { p_project_id: string; p_start_date: string; p_end_date: string }
+        Returns: {
+          date: string
+          landing_page_name: string
+          landing_page_url: string
+          total_page_views: number
+          unique_visitors: number
+        }[]
+      }
       get_user_agency_id: {
         Args: Record<PropertyKey, never>
         Returns: string
