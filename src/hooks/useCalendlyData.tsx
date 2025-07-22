@@ -51,66 +51,41 @@ export const useCalendlyData = (projectId?: string) => {
         })));
       }
 
-      // If no active mappings, return all events (they wouldn't be in DB if not mapped)
+      // Filter events based on active mappings (display-level filtering)
       if (!mappings || mappings.length === 0) {
-        console.log('⚠️ [useCalendlyData] No active mappings found, returning all events');
+        console.log('⚠️ [useCalendlyData] No active mappings found, showing all stored events');
+        console.log('📊 [useCalendlyData] Total events available:', allEvents?.length || 0);
         return allEvents || [];
       }
 
       const activeIds = new Set(mappings.map(m => m.calendly_event_type_id));
-      console.log('🔍 [useCalendlyData] Active event type IDs to filter by:', Array.from(activeIds));
+      console.log('🎯 [useCalendlyData] Active mappings for display:', Array.from(activeIds));
 
-      // Filter events based on active mappings
-      const filteredEvents = (allEvents || []).filter(e => {
-        const isIncluded = activeIds.has(e.calendly_event_type_id);
-        console.log(`🔍 [useCalendlyData] Event check:`, {
-          event_id: e.calendly_event_id,
-          event_type_id: e.calendly_event_type_id,
-          event_type_name: e.event_type_name,
-          status: e.status,
-          is_included: isIncluded,
-          active_ids: Array.from(activeIds)
-        });
-        return isIncluded;
-      });
+      // Filter events for display based on active mappings
+      const filteredEvents = (allEvents || []).filter(e => 
+        activeIds.has(e.calendly_event_type_id)
+      );
 
-      console.log('✅ [useCalendlyData] Final filtered events:', filteredEvents.length);
+      console.log('✅ [useCalendlyData] Events after display filtering:', filteredEvents.length);
+      console.log('📝 [useCalendlyData] Hidden events (inactive mappings):', (allEvents?.length || 0) - filteredEvents.length);
+      
+      // Count events by status for debugging
       if (filteredEvents.length > 0) {
-        console.log('📋 [useCalendlyData] Sample filtered events:', filteredEvents.slice(0, 3).map(e => ({
-          id: e.calendly_event_id,
-          event_type_id: e.calendly_event_type_id,
-          event_type_name: e.event_type_name,
-          status: e.status,
-          created_at: e.created_at,
-          scheduled_at: e.scheduled_at
-        })));
-        
-        // Debug: Count events by status
         const statusCounts = filteredEvents.reduce((acc, event) => {
           acc[event.status] = (acc[event.status] || 0) + 1;
           return acc;
         }, {});
-        console.log('📊 [useCalendlyData] Events by status:', statusCounts);
-        
-        // Debug: Find cancelled events specifically
-        const cancelledEvents = filteredEvents.filter(e => e.status === 'canceled' || e.status === 'cancelled');
-        console.log('🚫 [useCalendlyData] Cancelled events found:', cancelledEvents.length);
-        if (cancelledEvents.length > 0) {
-          console.log('🚫 [useCalendlyData] Cancelled events details:', cancelledEvents.map(e => ({
-            id: e.calendly_event_id,
-            status: e.status,
-            scheduled_at: e.scheduled_at,
-            event_type_name: e.event_type_name
-          })));
-        }
-      } else if (allEvents && allEvents.length > 0) {
-        console.warn('⚠️ [useCalendlyData] No events match active mappings!');
-        console.warn('Event type IDs in database:', allEvents.map(e => e.calendly_event_type_id));
-        console.warn('Active mapping IDs:', Array.from(activeIds));
-        
-        // For debugging: return all events if no filtering match
-        console.warn('🔧 [useCalendlyData] Returning all events for debugging');
-        return allEvents;
+        console.log('📊 [useCalendlyData] Visible events by status:', statusCounts);
+      }
+      
+      // Log hidden events by type for visibility
+      if (allEvents && allEvents.length > filteredEvents.length) {
+        const hiddenEvents = (allEvents || []).filter(e => !activeIds.has(e.calendly_event_type_id));
+        const hiddenByType = hiddenEvents.reduce((acc, event) => {
+          acc[event.event_type_name] = (acc[event.event_type_name] || 0) + 1;
+          return acc;
+        }, {});
+        console.log('👁️ [useCalendlyData] Hidden events by type:', hiddenByType);
       }
 
       return filteredEvents;
