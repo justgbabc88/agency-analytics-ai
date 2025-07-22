@@ -45,6 +45,14 @@ export const useCallStatsCalculations = (
       duplicatesRemoved: calendlyEvents.length - uniqueEvents.length
     });
 
+    console.log('📅 Date range being used for filtering:', {
+      from: dateRange.from,
+      to: dateRange.to,
+      startOfDay_from: startOfDay(dateRange.from),
+      endOfDay_to: endOfDay(dateRange.to),
+      timezone: userTimezone || 'UTC'
+    });
+
     // Filter events created within the selected date range
     const eventsCreatedInRange = uniqueEvents.filter(event => {
       const createdAt = new Date(event.created_at);
