@@ -83,6 +83,25 @@ export const useCalendlyData = (projectId?: string) => {
           created_at: e.created_at,
           scheduled_at: e.scheduled_at
         })));
+        
+        // Debug: Count events by status
+        const statusCounts = filteredEvents.reduce((acc, event) => {
+          acc[event.status] = (acc[event.status] || 0) + 1;
+          return acc;
+        }, {});
+        console.log('📊 [useCalendlyData] Events by status:', statusCounts);
+        
+        // Debug: Find cancelled events specifically
+        const cancelledEvents = filteredEvents.filter(e => e.status === 'canceled' || e.status === 'cancelled');
+        console.log('🚫 [useCalendlyData] Cancelled events found:', cancelledEvents.length);
+        if (cancelledEvents.length > 0) {
+          console.log('🚫 [useCalendlyData] Cancelled events details:', cancelledEvents.map(e => ({
+            id: e.calendly_event_id,
+            status: e.status,
+            scheduled_at: e.scheduled_at,
+            event_type_name: e.event_type_name
+          })));
+        }
       } else if (allEvents && allEvents.length > 0) {
         console.warn('⚠️ [useCalendlyData] No events match active mappings!');
         console.warn('Event type IDs in database:', allEvents.map(e => e.calendly_event_type_id));
