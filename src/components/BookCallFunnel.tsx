@@ -431,10 +431,10 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
 
     console.log('📊 Pages enabled for funnel metrics:', enabledPages.map((p: any) => ({ name: p.name, url: p.url })));
 
-    // If no pages are enabled, return empty array
+    // If no pages are configured (empty array), return all events instead of empty array
     if (enabledPages.length === 0) {
-      console.log('📊 No pages enabled for metrics, returning empty array');
-      return [];
+      console.log('📊 No pages configured for metrics, returning all tracking events');
+      return trackingEvents;
     }
 
     // Filter tracking events using the same isEventForPage logic as AttributionDashboard
