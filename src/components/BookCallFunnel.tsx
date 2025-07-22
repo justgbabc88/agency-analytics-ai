@@ -87,7 +87,8 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
         .eq('event_type', 'page_view')
         .gte('created_at', dateRange.from.toISOString())
         .lte('created_at', dateRange.to.toISOString())
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(5000); // Explicitly set high limit to avoid default Supabase 1000 row limit
 
       if (error) {
         console.error('Error fetching tracking events:', error);
