@@ -67,6 +67,7 @@ export const useCalendlyData = (projectId?: string) => {
           event_id: e.calendly_event_id,
           event_type_id: e.calendly_event_type_id,
           event_type_name: e.event_type_name,
+          status: e.status,
           is_included: isIncluded,
           active_ids: Array.from(activeIds)
         });
