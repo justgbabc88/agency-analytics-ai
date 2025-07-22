@@ -126,15 +126,28 @@ export const useCallStatsCalculations = (
       scheduled_at: e.scheduled_at
     })));
 
-    const completedCalls = eventsScheduledInRange.filter(event =>
-      (event.status !== 'cancelled' && event.status !== 'canceled') &&
-      new Date(event.scheduled_at) < new Date()
-    );
+    const completedCalls = eventsScheduledInRange.filter(event => {
+      const isNotCanceled = (event.status !== 'canceled' && event.status !== 'cancelled');
+      const isPastScheduled = new Date(event.scheduled_at) < new Date();
+      const shouldInclude = isNotCanceled && isPastScheduled;
+      
+      console.log('✅ Checking completed call:', {
+        id: event.calendly_event_id,
+        status: event.status,
+        scheduled_at: event.scheduled_at,
+        isNotCanceled,
+        isPastScheduled,
+        shouldInclude
+      });
+      
+      return shouldInclude;
+    });
 
-    const upcomingCalls = eventsScheduledInRange.filter(event =>
-      (event.status !== 'cancelled' && event.status !== 'canceled') &&
-      new Date(event.scheduled_at) >= new Date()
-    );
+    const upcomingCalls = eventsScheduledInRange.filter(event => {
+      const isNotCanceled = (event.status !== 'canceled' && event.status !== 'cancelled');
+      const isFutureScheduled = new Date(event.scheduled_at) >= new Date();
+      return isNotCanceled && isFutureScheduled;
+    });
 
     console.log('❌ Cancelled calls:', cancelledCalls.length);
     console.log('✅ Completed calls:', completedCalls.length);
