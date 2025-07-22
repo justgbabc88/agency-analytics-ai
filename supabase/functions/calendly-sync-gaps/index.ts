@@ -361,11 +361,8 @@ serve(async (req) => {
             const calendlyStatus = event.status || 'scheduled'
             const dbStatus = existingEvent?.status
             
-            // Skip update if both DB and Calendly show the event as canceled
-            if (existingEvent && dbStatus === 'canceled' && calendlyStatus === 'canceled') {
-              console.log('⏭️ Skipping canceled event (already canceled in DB):', event.uri)
-              continue
-            }
+            // Always process events regardless of status - removed skip logic for cancelled events
+            // This ensures cancelled events are properly included in the sync and UI data
             
             if (existingEvent) {
               console.log('🔄 Event exists, checking for status updates:', event.uri, 
