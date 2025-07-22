@@ -92,13 +92,39 @@ Deno.serve(async (req) => {
         }
       } else {
         console.error('❌ Failed to refresh token:', refreshResult.error);
-        return new Response(
-          JSON.stringify({ error: 'Authentication expired. Please reconnect your GHL account.' }),
-          { 
-            status: 401,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        );
+        
+        // Check if this is an invalid grant error (token expired/revoked)
+        if (refreshResult.error?.includes('invalid_grant') || refreshResult.error?.includes('invalid')) {
+          // Mark the integration as disconnected
+          await supabase
+            .from('project_integrations')
+            .update({ is_connected: false })
+            .eq('project_id', projectId)
+            .eq('platform', platform);
+            
+          return new Response(
+            JSON.stringify({ 
+              error: 'GHL connection expired. Please reconnect your GHL account.',
+              code: 'TOKEN_EXPIRED',
+              requiresReconnection: true
+            }),
+            { 
+              status: 401,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            }
+          );
+        } else {
+          return new Response(
+            JSON.stringify({ 
+              error: 'Authentication failed. Please try again or reconnect your GHL account.',
+              details: refreshResult.error
+            }),
+            { 
+              status: 401,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            }
+          );
+        }
       }
     }
 

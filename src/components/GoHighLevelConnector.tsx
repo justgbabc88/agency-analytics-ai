@@ -193,6 +193,19 @@ export const GoHighLevelConnector = ({
 
       if (error) throw error;
 
+      // Check if the response indicates token expiration
+      if (data?.code === 'TOKEN_EXPIRED' || data?.requiresReconnection) {
+        // Mark as disconnected locally
+        onConnectionChange(false);
+        
+        toast({
+          title: "Connection Expired",
+          description: "Your GHL connection has expired. Please reconnect your account.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       await loadForms();
       await loadSubmissions();
       await loadLastSync();
@@ -202,12 +215,29 @@ export const GoHighLevelConnector = ({
         description: data?.message || "Data synchronized successfully",
       });
 
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: `Failed to sync data: ${error.message || 'Unknown error'}`,
-        variant: "destructive",
-      });
+    } catch (error: any) {
+      console.error('Sync error:', error);
+      
+      // Check for specific token expiration errors
+      if (error.message?.includes('GHL connection expired') || 
+          error.message?.includes('TOKEN_EXPIRED') ||
+          error.message?.includes('invalid_grant')) {
+        
+        // Mark as disconnected
+        onConnectionChange(false);
+        
+        toast({
+          title: "Connection Expired",
+          description: "Your GHL connection has expired. Please reconnect your account to continue syncing forms.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Sync Error",
+          description: `Failed to sync data: ${error.message || 'Unknown error'}`,
+          variant: "destructive",
+        });
+      }
     } finally {
       setSyncing(false);
     }
