@@ -288,10 +288,14 @@ serve(async (req) => {
           const eventTypeUri = event.event_type
           const isMatched = activeEventTypeIds.has(eventTypeUri)
           
+          // Always include canceled/cancelled events regardless of event type mapping
+          const isCanceled = event.status === 'canceled' || event.status === 'cancelled'
+          const shouldInclude = isMatched || isCanceled
+          
           // Update date analysis
           const dateKey = new Date(event.start_time).toDateString()
           if (eventsByDate[dateKey]) {
-            if (isMatched) {
+            if (shouldInclude) {
               eventsByDate[dateKey].matched++
             } else {
               eventsByDate[dateKey].unmatched++
@@ -311,18 +315,21 @@ serve(async (req) => {
             console.log(`  - Created: ${event.created_at}`)
             console.log(`  - Updated: ${event.updated_at}`)
             console.log(`  - Matched: ${isMatched ? 'YES' : 'NO'}`)
-            if (!isMatched) {
+            console.log(`  - Is Canceled: ${isCanceled ? 'YES' : 'NO'}`)
+            console.log(`  - Should Include: ${shouldInclude ? 'YES' : 'NO'}`)
+            if (!isMatched && !isCanceled) {
               console.log(`  - Available mappings: ${Array.from(activeEventTypeIds).join(', ')}`)
             }
           }
           
-          if (!isMatched) {
+          if (!shouldInclude) {
             console.log(`🔍 Skipping event: ${event.name || 'unnamed'} - type: ${eventTypeUri}`)
           } else {
-            console.log(`✅ Including event: ${event.name || 'unnamed'} - type: ${eventTypeUri}`)
+            const reason = isCanceled ? '(canceled event)' : '(mapped event type)'
+            console.log(`✅ Including event: ${event.name || 'unnamed'} - type: ${eventTypeUri} ${reason}`)
           }
           
-          return isMatched
+          return shouldInclude
         })
         
         // Final date analysis summary
