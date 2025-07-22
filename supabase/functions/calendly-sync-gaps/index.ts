@@ -408,15 +408,13 @@ serve(async (req) => {
             const mapping = mappings.find(m => m.calendly_event_type_id === eventTypeUri)
             const eventTypeName = mapping?.event_type_name || event.event_type?.name || event.name || 'Unknown Event Type'
 
-            // Normalize the event status from Calendly
+            // Normalize the event status from Calendly - keep original status values
             let normalizedStatus = event.status || 'scheduled';
             
-            // Always normalize canceled/cancelled to 'cancelled' for consistency
-            if (normalizedStatus === 'canceled' || normalizedStatus === 'cancelled') {
-              normalizedStatus = 'cancelled';
-            }
+            // Keep original status as-is to maintain consistency with existing database values
+            // Most canceled events in DB use "canceled" (without 'l') so don't change it
             
-            console.log('📊 Event status normalization:', {
+            console.log('📊 Event status (keeping original):', {
               originalStatus: event.status,
               normalizedStatus: normalizedStatus,
               eventUri: event.uri
