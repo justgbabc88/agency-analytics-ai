@@ -110,6 +110,13 @@ export const useCallStatsCalculations = (
       return isCancelled;
     });
 
+    console.log('🚫 Total cancelled calls found:', cancelledCalls.length);
+    console.log('🚫 Cancelled calls details:', cancelledCalls.map(e => ({
+      id: e.calendly_event_id,
+      status: e.status,
+      scheduled_at: e.scheduled_at
+    })));
+
     const completedCalls = eventsScheduledInRange.filter(event =>
       (event.status !== 'cancelled' && event.status !== 'canceled') &&
       new Date(event.scheduled_at) < new Date()
