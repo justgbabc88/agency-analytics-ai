@@ -74,11 +74,100 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
     fetchPixelConfig();
   }, [projectId]);
 
-  // Fetch tracking events for page views
-  const fetchTrackingEvents = async () => {
+  // Trigger daily aggregation for current and historical data
+  const triggerDailyAggregation = async () => {
+    if (!projectId) return;
+    
+    try {
+      // Aggregate data for the current date range
+      const startDate = dateRange.from.toISOString().split('T')[0];
+      const endDate = dateRange.to.toISOString().split('T')[0];
+      
+      console.log('📊 Triggering daily aggregation for date range:', startDate, 'to', endDate);
+      
+      // Generate dates array for the range
+      const dates = [];
+      const currentDate = new Date(startDate);
+      const finalDate = new Date(endDate);
+      
+      while (currentDate <= finalDate) {
+        dates.push(currentDate.toISOString().split('T')[0]);
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+      
+      // Trigger aggregation for each date
+      for (const date of dates) {
+        await supabase.functions.invoke('daily-aggregation', {
+          body: { project_id: projectId, date }
+        });
+      }
+      
+      console.log('📊 Daily aggregation completed for all dates');
+    } catch (error) {
+      console.error('Error triggering daily aggregation:', error);
+    }
+  };
+
+  // Fetch aggregated metrics instead of raw tracking events
+  const fetchAggregatedMetrics = async () => {
     if (!projectId) return;
     
     setTrackingEventsLoading(true);
+    try {
+      const startDate = dateRange.from.toISOString().split('T')[0];
+      const endDate = dateRange.to.toISOString().split('T')[0];
+      
+      // First, trigger aggregation to ensure data is up to date
+      await triggerDailyAggregation();
+      
+      // Then fetch the aggregated data
+      const { data, error } = await supabase.rpc('get_project_daily_metrics', {
+        p_project_id: projectId,
+        p_start_date: startDate,
+        p_end_date: endDate
+      });
+
+      if (error) {
+        console.error('Error fetching aggregated metrics:', error);
+        // Fallback to raw events if aggregation fails
+        await fetchRawTrackingEvents();
+        return;
+      }
+
+      console.log('📊 Fetched aggregated metrics:', data?.length || 0);
+      
+      // Convert aggregated data back to event-like format for compatibility
+      const eventLikeData = data?.flatMap((metric: any) => {
+        // Create individual event entries for each page view to maintain compatibility
+        return Array.from({ length: metric.total_page_views }, (_, index) => ({
+          id: `${metric.date}-${metric.landing_page_name}-${index}`,
+          project_id: projectId,
+          event_type: 'page_view',
+          event_name: metric.landing_page_name,
+          page_url: metric.landing_page_url,
+          session_id: `session_${metric.date}_${metric.landing_page_name}_${index}`,
+          created_at: `${metric.date}T12:00:00.000Z`, // Use midday for aggregated data
+          // Include unique visitors info in metadata
+          _aggregated: true,
+          _date: metric.date,
+          _unique_visitors: metric.unique_visitors
+        }));
+      }) || [];
+      
+      setTrackingEvents(eventLikeData);
+    } catch (error) {
+      console.error('Error fetching aggregated metrics:', error);
+      // Fallback to raw events
+      await fetchRawTrackingEvents();
+    } finally {
+      setTrackingEventsLoading(false);
+    }
+  };
+
+  // Fallback method for raw events (when aggregation fails)
+  const fetchRawTrackingEvents = async () => {
+    if (!projectId) return;
+    
     try {
       const { data, error } = await supabase
         .from('tracking_events')
@@ -88,25 +177,23 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
         .gte('created_at', dateRange.from.toISOString())
         .lte('created_at', dateRange.to.toISOString())
         .order('created_at', { ascending: false })
-        .limit(5000); // Explicitly set high limit to avoid default Supabase 1000 row limit
+        .limit(10000); // Increased limit for better coverage
 
       if (error) {
-        console.error('Error fetching tracking events:', error);
+        console.error('Error fetching raw tracking events:', error);
         return;
       }
 
-      console.log('📊 Fetched tracking events:', data?.length || 0);
+      console.log('📊 Fetched raw tracking events (fallback):', data?.length || 0);
       setTrackingEvents(data || []);
     } catch (error) {
-      console.error('Error fetching tracking events:', error);
-    } finally {
-      setTrackingEventsLoading(false);
+      console.error('Error fetching raw tracking events:', error);
     }
   };
 
   // Fetch tracking events when component mounts or dependencies change
   useEffect(() => {
-    fetchTrackingEvents();
+    fetchAggregatedMetrics();
   }, [projectId, dateRange.from, dateRange.to]);
 
   // Real-time listener for new tracking events
@@ -137,7 +224,7 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
           }
           
           // Refresh tracking events data
-          fetchTrackingEvents();
+          fetchAggregatedMetrics();
         }
       )
       .subscribe();
