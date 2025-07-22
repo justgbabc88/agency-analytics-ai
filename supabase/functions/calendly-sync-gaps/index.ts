@@ -361,8 +361,8 @@ serve(async (req) => {
             const calendlyStatus = event.status || 'scheduled'
             const dbStatus = existingEvent?.status
             
-            // Always process events regardless of status - removed skip logic for cancelled events
-            // This ensures cancelled events are properly included in the sync and UI data
+            // Always process events regardless of status - including "canceled", "cancelled", and all other statuses
+            // This ensures ALL cancelled events (regardless of spelling) are properly included in the sync and UI data
             
             if (existingEvent) {
               console.log('🔄 Event exists, checking for status updates:', event.uri, 
