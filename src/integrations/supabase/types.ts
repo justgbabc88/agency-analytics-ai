@@ -82,6 +82,99 @@ export type Database = {
           },
         ]
       }
+      alert_configurations: {
+        Row: {
+          alert_type: string
+          cooldown_minutes: number | null
+          created_at: string
+          id: string
+          is_enabled: boolean
+          notification_channels: Json | null
+          platform: string
+          project_id: string
+          threshold_operator: string
+          threshold_value: number
+          updated_at: string
+        }
+        Insert: {
+          alert_type: string
+          cooldown_minutes?: number | null
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          notification_channels?: Json | null
+          platform: string
+          project_id: string
+          threshold_operator?: string
+          threshold_value: number
+          updated_at?: string
+        }
+        Update: {
+          alert_type?: string
+          cooldown_minutes?: number | null
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          notification_channels?: Json | null
+          platform?: string
+          project_id?: string
+          threshold_operator?: string
+          threshold_value?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      alert_incidents: {
+        Row: {
+          alert_config_id: string
+          created_at: string
+          description: string
+          id: string
+          incident_type: string
+          metadata: Json | null
+          platform: string
+          project_id: string
+          resolved_at: string | null
+          severity: string
+          status: string
+          title: string
+          triggered_at: string
+          updated_at: string
+        }
+        Insert: {
+          alert_config_id: string
+          created_at?: string
+          description: string
+          id?: string
+          incident_type: string
+          metadata?: Json | null
+          platform: string
+          project_id: string
+          resolved_at?: string | null
+          severity?: string
+          status?: string
+          title: string
+          triggered_at?: string
+          updated_at?: string
+        }
+        Update: {
+          alert_config_id?: string
+          created_at?: string
+          description?: string
+          id?: string
+          incident_type?: string
+          metadata?: Json | null
+          platform?: string
+          project_id?: string
+          resolved_at?: string | null
+          severity?: string
+          status?: string
+          title?: string
+          triggered_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       attribution_data: {
         Row: {
           attributed_revenue: number
@@ -675,41 +768,53 @@ export type Database = {
         Row: {
           consecutive_sync_failures: number | null
           created_at: string
+          data_quality_score: number | null
           id: string
           is_connected: boolean
+          last_health_check: string | null
           last_sync: string | null
           last_sync_duration_ms: number | null
           platform: string
           project_id: string
           sync_health_score: number | null
+          sync_preferences: Json | null
           total_events_synced: number | null
           updated_at: string
+          user_timezone: string | null
         }
         Insert: {
           consecutive_sync_failures?: number | null
           created_at?: string
+          data_quality_score?: number | null
           id?: string
           is_connected?: boolean
+          last_health_check?: string | null
           last_sync?: string | null
           last_sync_duration_ms?: number | null
           platform: string
           project_id: string
           sync_health_score?: number | null
+          sync_preferences?: Json | null
           total_events_synced?: number | null
           updated_at?: string
+          user_timezone?: string | null
         }
         Update: {
           consecutive_sync_failures?: number | null
           created_at?: string
+          data_quality_score?: number | null
           id?: string
           is_connected?: boolean
+          last_health_check?: string | null
           last_sync?: string | null
           last_sync_duration_ms?: number | null
           platform?: string
           project_id?: string
           sync_health_score?: number | null
+          sync_preferences?: Json | null
           total_events_synced?: number | null
           updated_at?: string
+          user_timezone?: string | null
         }
         Relationships: [
           {
@@ -769,6 +874,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      sync_health_metrics: {
+        Row: {
+          created_at: string
+          id: string
+          metadata: Json | null
+          metric_type: string
+          metric_value: number
+          platform: string
+          project_id: string
+          timestamp: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          metric_type: string
+          metric_value: number
+          platform: string
+          project_id: string
+          timestamp?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          metric_type?: string
+          metric_value?: number
+          platform?: string
+          project_id?: string
+          timestamp?: string
+        }
+        Relationships: []
       }
       tracking_events: {
         Row: {
@@ -1029,6 +1167,15 @@ export type Database = {
         Args: { p_project_id: string; target_date?: string }
         Returns: undefined
       }
+      check_alert_thresholds: {
+        Args: {
+          p_project_id: string
+          p_platform: string
+          p_metric_type: string
+          p_metric_value: number
+        }
+        Returns: undefined
+      }
       get_project_daily_metrics: {
         Args: { p_project_id: string; p_start_date: string; p_end_date: string }
         Returns: {
@@ -1055,6 +1202,16 @@ export type Database = {
           p_error_message?: string
           p_sync_range_start?: string
           p_sync_range_end?: string
+        }
+        Returns: string
+      }
+      record_sync_metric: {
+        Args: {
+          p_project_id: string
+          p_platform: string
+          p_metric_type: string
+          p_metric_value: number
+          p_metadata?: Json
         }
         Returns: string
       }
