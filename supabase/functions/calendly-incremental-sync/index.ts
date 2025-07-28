@@ -62,6 +62,12 @@ Deno.serve(async (req) => {
     for (const integration of integrations) {
       try {
         console.log(`🔄 Processing project: ${integration.project_id}`);
+        
+        // Add rate limiting delay between projects (2 seconds minimum)
+        if (integration !== integrations[0]) {
+          console.log('⏱️ Adding 2 second delay between projects for rate limiting...');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
 
         // Determine sync strategy based on last_sync timestamp
         let syncStartDate: Date;

@@ -6,9 +6,32 @@ import { toast } from "sonner";
 
 export const ManualSyncButton = () => {
   const [isLoading, setIsLoading] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<number>(0);
+
+  // Prevent rapid sync requests (minimum 30 seconds between syncs)
+  const canSync = () => {
+    const now = Date.now();
+    const timeSinceLastSync = now - lastSyncTime;
+    const minInterval = 30000; // 30 seconds
+    return timeSinceLastSync > minInterval;
+  };
+
+  const getRemainingCooldown = () => {
+    const now = Date.now();
+    const timeSinceLastSync = now - lastSyncTime;
+    const minInterval = 30000;
+    const remaining = Math.max(0, minInterval - timeSinceLastSync);
+    return Math.ceil(remaining / 1000);
+  };
 
   const handleManualSync = async () => {
+    if (!canSync()) {
+      toast.error(`Please wait ${getRemainingCooldown()} seconds before syncing again`);
+      return;
+    }
+
     setIsLoading(true);
+    setLastSyncTime(Date.now());
     try {
       console.log('🔧 Starting smart manual sync...');
       
@@ -70,7 +93,13 @@ export const ManualSyncButton = () => {
   };
 
   const handleDeepSync = async () => {
+    if (!canSync()) {
+      toast.error(`Please wait ${getRemainingCooldown()} seconds before syncing again`);
+      return;
+    }
+
     setIsLoading(true);
+    setLastSyncTime(Date.now());
     try {
       console.log('🗄️ Starting deep sync (90 days)...');
       toast.info('Deep sync started - this may take several minutes');
@@ -118,23 +147,25 @@ export const ManualSyncButton = () => {
     <div className="flex gap-2">
       <Button 
         onClick={handleManualSync}
-        disabled={isLoading}
+        disabled={isLoading || !canSync()}
         variant="outline"
         size="sm"
         className="flex items-center gap-2"
+        title={!canSync() ? `Wait ${getRemainingCooldown()} seconds` : 'Start smart sync'}
       >
         <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-        {isLoading ? 'Syncing...' : 'Smart Sync'}
+        {isLoading ? 'Syncing...' : !canSync() ? `Wait ${getRemainingCooldown()}s` : 'Smart Sync'}
       </Button>
       <Button 
         onClick={handleDeepSync}
-        disabled={isLoading}
+        disabled={isLoading || !canSync()}
         variant="outline"
         size="sm"
         className="flex items-center gap-2"
+        title={!canSync() ? `Wait ${getRemainingCooldown()} seconds` : 'Start deep sync'}
       >
         <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-        {isLoading ? 'Deep Syncing...' : 'Deep Sync'}
+        {isLoading ? 'Deep Syncing...' : !canSync() ? `Wait ${getRemainingCooldown()}s` : 'Deep Sync'}
       </Button>
       <Button 
         onClick={async () => {

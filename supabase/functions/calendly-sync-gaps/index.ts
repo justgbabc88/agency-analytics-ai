@@ -251,6 +251,7 @@ serve(async (req) => {
                 
                 console.log(`⏰ Rate limited for ${status} events. Waiting ${waitTime/1000} seconds`);
                 
+                // Add exponential backoff for rate limiting
                 await new Promise(resolve => setTimeout(resolve, waitTime));
                 consecutiveErrors++;
                 
@@ -265,6 +266,9 @@ serve(async (req) => {
               
               console.error(`❌ Calendly API error (${status}): ${eventsResponse.status} ${errorText}`);
               consecutiveErrors++;
+              
+              // Add delay even for non-rate-limit errors to be more conservative
+              await new Promise(resolve => setTimeout(resolve, 2000));
               
               if (consecutiveErrors >= maxConsecutiveErrors) {
                 console.error(`❌ Too many consecutive errors for ${status}, stopping pagination`);
@@ -333,6 +337,12 @@ serve(async (req) => {
       // Fetch events for each status to ensure comprehensive coverage
       for (const status of eventStatuses) {
         try {
+          console.log(`🔄 Processing status: ${status}`);
+          // Add delay between different status fetches to respect rate limits
+          if (status !== eventStatuses[0]) {
+            console.log('⏱️ Adding 2 second delay between status fetches...');
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
           console.log(`\n=== FETCHING ${status.toUpperCase()} EVENTS ===`);
           await fetchEventsByStatus(allEvents, organizationUri, syncFrom, syncTo, tokenData.access_token, status);
           
