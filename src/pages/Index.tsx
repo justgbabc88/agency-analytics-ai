@@ -430,7 +430,6 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-6">
-            <FacebookSyncDebug />
             <ProjectIntegrationsPanel 
               projectId={selectedProjectId} 
               selectedFormIds={selectedFormIds}
