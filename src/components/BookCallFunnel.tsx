@@ -361,19 +361,19 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
     console.log('🔄 Recalculating chart data due to dependency change');
     console.log('🔄 Date range key:', dateRangeKey);
     console.log('🔄 Events available:', filteredEvents.length);
+    console.log('🔄 All Calendly events available:', calendlyEvents.length);
     console.log('🔄 Tracking events available:', trackingEvents.length);
     console.log('🔄 Using timezone:', userTimezone);
     console.log('🔄 Profile loaded:', !!profile);
     
-    if (filteredEvents.length === 0) {
-      console.log('⚠️ No events available for chart generation');
-      return [];
-    }
+    // Always generate chart data - use all calendly events if filtered events is empty
+    const eventsToUse = filteredEvents.length > 0 ? filteredEvents : calendlyEvents;
+    console.log('🔄 Using events for chart:', eventsToUse.length);
     
-    const data = generateCallDataFromEvents(filteredEvents, dateRange, userTimezone, trackingEvents);
+    const data = generateCallDataFromEvents(eventsToUse, dateRange, userTimezone, trackingEvents);
     console.log('🎯 Generated chart data:', data);
     return data;
-  }, [filteredEvents, dateRangeKey, userTimezone, trackingEvents]);
+  }, [filteredEvents, calendlyEvents, dateRangeKey, userTimezone, trackingEvents]);
 
   
   // Calculate stats using the same exact logic as CallsList for consistency
