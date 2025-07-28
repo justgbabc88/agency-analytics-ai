@@ -81,9 +81,13 @@ serve(async (req) => {
           existingMap.set(key, insight)
         })
         
-        // Convert back to array and sort by date
+        // Convert back to array and sort by date, then by campaign_id for consistency
         const mergedDailyInsights = Array.from(existingMap.values())
-          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+          .sort((a, b) => {
+            const dateCompare = new Date(a.date).getTime() - new Date(b.date).getTime()
+            if (dateCompare !== 0) return dateCompare
+            return a.campaign_id.localeCompare(b.campaign_id)
+          })
         
         // Keep only last 30 days of data
         const thirtyDaysAgo = new Date()
@@ -95,13 +99,20 @@ serve(async (req) => {
         
         console.log(`Merged data: ${existingDailyInsights.length} existing + ${newDailyInsights.length} new = ${filteredInsights.length} total insights`)
         
-        // Update the final data with merged insights
+        // Update the final data with merged insights - prioritize new data over old
         finalData = {
-          ...existingRecord.data,
-          ...syncResult,
+          ...syncResult, // Start with new sync data
           daily_insights: filteredInsights,
+          // Preserve specific fields from existing data that might not be in the new sync
+          adsets: existingRecord.data.adsets || syncResult.adsets || [],
           last_updated: new Date().toISOString(),
           synced_at: new Date().toISOString()
+        }
+        
+        // Ensure ad sets are preserved if they exist in either dataset
+        if (existingRecord.data.adsets && existingRecord.data.adsets.length > 0 && 
+            (!syncResult.adsets || syncResult.adsets.length === 0)) {
+          finalData.adsets = existingRecord.data.adsets
         }
       }
     }
