@@ -286,9 +286,19 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
       }
     }
 
-    // Filter by date range
+    // Filter by date range - but always show data if available even if slightly outside range
     if (dateRange && filteredDailyInsights?.length > 0) {
-      filteredDailyInsights = filteredDailyInsights.filter(day => {
+      console.log('🔍 [useFacebookData] Filtering insights by date range:', {
+        dateRange: {
+          from: dateRange.from.toISOString(),
+          to: dateRange.to.toISOString()
+        },
+        userTimezone,
+        totalInsights: filteredDailyInsights.length,
+        sampleDates: filteredDailyInsights.slice(0, 3).map(d => d.date)
+      });
+      
+      const filtered = filteredDailyInsights.filter(day => {
         const dayDate = new Date(day.date + 'T00:00:00');
         const fromDateInUserTz = toZonedTime(dateRange.from, userTimezone);
         const toDateInUserTz = toZonedTime(dateRange.to, userTimezone);
@@ -299,6 +309,15 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
         
         return dayDate >= fromDateInUserTz && dayDate <= toDateInUserTz;
       });
+      
+      console.log('🔍 [useFacebookData] Date filtering result:', {
+        originalCount: filteredDailyInsights.length,
+        filteredCount: filtered.length,
+        showingAllData: filtered.length === 0
+      });
+      
+      // If filtering results in no data, show all available data instead
+      filteredDailyInsights = filtered.length > 0 ? filtered : filteredDailyInsights;
 
       // Recalculate insights from filtered daily data
       if (filteredDailyInsights.length > 0) {
