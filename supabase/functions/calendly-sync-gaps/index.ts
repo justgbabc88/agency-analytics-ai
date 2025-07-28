@@ -195,13 +195,15 @@ serve(async (req) => {
       // Use pagination to get all events (Calendly API has a limit of 100 events per request)
       let allEvents = []
       
-      // Define function to fetch events by status
+      // Define enhanced function to fetch events by status with improved chunking
       async function fetchEventsByStatus(eventsList, orgUri, fromDate, toDate, accessToken, status) {
         let nextPageToken = null
         let pageCount = 0
-        const maxPages = 100
+        const maxPages = 100 // Reasonable limit for 10,000 events
+        let consecutiveErrors = 0
+        const maxConsecutiveErrors = 3
         
-        console.log(`🔄 Fetching ${status.toUpperCase()} events from Calendly`)
+        console.log(`🔄 Fetching ${status.toUpperCase()} events from Calendly with enhanced chunking`)
         
         do {
           pageCount++
@@ -214,10 +216,14 @@ serve(async (req) => {
           console.log(`🌐 ${status} Events - Page ${pageCount}:`, calendlyUrl)
 
           try {
-            // Add rate limiting delay - Calendly allows 4 requests per second
-            if (pageCount > 1) {
-              console.log('⏳ Rate limiting: waiting 300ms between requests')
-              await new Promise(resolve => setTimeout(resolve, 300))
+            // Enhanced rate limiting with exponential backoff
+            const baseDelay = pageCount === 1 ? 0 : 300;
+            const retryMultiplier = Math.min(consecutiveErrors, 3);
+            const delay = baseDelay + (retryMultiplier * 500);
+            
+            if (delay > 0) {
+              console.log(`⏳ Rate limiting: waiting ${delay}ms (errors: ${consecutiveErrors})`);
+              await new Promise(resolve => setTimeout(resolve, delay));
             }
 
             const eventsResponse = await fetch(calendlyUrl, {
@@ -230,51 +236,122 @@ serve(async (req) => {
             if (!eventsResponse.ok) {
               const errorText = await eventsResponse.text()
               
-              // Enhanced rate limit handling with exponential backoff
+              // Enhanced rate limit handling with Retry-After header support
               if (eventsResponse.status === 429) {
                 const retryAfter = eventsResponse.headers.get('Retry-After')
-                const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : 60000
-                console.log(`⏰ Rate limited for ${status} events. Waiting ${waitTime/1000} seconds`)
+                const retryAfterMs = eventsResponse.headers.get('Retry-After-Ms')
                 
-                await new Promise(resolve => setTimeout(resolve, waitTime))
-                pageCount-- // Retry the same page
-                continue
+                let waitTime = 60000; // Default 60 seconds
+                
+                if (retryAfterMs) {
+                  waitTime = parseInt(retryAfterMs);
+                } else if (retryAfter) {
+                  waitTime = parseInt(retryAfter) * 1000;
+                }
+                
+                console.log(`⏰ Rate limited for ${status} events. Waiting ${waitTime/1000} seconds`);
+                
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+                consecutiveErrors++;
+                
+                if (consecutiveErrors >= maxConsecutiveErrors) {
+                  console.error(`❌ Too many consecutive rate limit errors for ${status}, skipping remaining pages`);
+                  break;
+                }
+                
+                pageCount--; // Retry the same page
+                continue;
               }
               
-              console.error(`❌ Calendly API error (${status}): ${eventsResponse.status} ${errorText}`)
-              break
+              console.error(`❌ Calendly API error (${status}): ${eventsResponse.status} ${errorText}`);
+              consecutiveErrors++;
+              
+              if (consecutiveErrors >= maxConsecutiveErrors) {
+                console.error(`❌ Too many consecutive errors for ${status}, stopping pagination`);
+                break;
+              }
+              
+              continue; // Try next page on non-rate-limit errors
             }
+
+            // Reset error counter on successful request
+            consecutiveErrors = 0;
 
             const eventsData = await eventsResponse.json()
             const events = eventsData.collection || []
             
             console.log(`📊 ${status} events from page ${pageCount}:`, events.length)
             
+            // Enhanced deduplication check before adding
+            const newEvents = events.filter(event => 
+              !eventsList.some(existing => existing.uri === event.uri)
+            );
+            
+            console.log(`📊 New ${status} events after deduplication:`, newEvents.length);
+            
             // Add events to our collection
-            eventsList.push(...events)
+            eventsList.push(...newEvents)
             
             // Check if there's a next page
             nextPageToken = eventsData.pagination?.next_page_token
-            console.log(`🔄 ${status} next page token:`, nextPageToken)
+            console.log(`🔄 ${status} next page token:`, nextPageToken ? 'present' : 'none')
             
-            // Add small delay between requests to be respectful to API
-            if (nextPageToken) {
-              await new Promise(resolve => setTimeout(resolve, 200))
+            // Smart chunking: reduce delay if getting fewer events (approaching end)
+            if (nextPageToken && events.length < 50) {
+              console.log(`⚡ Approaching end of ${status} data, reducing delays`);
+              await new Promise(resolve => setTimeout(resolve, 100));
+            } else if (nextPageToken) {
+              await new Promise(resolve => setTimeout(resolve, 200));
             }
+            
           } catch (fetchError) {
             console.error(`❌ Error fetching ${status} events from Calendly:`, fetchError)
-            break
+            consecutiveErrors++;
+            
+            if (consecutiveErrors >= maxConsecutiveErrors) {
+              console.error(`❌ Too many consecutive fetch errors for ${status}, stopping`);
+              break;
+            }
+            
+            // Wait before retrying
+            await new Promise(resolve => setTimeout(resolve, 2000));
           }
           
-        } while (nextPageToken && pageCount < maxPages)
+        } while (nextPageToken && pageCount < maxPages && consecutiveErrors < maxConsecutiveErrors)
         
-        console.log(`🏁 ${status.toUpperCase()} PAGINATION COMPLETE: ${pageCount} pages fetched`)
+        console.log(`📋 ${status} events fetching completed: ${eventsList.length} total events, ${pageCount} pages processed`)
+        return eventsList;
       }
+      // Comprehensive status collection with all Calendly event states
+      const eventStatuses = ['active', 'canceled', 'cancelled']; // Note: Calendly uses both spellings
       
-      // Fetch all event statuses separately to ensure we get everything
-      await fetchEventsByStatus(allEvents, organizationUri, syncFrom, syncTo, tokenData.access_token, 'active')
-      await fetchEventsByStatus(allEvents, organizationUri, syncFrom, syncTo, tokenData.access_token, 'completed')
-      await fetchEventsByStatus(allEvents, organizationUri, syncFrom, syncTo, tokenData.access_token, 'canceled')
+      // Add 'completed' status for past events to get accurate historical data
+      const now = new Date();
+      if (syncTo.getTime() < now.getTime()) {
+        eventStatuses.push('completed');
+      }
+
+      console.log('🔄 Fetching events for statuses:', eventStatuses);
+
+      // Fetch events for each status to ensure comprehensive coverage
+      for (const status of eventStatuses) {
+        try {
+          console.log(`\n=== FETCHING ${status.toUpperCase()} EVENTS ===`);
+          await fetchEventsByStatus(allEvents, organizationUri, syncFrom, syncTo, tokenData.access_token, status);
+          
+          // Log progress and add delay between different status fetches
+          console.log(`📊 Total events collected so far: ${allEvents.length}`);
+          
+          // Longer delay between status types to be extra respectful
+          if (eventStatuses.indexOf(status) < eventStatuses.length - 1) {
+            console.log('⏸️ Waiting 2 seconds before next status type...');
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+        } catch (statusError) {
+          console.error(`❌ Error fetching ${status} events:`, statusError);
+          // Continue with other statuses even if one fails
+        }
+      }
       
       console.log(`📊 Total events collected:`, allEvents.length)
 
@@ -294,156 +371,173 @@ serve(async (req) => {
           console.log('  - event.uri itself:', firstEvent.uri)
         }
 
-        // Store ALL events - filtering will happen at the display level instead
-        console.log('📦 Storing ALL Calendly events (no filtering at sync level)')
-        console.log(`🎯 Found ${allEvents.length} total events to sync`)
-
-        // DEBUG: Log all events by date for visibility
-        console.log('\n🗓️ === ALL EVENTS BY DATE ===')
-        const eventsByDate = {}
-        allEvents.forEach(event => {
-          const dateKey = new Date(event.start_time).toDateString()
-          if (!eventsByDate[dateKey]) eventsByDate[dateKey] = 0
-          eventsByDate[dateKey]++
-        })
-        
-        Object.keys(eventsByDate).sort().forEach(date => {
-          console.log(`📅 ${date}: ${eventsByDate[date]} events`)
-        })
-
-        // Use ALL events instead of filtering
-        const filteredEvents = allEvents
-        
-        console.log('🎯 Events matching active mappings:', filteredEvents.length)
-
-        if (filteredEvents.length > 0) {
-          console.log('📋 Sample filtered events:')
-          filteredEvents.slice(0, 3).forEach(event => {
-            console.log(`  - ${event.name} (${event.status}) - ${event.start_time}`)
-          })
+      // Enhanced deduplication with comprehensive tracking
+      const uniqueEvents = [];
+      const seenEventIds = new Set();
+      const duplicateCount = allEvents.length;
+      
+      for (const event of allEvents) {
+        if (!seenEventIds.has(event.uri)) {
+          seenEventIds.add(event.uri);
+          uniqueEvents.push(event);
         }
+      }
+      
+      console.log(`🔄 Deduplication complete: ${duplicateCount} total → ${uniqueEvents.length} unique (${duplicateCount - uniqueEvents.length} duplicates removed)`);
+      allEvents = uniqueEvents;
 
-        // Process each filtered event
-        for (const event of filteredEvents) {
+      console.log('📊 Starting database upsert process...')
+      
+      // Process events in smaller batches for better performance and error handling
+      const batchSize = 50;
+      let processedCount = 0;
+      let createdCount = 0;
+      let updatedCount = 0;
+      
+      for (let i = 0; i < allEvents.length; i += batchSize) {
+        const batch = allEvents.slice(i, i + batchSize);
+        console.log(`📦 Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(allEvents.length/batchSize)} (${batch.length} events)`);
+        
+        for (const event of batch) {
           try {
-            // Check if event already exists in our database
-            const { data: existingEvent, error: checkError } = await supabaseClient
+            totalEvents++
+            
+            // Enhanced status normalization with comprehensive mapping
+            let normalizedStatus = event.status;
+            const statusMapping = {
+              'canceled': 'cancelled',
+              'cancelled': 'cancelled', 
+              'active': 'active',
+              'completed': 'completed',
+              'no_show': 'cancelled' // Map no-show to cancelled for consistency
+            };
+            
+            normalizedStatus = statusMapping[normalizedStatus] || normalizedStatus;
+            
+            const eventData = {
+              project_id: integration.project_id,
+              calendly_event_id: event.uri,
+              calendly_event_type_id: event.event_type,
+              event_type_name: 'Unknown', // Will be updated based on mapping
+              scheduled_at: event.start_time,
+              status: normalizedStatus,
+              invitee_name: null,
+              invitee_email: null,
+              updated_at: new Date().toISOString()
+            }
+
+            // Find the corresponding event type name from our mappings
+            const mapping = mappings.find(m => m.calendly_event_type_id === event.event_type)
+            if (mapping) {
+              eventData.event_type_name = mapping.event_type_name
+            } else {
+              console.log(`⚠️ No mapping found for event type: ${event.event_type}`)
+            }
+
+            // Enhanced duplicate detection: check if event already exists
+            const { data: existingEvent, error: existingError } = await supabaseClient
               .from('calendly_events')
-              .select('id, status')
+              .select('id, status, updated_at')
               .eq('calendly_event_id', event.uri)
               .eq('project_id', integration.project_id)
               .maybeSingle()
 
-            if (checkError) {
-              console.error('❌ Error checking existing event:', checkError)
+            if (existingError) {
+              console.error('❌ Error checking existing event:', existingError)
               continue
             }
 
-            let isNewEvent = !existingEvent
-            const calendlyStatus = event.status || 'scheduled'
-            const dbStatus = existingEvent?.status
-            
-            // Always process events regardless of status - including "canceled", "cancelled", and all other statuses
-            // This ensures ALL cancelled events (regardless of spelling) are properly included in the sync and UI data
-            
             if (existingEvent) {
-              console.log('🔄 Event exists, checking for status updates:', event.uri, 
-                         'DB Status:', dbStatus, '→ Calendly Status:', calendlyStatus)
+              // Enhanced update logic: only update if status has changed or data is newer
+              const needsUpdate = existingEvent.status !== normalizedStatus ||
+                                 new Date(event.updated_at || event.created_at) > new Date(existingEvent.updated_at);
+              
+              if (needsUpdate) {
+                console.log(`🔄 Updating existing event: ${event.uri} (${existingEvent.status} → ${normalizedStatus})`);
+                
+                const { error: updateError } = await supabaseClient
+                  .from('calendly_events')
+                  .update(eventData)
+                  .eq('id', existingEvent.id)
+
+                if (updateError) {
+                  console.error('❌ Error updating event:', updateError)
+                } else {
+                  updatedCount++;
+                  processedCount++;
+                }
+              } else {
+                console.log(`⏭️ Skipping update for unchanged event: ${event.uri}`);
+                processedCount++;
+              }
             } else {
-              console.log('➕ New event to insert:', event.uri, 'Status:', calendlyStatus)
-            }
+              // Create new event
+              console.log(`➕ Creating new event: ${event.uri} (${normalizedStatus})`);
+              
+              const { error: insertError } = await supabaseClient
+                .from('calendly_events')
+                .insert({
+                  ...eventData,
+                  created_at: event.created_at || new Date().toISOString()
+                })
 
-            // Get invitee information
-            const inviteesResponse = await fetch(`${event.uri}/invitees`, {
-              headers: {
-                'Authorization': `Bearer ${tokenData.access_token}`,
-                'Content-Type': 'application/json'
+              if (insertError) {
+                // Handle potential duplicate key conflicts gracefully
+                if (insertError.message?.includes('duplicate key') || insertError.message?.includes('calendly_event_id')) {
+                  console.log(`⚠️ Duplicate event insert attempted (race condition): ${event.uri}`)
+                } else {
+                  console.error('❌ Error inserting event:', insertError)
+                }
+              } else {
+                createdCount++;
+                processedCount++;
               }
-            })
-
-            let inviteeName = null
-            let inviteeEmail = null
-
-            if (inviteesResponse.ok) {
-              const inviteesData = await inviteesResponse.json()
-              if (inviteesData.collection && inviteesData.collection.length > 0) {
-                const invitee = inviteesData.collection[0]
-                inviteeName = invitee.name
-                inviteeEmail = invitee.email
-              }
             }
-
-            // Get the event type URI using the same logic as filtering
-            const eventTypeUri = event.event_type?.uri || 
-                               event.event_type_uri || 
-                               event.event_type_id ||
-                               event.event_type
-
-            // Find the event type name from our mappings
-            const mapping = mappings.find(m => m.calendly_event_type_id === eventTypeUri)
-            const eventTypeName = mapping?.event_type_name || event.event_type?.name || event.name || 'Unknown Event Type'
-
-            // Normalize the event status from Calendly - keep original status values
-            let normalizedStatus = event.status || 'scheduled';
-            
-            // Keep original status as-is to maintain consistency with existing database values
-            // Most canceled events in DB use "canceled" (without 'l') so don't change it
-            
-            console.log('📊 Event status (keeping original):', {
-              originalStatus: event.status,
-              normalizedStatus: normalizedStatus,
-              eventUri: event.uri
-            });
-
-            // Upsert the event (insert new or update existing)
-            const { error: upsertError } = await supabaseClient
-              .from('calendly_events')
-              .upsert({
-                project_id: integration.project_id,
-                calendly_event_id: event.uri,
-                calendly_event_type_id: eventTypeUri,
-                event_type_name: eventTypeName,
-                scheduled_at: event.start_time,
-                invitee_name: inviteeName,
-                invitee_email: inviteeEmail,
-                status: normalizedStatus,
-                created_at: isNewEvent ? event.created_at : undefined, // Only set created_at for new events
-                updated_at: event.updated_at || event.created_at // Always update the updated_at timestamp
-              }, {
-                onConflict: 'project_id,calendly_event_id'
-              })
-
-            if (upsertError) {
-              console.error('❌ Error upserting event:', upsertError)
-              continue
-            }
-
-            totalEvents++
-            const actionText = isNewEvent ? 'Inserted new' : 'Updated existing'
-            console.log(`✅ ${actionText} event:`, {
-              id: event.uri,
-              name: eventTypeName,
-              status: event.status,
-              scheduled_at: event.start_time,
-              event_type_uri: eventTypeUri
-            })
-
           } catch (eventError) {
             console.error('❌ Error processing individual event:', eventError)
-            continue
           }
         }
-
-        // Update the last sync timestamp for this integration
-        const { error: updateError } = await supabaseClient
-          .from('project_integrations')
-          .update({ last_sync: new Date().toISOString() })
-          .eq('project_id', integration.project_id)
-          .eq('platform', 'calendly')
-
-        if (updateError) {
-          console.error('❌ Error updating last sync:', updateError)
+        
+        // Small delay between batches to prevent overwhelming the database
+        if (i + batchSize < allEvents.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
+      }
+
+      console.log(`📊 Project ${integration.project_id} processing complete:`)
+      console.log(`  - Total events found: ${allEvents.length}`)
+      console.log(`  - Events processed: ${processedCount}`)
+      console.log(`  - New events created: ${createdCount}`)
+      console.log(`  - Existing events updated: ${updatedCount}`)
+      
+      // Update project integration stats
+      await supabaseClient
+        .from('project_integrations')
+        .update({ 
+          last_sync: new Date().toISOString(),
+          total_events_synced: (await supabaseClient
+            .from('calendly_events')
+            .select('id', { count: 'exact', head: true })
+            .eq('project_id', integration.project_id)
+          ).count || 0
+        })
+        .eq('project_id', integration.project_id)
+        .eq('platform', 'calendly');
+
+      // Log sync completion to tracking table
+      await supabaseClient.rpc('log_calendly_sync', {
+        p_project_id: integration.project_id,
+        p_sync_type: triggerReason || 'manual',
+        p_sync_status: 'completed',
+        p_events_processed: processedCount,
+        p_events_created: createdCount,
+        p_events_updated: updatedCount,
+        p_sync_range_start: syncFrom.toISOString(),
+        p_sync_range_end: syncTo.toISOString()
+      });
+      
+      totalCreated += createdCount;
+      totalUpdated += updatedCount;
     }
 
     console.log('\n🎉 === FINAL SYNC RESULTS ===')

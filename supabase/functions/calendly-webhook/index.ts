@@ -480,23 +480,47 @@ serve(async (req) => {
 
     console.log('📈 Total events processed successfully:', totalProcessed);
 
-    // Trigger a background sync to check for any gaps
-    console.log('🔄 Triggering background gap sync...');
+    // Enhanced fallback sync on webhook processing failures
+    if (totalProcessed === 0 && mappings && mappings.length > 0) {
+      console.log('⚠️ No events processed - triggering fallback gap sync for reliability');
+      try {
+        const fallbackSyncResponse = await supabase.functions.invoke('calendly-incremental-sync', {
+          body: { 
+            triggerReason: 'webhook_fallback',
+            project_id: mappings[0].project_id,
+            incremental: true,
+            days_back: 3 // Small recent window to catch missed events
+          }
+        });
+
+        if (fallbackSyncResponse.error) {
+          console.error('❌ Fallback sync failed:', fallbackSyncResponse.error);
+        } else {
+          console.log('✅ Fallback sync completed successfully');
+        }
+      } catch (error) {
+        console.error('❌ Fallback sync error:', error);
+      }
+    }
+
+    // Trigger gap detection to identify any missing date ranges
+    console.log('🔄 Triggering gap detection...');
     try {
-      const syncResponse = await supabase.functions.invoke('calendly-sync-gaps', {
+      const gapDetectionResponse = await supabase.functions.invoke('calendly-gap-detection', {
         body: { 
           triggerReason: 'webhook',
-          eventTypeUri: eventTypeUri 
+          eventTypeUri: eventTypeUri,
+          recentEventId: scheduledEvent.uri
         }
       });
 
-      if (syncResponse.error) {
-        console.error('❌ Background sync trigger failed:', syncResponse.error);
+      if (gapDetectionResponse.error) {
+        console.error('❌ Gap detection failed:', gapDetectionResponse.error);
       } else {
-        console.log('✅ Background sync triggered successfully');
+        console.log('✅ Gap detection completed');
       }
     } catch (error) {
-      console.error('❌ Background sync error:', error);
+      console.error('❌ Gap detection error:', error);
     }
 
     console.log('🎉 Webhook processing completed successfully');
