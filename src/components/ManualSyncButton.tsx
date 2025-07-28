@@ -10,7 +10,7 @@ export const ManualSyncButton = () => {
   const handleManualSync = async () => {
     setIsLoading(true);
     try {
-      console.log('🔧 First mapping all event types...');
+      console.log('🔧 Starting smart manual sync...');
       
       // First, create mappings for all event types
       const { data: mapData, error: mapError } = await supabase.functions.invoke('manual-map-event-types', {
@@ -24,29 +24,71 @@ export const ManualSyncButton = () => {
       }
       
       console.log('✅ Event types mapped:', mapData);
-      toast.success(`Mapped ${mapData.mappingsCreated} event types`);
+      toast.success(`Mapped ${mapData.mappingsCreated || 0} event types`);
       
-      console.log('🔧 Now triggering Calendly sync...');
+      // Use incremental sync for better performance
+      console.log('⚡ Triggering incremental sync...');
       
-      const { data, error } = await supabase.functions.invoke('manual-calendly-sync');
+      const { data, error } = await supabase.functions.invoke('calendly-incremental-sync', {
+        body: { 
+          project_id: '382c6666-c24d-4de1-b449-3858a46fbed3',
+          incremental: true,
+          days_back: 14
+        }
+      });
       
       if (error) {
-        console.error('❌ Manual sync error:', error);
+        console.error('❌ Incremental sync error:', error);
         toast.error('Failed to trigger sync');
         return;
       }
       
-      console.log('✅ Manual sync response:', data);
-      toast.success('Calendly sync triggered successfully');
+      console.log('✅ Incremental sync response:', data);
+      toast.success(`Sync completed: ${data.stats?.projectsProcessed || 0} projects processed`);
       
       // Refresh the page after a short delay to see updated data
       setTimeout(() => {
         window.location.reload();
-      }, 3000);
+      }, 2000);
       
     } catch (error) {
       console.error('❌ Manual sync error:', error);
       toast.error('Failed to trigger sync');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeepSync = async () => {
+    setIsLoading(true);
+    try {
+      console.log('🗄️ Starting deep sync (90 days)...');
+      toast.info('Deep sync started - this may take several minutes');
+      
+      const { data, error } = await supabase.functions.invoke('calendly-incremental-sync', {
+        body: { 
+          project_id: '382c6666-c24d-4de1-b449-3858a46fbed3',
+          deep_sync: true,
+          incremental: false
+        }
+      });
+      
+      if (error) {
+        console.error('❌ Deep sync error:', error);
+        toast.error('Failed to trigger deep sync');
+        return;
+      }
+      
+      console.log('✅ Deep sync response:', data);
+      toast.success(`Deep sync completed: ${data.stats?.projectsProcessed || 0} projects processed`);
+      
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+      
+    } catch (error) {
+      console.error('❌ Deep sync error:', error);
+      toast.error('Failed to trigger deep sync');
     } finally {
       setIsLoading(false);
     }
@@ -62,7 +104,17 @@ export const ManualSyncButton = () => {
         className="flex items-center gap-2"
       >
         <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-        {isLoading ? 'Syncing...' : 'Manual Sync'}
+        {isLoading ? 'Syncing...' : 'Smart Sync'}
+      </Button>
+      <Button 
+        onClick={handleDeepSync}
+        disabled={isLoading}
+        variant="outline"
+        size="sm"
+        className="flex items-center gap-2"
+      >
+        <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+        {isLoading ? 'Deep Syncing...' : 'Deep Sync'}
       </Button>
       <Button 
         onClick={async () => {
