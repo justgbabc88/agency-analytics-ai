@@ -227,6 +227,59 @@ export type Database = {
         }
         Relationships: []
       }
+      calendly_sync_logs: {
+        Row: {
+          created_at: string | null
+          error_message: string | null
+          events_created: number | null
+          events_processed: number | null
+          events_updated: number | null
+          id: string
+          project_id: string | null
+          sync_duration_ms: number | null
+          sync_range_end: string | null
+          sync_range_start: string | null
+          sync_status: string
+          sync_type: string
+        }
+        Insert: {
+          created_at?: string | null
+          error_message?: string | null
+          events_created?: number | null
+          events_processed?: number | null
+          events_updated?: number | null
+          id?: string
+          project_id?: string | null
+          sync_duration_ms?: number | null
+          sync_range_end?: string | null
+          sync_range_start?: string | null
+          sync_status: string
+          sync_type: string
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string | null
+          events_created?: number | null
+          events_processed?: number | null
+          events_updated?: number | null
+          id?: string
+          project_id?: string | null
+          sync_duration_ms?: number | null
+          sync_range_end?: string | null
+          sync_range_start?: string | null
+          sync_status?: string
+          sync_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendly_sync_logs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaigns: {
         Row: {
           activecampaign_list_id: string | null
@@ -620,30 +673,42 @@ export type Database = {
       }
       project_integrations: {
         Row: {
+          consecutive_sync_failures: number | null
           created_at: string
           id: string
           is_connected: boolean
           last_sync: string | null
+          last_sync_duration_ms: number | null
           platform: string
           project_id: string
+          sync_health_score: number | null
+          total_events_synced: number | null
           updated_at: string
         }
         Insert: {
+          consecutive_sync_failures?: number | null
           created_at?: string
           id?: string
           is_connected?: boolean
           last_sync?: string | null
+          last_sync_duration_ms?: number | null
           platform: string
           project_id: string
+          sync_health_score?: number | null
+          total_events_synced?: number | null
           updated_at?: string
         }
         Update: {
+          consecutive_sync_failures?: number | null
           created_at?: string
           id?: string
           is_connected?: boolean
           last_sync?: string | null
+          last_sync_duration_ms?: number | null
           platform?: string
           project_id?: string
+          sync_health_score?: number | null
+          total_events_synced?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -945,6 +1010,10 @@ export type Database = {
         }[]
       }
       get_user_agency_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      setup_calendly_sync_cron: {
         Args: Record<PropertyKey, never>
         Returns: string
       }
