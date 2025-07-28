@@ -230,7 +230,7 @@ const Index = () => {
       <div className="p-6">
         <Tabs defaultValue="funnel" className="space-y-6">
           <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <TabsList className="grid w-full grid-cols-3 h-12">
+            <TabsList className="grid w-full grid-cols-4 h-12">
               <TabsTrigger value="funnel" className="flex items-center justify-center gap-2 h-10">
                 <BarChart3 className="h-4 w-4" />
                 <span className="hidden sm:inline">Stats</span>
