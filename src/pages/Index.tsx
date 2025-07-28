@@ -233,7 +233,7 @@ const Index = () => {
             <TabsList className="grid w-full grid-cols-5 h-12">
               <TabsTrigger value="funnel" className="flex items-center justify-center gap-2 h-10">
                 <BarChart3 className="h-4 w-4" />
-                <span className="hidden sm:inline">Funnel</span>
+                <span className="hidden sm:inline">Stats</span>
               </TabsTrigger>
               <TabsTrigger value="facebook" className="flex items-center justify-center gap-2 h-10">
                 <Facebook className="h-4 w-4" />
