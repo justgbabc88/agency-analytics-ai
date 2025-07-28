@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { User, Clock, Mail, Building } from "lucide-react";
+import { User, Clock, Mail, Building, ArrowLeft } from "lucide-react";
 
 interface UserProfile {
   id: string;
@@ -164,6 +164,24 @@ export const ProfileSettings = () => {
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+        <Button 
+          variant="ghost" 
+          size="sm"
+          onClick={() => {
+            const statsTab = document.querySelector('[data-state="active"]')?.parentElement?.querySelector('[value="funnel"]') as HTMLElement;
+            statsTab?.click();
+          }}
+          className="p-1 h-auto text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4 mr-1" />
+          Back to Stats
+        </Button>
+        <span>/</span>
+        <span>Integrations</span>
+        <span>/</span>
+        <span>Profile Settings</span>
+      </div>
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
