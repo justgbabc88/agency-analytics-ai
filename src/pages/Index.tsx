@@ -230,7 +230,7 @@ const Index = () => {
       <div className="p-6">
         <Tabs defaultValue="funnel" className="space-y-6">
           <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <TabsList className="grid w-full grid-cols-5 h-12">
+            <TabsList className="grid w-full grid-cols-3 h-12">
               <TabsTrigger value="funnel" className="flex items-center justify-center gap-2 h-10">
                 <BarChart3 className="h-4 w-4" />
                 <span className="hidden sm:inline">Stats</span>
@@ -242,10 +242,6 @@ const Index = () => {
               <TabsTrigger value="tracking" className="flex items-center justify-center gap-2 h-10">
                 <Target className="h-4 w-4" />
                 <span className="hidden sm:inline">Tracking</span>
-              </TabsTrigger>
-              <TabsTrigger value="assistant" className="flex items-center justify-center gap-2 h-10">
-                <MessageSquare className="h-4 w-4" />
-                <span className="hidden sm:inline">Assistant</span>
               </TabsTrigger>
               <TabsTrigger value="settings" className="flex items-center justify-center gap-2 h-10">
                 <Settings className="h-4 w-4" />
@@ -419,15 +415,6 @@ const Index = () => {
             )}
           </TabsContent>
 
-          <TabsContent value="assistant" className="space-y-6">
-            <BookCallAIAssistant 
-              projectId={selectedProjectId} 
-              dateRange={dateRange}
-              selectedCampaignIds={selectedCampaignIds}
-              selectedFormIds={selectedFormIds}
-              onFormSelectionChange={setSelectedFormIds}
-            />
-          </TabsContent>
 
           <TabsContent value="settings" className="space-y-6">
             <ProjectIntegrationsPanel 
