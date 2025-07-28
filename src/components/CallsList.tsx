@@ -122,14 +122,14 @@ export const CallsList = ({ calls, isLoading, dateRange }: CallsListProps) => {
             size="sm"
             onClick={() => setStatusFilter('total_bookings')}
           >
-            Total Bookings ({calls.filter(call => isCallCreatedInDateRange(call)).length})
+            New Bookings ({calls.filter(call => isCallCreatedInDateRange(call)).length})
           </Button>
           <Button
             variant={statusFilter === 'calls_taken' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setStatusFilter('calls_taken')}
           >
-            Calls Taken ({calls.filter(call => isCallScheduledInDateRange(call) && call.status.toLowerCase() !== 'cancelled').length})
+            Calls Scheduled ({calls.filter(call => isCallScheduledInDateRange(call) && call.status.toLowerCase() !== 'cancelled').length})
           </Button>
           <Button
             variant={statusFilter === 'calls_cancelled' ? 'default' : 'outline'}

@@ -80,7 +80,7 @@ export const LandingPageMetrics = ({
             description="Leads per unique visitor"
           />
           <MetricCard 
-            title="Total Bookings" 
+            title="New Bookings" 
             value={totalBookings} 
             previousValue={previousTotalBookings}
             description="Events created in date range"

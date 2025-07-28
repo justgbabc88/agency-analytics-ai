@@ -519,7 +519,7 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
                   </div>
                 </div>
                 <div className="text-center p-3 bg-gradient-to-br from-green-50 to-green-100/50 rounded-lg border border-green-100">
-                  <div className="text-xs text-green-600 mb-1 font-medium">Total Bookings</div>
+                  <div className="text-xs text-green-600 mb-1 font-medium">New Bookings</div>
                   <div className="text-2xl font-bold text-green-800">{totalBookings}</div>
                   <div className="text-xs text-green-600 mt-1">in selected period</div>
                 </div>

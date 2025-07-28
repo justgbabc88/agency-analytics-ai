@@ -36,13 +36,13 @@ export const CallStatsMetrics = ({
       <CardContent className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <MetricCard 
-            title="Total Bookings" 
+            title="New Bookings" 
             value={totalBookings} 
             previousValue={previousTotalBookings}
             description="Events created in date range"
           />
           <MetricCard 
-            title="Calls Taken" 
+            title="Calls Scheduled" 
             value={callsTaken} 
             previousValue={previousCallsTaken}
             description="Completed calls"
