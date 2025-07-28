@@ -245,7 +245,7 @@ const Index = () => {
               </TabsTrigger>
               <TabsTrigger value="settings" className="flex items-center justify-center gap-2 h-10">
                 <Settings className="h-4 w-4" />
-                <span className="hidden sm:inline">Settings</span>
+                <span className="hidden sm:inline">Integrations</span>
               </TabsTrigger>
             </TabsList>
           </div>
