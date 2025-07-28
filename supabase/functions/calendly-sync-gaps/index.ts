@@ -325,10 +325,8 @@ serve(async (req) => {
       // Comprehensive status collection with all Calendly event states
       const eventStatuses = ['active', 'canceled', 'cancelled']; // Note: Calendly uses both spellings
       
-      // Add 'completed' status for past events to get accurate historical data
-      if (syncTo.getTime() < now.getTime()) {
-        eventStatuses.push('completed');
-      }
+      // Always include 'completed' status for comprehensive sync
+      eventStatuses.push('completed');
 
       console.log('🔄 Fetching events for statuses:', eventStatuses);
 
