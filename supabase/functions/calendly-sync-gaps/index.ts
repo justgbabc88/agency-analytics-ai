@@ -163,14 +163,15 @@ serve(async (req) => {
         continue
       }
 
-      // Use the specific date range for July 20-21, 2025 AEST (converted to UTC)
-      const syncFrom = new Date("2025-07-19T14:00:00Z")
-      const syncTo = new Date("2025-07-21T13:59:59Z")
+      // Use a comprehensive date range for better data coverage
+      const now = new Date()
+      const syncFrom = new Date(now.getTime() - (90 * 24 * 60 * 60 * 1000)) // 90 days ago
+      const syncTo = new Date(now.getTime() + (30 * 24 * 60 * 60 * 1000)) // 30 days from now
 
-      console.log('📅 Sync date range (CUSTOM FOR JULY 20-21 AEST):')
+      console.log('📅 Comprehensive sync date range:')
       console.log('  From:', syncFrom.toISOString())
       console.log('  To:', syncTo.toISOString())
-      console.log('  Target: Events created July 20-21, 2025 AEST')
+      console.log('  Coverage: 90 days historical + 30 days future')
 
       // Use pagination to get all events (Calendly API has a limit of 100 events per request)
       let allEvents = []
@@ -194,6 +195,12 @@ serve(async (req) => {
           console.log(`🌐 ${status} Events - Page ${pageCount}:`, calendlyUrl)
 
           try {
+            // Add rate limiting delay - Calendly allows 4 requests per second
+            if (pageCount > 1) {
+              console.log('⏳ Rate limiting: waiting 300ms between requests')
+              await new Promise(resolve => setTimeout(resolve, 300))
+            }
+
             const eventsResponse = await fetch(calendlyUrl, {
               headers: {
                 'Authorization': `Bearer ${accessToken}`,
@@ -204,12 +211,15 @@ serve(async (req) => {
             if (!eventsResponse.ok) {
               const errorText = await eventsResponse.text()
               
-              // Handle rate limiting specifically
+              // Enhanced rate limit handling with exponential backoff
               if (eventsResponse.status === 429) {
-                const retryAfter = eventsResponse.headers.get('Retry-After') || '60'
-                console.log(`⏰ Rate limited for ${status} events. Retry after: ${retryAfter} seconds`)
-                // For now, log the rate limit and continue - in production you'd want to implement proper retry
-                return
+                const retryAfter = eventsResponse.headers.get('Retry-After')
+                const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : 60000
+                console.log(`⏰ Rate limited for ${status} events. Waiting ${waitTime/1000} seconds`)
+                
+                await new Promise(resolve => setTimeout(resolve, waitTime))
+                pageCount-- // Retry the same page
+                continue
               }
               
               console.error(`❌ Calendly API error (${status}): ${eventsResponse.status} ${errorText}`)

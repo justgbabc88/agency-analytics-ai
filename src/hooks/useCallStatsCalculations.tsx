@@ -106,9 +106,20 @@ export const useCallStatsCalculations = (
       event_type: e.event_type_name
     })));
 
-    // Create 3 filtered arrays to count the different types of calls
+    // UPDATED METRICS TO MATCH CALENDLY LOGIC:
+    
+    // 1. Total Bookings = Events created in the date range (when people actually booked)
+    // This is already correct above
+    
+    // 2. Calls Taken = Events scheduled for today/date range MINUS canceled ones
+    // This matches how Calendly shows "calls taken" - it's scheduled minus cancellations
+    const callsTakenEvents = eventsScheduledInRange.filter(event => {
+      return event.status !== 'canceled' && event.status !== 'cancelled';
+    });
+
+    // 3. Calls Canceled = Events that were canceled AND scheduled in the date range
+    // This shows cancellations for calls that were supposed to happen in this period
     const cancelledCalls = eventsScheduledInRange.filter(event => {
-      // Check for both "canceled" (primary in DB) and "cancelled" spelling
       const isCancelled = event.status === 'canceled' || event.status === 'cancelled';
       console.log('🚫 Checking event for cancellation:', {
         id: event.calendly_event_id,
@@ -126,6 +137,7 @@ export const useCallStatsCalculations = (
       scheduled_at: e.scheduled_at
     })));
 
+    // For show-up rate calculation, we need completed vs total scheduled
     const completedCalls = eventsScheduledInRange.filter(event => {
       const isNotCanceled = (event.status !== 'canceled' && event.status !== 'cancelled');
       const isPastScheduled = new Date(event.scheduled_at) < new Date();
@@ -156,14 +168,19 @@ export const useCallStatsCalculations = (
     // Total bookings = all unique events created in the date range (when people actually booked)
     const totalBookings = eventsCreatedInRange.length;
 
-    // Use the filtered arrays for calculations (maintaining exact same functionality)
-    const callsTaken = completedCalls.length; // Use completedCalls instead of the old logic
-    const cancelled = cancelledCalls.length; // Use cancelledCalls instead of the old logic
+    // UPDATED CALCULATIONS TO MATCH CALENDLY'S NUMBERS:
+    
+    // Calls Taken = All non-canceled events scheduled in the date range
+    // This matches Calendly's logic: scheduled events minus cancellations
+    const callsTaken = callsTakenEvents.length;
+    
+    // Canceled = Events canceled that were scheduled for this period  
+    const cancelled = cancelledCalls.length;
 
-    // Show up rate = (calls taken / total scheduled calls) * 100
-    // Only count past calls (taken + cancelled) for show up rate calculation
-    const pastCalls = callsTaken + cancelled;
-    const showUpRate = pastCalls > 0 ? Math.round((callsTaken / pastCalls) * 100) : 0;
+    // Show up rate = (completed calls / total past scheduled calls) * 100
+    // Only count past calls (completed + cancelled) for show up rate calculation
+    const pastCalls = completedCalls.length + cancelledCalls.length;
+    const showUpRate = pastCalls > 0 ? Math.round((completedCalls.length / pastCalls) * 100) : 0;
 
     console.log('📈 Current period stats:', {
       totalBookings,
@@ -213,6 +230,10 @@ export const useCallStatsCalculations = (
       event.status === 'cancelled' || event.status === 'canceled'
     );
 
+    const previousCallsTakenEvents = previousPeriodEventsScheduled.filter(event =>
+      event.status !== 'cancelled' && event.status !== 'canceled'
+    );
+
     const previousCompletedCalls = previousPeriodEventsScheduled.filter(event =>
       (event.status !== 'cancelled' && event.status !== 'canceled') &&
       new Date(event.scheduled_at) < new Date()
@@ -224,12 +245,12 @@ export const useCallStatsCalculations = (
     );
 
     const previousTotalBookings = previousPeriodEventsCreated.length;
-    const previousCallsTaken = previousCompletedCalls.length; // Using completedCalls logic
+    const previousCallsTaken = previousCallsTakenEvents.length; // Using callsTakenEvents logic
     const previousCancelled = previousCancelledCalls.length; // Using cancelledCalls logic
 
-    const previousPastCalls = previousCallsTaken + previousCancelled;
+    const previousPastCalls = previousCompletedCalls.length + previousCancelledCalls.length;
     const previousShowUpRate = previousPastCalls > 0 ? 
-      Math.round((previousCallsTaken / previousPastCalls) * 100) : 0;
+      Math.round((previousCompletedCalls.length / previousPastCalls) * 100) : 0;
 
     console.log('📉 Previous period stats:', {
       previousTotalBookings,
