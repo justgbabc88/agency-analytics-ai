@@ -44,7 +44,17 @@ export const ManualSyncButton = () => {
       }
       
       console.log('✅ Incremental sync response:', data);
-      toast.success(`Sync completed: ${data.stats?.projectsProcessed || 0} projects processed`);
+      
+      // Show detailed results
+      const projectsProcessed = data.projectsProcessed || 0;
+      const projectsWithErrors = data.projectsWithErrors || 0;
+      const totalProjects = data.totalProjects || 0;
+      
+      if (projectsWithErrors > 0) {
+        toast.warning(`Sync partially completed: ${projectsProcessed}/${totalProjects} projects processed. ${projectsWithErrors} had errors.`);
+      } else {
+        toast.success(`Sync completed successfully: ${projectsProcessed}/${totalProjects} projects processed`);
+      }
       
       // Refresh the page after a short delay to see updated data
       setTimeout(() => {
@@ -80,7 +90,17 @@ export const ManualSyncButton = () => {
       }
       
       console.log('✅ Deep sync response:', data);
-      toast.success(`Deep sync completed: ${data.stats?.projectsProcessed || 0} projects processed`);
+      
+      // Show detailed results for deep sync
+      const projectsProcessed = data.projectsProcessed || 0;
+      const projectsWithErrors = data.projectsWithErrors || 0;
+      const totalProjects = data.totalProjects || 0;
+      
+      if (projectsWithErrors > 0) {
+        toast.warning(`Deep sync partially completed: ${projectsProcessed}/${totalProjects} projects processed. ${projectsWithErrors} had errors.`);
+      } else {
+        toast.success(`Deep sync completed successfully: ${projectsProcessed}/${totalProjects} projects processed`);
+      }
       
       setTimeout(() => {
         window.location.reload();

@@ -326,7 +326,6 @@ serve(async (req) => {
       const eventStatuses = ['active', 'canceled', 'cancelled']; // Note: Calendly uses both spellings
       
       // Add 'completed' status for past events to get accurate historical data
-      const now = new Date();
       if (syncTo.getTime() < now.getTime()) {
         eventStatuses.push('completed');
       }
@@ -536,8 +535,7 @@ serve(async (req) => {
         p_sync_range_end: syncTo.toISOString()
       });
       
-      totalCreated += createdCount;
-      totalUpdated += updatedCount;
+      // Note: totalCreated and totalUpdated would be accumulated here if tracking across projects
     }
 
     console.log('\n🎉 === FINAL SYNC RESULTS ===')
