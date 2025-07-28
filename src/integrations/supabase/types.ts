@@ -971,6 +971,36 @@ export type Database = {
       }
     }
     Views: {
+      calendly_sync_health: {
+        Row: {
+          consecutive_sync_failures: number | null
+          health_status: string | null
+          last_activity: string | null
+          last_sync: string | null
+          last_sync_duration_ms: number | null
+          project_id: string | null
+          project_name: string | null
+          recent_failures: number | null
+          sync_health_score: number | null
+          total_events_synced: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_project_integrations_project_id"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_integrations_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_daily_metrics: {
         Row: {
           created_at: string | null
@@ -1011,6 +1041,21 @@ export type Database = {
       }
       get_user_agency_id: {
         Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      log_calendly_sync: {
+        Args: {
+          p_project_id: string
+          p_sync_type: string
+          p_sync_status: string
+          p_events_processed?: number
+          p_events_created?: number
+          p_events_updated?: number
+          p_sync_duration_ms?: number
+          p_error_message?: string
+          p_sync_range_start?: string
+          p_sync_range_end?: string
+        }
         Returns: string
       }
       setup_calendly_sync_cron: {

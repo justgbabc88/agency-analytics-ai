@@ -19,14 +19,17 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { triggerReason, eventTypeUri, specificProjectId } = await req.json()
+    const body = req.method === 'POST' ? await req.json() : {};
+    const { triggerReason, eventTypeUri, specificProjectId, startDate, endDate } = body;
     
     console.log('🔍 ENHANCED GAP DETECTION - Starting comprehensive sync:', {
       triggerReason,
       eventTypeUri,
       specificProjectId,
+      startDate,
+      endDate,
       timestamp: new Date().toISOString()
-    })
+    });
 
     let totalGaps = 0
     let totalEvents = 0
@@ -163,15 +166,31 @@ serve(async (req) => {
         continue
       }
 
-      // Use a comprehensive date range for better data coverage
+      // Use configurable date range with smart defaults
       const now = new Date()
-      const syncFrom = new Date(now.getTime() - (90 * 24 * 60 * 60 * 1000)) // 90 days ago
-      const syncTo = new Date(now.getTime() + (30 * 24 * 60 * 60 * 1000)) // 30 days from now
-
-      console.log('📅 Comprehensive sync date range:')
+      
+      // Use provided dates or intelligent defaults based on trigger reason
+      let syncFrom, syncTo;
+      
+      if (startDate && endDate) {
+        syncFrom = new Date(startDate);
+        syncTo = new Date(endDate);
+        console.log('📅 Using provided date range');
+      } else if (triggerReason === 'incremental_sync') {
+        // Incremental sync: smaller, recent window
+        syncFrom = new Date(now.getTime() - (14 * 24 * 60 * 60 * 1000)); // 14 days ago
+        syncTo = new Date(now.getTime() + (7 * 24 * 60 * 60 * 1000)); // 7 days from now
+        console.log('📅 Using incremental sync date range (14 days back, 7 forward)');
+      } else {
+        // Default/manual sync: comprehensive range
+        syncFrom = new Date(now.getTime() - (90 * 24 * 60 * 60 * 1000)); // 90 days ago
+        syncTo = new Date(now.getTime() + (30 * 24 * 60 * 60 * 1000)); // 30 days from now
+        console.log('📅 Using default sync date range (90 days back, 30 forward)');
+      }
+      console.log('📅 Final sync date range:')
       console.log('  From:', syncFrom.toISOString())
       console.log('  To:', syncTo.toISOString())
-      console.log('  Coverage: 90 days historical + 30 days future')
+      console.log('  Days covered:', Math.ceil((syncTo.getTime() - syncFrom.getTime()) / (24 * 60 * 60 * 1000)))
 
       // Use pagination to get all events (Calendly API has a limit of 100 events per request)
       let allEvents = []
