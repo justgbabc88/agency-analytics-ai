@@ -207,7 +207,7 @@ serve(async (req) => {
         
         do {
           pageCount++
-          let calendlyUrl = `https://api.calendly.com/scheduled_events?organization=${encodeURIComponent(orgUri)}&min_start_time=${fromDate.toISOString()}&max_start_time=${toDate.toISOString()}&count=100&status=${status}`
+          let calendlyUrl = `https://api.calendly.com/scheduled_events?organization=${encodeURIComponent(orgUri)}&min_start_time=${fromDate.toISOString()}&max_start_time=${toDate.toISOString()}&count=100&status=${status}&sort=start_time:desc`
           
           if (nextPageToken) {
             calendlyUrl += `&page_token=${nextPageToken}`
@@ -444,7 +444,7 @@ serve(async (req) => {
             // Enhanced duplicate detection: check if event already exists
             const { data: existingEvent, error: existingError } = await supabaseClient
               .from('calendly_events')
-              .select('id, status, updated_at')
+              .select('id, status, updated_at, scheduled_at')
               .eq('calendly_event_id', event.uri)
               .eq('project_id', integration.project_id)
               .maybeSingle()
@@ -455,9 +455,15 @@ serve(async (req) => {
             }
 
             if (existingEvent) {
-              // Enhanced update logic: only update if status has changed or data is newer
+              // Enhanced update logic: prioritize recent events and any status changes
+              const eventDate = new Date(event.start_time);
+              const now = new Date();
+              const daysSinceEvent = Math.abs((now.getTime() - eventDate.getTime()) / (24 * 60 * 60 * 1000));
+              
+              // Always update if: status changed, data is newer, or event is within last 7 days (recent priority)
               const needsUpdate = existingEvent.status !== normalizedStatus ||
-                                 new Date(event.updated_at || event.created_at) > new Date(existingEvent.updated_at);
+                                 new Date(event.updated_at || event.created_at) > new Date(existingEvent.updated_at) ||
+                                 daysSinceEvent <= 7;
               
               if (needsUpdate) {
                 console.log(`🔄 Updating existing event: ${event.uri} (${existingEvent.status} → ${normalizedStatus})`);

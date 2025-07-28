@@ -89,11 +89,11 @@ Deno.serve(async (req) => {
           console.log(`📅 Default sync: syncing last ${days_back} days from ${syncStartDate.toISOString()}`);
         }
 
-        // Call the main sync function with targeted date range
+        // Call the main sync function with targeted date range - prioritizing recent events
         const { data: syncResult, error: syncError } = await supabaseClient.functions.invoke('calendly-sync-gaps', {
           body: { 
             specificProjectId: integration.project_id,
-            triggerReason: incremental ? 'incremental_sync' : 'manual_sync',
+            triggerReason: incremental ? 'incremental_sync_priority' : 'manual_sync',
             startDate: syncStartDate.toISOString(),
             endDate: new Date().toISOString()
           }
