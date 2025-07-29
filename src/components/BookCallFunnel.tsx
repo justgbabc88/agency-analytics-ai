@@ -604,15 +604,24 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
         });
       }
       
-      // Sum all unique visitors from the filtered metrics
-      // Note: This may include some double-counting across pages, but provides accurate totals per page
-      const totalUniqueVisitors = filteredMetrics.reduce((sum: number, metric: any) => {
+      // Filter metrics to only include the selected date range
+      const startDate = dateRange.from.toISOString().split('T')[0]; // Get YYYY-MM-DD format
+      const endDate = dateRange.to.toISOString().split('T')[0]; // Get YYYY-MM-DD format
+      
+      const dateFilteredMetrics = filteredMetrics.filter((metric: any) => {
+        return metric.date >= startDate && metric.date <= endDate;
+      });
+      
+      // Sum all unique visitors from the date and page filtered metrics
+      const totalUniqueVisitors = dateFilteredMetrics.reduce((sum: number, metric: any) => {
         return sum + (metric.unique_visitors || 0);
       }, 0);
       
       console.log('📊 Unique visitors from aggregated metrics:', totalUniqueVisitors);
-      console.log('📊 Aggregated metrics used:', filteredMetrics.length, 'metrics for', filteredMetrics.map(m => `${m.date}: ${m.landing_page_name} (${m.unique_visitors} visitors)`));
-      console.log('📊 Total unique visitors for July 27th:', filteredMetrics.filter(m => m.date === '2025-07-27').reduce((sum: number, metric: any) => sum + (metric.unique_visitors || 0), 0));
+      console.log('📊 Date range filtered metrics:', dateFilteredMetrics.length, 'of', filteredMetrics.length, 'total metrics');
+      console.log('📊 Date range used for filtering:', { startDate, endDate });
+      console.log('📊 Aggregated metrics used:', dateFilteredMetrics.length, 'metrics for', dateFilteredMetrics.map(m => `${m.date}: ${m.landing_page_name} (${m.unique_visitors} visitors)`));
+      console.log('📊 Total unique visitors for July 27th:', dateFilteredMetrics.filter(m => m.date === '2025-07-27').reduce((sum: number, metric: any) => sum + (metric.unique_visitors || 0), 0));
       
       return totalUniqueVisitors;
     }
