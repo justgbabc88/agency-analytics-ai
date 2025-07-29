@@ -686,6 +686,8 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
 
   // Debug logging
   console.log('🔍 [BookCallFunnel] Passing to LandingPageMetrics:', {
+    uniqueVisitors,
+    totalPageViews,
     dateRange: {
       from: dateRange.from.toISOString(),
       to: dateRange.to.toISOString()
