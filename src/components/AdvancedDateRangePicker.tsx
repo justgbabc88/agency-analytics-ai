@@ -32,18 +32,14 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
     });
     
     // For single day selections, ensure we get the full day in the user's timezone
-    // Convert the calendar date to user timezone and create start/end of that day
-    const fromInUserTz = toZonedTime(fromDate, userTimezone);
-    const toInUserTz = toZonedTime(toDate, userTimezone);
+    // Use the calendar date directly without additional timezone conversion
+    const fromYear = fromDate.getFullYear();
+    const fromMonth = fromDate.getMonth();
+    const fromDay = fromDate.getDate();
     
-    // Get date components in user timezone
-    const fromYear = fromInUserTz.getFullYear();
-    const fromMonth = fromInUserTz.getMonth();
-    const fromDay = fromInUserTz.getDate();
-    
-    const toYear = toInUserTz.getFullYear();
-    const toMonth = toInUserTz.getMonth();
-    const toDay = toInUserTz.getDate();
+    const toYear = toDate.getFullYear();
+    const toMonth = toDate.getMonth();
+    const toDay = toDate.getDate();
     
     // Create date strings in YYYY-MM-DD format
     const fromDateStr = `${fromYear}-${String(fromMonth + 1).padStart(2, '0')}-${String(fromDay).padStart(2, '0')}`;
@@ -53,8 +49,7 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
       fromDateStr,
       toDateStr,
       userTimezone,
-      fromInUserTz: fromInUserTz.toString(),
-      toInUserTz: toInUserTz.toString()
+      isSameDaySelection: fromDateStr === toDateStr
     });
     
     // Create start/end of day in the user's profile timezone
