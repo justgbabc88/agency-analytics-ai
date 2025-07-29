@@ -630,6 +630,9 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       console.log('🔍 DEBUG: Date range object:', dateRange);
       console.log('🔍 DEBUG: Start date string:', startDate);
       console.log('🔍 DEBUG: End date string:', endDate);
+      console.log('🔍 DEBUG: Date comparison - start === end:', startDate === endDate);
+      console.log('🔍 DEBUG: Date from ISO:', dateRange.from.toISOString());
+      console.log('🔍 DEBUG: Date to ISO:', dateRange.to.toISOString());
       console.log('🔍 DEBUG: All aggregated metrics:', aggregatedMetrics.length, 'total');
       console.log('🔍 DEBUG: After page filtering:', filteredMetrics.length, 'metrics');
       console.log('🔍 DEBUG: After date filtering:', dateFilteredMetrics.length, 'metrics');
