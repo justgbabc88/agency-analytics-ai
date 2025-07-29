@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useFacebookData } from "@/hooks/useFacebookData";
-import { FacebookAdSetFilter } from "./FacebookAdSetFilter";
+
 import { FacebookCampaignFilter } from "./FacebookCampaignFilter";
 import { FacebookBatchSyncButton } from "./FacebookBatchSyncButton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

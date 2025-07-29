@@ -7,7 +7,7 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 import { useGHLFormSubmissions } from "@/hooks/useGHLFormSubmissions";
 import { ConversionChart } from "./ConversionChart";
 import { FacebookCampaignFilter } from "./FacebookCampaignFilter";
-import { FacebookAdSetFilter } from "./FacebookAdSetFilter";
+
 import { BarChart3, TrendingUp, Users, DollarSign, MousePointer, Eye, ArrowUpRight, ArrowDownRight, Calendar } from "lucide-react";
 import { format, eachDayOfInterval, subDays, isWithinInterval, startOfDay } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
@@ -336,12 +336,6 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
                 campaigns={allCampaigns} 
                 selectedCampaignIds={activeCampaignIds}
                 onCampaignChange={handleCampaignChange}
-              />
-              <FacebookAdSetFilter
-                adSets={adSets || []}
-                selectedAdSetIds={activeAdSetIds}
-                onAdSetChange={handleAdSetChange}
-                selectedCampaignIds={activeCampaignIds}
               />
             </div>
           </div>
