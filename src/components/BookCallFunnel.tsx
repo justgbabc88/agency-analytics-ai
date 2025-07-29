@@ -551,24 +551,16 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
         });
       }
       
-      // For aggregated metrics, we need to handle cross-page visitor overlap
-      // Since we don't have session IDs in aggregated data, we need to estimate
-      // by taking the maximum unique visitors per date (conservative approach)
-      const visitorsByDate = new Map();
-      filteredMetrics.forEach((metric: any) => {
-        const dateKey = metric.date;
-        const currentMax = visitorsByDate.get(dateKey) || 0;
-        // Take the maximum unique visitors for any single page on this date
-        // This is conservative but avoids double-counting
-        visitorsByDate.set(dateKey, Math.max(currentMax, metric.unique_visitors));
-      });
-      
-      // Sum the maximum unique visitors across all dates
-      const totalUniqueVisitors = Array.from(visitorsByDate.values()).reduce((sum, count) => sum + count, 0);
+      // For aggregated metrics, sum all unique visitors across all pages and dates
+      // Note: This may include some double-counting if the same visitor visits multiple pages,
+      // but without session-level aggregation, this is the most accurate count we can provide
+      const totalUniqueVisitors = filteredMetrics.reduce((sum, metric) => {
+        return sum + (metric.unique_visitors || 0);
+      }, 0);
       
       console.log('📊 Unique visitors from aggregated metrics:', totalUniqueVisitors);
-      console.log('📊 Aggregated metrics used:', filteredMetrics.length, 'metrics for', filteredMetrics.map(m => `${m.date}: ${m.landing_page_name} (${m.unique_visitors} visitors)`));
-      console.log('📊 Unique visitors by date:', Object.fromEntries(visitorsByDate));
+      console.log('📊 Aggregated metrics used:', filteredMetrics.length, 'metrics');
+      console.log('📊 Detailed metrics:', filteredMetrics.map(m => `${m.date}: ${m.landing_page_name} (${m.unique_visitors} visitors)`));
       
       return totalUniqueVisitors;
     }
