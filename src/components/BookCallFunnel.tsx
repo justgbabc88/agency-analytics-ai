@@ -138,6 +138,15 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
 
       console.log('📊 Fetched aggregated metrics:', data?.length || 0, 'records');
       console.log('📊 Sample aggregated data:', data?.slice(0, 3));
+      console.log('📊 Date range for aggregated metrics:', {
+        from: dateRange.from.toISOString(),
+        to: dateRange.to.toISOString()
+      });
+      
+      // Debug: Check for July 27th specifically
+      const july27Metrics = data?.filter((metric: any) => metric.date === '2025-07-27');
+      console.log('📊 July 27th metrics found:', july27Metrics?.length || 0);
+      console.log('📊 July 27th data:', july27Metrics);
       
       setAggregatedMetrics(data || []);
       
