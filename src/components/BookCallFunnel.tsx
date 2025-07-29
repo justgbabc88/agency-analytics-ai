@@ -570,12 +570,21 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
         });
       }
       
-      // Sum all page views from the filtered metrics
-      const totalPageViewsCount = filteredMetrics.reduce((sum: number, metric: any) => {
+      // Filter metrics to only include the selected date range
+      const startDate = dateRange.from.toISOString().split('T')[0]; // Get YYYY-MM-DD format
+      const endDate = dateRange.to.toISOString().split('T')[0]; // Get YYYY-MM-DD format
+      
+      const dateFilteredMetrics = filteredMetrics.filter((metric: any) => {
+        return metric.date >= startDate && metric.date <= endDate;
+      });
+      
+      // Sum all page views from the date and page filtered metrics
+      const totalPageViewsCount = dateFilteredMetrics.reduce((sum: number, metric: any) => {
         return sum + (metric.total_page_views || 0);
       }, 0);
       
       console.log('📊 Total page views from aggregated metrics:', totalPageViewsCount);
+      console.log('📊 Page views date filtering - using metrics from:', startDate, 'to', endDate);
       return totalPageViewsCount;
     }
     
