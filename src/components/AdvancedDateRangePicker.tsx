@@ -31,45 +31,17 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
       isSameDay: fromDate.toDateString() === toDate.toDateString()
     });
     
-    // For single day selections, ensure we get the full day in the user's timezone
-    // Convert the calendar date to user timezone and create start/end of that day
-    const fromInUserTz = toZonedTime(fromDate, userTimezone);
-    const toInUserTz = toZonedTime(toDate, userTimezone);
-    
-    // Get date components in user timezone
-    const fromYear = fromInUserTz.getFullYear();
-    const fromMonth = fromInUserTz.getMonth();
-    const fromDay = fromInUserTz.getDate();
-    
-    const toYear = toInUserTz.getFullYear();
-    const toMonth = toInUserTz.getMonth();
-    const toDay = toInUserTz.getDate();
-    
-    // Create date strings in YYYY-MM-DD format
-    const fromDateStr = `${fromYear}-${String(fromMonth + 1).padStart(2, '0')}-${String(fromDay).padStart(2, '0')}`;
-    const toDateStr = `${toYear}-${String(toMonth + 1).padStart(2, '0')}-${String(toDay).padStart(2, '0')}`;
-    
-    console.log('🚨 [createDateRangeInUserTimezone] Date processing:', {
-      fromDateStr,
-      toDateStr,
-      userTimezone,
-      fromInUserTz: fromInUserTz.toString(),
-      toInUserTz: toInUserTz.toString()
-    });
-    
-    // Create start/end of day in the user's profile timezone
-    const fromStartOfDay = fromZonedTime(`${fromDateStr} 00:00:00`, userTimezone);
-    const toEndOfDay = fromZonedTime(`${toDateStr} 23:59:59`, userTimezone);
-    
-    const spansDays = Math.ceil((toEndOfDay.getTime() - fromStartOfDay.getTime()) / (1000 * 60 * 60 * 24));
+    // Create start and end of day for the selected dates
+    const fromStartOfDay = startOfDay(fromDate);
+    const toEndOfDay = endOfDay(toDate);
     
     console.log('🚨 [createDateRangeInUserTimezone] FINAL RESULT:', {
       from: fromStartOfDay.toISOString(),
       to: toEndOfDay.toISOString(),
       fromLocal: fromStartOfDay.toString(), 
       toLocal: toEndOfDay.toString(),
-      spansDays,
-      shouldBeOneDay: fromDateStr === toDateStr
+      fromDateInput: fromDate.toString(),
+      toDateInput: toDate.toString()
     });
     
     return { from: fromStartOfDay, to: toEndOfDay };
