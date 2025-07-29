@@ -663,7 +663,7 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       </div>
 
       <LandingPageMetrics
-        totalPageViews={totalPageViews}
+        totalPageViews={uniqueVisitors}
         bookingRate={bookingRate}
         previousBookingRate={previousBookingRate}
         totalBookings={callStatsData.totalBookings}
