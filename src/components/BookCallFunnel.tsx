@@ -626,6 +626,19 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
         return sum + (metric.unique_visitors || 0);
       }, 0);
       
+      console.log('🔍 DEBUG: Starting unique visitors calculation');
+      console.log('🔍 DEBUG: Date range object:', dateRange);
+      console.log('🔍 DEBUG: Start date string:', startDate);
+      console.log('🔍 DEBUG: End date string:', endDate);
+      console.log('🔍 DEBUG: All aggregated metrics:', aggregatedMetrics.length, 'total');
+      console.log('🔍 DEBUG: After page filtering:', filteredMetrics.length, 'metrics');
+      console.log('🔍 DEBUG: After date filtering:', dateFilteredMetrics.length, 'metrics');
+      console.log('🔍 DEBUG: Filtered metrics details:', dateFilteredMetrics.map(m => ({ 
+        date: m.date, 
+        page: m.landing_page_name, 
+        visitors: m.unique_visitors,
+        dateMatches: m.date >= startDate && m.date <= endDate
+      })));
       console.log('📊 Unique visitors from aggregated metrics:', totalUniqueVisitors);
       console.log('📊 Date range filtered metrics:', dateFilteredMetrics.length, 'of', filteredMetrics.length, 'total metrics');
       console.log('📊 Date range used for filtering:', { startDate, endDate });
