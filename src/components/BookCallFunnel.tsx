@@ -643,8 +643,21 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       console.log('📊 Date range filtered metrics:', dateFilteredMetrics.length, 'of', filteredMetrics.length, 'total metrics');
       console.log('📊 Date range used for filtering:', { startDate, endDate });
       console.log('📊 Aggregated metrics used:', dateFilteredMetrics.length, 'metrics for', dateFilteredMetrics.map(m => `${m.date}: ${m.landing_page_name} (${m.unique_visitors} visitors)`));
-      console.log('📊 Total unique visitors for July 27th:', dateFilteredMetrics.filter(m => m.date === '2025-07-27').reduce((sum: number, metric: any) => sum + (metric.unique_visitors || 0), 0));
       
+      // Check if this is a single day selection (start and end date are the same)
+      const isSingleDay = startDate === endDate;
+      console.log('📊 Is single day selection:', isSingleDay, 'for date:', startDate);
+      
+      if (isSingleDay) {
+        // For single day selections, only return visitors for that specific day
+        const singleDayVisitors = dateFilteredMetrics
+          .filter(m => m.date === startDate)
+          .reduce((sum: number, metric: any) => sum + (metric.unique_visitors || 0), 0);
+        console.log('📊 Single day visitors for', startDate, ':', singleDayVisitors);
+        return singleDayVisitors;
+      }
+      
+      console.log('📊 Date range visitors (total across range):', totalUniqueVisitors);
       return totalUniqueVisitors;
     }
     
