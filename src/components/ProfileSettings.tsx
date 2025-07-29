@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { User, Clock, Mail, Building, ArrowLeft } from "lucide-react";
+import { User, Clock, Mail, Building, ArrowLeft, Lock, Shield } from "lucide-react";
 
 interface UserProfile {
   id: string;
@@ -27,6 +27,14 @@ export const ProfileSettings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  
+  // Security settings state
+  const [newEmail, setNewEmail] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingEmail, setChangingEmail] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
 
   const timezones = [
     { value: 'America/New_York', label: 'Eastern Time (ET)' },
@@ -133,6 +141,100 @@ export const ProfileSettings = () => {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const changeEmail = async () => {
+    if (!newEmail.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a new email address",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setChangingEmail(true);
+      
+      const { error } = await supabase.auth.updateUser({
+        email: newEmail
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Email Change Initiated",
+        description: "Please check both your old and new email addresses for confirmation links.",
+      });
+      
+      setNewEmail('');
+    } catch (error: any) {
+      console.error('Failed to change email:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to change email",
+        variant: "destructive",
+      });
+    } finally {
+      setChangingEmail(false);
+    }
+  };
+
+  const changePassword = async () => {
+    if (!newPassword.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a new password",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: "Error",
+        description: "New passwords don't match",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 6 characters long",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setChangingPassword(true);
+
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Password changed successfully",
+      });
+      
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error: any) {
+      console.error('Failed to change password:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to change password",
+        variant: "destructive",
+      });
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -269,6 +371,95 @@ export const ProfileSettings = () => {
             >
               {saving ? 'Saving...' : 'Save Changes'}
             </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Security Settings Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            Security Settings
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Change Email Section */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Mail className="h-4 w-4" />
+              <Label className="text-base font-medium">Change Email Address</Label>
+            </div>
+            <p className="text-sm text-muted-foreground mb-3">
+              Current email: <span className="font-medium">{user?.email}</span>
+            </p>
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="newEmail">New Email Address</Label>
+                <Input
+                  id="newEmail"
+                  type="email"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  placeholder="Enter new email address"
+                />
+              </div>
+              <Button 
+                onClick={changeEmail} 
+                disabled={changingEmail || !newEmail.trim()}
+                variant="outline"
+                className="w-full md:w-auto"
+              >
+                {changingEmail ? 'Changing Email...' : 'Change Email'}
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                You'll need to confirm the change via email links sent to both your current and new email addresses.
+              </p>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t pt-6">
+            {/* Change Password Section */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Lock className="h-4 w-4" />
+                <Label className="text-base font-medium">Change Password</Label>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="newPassword">New Password</Label>
+                  <Input
+                    id="newPassword"
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Enter new password"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Confirm new password"
+                  />
+                </div>
+              </div>
+              <Button 
+                onClick={changePassword} 
+                disabled={changingPassword || !newPassword.trim() || !confirmPassword.trim()}
+                variant="outline"
+                className="w-full md:w-auto"
+              >
+                {changingPassword ? 'Changing Password...' : 'Change Password'}
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Password must be at least 6 characters long.
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
