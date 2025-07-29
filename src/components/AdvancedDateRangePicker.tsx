@@ -152,7 +152,18 @@ export const AdvancedDateRangePicker = ({ onDateChange, className }: AdvancedDat
     
     if (selectionStep === 'start') {
       // First click - create a single-day range and complete it immediately
+      console.log('🔍 SINGLE DAY SELECTION DEBUG:', {
+        selectedDate: selectedDate.toISOString(),
+        dateString: selectedDate.toDateString(),
+        userTimezone
+      });
       const singleDayRange = createDateRangeInUserTimezone(selectedDate, selectedDate);
+      console.log('🔍 SINGLE DAY RANGE CREATED:', {
+        from: singleDayRange.from.toISOString(),
+        to: singleDayRange.to.toISOString(),
+        fromLocal: format(singleDayRange.from, 'yyyy-MM-dd HH:mm:ss'),
+        toLocal: format(singleDayRange.to, 'yyyy-MM-dd HH:mm:ss')
+      });
       setDateRange(singleDayRange);
       onDateChange(singleDayRange.from, singleDayRange.to);
       setSelectionStep('end');
