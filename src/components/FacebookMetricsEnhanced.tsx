@@ -101,15 +101,6 @@ export const FacebookMetricsEnhanced = ({ dateRange }: FacebookMetricsEnhancedPr
             onCampaignChange={setSelectedCampaignIds}
           />
           
-          <FacebookAdSetFilter
-            adSets={adSets}
-            selectedAdSetIds={selectedAdSetIds}
-            onAdSetChange={setSelectedAdSetIds}
-            selectedCampaignIds={selectedCampaignIds}
-            meta={meta}
-            onRetrySync={handleRetrySyncAd}
-            isRetrying={isRetrying}
-          />
         </div>
         
         <Separator />
