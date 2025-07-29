@@ -600,6 +600,7 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       
       console.log('📊 Unique visitors from aggregated metrics:', totalUniqueVisitors);
       console.log('📊 Aggregated metrics used:', filteredMetrics.length, 'metrics for', filteredMetrics.map(m => `${m.date}: ${m.landing_page_name} (${m.unique_visitors} visitors)`));
+      console.log('📊 Total unique visitors for July 27th:', filteredMetrics.filter(m => m.date === '2025-07-27').reduce((sum: number, metric: any) => sum + (metric.unique_visitors || 0), 0));
       
       return totalUniqueVisitors;
     }
