@@ -140,13 +140,25 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       console.log('📊 Sample aggregated data:', data?.slice(0, 3));
       console.log('📊 Date range for aggregated metrics:', {
         from: dateRange.from.toISOString(),
-        to: dateRange.to.toISOString()
+        to: dateRange.to.toISOString(),
+        isSingleDay: dateRange.from.toDateString() === dateRange.to.toDateString()
       });
       
       // Debug: Check for July 27th specifically
       const july27Metrics = data?.filter((metric: any) => metric.date === '2025-07-27');
       console.log('📊 July 27th metrics found:', july27Metrics?.length || 0);
       console.log('📊 July 27th data:', july27Metrics);
+      
+      // Debug: Check for any duplicate entries
+      const duplicateCheck = data?.reduce((acc: any, metric: any) => {
+        const key = `${metric.date}-${metric.landing_page_name}-${metric.landing_page_url}`;
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+      }, {});
+      const duplicates = Object.entries(duplicateCheck || {}).filter(([_, count]) => (count as number) > 1);
+      if (duplicates.length > 0) {
+        console.log('📊 WARNING: Duplicate aggregated metrics found:', duplicates);
+      }
       
       setAggregatedMetrics(data || []);
       
