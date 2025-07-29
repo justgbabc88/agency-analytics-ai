@@ -204,10 +204,43 @@ export const useProjects = () => {
     },
   });
 
+  const updateProject = useMutation({
+    mutationFn: async ({ projectId, updates }: { projectId: string; updates: { name?: string; funnel_type?: string } }) => {
+      console.log('Updating project:', projectId, updates);
+      
+      try {
+        const { data, error } = await supabase
+          .from('projects')
+          .update(updates)
+          .eq('id', projectId)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('Error updating project:', error);
+          throw error;
+        }
+        
+        console.log('Successfully updated project:', data);
+        return data;
+      } catch (error) {
+        console.error('Failed to update project:', error);
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+    },
+    onError: (error) => {
+      console.error('Update project mutation failed:', error);
+    },
+  });
+
   return {
     projects: projects || [],
     isLoading,
     createProject,
+    updateProject,
     deleteProject,
     selectedProjectId,
     setSelectedProjectId,
