@@ -528,7 +528,39 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
     return filtered;
   }, [pixelConfig, trackingEvents]);
 
-  const totalPageViews = filteredPageViews.length;
+  // Calculate total page views from aggregated metrics (more accurate than event-level calculation)
+  const totalPageViews = useMemo(() => {
+    if (aggregatedMetrics.length > 0) {
+      // Use aggregated metrics for accurate page view count
+      const enabledPages = pixelConfig?.funnelPages?.filter((page: any) => page.includeInPageViewMetrics !== false) || [];
+      
+      // If no pages configured, include all metrics
+      let filteredMetrics = aggregatedMetrics;
+      
+      if (enabledPages.length > 0) {
+        // Filter metrics to only include enabled pages
+        filteredMetrics = aggregatedMetrics.filter((metric: any) => {
+          return enabledPages.some((page: any) => {
+            // Check if metric matches the page by name or URL
+            const pageNameMatch = metric.landing_page_name?.toLowerCase().includes(page.name?.toLowerCase() || '');
+            const pageUrlMatch = metric.landing_page_url?.toLowerCase().includes(page.url?.toLowerCase() || '');
+            return pageNameMatch || pageUrlMatch;
+          });
+        });
+      }
+      
+      // Sum all page views from the filtered metrics
+      const totalPageViewsCount = filteredMetrics.reduce((sum: number, metric: any) => {
+        return sum + (metric.total_page_views || 0);
+      }, 0);
+      
+      console.log('📊 Total page views from aggregated metrics:', totalPageViewsCount);
+      return totalPageViewsCount;
+    }
+    
+    // Fallback to tracking events if no aggregated metrics
+    return filteredPageViews.length;
+  }, [aggregatedMetrics, pixelConfig, filteredPageViews]);
   
   // Calculate unique visitors from aggregated metrics (more accurate than event-level calculation)
   const uniqueVisitors = useMemo(() => {
