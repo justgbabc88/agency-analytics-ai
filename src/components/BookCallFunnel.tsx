@@ -614,21 +614,49 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       }
       
       // Filter metrics to only include the selected date range
-      // Convert UTC dates to user timezone for proper date comparison
-      const startDateInTz = formatInTimeZone(dateRange.from, userTimezone, 'yyyy-MM-dd');
-      const endDateInTz = formatInTimeZone(dateRange.to, userTimezone, 'yyyy-MM-dd');
+      // For single day selections, use timezone-aware filtering
+      // For date ranges, use the original logic to avoid underreporting
+      const isSameDaySelection = dateRange.from.toDateString() === dateRange.to.toDateString();
       
-      console.log('🔍 DEBUG: Timezone-aware date filtering:', {
-        originalFrom: dateRange.from.toISOString(),
-        originalTo: dateRange.to.toISOString(),
-        startDateInTz,
-        endDateInTz,
-        userTimezone
-      });
+      let dateFilteredMetrics;
+      let startDateForComparison, endDateForComparison;
       
-      const dateFilteredMetrics = filteredMetrics.filter((metric: any) => {
-        return metric.date >= startDateInTz && metric.date <= endDateInTz;
-      });
+      if (isSameDaySelection) {
+        // Single day: use timezone-aware filtering
+        const startDateInTz = formatInTimeZone(dateRange.from, userTimezone, 'yyyy-MM-dd');
+        const endDateInTz = formatInTimeZone(dateRange.to, userTimezone, 'yyyy-MM-dd');
+        
+        dateFilteredMetrics = filteredMetrics.filter((metric: any) => {
+          return metric.date >= startDateInTz && metric.date <= endDateInTz;
+        });
+        
+        startDateForComparison = startDateInTz;
+        endDateForComparison = endDateInTz;
+        
+        console.log('🔍 DEBUG: Single day timezone-aware filtering:', {
+          startDateInTz,
+          endDateInTz,
+          userTimezone,
+          filteredCount: dateFilteredMetrics.length
+        });
+      } else {
+        // Date range: use original UTC-based filtering to avoid underreporting
+        const startDate = dateRange.from.toISOString().split('T')[0];
+        const endDate = dateRange.to.toISOString().split('T')[0];
+        
+        dateFilteredMetrics = filteredMetrics.filter((metric: any) => {
+          return metric.date >= startDate && metric.date <= endDate;
+        });
+        
+        startDateForComparison = startDate;
+        endDateForComparison = endDate;
+        
+        console.log('🔍 DEBUG: Date range UTC-based filtering:', {
+          startDate,
+          endDate,
+          filteredCount: dateFilteredMetrics.length
+        });
+      }
       
       // Sum all unique visitors from the date and page filtered metrics
       const totalUniqueVisitors = dateFilteredMetrics.reduce((sum: number, metric: any) => {
@@ -637,9 +665,9 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       
       console.log('🔍 DEBUG: Starting unique visitors calculation');
       console.log('🔍 DEBUG: Date range object:', dateRange);
-      console.log('🔍 DEBUG: Start date string:', startDateInTz);
-      console.log('🔍 DEBUG: End date string:', endDateInTz);
-      console.log('🔍 DEBUG: Date comparison - start === end:', startDateInTz === endDateInTz);
+      console.log('🔍 DEBUG: Start date string:', startDateForComparison);
+      console.log('🔍 DEBUG: End date string:', endDateForComparison);
+      console.log('🔍 DEBUG: Date comparison - start === end:', startDateForComparison === endDateForComparison);
       console.log('🔍 DEBUG: Date from ISO:', dateRange.from.toISOString());
       console.log('🔍 DEBUG: Date to ISO:', dateRange.to.toISOString());
       console.log('🔍 DEBUG: All aggregated metrics:', aggregatedMetrics.length, 'total');
@@ -649,7 +677,7 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
         date: m.date, 
         page: m.landing_page_name, 
         visitors: m.unique_visitors,
-        dateMatches: m.date >= startDateInTz && m.date <= endDateInTz
+        dateMatches: m.date >= startDateForComparison && m.date <= endDateForComparison
       })));
       console.log('📊 Unique visitors from aggregated metrics:', totalUniqueVisitors);
       
