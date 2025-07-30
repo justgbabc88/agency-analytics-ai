@@ -236,229 +236,77 @@ export const ZohoDealsDisplay = ({ projectId }: ZohoDealsDisplayProps) => {
 
   return (
     <div className="space-y-6">
-      {/* Analytics Cards */}
-      {analytics && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <DollarSign className="h-5 w-5 text-green-600" />
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Total Deal Value</p>
-                  <p className="text-2xl font-bold">{formatCurrency(analytics.total_deal_value)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <Users className="h-5 w-5 text-blue-600" />
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Total Deals</p>
-                  <p className="text-2xl font-bold">{analytics.deals_count}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <Filter className="h-5 w-5 text-purple-600" />
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Filtered Results</p>
-                  <p className="text-2xl font-bold">{filteredDeals.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Deals by Stage */}
-      {analytics?.deals_by_stage && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Deals by Stage</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(analytics.deals_by_stage).map(([stage, count]) => (
-                <Badge key={stage} className={getStageColor(stage)}>
-                  {stage}: {count as number}
-                </Badge>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Filters */}
+      {/* Only show Filtered Results metric */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            Filters
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">Lead Sources</label>
-                <div className="flex gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={selectAllLeadSources}
-                    disabled={selectedLeadSources.length === leadSources.length}
-                  >
-                    Select All
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={clearAllLeadSources}
-                    disabled={selectedLeadSources.length === 0}
-                  >
-                    Clear All
-                  </Button>
-                </div>
-              </div>
-              <div className="max-h-48 overflow-y-auto border rounded-md p-3 space-y-2 bg-background">
-                {leadSources.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No lead sources available</p>
-                ) : (
-                  leadSources.map((source) => (
-                    <div key={source} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`lead-source-${source}`}
-                        checked={selectedLeadSources.includes(source)}
-                        onCheckedChange={(checked) => handleLeadSourceToggle(source, checked as boolean)}
-                      />
-                      <label 
-                        htmlFor={`lead-source-${source}`}
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                      >
-                        {source}
-                      </label>
-                    </div>
-                  ))
-                )}
-              </div>
-              {selectedLeadSources.length > 0 && (
-                <div className="text-xs text-muted-foreground">
-                  {selectedLeadSources.length} source(s) selected
-                </div>
-              )}
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Search</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search deals, stages, campaigns..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                Agreement Date Filter
-              </label>
-              <div className="space-y-2">
-                <div>
-                  <label className="text-xs text-muted-foreground">From Date</label>
-                  <Input
-                    type="date"
-                    value={dateFrom}
-                    onChange={(e) => setDateFrom(e.target.value)}
-                    placeholder="From date"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">To Date</label>
-                  <Input
-                    type="date"
-                    value={dateTo}
-                    onChange={(e) => setDateTo(e.target.value)}
-                    placeholder="To date"
-                  />
-                </div>
-                {(dateFrom || dateTo) && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setDateFrom('');
-                      setDateTo('');
-                    }}
-                    className="w-full"
-                  >
-                    Clear Date Filter
-                  </Button>
-                )}
-              </div>
+        <CardContent className="p-4">
+          <div className="flex items-center space-x-2">
+            <Filter className="h-5 w-5 text-purple-600" />
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Filtered Results</p>
+              <p className="text-2xl font-bold">{filteredDeals.length}</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Deals Table */}
+      {/* Lead Source Filter Only */}
       <Card>
         <CardHeader>
-          <CardTitle>Deals Details</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="h-5 w-5" />
+            Lead Source Filter
+          </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Deal Name</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Stage</TableHead>
-                  <TableHead>Lead Source</TableHead>
-                  <TableHead>UTM Campaign</TableHead>
-                  <TableHead>UTM Medium</TableHead>
-                  <TableHead>UTM Content</TableHead>
-                  <TableHead>Agreement Date</TableHead>
-                  <TableHead>Owner</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredDeals.map((deal) => (
-                  <TableRow key={deal.id}>
-                    <TableCell className="font-medium">{deal.Deal_Name}</TableCell>
-                    <TableCell>{formatCurrency(deal.Amount)}</TableCell>
-                    <TableCell>
-                      <Badge className={getStageColor(deal.Stage)}>
-                        {deal.Stage}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{deal.Lead_Source || 'N/A'}</TableCell>
-                    <TableCell>{deal.UTM_Campaign || 'N/A'}</TableCell>
-                    <TableCell>{deal.UTM_Medium || 'N/A'}</TableCell>
-                    <TableCell>{deal.UTM_Content || 'N/A'}</TableCell>
-                    <TableCell>{formatDate(deal.Agreement_Received_Date)}</TableCell>
-                    <TableCell>{deal.Owner?.name || 'N/A'}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          
-          {filteredDeals.length === 0 && (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">No deals match your current filters.</p>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">Lead Sources</label>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={selectAllLeadSources}
+                  disabled={selectedLeadSources.length === leadSources.length}
+                >
+                  Select All
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={clearAllLeadSources}
+                  disabled={selectedLeadSources.length === 0}
+                >
+                  Clear All
+                </Button>
+              </div>
             </div>
-          )}
+            <div className="max-h-48 overflow-y-auto border rounded-md p-3 space-y-2 bg-background">
+              {leadSources.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No lead sources available</p>
+              ) : (
+                leadSources.map((source) => (
+                  <div key={source} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`lead-source-${source}`}
+                      checked={selectedLeadSources.includes(source)}
+                      onCheckedChange={(checked) => handleLeadSourceToggle(source, checked as boolean)}
+                    />
+                    <label 
+                      htmlFor={`lead-source-${source}`}
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    >
+                      {source}
+                    </label>
+                  </div>
+                ))
+              )}
+            </div>
+            {selectedLeadSources.length > 0 && (
+              <div className="text-xs text-muted-foreground">
+                {selectedLeadSources.length} source(s) selected
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>
