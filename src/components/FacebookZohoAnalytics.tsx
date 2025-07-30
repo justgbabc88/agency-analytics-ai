@@ -29,6 +29,9 @@ export const FacebookZohoAnalytics = ({ projectId, dateRange }: FacebookZohoAnal
   const [loading, setLoading] = useState(true);
 
   const { facebookData, insights } = useFacebookData({ dateRange });
+  
+  // Use the same dailyInsights that FacebookMetrics uses for cost per lead
+  const dailyInsights = facebookData?.daily_insights;
 
   useEffect(() => {
     if (projectId) {
@@ -74,19 +77,18 @@ export const FacebookZohoAnalytics = ({ projectId, dateRange }: FacebookZohoAnal
   };
 
   const chartData = useMemo(() => {
-    console.log('FacebookZohoAnalytics - Facebook daily insights raw data:', facebookData?.daily_insights?.slice(0, 5));
-    console.log('FacebookZohoAnalytics - Available date range in Facebook data:', {
-      firstDate: facebookData?.daily_insights?.[0]?.date_start,
-      lastDate: facebookData?.daily_insights?.[facebookData.daily_insights.length - 1]?.date_start,
-      totalInsights: facebookData?.daily_insights?.length
+    console.log('FacebookZohoAnalytics - Daily insights data:', dailyInsights?.slice(0, 5));
+    console.log('FacebookZohoAnalytics - Available spend data:', {
+      totalInsights: dailyInsights?.length,
+      firstInsight: dailyInsights?.[0],
+      hasSpendData: dailyInsights?.some(d => d.spend > 0)
     });
     console.log('FacebookZohoAnalytics - Chart date range:', dateRange);
-    console.log('FacebookZohoAnalytics - Total insights spend:', insights?.spend);
     
-    if (!dateRange || !facebookData?.daily_insights || deals.length === 0) {
+    if (!dateRange || !dailyInsights || deals.length === 0) {
       console.log('FacebookZohoAnalytics - No chart data available:', {
         hasDateRange: !!dateRange,
-        hasFacebookData: !!facebookData?.daily_insights,
+        hasDailyInsights: !!dailyInsights,
         dealsCount: deals.length
       });
       return [];
@@ -108,18 +110,19 @@ export const FacebookZohoAnalytics = ({ projectId, dateRange }: FacebookZohoAnal
         return format(dealDate, 'yyyy-MM-dd') === isoDateStr;
       });
 
-      // Get Facebook spend for this date - let's debug the matching
-      const facebookInsight = facebookData.daily_insights.find(
-        (insight: any) => insight.date_start === isoDateStr
+      // Get Facebook spend for this date using the same approach as cost per lead
+      const facebookInsight = dailyInsights.find(
+        (insight: any) => insight.date === isoDateStr || insight.date_start === isoDateStr
       );
       const dailySpend = facebookInsight?.spend || 0;
       
-      // Debug the date matching
+      // Debug the date matching - same as cost per lead does it
       if (dealsOnDate.length > 0) {
         console.log(`FacebookZohoAnalytics - Date matching debug for ${isoDateStr}:`, {
           lookingFor: isoDateStr,
-          availableDates: facebookData.daily_insights.slice(0, 3).map(i => i.date_start),
+          availableDates: dailyInsights.slice(0, 3).map(i => i.date || i.date_start),
           foundInsight: !!facebookInsight,
+          insightData: facebookInsight,
           spendFound: facebookInsight?.spend || 'No spend data'
         });
       }
@@ -147,7 +150,7 @@ export const FacebookZohoAnalytics = ({ projectId, dateRange }: FacebookZohoAnal
     
     console.log('FacebookZohoAnalytics - Final chart data:', chartData);
     return chartData;
-  }, [facebookData, deals, dateRange]);
+  }, [dailyInsights, deals, dateRange]);
 
   const totalDeals = useMemo(() => {
     if (!dateRange || deals.length === 0) return deals.length; // Show total deals even without date range
