@@ -111,23 +111,8 @@ export const FacebookZohoAnalytics = ({ projectId, dateRange }: FacebookZohoAnal
 
       const totalDeals = dealsOnDate.length;
       
-      // Calculate cost per deal - if there's no daily spend data but we have total spend,
-      // distribute it proportionally across days with deals
-      let costPerDeal = 0;
-      if (totalDeals > 0 && dailySpend > 0) {
-        costPerDeal = dailySpend / totalDeals;
-      } else if (totalDeals > 0 && (insights?.spend || 0) > 0) {
-        // Fallback: use average cost per deal when no daily spend data
-        const totalSpend = insights?.spend || 0;
-        const allDealsInRange = deals.filter(deal => {
-          if (!dateRange) return true;
-          const dealDate = new Date(deal.Agreement_Received_Date);
-          return dealDate >= dateRange.from && dealDate <= dateRange.to;
-        }).length;
-        if (allDealsInRange > 0) {
-          costPerDeal = totalSpend / allDealsInRange;
-        }
-      }
+      // Calculate cost per deal using actual daily spend for this specific date
+      const costPerDeal = totalDeals > 0 && dailySpend > 0 ? dailySpend / totalDeals : 0;
 
       const dataPoint = {
         date: dateStr,
@@ -140,8 +125,7 @@ export const FacebookZohoAnalytics = ({ projectId, dateRange }: FacebookZohoAnal
         ...dataPoint,
         dealsOnThisDate: dealsOnDate.map(d => d.Deal_Name),
         facebookSpend: dailySpend,
-        totalSpendAvailable: insights?.spend,
-        calculationMethod: dailySpend > 0 ? 'daily' : 'average'
+        costPerDealCalculation: totalDeals > 0 ? `$${dailySpend} ÷ ${totalDeals} deals = $${costPerDeal.toFixed(2)}` : 'No deals'
       });
       return dataPoint;
     });
