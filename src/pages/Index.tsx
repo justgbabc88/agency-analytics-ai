@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Navbar } from "@/components/Navbar";
 import { LowTicketFunnel } from "@/components/LowTicketFunnel";
 import { BookCallFunnel } from "@/components/BookCallFunnel";
-import { IntegrationsPanel } from "@/components/IntegrationsPanel";
+import { ProjectIntegrationsPanel } from "@/components/ProjectIntegrationsPanel";
 import { FacebookAIInsights } from "@/components/FacebookAIInsights";
 import { BookCallAIAssistant } from "@/components/BookCallAIAssistant";
 import { FacebookMetrics } from "@/components/FacebookMetrics";
@@ -417,7 +417,12 @@ const Index = () => {
 
 
           <TabsContent value="settings" className="space-y-6">
-            <IntegrationsPanel projectId={selectedProjectId} />
+            <ProjectIntegrationsPanel 
+              projectId={selectedProjectId} 
+              selectedFormIds={selectedFormIds}
+              onFormSelectionChange={setSelectedFormIds}
+              onGHLDataRefresh={refetchGHLData}
+            />
           </TabsContent>
         </Tabs>
       </div>

@@ -8,6 +8,7 @@ import { FacebookConnector } from "./FacebookConnector";
 import { CalendlyConnector } from "./CalendlyConnector";
 import { GoHighLevelConnector } from "./GoHighLevelConnector";
 import { ZohoCRMConnector } from "./ZohoCRMConnector";
+import { ZohoDealsDisplay } from "./ZohoDealsDisplay";
 import { Settings, CheckCircle, XCircle, RefreshCw, BarChart3, ChevronDown, ChevronRight, Calendar, FormInput, Users } from "lucide-react";
 import { useState } from "react";
 
@@ -161,15 +162,18 @@ export const ProjectIntegrationsPanel = ({ projectId, selectedFormIds = [], onFo
         );
       case 'zoho_crm':
         return (
-          <ZohoCRMConnector
-            projectId={projectId}
-            isConnected={isConnected}
-            onConnectionChange={(connected) => {
-              if (connected) {
-                handleToggleIntegration(platform.id, true);
-              }
-            }}
-          />
+          <div className="space-y-4">
+            <ZohoCRMConnector
+              projectId={projectId}
+              isConnected={isConnected}
+              onConnectionChange={(connected) => {
+                if (connected) {
+                  handleToggleIntegration(platform.id, true);
+                }
+              }}
+            />
+            {isConnected && <ZohoDealsDisplay projectId={projectId} />}
+          </div>
         );
       default:
         return null;
