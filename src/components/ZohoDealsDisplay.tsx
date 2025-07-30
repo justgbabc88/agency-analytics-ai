@@ -68,6 +68,17 @@ export const ZohoDealsDisplay = ({ projectId }: ZohoDealsDisplayProps) => {
 
       if (data?.data) {
         const zohoData = data.data as any;
+        
+        // Check if there's an error in the sync data
+        if (zohoData.error) {
+          toast({
+            title: "Zoho CRM Sync Error",
+            description: zohoData.error,
+            variant: "destructive",
+          });
+          return;
+        }
+        
         const dealsData = zohoData.modules?.deals?.records || [];
         const analyticsData = zohoData.analytics || {};
 
