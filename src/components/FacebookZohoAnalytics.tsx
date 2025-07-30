@@ -159,44 +159,74 @@ export const FacebookZohoAnalytics = ({ projectId, dateRange }: FacebookZohoAnal
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Deal Performance</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Debug info */}
-        <div className="text-xs text-muted-foreground">
-          Debug: {deals.length} deals loaded, {totalDeals} in date range, ProjectID: {projectId || 'None'}
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Total Deals</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalDeals}</div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Average Cost Per Deal</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">${averageCostPerDeal.toLocaleString()}</div>
-            </CardContent>
-          </Card>
-        </div>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Total Deals Analysis */}
+      <Card>
+        <CardHeader className="space-y-0 pb-4">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <CardTitle className="text-lg font-semibold mb-1">Total Deals Analysis</CardTitle>
+              <p className="text-sm text-muted-foreground">Track your deal conversion performance</p>
+            </div>
+          </div>
+          <div className="text-center p-3 bg-gradient-to-br from-green-50 to-green-100/50 rounded-lg border border-green-100">
+            <div className="text-xs text-green-600 mb-1 font-medium">Total Deals Closed</div>
+            <div className="text-2xl font-bold text-green-800">
+              {totalDeals}
+            </div>
+            <div className="text-xs text-green-600 mt-1">
+              {dateRange ? 'in selected period' : 'all time'}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {chartData.length > 0 ? (
+            <ConversionChart 
+              data={chartData}
+              title=""
+              metrics={['totalDeals']}
+            />
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              No chart data available - ensure both Facebook and Zoho data is synced
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-        {chartData.length > 0 && (
-          <ConversionChart 
-            data={chartData}
-            title="Daily Deal Performance"
-            metrics={['totalDeals', 'costPerDeal']}
-          />
-        )}
-      </CardContent>
-    </Card>
+      {/* Cost Per Deal Analysis */}
+      <Card>
+        <CardHeader className="space-y-0 pb-4">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <CardTitle className="text-lg font-semibold mb-1">Cost Per Deal Analysis</CardTitle>
+              <p className="text-sm text-muted-foreground">Track your deal acquisition efficiency</p>
+            </div>
+          </div>
+          <div className="text-center p-3 bg-gradient-to-br from-blue-50 to-blue-100/50 rounded-lg border border-blue-100">
+            <div className="text-xs text-blue-600 mb-1 font-medium">Average Cost Per Deal</div>
+            <div className="text-2xl font-bold text-blue-800">
+              {totalDeals > 0 ? `$${averageCostPerDeal.toLocaleString()}` : 'N/A'}
+            </div>
+            <div className="text-xs text-blue-600 mt-1">
+              based on Facebook spend
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {chartData.length > 0 ? (
+            <ConversionChart 
+              data={chartData}
+              title=""
+              metrics={['costPerDeal']}
+            />
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              No chart data available - ensure both Facebook and Zoho data is synced
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 };
