@@ -74,8 +74,13 @@ export const FacebookZohoAnalytics = ({ projectId, dateRange }: FacebookZohoAnal
   };
 
   const chartData = useMemo(() => {
-    console.log('FacebookZohoAnalytics - Facebook daily insights:', facebookData?.daily_insights);
-    console.log('FacebookZohoAnalytics - Date range:', dateRange);
+    console.log('FacebookZohoAnalytics - Facebook daily insights raw data:', facebookData?.daily_insights?.slice(0, 5));
+    console.log('FacebookZohoAnalytics - Available date range in Facebook data:', {
+      firstDate: facebookData?.daily_insights?.[0]?.date_start,
+      lastDate: facebookData?.daily_insights?.[facebookData.daily_insights.length - 1]?.date_start,
+      totalInsights: facebookData?.daily_insights?.length
+    });
+    console.log('FacebookZohoAnalytics - Chart date range:', dateRange);
     console.log('FacebookZohoAnalytics - Total insights spend:', insights?.spend);
     
     if (!dateRange || !facebookData?.daily_insights || deals.length === 0) {
@@ -97,17 +102,27 @@ export const FacebookZohoAnalytics = ({ projectId, dateRange }: FacebookZohoAnal
       const dateStr = format(date, 'MMM dd');
       const isoDateStr = format(date, 'yyyy-MM-dd');
 
-      // Get Facebook spend for this date
-      const facebookInsight = facebookData.daily_insights.find(
-        (insight: any) => insight.date_start === isoDateStr
-      );
-      const dailySpend = facebookInsight?.spend || 0;
-
-      // Count deals for this date
+      // Count deals for this date first
       const dealsOnDate = deals.filter(deal => {
         const dealDate = new Date(deal.Agreement_Received_Date);
         return format(dealDate, 'yyyy-MM-dd') === isoDateStr;
       });
+
+      // Get Facebook spend for this date - let's debug the matching
+      const facebookInsight = facebookData.daily_insights.find(
+        (insight: any) => insight.date_start === isoDateStr
+      );
+      const dailySpend = facebookInsight?.spend || 0;
+      
+      // Debug the date matching
+      if (dealsOnDate.length > 0) {
+        console.log(`FacebookZohoAnalytics - Date matching debug for ${isoDateStr}:`, {
+          lookingFor: isoDateStr,
+          availableDates: facebookData.daily_insights.slice(0, 3).map(i => i.date_start),
+          foundInsight: !!facebookInsight,
+          spendFound: facebookInsight?.spend || 'No spend data'
+        });
+      }
 
       const totalDeals = dealsOnDate.length;
       
