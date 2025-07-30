@@ -373,7 +373,7 @@ export const ZohoDealsDisplay = ({ projectId }: ZohoDealsDisplayProps) => {
                     <TableCell>{deal.UTM_Campaign || 'N/A'}</TableCell>
                     <TableCell>{deal.UTM_Medium || 'N/A'}</TableCell>
                     <TableCell>{deal.UTM_Content || 'N/A'}</TableCell>
-                    <TableCell>{formatDate(deal.Agreement_Received_Date || deal.Created_Time)}</TableCell>
+                    <TableCell>{formatDate(deal.Agreement_Received_Date)}</TableCell>
                     <TableCell>{deal.Owner?.name || 'N/A'}</TableCell>
                   </TableRow>
                 ))}
