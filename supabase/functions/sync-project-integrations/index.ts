@@ -474,15 +474,29 @@ async function syncZohoCRM(projectId: string, supabase: any) {
         
         let allRecords: any[] = []
         let page = 1
-        const maxRecords = moduleName === 'Deals' ? 1000 : 200 // Limit deals to 1000, others to 200
+        const maxRecords = moduleName === 'Deals' ? 2000 : 200 // Increased deals limit to 2000
         const perPage = 200 // Zoho's max per page
         const maxPages = Math.ceil(maxRecords / perPage)
         
-        // Filter to only fetch deals with Agreement_Received_Date
-        const filterParam = moduleName === 'Deals' ? '&criteria=(Agreement_Received_Date:not_null)' : ''
+        // Enhanced filtering and sorting for deals
+        let filterParam = ''
+        let sortParam = ''
+        
+        if (moduleName === 'Deals') {
+          // Sort by Agreement_Received_Date descending to get most recent deals first
+          sortParam = '&sort_by=Agreement_Received_Date&sort_order=desc'
+          
+          // Keep the Agreement_Received_Date filter but add debugging
+          filterParam = '&criteria=(Agreement_Received_Date:not_null)'
+          console.log(`ZOHO SYNC DEBUG: Using filter for ${moduleName}: ${filterParam}`)
+          console.log(`ZOHO SYNC DEBUG: Using sort for ${moduleName}: ${sortParam}`)
+        }
         
         while (page <= maxPages) {
-          const recordsResponse = await fetch(`${baseUrl}/crm/v2/${moduleName}?per_page=${perPage}&page=${page}${filterParam}`, {
+          const url = `${baseUrl}/crm/v2/${moduleName}?per_page=${perPage}&page=${page}${filterParam}${sortParam}`
+          console.log(`ZOHO SYNC DEBUG: Fetching URL: ${url}`)
+          
+          const recordsResponse = await fetch(url, {
             headers: {
               'Authorization': `Zoho-oauthtoken ${access_token}`,
               'Content-Type': 'application/json'
@@ -493,9 +507,29 @@ async function syncZohoCRM(projectId: string, supabase: any) {
             const recordsData = await recordsResponse.json()
             const records = recordsData.data || []
             
+            console.log(`ZOHO SYNC DEBUG: Page ${page} returned ${records.length} ${moduleName} records`)
+            
             if (records.length === 0) {
               console.log(`No more ${moduleName} records found on page ${page}`)
               break // No more records to fetch
+            }
+            
+            // Add detailed logging for deals to debug Rebecca Seeley issue
+            if (moduleName === 'Deals' && page === 1) {
+              console.log(`ZOHO SYNC DEBUG: First 5 deals from page 1:`)
+              records.slice(0, 5).forEach((deal: any, index: number) => {
+                console.log(`  ${index + 1}. Deal: "${deal.Deal_Name}" | Agreement Date: ${deal.Agreement_Received_Date} | Stage: ${deal.Stage} | Amount: ${deal.Amount}`)
+              })
+              
+              // Check specifically for Rebecca Seeley
+              const rebeccaDeal = records.find((deal: any) => 
+                deal.Deal_Name && deal.Deal_Name.toLowerCase().includes('rebecca')
+              )
+              if (rebeccaDeal) {
+                console.log(`ZOHO SYNC DEBUG: Found Rebecca deal:`, rebeccaDeal)
+              } else {
+                console.log(`ZOHO SYNC DEBUG: No Rebecca deal found in first page`)
+              }
             }
             
             allRecords = allRecords.concat(records)
@@ -513,6 +547,8 @@ async function syncZohoCRM(projectId: string, supabase: any) {
             
           } else {
             console.log(`Failed to fetch ${moduleName} page ${page}: ${recordsResponse.status}`)
+            const errorText = await recordsResponse.text()
+            console.log(`ZOHO SYNC DEBUG: Error response: ${errorText}`)
             break
           }
         }
@@ -522,10 +558,55 @@ async function syncZohoCRM(projectId: string, supabase: any) {
           allRecords = allRecords.slice(0, maxRecords)
         }
         
+        // Additional debugging for deals
+        if (moduleName === 'Deals') {
+          console.log(`ZOHO SYNC DEBUG: Final deals summary:`)
+          console.log(`  - Total deals fetched: ${allRecords.length}`)
+          console.log(`  - Date range of agreements:`)
+          
+          const agreementDates = allRecords
+            .map(deal => deal.Agreement_Received_Date)
+            .filter(date => date)
+            .sort()
+          
+          if (agreementDates.length > 0) {
+            console.log(`    - Earliest: ${agreementDates[0]}`)
+            console.log(`    - Latest: ${agreementDates[agreementDates.length - 1]}`)
+          }
+          
+          // Check for 2025 deals specifically
+          const deals2025 = allRecords.filter(deal => 
+            deal.Agreement_Received_Date && deal.Agreement_Received_Date.includes('2025')
+          )
+          console.log(`  - Deals with 2025 agreement dates: ${deals2025.length}`)
+          
+          if (deals2025.length > 0) {
+            console.log(`    2025 deals:`)
+            deals2025.forEach((deal: any) => {
+              console.log(`      - "${deal.Deal_Name}" (${deal.Agreement_Received_Date})`)
+            })
+          }
+          
+          // Final check for Rebecca
+          const rebeccaDeals = allRecords.filter(deal => 
+            deal.Deal_Name && deal.Deal_Name.toLowerCase().includes('rebecca')
+          )
+          console.log(`  - Deals with "Rebecca" in name: ${rebeccaDeals.length}`)
+          rebeccaDeals.forEach((deal: any) => {
+            console.log(`    - "${deal.Deal_Name}" | Agreement: ${deal.Agreement_Received_Date} | Stage: ${deal.Stage}`)
+          })
+        }
+        
         moduleData[moduleName.toLowerCase()] = {
           records: allRecords,
           count: allRecords.length,
-          info: { total_fetched: allRecords.length, pages_fetched: page - 1 }
+          info: { 
+            total_fetched: allRecords.length, 
+            pages_fetched: page - 1,
+            filter_used: filterParam,
+            sort_used: sortParam,
+            max_records_limit: maxRecords
+          }
         }
         
         totalRecords += allRecords.length
