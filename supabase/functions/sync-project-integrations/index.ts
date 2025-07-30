@@ -441,21 +441,73 @@ async function syncZohoCRM(projectId: string, supabase: any) {
       throw new Error('Zoho CRM access token not found. Please reconnect your Zoho integration.')
     }
 
-    const { access_token, api_domain } = oauthData.data
+    let { access_token, refresh_token, api_domain } = oauthData.data
     const baseUrl = api_domain || 'https://www.zohoapis.com'
 
-    console.log('Fetching Zoho CRM modules')
+    console.log('Testing Zoho CRM access token')
 
-    // Fetch available modules
-    const modulesResponse = await fetch(`${baseUrl}/crm/v2/settings/modules`, {
+    // Test the access token by fetching modules
+    let modulesResponse = await fetch(`${baseUrl}/crm/v2/settings/modules`, {
       headers: {
         'Authorization': `Zoho-oauthtoken ${access_token}`,
         'Content-Type': 'application/json'
       }
     })
 
+    // If we get a 401, try to refresh the token
+    if (modulesResponse.status === 401 && refresh_token) {
+      console.log('Access token expired, attempting to refresh...')
+      
+      try {
+        const refreshResponse = await fetch('https://accounts.zoho.com/oauth/v2/token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            refresh_token: refresh_token,
+            client_id: Deno.env.get('ZOHO_CLIENT_ID') || '',
+            client_secret: Deno.env.get('ZOHO_CLIENT_SECRET') || '',
+            grant_type: 'refresh_token'
+          })
+        })
+
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json()
+          access_token = refreshData.access_token
+          
+          // Update the stored token
+          const updatedData = { ...oauthData.data, access_token }
+          await supabase
+            .from('project_integration_data')
+            .update({ data: updatedData })
+            .eq('project_id', projectId)
+            .eq('platform', 'zoho_crm')
+
+          console.log('Successfully refreshed Zoho access token')
+          
+          // Retry the modules request with new token
+          modulesResponse = await fetch(`${baseUrl}/crm/v2/settings/modules`, {
+            headers: {
+              'Authorization': `Zoho-oauthtoken ${access_token}`,
+              'Content-Type': 'application/json'
+            }
+          })
+        } else {
+          const errorText = await refreshResponse.text()
+          console.error('Failed to refresh Zoho token:', errorText)
+          throw new Error('Zoho access token expired and refresh failed. Please reconnect your Zoho integration.')
+        }
+      } catch (refreshError) {
+        console.error('Token refresh error:', refreshError)
+        throw new Error('Zoho access token expired and refresh failed. Please reconnect your Zoho integration.')
+      }
+    }
+
     if (!modulesResponse.ok) {
-      throw new Error(`Failed to fetch Zoho modules: ${modulesResponse.status}`)
+      const errorText = await modulesResponse.text()
+      console.error(`Failed to fetch Zoho modules: ${modulesResponse.status} - ${errorText}`)
+      throw new Error(`Failed to fetch Zoho modules: ${modulesResponse.status} - ${errorText}`)
     }
 
     const modulesData = await modulesResponse.json()
