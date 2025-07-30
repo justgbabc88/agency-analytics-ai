@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -36,7 +37,7 @@ export const ZohoDealsDisplay = ({ projectId }: ZohoDealsDisplayProps) => {
   const [loading, setLoading] = useState(true);
   const [analytics, setAnalytics] = useState<any>(null);
   const [leadSources, setLeadSources] = useState<string[]>([]);
-  const [selectedLeadSource, setSelectedLeadSource] = useState<string>('all');
+  const [selectedLeadSources, setSelectedLeadSources] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
 
@@ -48,7 +49,7 @@ export const ZohoDealsDisplay = ({ projectId }: ZohoDealsDisplayProps) => {
 
   useEffect(() => {
     filterDeals();
-  }, [deals, selectedLeadSource, searchTerm]);
+  }, [deals, selectedLeadSources, searchTerm]);
 
   const fetchZohoData = async () => {
     if (!projectId) return;
@@ -108,9 +109,11 @@ export const ZohoDealsDisplay = ({ projectId }: ZohoDealsDisplayProps) => {
   const filterDeals = () => {
     let filtered = deals;
 
-    // Filter by lead source
-    if (selectedLeadSource !== 'all') {
-      filtered = filtered.filter(deal => deal.Lead_Source === selectedLeadSource);
+    // Filter by lead sources (multiple selection)
+    if (selectedLeadSources.length > 0) {
+      filtered = filtered.filter(deal => 
+        deal.Lead_Source && selectedLeadSources.includes(deal.Lead_Source)
+      );
     }
 
     // Filter by search term
@@ -124,6 +127,22 @@ export const ZohoDealsDisplay = ({ projectId }: ZohoDealsDisplayProps) => {
     }
 
     setFilteredDeals(filtered);
+  };
+
+  const handleLeadSourceToggle = (source: string, checked: boolean) => {
+    if (checked) {
+      setSelectedLeadSources(prev => [...prev, source]);
+    } else {
+      setSelectedLeadSources(prev => prev.filter(s => s !== source));
+    }
+  };
+
+  const clearAllLeadSources = () => {
+    setSelectedLeadSources([]);
+  };
+
+  const selectAllLeadSources = () => {
+    setSelectedLeadSources([...leadSources]);
   };
 
   const formatCurrency = (amount: number) => {
@@ -254,20 +273,53 @@ export const ZohoDealsDisplay = ({ projectId }: ZohoDealsDisplayProps) => {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Lead Source</label>
-              <Select value={selectedLeadSource} onValueChange={setSelectedLeadSource}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select lead source" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Lead Sources</SelectItem>
-                  {leadSources.map((source) => (
-                    <SelectItem key={source} value={source}>
-                      {source}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Lead Sources</label>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={selectAllLeadSources}
+                    disabled={selectedLeadSources.length === leadSources.length}
+                  >
+                    Select All
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={clearAllLeadSources}
+                    disabled={selectedLeadSources.length === 0}
+                  >
+                    Clear All
+                  </Button>
+                </div>
+              </div>
+              <div className="max-h-48 overflow-y-auto border rounded-md p-3 space-y-2 bg-background">
+                {leadSources.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No lead sources available</p>
+                ) : (
+                  leadSources.map((source) => (
+                    <div key={source} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`lead-source-${source}`}
+                        checked={selectedLeadSources.includes(source)}
+                        onCheckedChange={(checked) => handleLeadSourceToggle(source, checked as boolean)}
+                      />
+                      <label 
+                        htmlFor={`lead-source-${source}`}
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                      >
+                        {source}
+                      </label>
+                    </div>
+                  ))
+                )}
+              </div>
+              {selectedLeadSources.length > 0 && (
+                <div className="text-xs text-muted-foreground">
+                  {selectedLeadSources.length} source(s) selected
+                </div>
+              )}
             </div>
             
             <div className="space-y-2">
