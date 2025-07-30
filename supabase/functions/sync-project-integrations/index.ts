@@ -6,6 +6,34 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Retry utility function
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<T> {
+  let lastError: Error
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn()
+    } catch (error) {
+      lastError = error as Error
+      
+      if (attempt === maxRetries) {
+        throw lastError
+      }
+      
+      // Exponential backoff with jitter
+      const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 1000
+      console.log(`Attempt ${attempt + 1} failed, retrying in ${delay}ms:`, error.message)
+      await new Promise(resolve => setTimeout(resolve, delay))
+    }
+  }
+  
+  throw lastError
+}
+
 interface SyncRequest {
   projectId: string
   platform: string
@@ -460,13 +488,15 @@ async function syncZohoCRM(projectId: string, supabase: any) {
 
     console.log('Testing Zoho CRM access token')
 
-    // Test the access token by fetching modules with timeout
-    let modulesResponse = await fetch(`${baseUrl}/crm/v2/settings/modules`, {
-      headers: {
-        'Authorization': `Zoho-oauthtoken ${access_token}`,
-        'Content-Type': 'application/json'
-      },
-      signal: AbortSignal.timeout(30000) // 30 second timeout
+    // Test the access token by fetching modules with retry logic
+    let modulesResponse = await retryWithBackoff(async () => {
+      return await fetch(`${baseUrl}/crm/v2/settings/modules`, {
+        headers: {
+          'Authorization': `Zoho-oauthtoken ${access_token}`,
+          'Content-Type': 'application/json'
+        },
+        signal: AbortSignal.timeout(30000) // 30 second timeout
+      })
     })
 
     // If we get a 401, try to refresh the token
@@ -563,12 +593,14 @@ async function syncZohoCRM(projectId: string, supabase: any) {
           const url = `${baseUrl}/crm/v2/${moduleName}?per_page=${perPage}&page=${page}${filterParam}${sortParam}`
           console.log(`ZOHO SYNC DEBUG: Fetching URL: ${url}`)
           
-          const recordsResponse = await fetch(url, {
-            headers: {
-              'Authorization': `Zoho-oauthtoken ${access_token}`,
-              'Content-Type': 'application/json'
-            },
-            signal: AbortSignal.timeout(45000) // 45 second timeout per request
+          const recordsResponse = await retryWithBackoff(async () => {
+            return await fetch(url, {
+              headers: {
+                'Authorization': `Zoho-oauthtoken ${access_token}`,
+                'Content-Type': 'application/json'
+              },
+              signal: AbortSignal.timeout(45000) // 45 second timeout per request
+            })
           })
 
           if (recordsResponse.ok) {
