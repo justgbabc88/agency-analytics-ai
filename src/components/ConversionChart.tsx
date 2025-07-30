@@ -78,7 +78,9 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     cancelled: '#EF4444',
     showUpRate: '#8B5CF6',
     costPerCall: '#9333EA',
-    costPerLead: '#EC4899'
+    costPerLead: '#EC4899',
+    totalDeals: '#10B981',
+    costPerDeal: '#EF4444'
   };
 
   const getMetricColor = (metric: string) => {
@@ -245,7 +247,9 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
       cancelled: 'Cancelled',
       showUpRate: 'Show Up Rate',
       costPerCall: 'Cost Per Call',
-      costPerLead: 'Cost Per Lead'
+      costPerLead: 'Cost Per Lead',
+      totalDeals: 'Total Deals',
+      costPerDeal: 'Cost Per Deal'
     };
 
     return nameMap[metric as keyof typeof nameMap] || metric.charAt(0).toUpperCase() + metric.slice(1).replace(/([A-Z])/g, ' $1');

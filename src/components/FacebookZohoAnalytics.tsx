@@ -12,7 +12,8 @@ interface FacebookZohoAnalyticsProps {
 
 interface DealData {
   Agreement_Received_Date: string;
-  Amount: number;
+  Fixed_Fee_Inc_GST?: number;
+  Total_Commission?: number;
   Deal_Name: string;
 }
 
@@ -55,12 +56,13 @@ export const FacebookZohoAnalytics = ({ projectId, dateRange }: FacebookZohoAnal
         const zohoData = data.data as any;
         const dealsData = zohoData.data?.deals?.records || [];
         
-        // Filter deals with valid Agreement_Received_Date and Amount
-        const validDeals = dealsData.filter((deal: any) => 
-          deal.Agreement_Received_Date && 
-          deal.Amount && 
-          !isNaN(parseFloat(deal.Amount))
-        );
+        // Filter deals with valid Agreement_Received_Date and amount
+        const validDeals = dealsData.filter((deal: any) => {
+          const hasDate = deal.Agreement_Received_Date;
+          const hasAmount = deal.Fixed_Fee_Inc_GST || deal.Total_Commission;
+          const amountValue = deal.Fixed_Fee_Inc_GST || deal.Total_Commission;
+          return hasDate && hasAmount && !isNaN(parseFloat(amountValue));
+        });
         
         setDeals(validDeals);
       }
@@ -111,7 +113,7 @@ export const FacebookZohoAnalytics = ({ projectId, dateRange }: FacebookZohoAnal
   }, [facebookData, deals, dateRange]);
 
   const totalDeals = useMemo(() => {
-    if (!dateRange || deals.length === 0) return 0;
+    if (!dateRange || deals.length === 0) return deals.length; // Show total deals even without date range
     
     return deals.filter(deal => {
       const dealDate = new Date(deal.Agreement_Received_Date);
@@ -162,6 +164,11 @@ export const FacebookZohoAnalytics = ({ projectId, dateRange }: FacebookZohoAnal
         <CardTitle>Deal Performance</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Debug info */}
+        <div className="text-xs text-muted-foreground">
+          Debug: {deals.length} deals loaded, {totalDeals} in date range, ProjectID: {projectId || 'None'}
+        </div>
+        
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card>
             <CardHeader className="pb-2">
