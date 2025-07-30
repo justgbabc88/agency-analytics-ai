@@ -310,12 +310,12 @@ async function handleDisconnect(projectId: string, supabase: any) {
   // Update integration status
   const { error: integrationError } = await supabase
     .from('project_integrations')
-    .upsert({
-      project_id: projectId,
-      platform: 'zoho_crm',
+    .update({
       is_connected: false,
       last_sync: null
     })
+    .eq('project_id', projectId)
+    .eq('platform', 'zoho_crm')
 
   if (integrationError) {
     console.error('Failed to update integration status:', integrationError)
