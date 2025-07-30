@@ -435,7 +435,7 @@ async function syncZohoCRM(projectId: string, supabase: any) {
       .select('data')
       .eq('project_id', projectId)
       .eq('platform', 'zoho_crm')
-      .single()
+      .maybeSingle()
 
     if (oauthError || !oauthData?.data?.access_token) {
       throw new Error('Zoho CRM access token not found. Please reconnect your Zoho integration.')
