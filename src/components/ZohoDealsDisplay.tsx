@@ -54,6 +54,7 @@ export const ZohoDealsDisplay = ({ projectId }: ZohoDealsDisplayProps) => {
   }, [projectId]);
 
   useEffect(() => {
+    console.log('🔍 Filter effect triggered. Deals count:', deals.length, 'Filters:', { selectedLeadSources, searchTerm, dateFrom, dateTo });
     filterDeals();
   }, [deals, selectedLeadSources, searchTerm, dateFrom, dateTo]);
 
@@ -154,6 +155,9 @@ export const ZohoDealsDisplay = ({ projectId }: ZohoDealsDisplayProps) => {
       });
     }
 
+    console.log('📊 Final filtered deals count:', filtered.length);
+    console.log('📋 Filtered deals names and dates:', filtered.map(d => ({ name: d.Deal_Name, date: d.Agreement_Received_Date })));
+    
     setFilteredDeals(filtered);
   };
 
