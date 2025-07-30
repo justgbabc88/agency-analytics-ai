@@ -460,8 +460,8 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
         </CardContent>
       </Card>
 
-      {/* Cost Per Lead and Cost Per Call Analysis - Side by Side */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Cost Per Lead, Cost Per Call, and Deal Performance Analysis - Side by Side */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Cost Per Lead Chart */}
         <Card>
           <CardHeader className="pb-3">
@@ -529,6 +529,12 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
             />
           </CardContent>
         </Card>
+
+        {/* Deal Performance Analytics */}
+        <FacebookZohoAnalytics 
+          projectId={projectId}
+          dateRange={dateRange}
+        />
       </div>
 
       {/* Other Facebook Performance Charts */}
@@ -585,12 +591,6 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
           </CardContent>
         </Card>
       </div>
-
-      {/* Deal Performance Analytics */}
-      <FacebookZohoAnalytics 
-        projectId={projectId}
-        dateRange={dateRange}
-      />
     </div>
   );
 };

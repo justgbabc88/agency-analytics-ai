@@ -217,12 +217,12 @@ export const FacebookZohoAnalytics = ({ projectId, dateRange }: FacebookZohoAnal
               {dateRange ? 'in selected period' : 'all time'}
             </div>
           </div>
-          <div className="text-center p-3 bg-gradient-to-br from-blue-50 to-blue-100/50 rounded-lg border border-blue-100">
-            <div className="text-xs text-blue-600 mb-1 font-medium">Average Cost Per Deal</div>
-            <div className="text-2xl font-bold text-blue-800">
+          <div className="text-center p-3 bg-gradient-to-br from-amber-50 to-amber-100/50 rounded-lg border border-amber-100">
+            <div className="text-xs text-amber-600 mb-1 font-medium">Average Cost Per Deal</div>
+            <div className="text-2xl font-bold text-amber-800">
               {totalDeals > 0 ? `$${averageCostPerDeal.toLocaleString()}` : 'N/A'}
             </div>
-            <div className="text-xs text-blue-600 mt-1">
+            <div className="text-xs text-amber-600 mt-1">
               based on Facebook spend
             </div>
           </div>

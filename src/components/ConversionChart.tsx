@@ -80,7 +80,7 @@ export const ConversionChart = ({ data, title, metrics = [], productConfig }: Co
     costPerCall: '#9333EA',
     costPerLead: '#EC4899',
     totalDeals: '#10B981',
-    costPerDeal: '#EF4444'
+    costPerDeal: '#F59E0B' // Changed to amber/orange to be unique
   };
 
   const getMetricColor = (metric: string) => {
