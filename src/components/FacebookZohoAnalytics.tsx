@@ -20,7 +20,7 @@ interface DealData {
 interface ChartDataPoint {
   date: string;
   totalDeals: number;
-  costPerDeal: number;
+  costPerDeal: number | null;
   spend: number;
 }
 
@@ -89,7 +89,7 @@ export const FacebookZohoAnalytics = ({ projectId, dateRange }: FacebookZohoAnal
       end: startOfDay(dateRange.to)
     });
 
-    return allDates.map(date => {
+    const chartData = allDates.map(date => {
       const dateStr = format(date, 'MMM dd');
       const isoDateStr = format(date, 'yyyy-MM-dd');
 
@@ -106,18 +106,26 @@ export const FacebookZohoAnalytics = ({ projectId, dateRange }: FacebookZohoAnal
       });
 
       const totalDeals = dealsOnDate.length;
-      const costPerDeal = totalDeals > 0 ? dailySpend / totalDeals : 0;
+      // Only calculate cost per deal if there are both deals and spend
+      const costPerDeal = totalDeals > 0 && dailySpend > 0 ? dailySpend / totalDeals : null;
 
       const dataPoint = {
         date: dateStr,
         totalDeals,
-        costPerDeal: Math.round(costPerDeal * 100) / 100, // Round to 2 decimal places
+        costPerDeal: costPerDeal !== null ? Math.round(costPerDeal * 100) / 100 : null,
         spend: dailySpend
       };
       
-      console.log(`FacebookZohoAnalytics - ${dateStr}:`, dataPoint);
+      console.log(`FacebookZohoAnalytics - ${dateStr}:`, {
+        ...dataPoint,
+        dealsOnThisDate: dealsOnDate.map(d => d.Deal_Name),
+        facebookSpend: dailySpend
+      });
       return dataPoint;
     });
+    
+    console.log('FacebookZohoAnalytics - Final chart data:', chartData);
+    return chartData;
   }, [facebookData, deals, dateRange]);
 
   const totalDeals = useMemo(() => {
@@ -198,18 +206,11 @@ export const FacebookZohoAnalytics = ({ projectId, dateRange }: FacebookZohoAnal
       </CardHeader>
       <CardContent>
         {chartData.length > 0 ? (
-          <div className="space-y-4">
-            <ConversionChart 
-              data={chartData}
-              title=""
-              metrics={['totalDeals']}
-            />
-            <ConversionChart 
-              data={chartData}
-              title=""
-              metrics={['costPerDeal']}
-            />
-          </div>
+          <ConversionChart 
+            data={chartData}
+            title=""
+            metrics={['totalDeals', 'costPerDeal']}
+          />
         ) : (
           <div className="text-center py-8 text-muted-foreground">
             No chart data available - ensure both Facebook and Zoho data is synced
