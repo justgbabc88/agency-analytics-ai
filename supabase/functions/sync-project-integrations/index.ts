@@ -571,7 +571,7 @@ async function syncZohoCRM(projectId: string, supabase: any) {
         
         let allRecords: any[] = []
         let page = 1
-        const maxRecords = moduleName === 'Deals' ? 2000 : 200 // Increased deals limit to 2000
+        const maxRecords = moduleName === 'Deals' ? 1000 : 200 // Limited deals to 1000
         const perPage = 200 // Zoho's max per page
         const maxPages = Math.ceil(maxRecords / perPage)
         
