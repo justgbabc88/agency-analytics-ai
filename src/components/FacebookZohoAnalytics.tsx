@@ -75,6 +75,11 @@ export const FacebookZohoAnalytics = ({ projectId, dateRange }: FacebookZohoAnal
 
   const chartData = useMemo(() => {
     if (!dateRange || !facebookData?.daily_insights || deals.length === 0) {
+      console.log('FacebookZohoAnalytics - No chart data available:', {
+        hasDateRange: !!dateRange,
+        hasFacebookData: !!facebookData?.daily_insights,
+        dealsCount: deals.length
+      });
       return [];
     }
 
@@ -103,12 +108,15 @@ export const FacebookZohoAnalytics = ({ projectId, dateRange }: FacebookZohoAnal
       const totalDeals = dealsOnDate.length;
       const costPerDeal = totalDeals > 0 ? dailySpend / totalDeals : 0;
 
-      return {
+      const dataPoint = {
         date: dateStr,
         totalDeals,
         costPerDeal: Math.round(costPerDeal * 100) / 100, // Round to 2 decimal places
         spend: dailySpend
       };
+      
+      console.log(`FacebookZohoAnalytics - ${dateStr}:`, dataPoint);
+      return dataPoint;
     });
   }, [facebookData, deals, dateRange]);
 
@@ -190,11 +198,18 @@ export const FacebookZohoAnalytics = ({ projectId, dateRange }: FacebookZohoAnal
       </CardHeader>
       <CardContent>
         {chartData.length > 0 ? (
-          <ConversionChart 
-            data={chartData}
-            title=""
-            metrics={['totalDeals', 'costPerDeal']}
-          />
+          <div className="space-y-4">
+            <ConversionChart 
+              data={chartData}
+              title=""
+              metrics={['totalDeals']}
+            />
+            <ConversionChart 
+              data={chartData}
+              title=""
+              metrics={['costPerDeal']}
+            />
+          </div>
         ) : (
           <div className="text-center py-8 text-muted-foreground">
             No chart data available - ensure both Facebook and Zoho data is synced
