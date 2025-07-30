@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Users, AlertCircle, CheckCircle, ExternalLink } from 'lucide-react';
+import { useProjectIntegrations } from '@/hooks/useProjectIntegrations';
+import { Users, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 
 interface ZohoCRMConnectorProps {
   projectId?: string;
@@ -21,6 +22,7 @@ export const ZohoCRMConnector = ({
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionData, setConnectionData] = useState<any>(null);
   const { toast } = useToast();
+  const { syncIntegration } = useProjectIntegrations(projectId);
 
   // Check for OAuth callback parameters on mount
   useEffect(() => {
@@ -272,12 +274,15 @@ export const ZohoCRMConnector = ({
         <div className="space-y-3">
           <h4 className="font-medium">Available Actions:</h4>
           <div className="space-y-2">
-            <Button variant="outline" size="sm" className="w-full">
-              <ExternalLink className="h-4 w-4 mr-2" />
-              Open Zoho CRM
-            </Button>
-            <Button variant="outline" size="sm" className="w-full">
-              Sync Now
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="w-full"
+              onClick={() => syncIntegration.mutate('zoho_crm')}
+              disabled={syncIntegration.isPending}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${syncIntegration.isPending ? 'animate-spin' : ''}`} />
+              {syncIntegration.isPending ? 'Syncing...' : 'Sync Now'}
             </Button>
           </div>
         </div>
