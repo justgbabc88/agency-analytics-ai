@@ -233,7 +233,7 @@ export const FacebookZohoAnalytics = ({ projectId, dateRange }: FacebookZohoAnal
           <ConversionChart 
             data={chartData}
             title=""
-            metrics={['totalDeals', 'costPerDeal']}
+            metrics={['costPerDeal']}
           />
         ) : (
           <div className="text-center py-8 text-muted-foreground">
