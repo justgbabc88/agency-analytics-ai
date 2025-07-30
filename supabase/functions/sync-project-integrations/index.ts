@@ -103,10 +103,24 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Sync error:', error)
+    
+    // Determine if this is a timeout/server error vs client error
+    const isServerError = error.message.includes('timeout') || 
+                          error.message.includes('520') || 
+                          error.message.includes('AbortError') ||
+                          error.message.includes('Failed to fetch')
+    
+    const statusCode = isServerError ? 503 : 400
+    
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        type: isServerError ? 'server_error' : 'client_error',
+        timestamp: new Date().toISOString(),
+        platform
+      }),
       { 
-        status: 400,
+        status: statusCode,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     )
@@ -446,12 +460,13 @@ async function syncZohoCRM(projectId: string, supabase: any) {
 
     console.log('Testing Zoho CRM access token')
 
-    // Test the access token by fetching modules
+    // Test the access token by fetching modules with timeout
     let modulesResponse = await fetch(`${baseUrl}/crm/v2/settings/modules`, {
       headers: {
         'Authorization': `Zoho-oauthtoken ${access_token}`,
         'Content-Type': 'application/json'
-      }
+      },
+      signal: AbortSignal.timeout(30000) // 30 second timeout
     })
 
     // If we get a 401, try to refresh the token
@@ -552,7 +567,8 @@ async function syncZohoCRM(projectId: string, supabase: any) {
             headers: {
               'Authorization': `Zoho-oauthtoken ${access_token}`,
               'Content-Type': 'application/json'
-            }
+            },
+            signal: AbortSignal.timeout(45000) // 45 second timeout per request
           })
 
           if (recordsResponse.ok) {
