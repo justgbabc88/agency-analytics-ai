@@ -8,6 +8,15 @@ import { format, eachDayOfInterval, startOfDay } from "date-fns";
 interface FacebookZohoAnalyticsProps {
   projectId?: string;
   dateRange?: { from: Date; to: Date };
+  zohoLeadSourceFilter?: {
+    leadSources: string[];
+    selectedLeadSources: string[];
+    filteredDeals: any[];
+    loading: boolean;
+    handleLeadSourceToggle: (source: string, checked: boolean) => void;
+    clearAllLeadSources: () => void;
+    selectAllLeadSources: () => void;
+  };
 }
 
 interface DealData {
@@ -24,57 +33,17 @@ interface ChartDataPoint {
   spend: number;
 }
 
-export const FacebookZohoAnalytics = ({ projectId, dateRange }: FacebookZohoAnalyticsProps) => {
-  const [deals, setDeals] = useState<DealData[]>([]);
-  const [loading, setLoading] = useState(true);
+export const FacebookZohoAnalytics = ({ projectId, dateRange, zohoLeadSourceFilter }: FacebookZohoAnalyticsProps) => {
+  const [loading, setLoading] = useState(false);
 
   const { facebookData, insights } = useFacebookData({ dateRange });
   
   // Use the same dailyInsights that FacebookMetrics uses for cost per lead
   const dailyInsights = facebookData?.daily_insights;
 
-  useEffect(() => {
-    if (projectId) {
-      fetchZohoDeals();
-    }
-  }, [projectId]);
+  // Use filtered deals from the shared hook, or fallback to empty array
+  const deals = zohoLeadSourceFilter?.filteredDeals || [];
 
-  const fetchZohoDeals = async () => {
-    if (!projectId) return;
-
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('project_integration_data')
-        .select('data')
-        .eq('project_id', projectId)
-        .eq('platform', 'zoho_crm')
-        .order('synced_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (data?.data) {
-        const zohoData = data.data as any;
-        const dealsData = zohoData.data?.deals?.records || [];
-        
-        // Filter deals with valid Agreement_Received_Date and amount
-        const validDeals = dealsData.filter((deal: any) => {
-          const hasDate = deal.Agreement_Received_Date;
-          const hasAmount = deal.Fixed_Fee_Inc_GST || deal.Total_Commission;
-          const amountValue = deal.Fixed_Fee_Inc_GST || deal.Total_Commission;
-          return hasDate && hasAmount && !isNaN(parseFloat(amountValue));
-        });
-        
-        setDeals(validDeals);
-      }
-    } catch (error) {
-      console.error('Error fetching Zoho deals:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const chartData = useMemo(() => {
     console.log('FacebookZohoAnalytics - Daily insights data:', dailyInsights?.slice(0, 5));
@@ -166,7 +135,7 @@ export const FacebookZohoAnalytics = ({ projectId, dateRange }: FacebookZohoAnal
     return totalDeals > 0 ? Math.round((totalSpend / totalDeals) * 100) / 100 : 0;
   }, [insights?.spend, totalDeals]);
 
-  if (loading) {
+  if (zohoLeadSourceFilter?.loading) {
     return (
       <Card>
         <CardHeader>

@@ -1,9 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,6 +15,15 @@ import { isEventInDateRange } from '@/utils/dateFiltering';
 
 interface ZohoDealsDisplayProps {
   projectId?: string;
+  zohoLeadSourceFilter?: {
+    leadSources: string[];
+    selectedLeadSources: string[];
+    filteredDeals: any[];
+    loading: boolean;
+    handleLeadSourceToggle: (source: string, checked: boolean) => void;
+    clearAllLeadSources: () => void;
+    selectAllLeadSources: () => void;
+  };
 }
 
 interface Deal {
@@ -35,18 +43,23 @@ interface Deal {
   };
 }
 
-export const ZohoDealsDisplay = ({ projectId }: ZohoDealsDisplayProps) => {
+export const ZohoDealsDisplay = ({ projectId, zohoLeadSourceFilter }: ZohoDealsDisplayProps) => {
   const [deals, setDeals] = useState<Deal[]>([]);
-  const [filteredDeals, setFilteredDeals] = useState<Deal[]>([]);
-  const [loading, setLoading] = useState(true);
   const [analytics, setAnalytics] = useState<any>(null);
-  const [leadSources, setLeadSources] = useState<string[]>([]);
-  const [selectedLeadSources, setSelectedLeadSources] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [localLoading, setLocalLoading] = useState(true);
   const { toast } = useToast();
   const { getUserTimezone } = useUserProfile();
+
+  // Use shared filter state if available, otherwise use local state
+  const leadSources = zohoLeadSourceFilter?.leadSources || [];
+  const selectedLeadSources = zohoLeadSourceFilter?.selectedLeadSources || [];
+  const loading = zohoLeadSourceFilter?.loading ?? localLoading;
+  const handleLeadSourceToggle = zohoLeadSourceFilter?.handleLeadSourceToggle || (() => {});
+  const clearAllLeadSources = zohoLeadSourceFilter?.clearAllLeadSources || (() => {});
+  const selectAllLeadSources = zohoLeadSourceFilter?.selectAllLeadSources || (() => {});
 
   useEffect(() => {
     if (projectId) {
@@ -54,16 +67,11 @@ export const ZohoDealsDisplay = ({ projectId }: ZohoDealsDisplayProps) => {
     }
   }, [projectId]);
 
-  useEffect(() => {
-    console.log('🔍 Filter effect triggered. Deals count:', deals.length, 'Filters:', { selectedLeadSources, searchTerm, dateFrom, dateTo });
-    filterDeals();
-  }, [deals, selectedLeadSources, searchTerm, dateFrom, dateTo]);
-
   const fetchZohoData = async () => {
     if (!projectId) return;
 
     try {
-      setLoading(true);
+      setLocalLoading(true);
       const { data, error } = await supabase
         .from('project_integration_data')
         .select('data')
@@ -93,14 +101,6 @@ export const ZohoDealsDisplay = ({ projectId }: ZohoDealsDisplayProps) => {
 
         setDeals(dealsData);
         setAnalytics(analyticsData);
-
-        // Extract unique lead sources
-        const sources = Array.from(new Set(
-          dealsData
-            .map((deal: Deal) => deal.Lead_Source)
-            .filter(Boolean)
-        )) as string[];
-        setLeadSources(sources);
       }
     } catch (error) {
       console.error('Error fetching Zoho data:', error);
@@ -110,19 +110,14 @@ export const ZohoDealsDisplay = ({ projectId }: ZohoDealsDisplayProps) => {
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      setLocalLoading(false);
     }
   };
 
-  const filterDeals = () => {
-    let filtered = deals;
-
-    // Filter by lead sources (multiple selection)
-    if (selectedLeadSources.length > 0) {
-      filtered = filtered.filter(deal => 
-        deal.Lead_Source && selectedLeadSources.includes(deal.Lead_Source)
-      );
-    }
+  // Filter deals by search term and date range (lead source filtering is handled by the shared hook)
+  const filteredDeals = useMemo(() => {
+    // Start with either shared filtered deals or all deals
+    let filtered = zohoLeadSourceFilter?.filteredDeals || deals;
 
     // Filter by search term
     if (searchTerm) {
@@ -156,27 +151,8 @@ export const ZohoDealsDisplay = ({ projectId }: ZohoDealsDisplayProps) => {
       });
     }
 
-    console.log('📊 Final filtered deals count:', filtered.length);
-    console.log('📋 Filtered deals names and dates:', filtered.map(d => ({ name: d.Deal_Name, date: d.Agreement_Received_Date })));
-    
-    setFilteredDeals(filtered);
-  };
-
-  const handleLeadSourceToggle = (source: string, checked: boolean) => {
-    if (checked) {
-      setSelectedLeadSources(prev => [...prev, source]);
-    } else {
-      setSelectedLeadSources(prev => prev.filter(s => s !== source));
-    }
-  };
-
-  const clearAllLeadSources = () => {
-    setSelectedLeadSources([]);
-  };
-
-  const selectAllLeadSources = () => {
-    setSelectedLeadSources([...leadSources]);
-  };
+    return filtered;
+  }, [zohoLeadSourceFilter?.filteredDeals, deals, searchTerm, dateFrom, dateTo]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
