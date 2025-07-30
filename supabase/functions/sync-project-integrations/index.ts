@@ -53,6 +53,9 @@ serve(async (req) => {
       case 'google_sheets':
         syncResult = await syncGoogleSheets(apiKeys)
         break
+      case 'zoho_crm':
+        syncResult = await syncZohoCRM(projectId, supabase)
+        break
       default:
         throw new Error(`Unsupported platform: ${platform}`)
     }
@@ -419,5 +422,163 @@ async function syncClickFunnelsOAuth(oauthData: any, projectId: string, supabase
   } catch (error) {
     console.error('ClickFunnels OAuth API error:', error)
     throw error
+  }
+}
+
+async function syncZohoCRM(projectId: string, supabase: any) {
+  console.log('Zoho CRM sync initiated')
+
+  try {
+    // Get the stored OAuth tokens for this project
+    const { data: oauthData, error: oauthError } = await supabase
+      .from('project_integration_data')
+      .select('data')
+      .eq('project_id', projectId)
+      .eq('platform', 'zoho_crm')
+      .single()
+
+    if (oauthError || !oauthData?.data?.access_token) {
+      throw new Error('Zoho CRM access token not found. Please reconnect your Zoho integration.')
+    }
+
+    const { access_token, api_domain } = oauthData.data
+    const baseUrl = api_domain || 'https://www.zohoapis.com'
+
+    console.log('Fetching Zoho CRM modules')
+
+    // Fetch available modules
+    const modulesResponse = await fetch(`${baseUrl}/crm/v2/settings/modules`, {
+      headers: {
+        'Authorization': `Zoho-oauthtoken ${access_token}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (!modulesResponse.ok) {
+      throw new Error(`Failed to fetch Zoho modules: ${modulesResponse.status}`)
+    }
+
+    const modulesData = await modulesResponse.json()
+    const modules = modulesData.modules || []
+
+    console.log(`Found ${modules.length} Zoho CRM modules`)
+
+    // Fetch data from key modules (Leads, Contacts, Deals, Accounts)
+    const keyModules = ['Leads', 'Contacts', 'Deals', 'Accounts']
+    const moduleData: any = {}
+    let totalRecords = 0
+
+    for (const moduleName of keyModules) {
+      try {
+        console.log(`Fetching ${moduleName} records`)
+        
+        const recordsResponse = await fetch(`${baseUrl}/crm/v2/${moduleName}?per_page=200`, {
+          headers: {
+            'Authorization': `Zoho-oauthtoken ${access_token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (recordsResponse.ok) {
+          const recordsData = await recordsResponse.json()
+          const records = recordsData.data || []
+          
+          moduleData[moduleName.toLowerCase()] = {
+            records,
+            count: records.length,
+            info: recordsData.info || {}
+          }
+          
+          totalRecords += records.length
+          console.log(`Fetched ${records.length} ${moduleName} records`)
+        } else {
+          console.log(`Failed to fetch ${moduleName}: ${recordsResponse.status}`)
+          moduleData[moduleName.toLowerCase()] = {
+            records: [],
+            count: 0,
+            error: `Failed to fetch: ${recordsResponse.status}`
+          }
+        }
+
+        // Add a small delay between requests to avoid rate limits
+        await new Promise(resolve => setTimeout(resolve, 100))
+
+      } catch (error) {
+        console.error(`Error fetching ${moduleName}:`, error)
+        moduleData[moduleName.toLowerCase()] = {
+          records: [],
+          count: 0,
+          error: error.message
+        }
+      }
+    }
+
+    // Calculate some basic analytics
+    const analytics = {
+      total_records: totalRecords,
+      leads_count: moduleData.leads?.count || 0,
+      contacts_count: moduleData.contacts?.count || 0,
+      deals_count: moduleData.deals?.count || 0,
+      accounts_count: moduleData.accounts?.count || 0,
+      
+      // Calculate revenue from deals (if available)
+      total_deal_value: moduleData.deals?.records?.reduce((total: number, deal: any) => {
+        return total + (parseFloat(deal.Amount || 0))
+      }, 0) || 0,
+      
+      // Count deals by stage
+      deals_by_stage: moduleData.deals?.records?.reduce((stages: any, deal: any) => {
+        const stage = deal.Stage || 'Unknown'
+        stages[stage] = (stages[stage] || 0) + 1
+        return stages
+      }, {}) || {}
+    }
+
+    console.log(`Zoho CRM sync completed - ${totalRecords} total records synced`)
+
+    return {
+      modules: modules.map((module: any) => ({
+        api_name: module.api_name,
+        singular_label: module.singular_label,
+        plural_label: module.plural_label,
+        module_name: module.module_name
+      })),
+      data: moduleData,
+      analytics,
+      total_records: totalRecords,
+      synced_modules: keyModules,
+      user_info: {
+        email: oauthData.data.user_email,
+        name: oauthData.data.user_name,
+        organization: oauthData.data.organization_name
+      },
+      api_domain: baseUrl,
+      last_updated: new Date().toISOString(),
+      synced_at: new Date().toISOString()
+    }
+
+  } catch (error) {
+    console.error('Zoho CRM sync error:', error)
+    
+    // Return error info but don't throw to avoid breaking the sync process
+    return {
+      error: error.message,
+      modules: [],
+      data: {},
+      analytics: {
+        total_records: 0,
+        leads_count: 0,
+        contacts_count: 0,
+        deals_count: 0,
+        accounts_count: 0,
+        total_deal_value: 0,
+        deals_by_stage: {}
+      },
+      total_records: 0,
+      synced_modules: [],
+      last_updated: new Date().toISOString(),
+      synced_at: new Date().toISOString(),
+      note: 'Sync failed - check your Zoho CRM connection'
+    }
   }
 }
