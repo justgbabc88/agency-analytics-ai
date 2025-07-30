@@ -141,13 +141,22 @@ export const ZohoDealsDisplay = ({ projectId }: ZohoDealsDisplayProps) => {
       filtered = filtered.filter(deal => {
         if (!deal.Agreement_Received_Date) return false;
         
+        // Debug logging
+        console.log('Deal:', deal.Deal_Name, 'Agreement Date:', deal.Agreement_Received_Date, 'User Timezone:', userTimezone);
+        
         // Use timezone-aware date range checking
         if (fromDate && toDate) {
-          return isEventInDateRange(deal.Agreement_Received_Date, fromDate, toDate, userTimezone);
+          const result = isEventInDateRange(deal.Agreement_Received_Date, fromDate, toDate, userTimezone);
+          console.log('Date range filter result for', deal.Deal_Name, ':', result, 'Range:', dateFrom, 'to', dateTo);
+          return result;
         } else if (fromDate) {
-          return isEventInDateRange(deal.Agreement_Received_Date, fromDate, new Date('2099-12-31'), userTimezone);
+          const result = isEventInDateRange(deal.Agreement_Received_Date, fromDate, new Date('2099-12-31'), userTimezone);
+          console.log('From date filter result for', deal.Deal_Name, ':', result, 'From:', dateFrom);
+          return result;
         } else if (toDate) {
-          return isEventInDateRange(deal.Agreement_Received_Date, new Date('1900-01-01'), toDate, userTimezone);
+          const result = isEventInDateRange(deal.Agreement_Received_Date, new Date('1900-01-01'), toDate, userTimezone);
+          console.log('To date filter result for', deal.Deal_Name, ':', result, 'To:', dateTo);
+          return result;
         }
         
         return true;
