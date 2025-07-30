@@ -79,7 +79,7 @@ export const ZohoDealsDisplay = ({ projectId }: ZohoDealsDisplayProps) => {
           return;
         }
         
-        const dealsData = zohoData.modules?.deals?.records || [];
+        const dealsData = zohoData.data?.deals?.records || [];
         const analyticsData = zohoData.analytics || {};
 
         setDeals(dealsData);
