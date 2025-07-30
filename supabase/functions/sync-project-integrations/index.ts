@@ -472,39 +472,64 @@ async function syncZohoCRM(projectId: string, supabase: any) {
       try {
         console.log(`Fetching ${moduleName} records`)
         
+        let allRecords: any[] = []
+        let page = 1
+        const maxRecords = moduleName === 'Deals' ? 1000 : 200 // Limit deals to 1000, others to 200
+        const perPage = 200 // Zoho's max per page
+        const maxPages = Math.ceil(maxRecords / perPage)
+        
         // Filter to only fetch deals with Agreement_Received_Date
         const filterParam = moduleName === 'Deals' ? '&criteria=(Agreement_Received_Date:not_null)' : ''
         
-        const recordsResponse = await fetch(`${baseUrl}/crm/v2/${moduleName}?per_page=200${filterParam}`, {
-          headers: {
-            'Authorization': `Zoho-oauthtoken ${access_token}`,
-            'Content-Type': 'application/json'
-          }
-        })
+        while (page <= maxPages) {
+          const recordsResponse = await fetch(`${baseUrl}/crm/v2/${moduleName}?per_page=${perPage}&page=${page}${filterParam}`, {
+            headers: {
+              'Authorization': `Zoho-oauthtoken ${access_token}`,
+              'Content-Type': 'application/json'
+            }
+          })
 
-        if (recordsResponse.ok) {
-          const recordsData = await recordsResponse.json()
-          const records = recordsData.data || []
-          
-          moduleData[moduleName.toLowerCase()] = {
-            records,
-            count: records.length,
-            info: recordsData.info || {}
-          }
-          
-          totalRecords += records.length
-          console.log(`Fetched ${records.length} ${moduleName} records`)
-        } else {
-          console.log(`Failed to fetch ${moduleName}: ${recordsResponse.status}`)
-          moduleData[moduleName.toLowerCase()] = {
-            records: [],
-            count: 0,
-            error: `Failed to fetch: ${recordsResponse.status}`
+          if (recordsResponse.ok) {
+            const recordsData = await recordsResponse.json()
+            const records = recordsData.data || []
+            
+            if (records.length === 0) {
+              console.log(`No more ${moduleName} records found on page ${page}`)
+              break // No more records to fetch
+            }
+            
+            allRecords = allRecords.concat(records)
+            console.log(`Fetched ${records.length} ${moduleName} records from page ${page} (total: ${allRecords.length})`)
+            
+            // Check if we have enough records or if this was the last page
+            if (allRecords.length >= maxRecords || records.length < perPage) {
+              break
+            }
+            
+            page++
+            
+            // Add delay between requests to respect rate limits (10 requests per minute)
+            await new Promise(resolve => setTimeout(resolve, 6500)) // 6.5 seconds between requests
+            
+          } else {
+            console.log(`Failed to fetch ${moduleName} page ${page}: ${recordsResponse.status}`)
+            break
           }
         }
-
-        // Add a small delay between requests to avoid rate limits
-        await new Promise(resolve => setTimeout(resolve, 100))
+        
+        // Limit to maxRecords if we got more than expected
+        if (allRecords.length > maxRecords) {
+          allRecords = allRecords.slice(0, maxRecords)
+        }
+        
+        moduleData[moduleName.toLowerCase()] = {
+          records: allRecords,
+          count: allRecords.length,
+          info: { total_fetched: allRecords.length, pages_fetched: page - 1 }
+        }
+        
+        totalRecords += allRecords.length
+        console.log(`Completed fetching ${allRecords.length} ${moduleName} records`)
 
       } catch (error) {
         console.error(`Error fetching ${moduleName}:`, error)
