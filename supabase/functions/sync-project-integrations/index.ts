@@ -45,13 +45,16 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
+  let platform = 'unknown' // Default value for error handling
+  
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { projectId, platform, apiKeys }: SyncRequest = await req.json()
+    const { projectId, platform: requestPlatform, apiKeys }: SyncRequest = await req.json()
+    platform = requestPlatform // Update the platform variable
 
     console.log(`Syncing data for platform: ${platform}, project: ${projectId}`)
 
