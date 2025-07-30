@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 interface Deal {
@@ -8,22 +9,14 @@ interface Deal {
 }
 
 export const useZohoLeadSourceFilter = (projectId?: string) => {
-  const [leadSources, setLeadSources] = useState<string[]>([]);
   const [selectedLeadSources, setSelectedLeadSources] = useState<string[]>([]);
-  const [allDeals, setAllDeals] = useState<Deal[]>([]);
-  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (projectId) {
-      fetchZohoDeals();
-    }
-  }, [projectId]);
+  // Use React Query for efficient caching of Zoho data
+  const { data: zohoData, isLoading, refetch } = useQuery({
+    queryKey: ['zoho-deals', projectId],
+    queryFn: async () => {
+      if (!projectId) return null;
 
-  const fetchZohoDeals = async () => {
-    if (!projectId) return;
-
-    try {
-      setLoading(true);
       const { data, error } = await supabase
         .from('project_integration_data')
         .select('data')
@@ -37,32 +30,40 @@ export const useZohoLeadSourceFilter = (projectId?: string) => {
 
       if (data?.data) {
         const zohoData = data.data as any;
-        const dealsData = zohoData.data?.deals?.records || [];
-        
-        setAllDeals(dealsData);
-
-        // Extract unique lead sources
-        const sources = Array.from(new Set(
-          dealsData
-            .map((deal: Deal) => deal.Lead_Source)
-            .filter(Boolean)
-        )) as string[];
-        setLeadSources(sources);
+        return zohoData.data?.deals?.records || [];
       }
-    } catch (error) {
-      console.error('Error fetching Zoho deals for lead source filter:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+      
+      return [];
+    },
+    enabled: !!projectId,
+    staleTime: 5 * 60 * 1000, // Data is fresh for 5 minutes
+    gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
+    refetchOnWindowFocus: false, // Don't refetch when window regains focus
+    refetchOnMount: false, // Don't refetch on component mount if data exists
+  });
 
-  // Filter deals by selected lead sources
-  const getFilteredDeals = () => {
+  const allDeals = zohoData || [];
+
+  // Extract unique lead sources with memoization
+  const leadSources = useMemo(() => {
+    if (!allDeals.length) return [];
+    
+    const sources = Array.from(new Set(
+      allDeals
+        .map((deal: Deal) => deal.Lead_Source)
+        .filter(Boolean)
+    )) as string[];
+    
+    return sources;
+  }, [allDeals]);
+
+  // Filter deals by selected lead sources with memoization
+  const filteredDeals = useMemo(() => {
     if (selectedLeadSources.length === 0) return allDeals;
-    return allDeals.filter(deal => 
+    return allDeals.filter((deal: Deal) => 
       deal.Lead_Source && selectedLeadSources.includes(deal.Lead_Source)
     );
-  };
+  }, [allDeals, selectedLeadSources]);
 
   const handleLeadSourceToggle = (source: string, checked: boolean) => {
     if (checked) {
@@ -84,11 +85,11 @@ export const useZohoLeadSourceFilter = (projectId?: string) => {
     leadSources,
     selectedLeadSources,
     allDeals,
-    filteredDeals: getFilteredDeals(),
-    loading,
+    filteredDeals,
+    loading: isLoading,
     handleLeadSourceToggle,
     clearAllLeadSources,
     selectAllLeadSources,
-    refetchDeals: fetchZohoDeals
+    refetchDeals: refetch
   };
 };
