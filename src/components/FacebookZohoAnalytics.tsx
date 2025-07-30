@@ -8,15 +8,6 @@ import { format, eachDayOfInterval, startOfDay } from "date-fns";
 interface FacebookZohoAnalyticsProps {
   projectId?: string;
   dateRange?: { from: Date; to: Date };
-  zohoLeadSourceFilter?: {
-    leadSources: string[];
-    selectedLeadSources: string[];
-    filteredDeals: any[];
-    loading: boolean;
-    handleLeadSourceToggle: (source: string, checked: boolean) => void;
-    clearAllLeadSources: () => void;
-    selectAllLeadSources: () => void;
-  };
 }
 
 interface DealData {
@@ -33,7 +24,8 @@ interface ChartDataPoint {
   spend: number;
 }
 
-export const FacebookZohoAnalytics = ({ projectId, dateRange, zohoLeadSourceFilter }: FacebookZohoAnalyticsProps) => {
+export const FacebookZohoAnalytics = ({ projectId, dateRange }: FacebookZohoAnalyticsProps) => {
+  const [deals, setDeals] = useState<DealData[]>([]);
   const [loading, setLoading] = useState(false);
 
   const { facebookData, insights } = useFacebookData({ dateRange });
@@ -41,8 +33,39 @@ export const FacebookZohoAnalytics = ({ projectId, dateRange, zohoLeadSourceFilt
   // Use the same dailyInsights that FacebookMetrics uses for cost per lead
   const dailyInsights = facebookData?.daily_insights;
 
-  // Use filtered deals from the shared hook, or fallback to empty array
-  const deals = zohoLeadSourceFilter?.filteredDeals || [];
+  useEffect(() => {
+    if (projectId) {
+      fetchZohoDeals();
+    }
+  }, [projectId]);
+
+  const fetchZohoDeals = async () => {
+    if (!projectId) return;
+
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('project_integration_data')
+        .select('data')
+        .eq('project_id', projectId)
+        .eq('platform', 'zoho_crm')
+        .order('synced_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data?.data) {
+        const zohoData = data.data as any;
+        const dealsData = zohoData.data?.deals?.records || [];
+        setDeals(dealsData);
+      }
+    } catch (error) {
+      console.error('Error fetching Zoho deals:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
 
   const chartData = useMemo(() => {
@@ -135,7 +158,7 @@ export const FacebookZohoAnalytics = ({ projectId, dateRange, zohoLeadSourceFilt
     return totalDeals > 0 ? Math.round((totalSpend / totalDeals) * 100) / 100 : 0;
   }, [insights?.spend, totalDeals]);
 
-  if (zohoLeadSourceFilter?.loading) {
+  if (loading) {
     return (
       <Card>
         <CardHeader>

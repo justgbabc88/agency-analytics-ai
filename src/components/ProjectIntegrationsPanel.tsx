@@ -48,18 +48,9 @@ interface ProjectIntegrationsPanelProps {
   selectedFormIds?: string[];
   onFormSelectionChange?: (formIds: string[]) => void;
   onGHLDataRefresh?: () => void; // Add GHL data refresh function
-  zohoLeadSourceFilter?: {
-    leadSources: string[];
-    selectedLeadSources: string[];
-    filteredDeals: any[];
-    loading: boolean;
-    handleLeadSourceToggle: (source: string, checked: boolean) => void;
-    clearAllLeadSources: () => void;
-    selectAllLeadSources: () => void;
-  };
 }
 
-export const ProjectIntegrationsPanel = ({ projectId, selectedFormIds = [], onFormSelectionChange, onGHLDataRefresh, zohoLeadSourceFilter }: ProjectIntegrationsPanelProps) => {
+export const ProjectIntegrationsPanel = ({ projectId, selectedFormIds = [], onFormSelectionChange, onGHLDataRefresh }: ProjectIntegrationsPanelProps) => {
   const { integrations, updateIntegration } = useProjectIntegrations(projectId);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
 
@@ -181,7 +172,7 @@ export const ProjectIntegrationsPanel = ({ projectId, selectedFormIds = [], onFo
                 }
               }}
             />
-            {isConnected && <ZohoDealsDisplay projectId={projectId} zohoLeadSourceFilter={zohoLeadSourceFilter} />}
+            {isConnected && <ZohoDealsDisplay projectId={projectId} />}
           </div>
         );
       default:
