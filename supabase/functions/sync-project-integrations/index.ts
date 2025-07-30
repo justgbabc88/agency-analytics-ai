@@ -463,8 +463,8 @@ async function syncZohoCRM(projectId: string, supabase: any) {
 
     console.log(`Found ${modules.length} Zoho CRM modules`)
 
-    // Fetch data from key modules (Leads, Contacts, Deals, Accounts)
-    const keyModules = ['Leads', 'Contacts', 'Deals', 'Accounts']
+    // Fetch data from key modules (Leads and Deals only)
+    const keyModules = ['Leads', 'Deals']
     const moduleData: any = {}
     let totalRecords = 0
 
@@ -517,9 +517,7 @@ async function syncZohoCRM(projectId: string, supabase: any) {
     const analytics = {
       total_records: totalRecords,
       leads_count: moduleData.leads?.count || 0,
-      contacts_count: moduleData.contacts?.count || 0,
       deals_count: moduleData.deals?.count || 0,
-      accounts_count: moduleData.accounts?.count || 0,
       
       // Calculate revenue from deals (if available)
       total_deal_value: moduleData.deals?.records?.reduce((total: number, deal: any) => {
@@ -568,9 +566,7 @@ async function syncZohoCRM(projectId: string, supabase: any) {
       analytics: {
         total_records: 0,
         leads_count: 0,
-        contacts_count: 0,
         deals_count: 0,
-        accounts_count: 0,
         total_deal_value: 0,
         deals_by_stage: {}
       },
