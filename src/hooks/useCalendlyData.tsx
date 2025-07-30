@@ -1,7 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 export const useCalendlyData = (projectId?: string) => {
+  const queryClient = useQueryClient();
   const { data: calendlyEvents, isLoading, refetch } = useQuery({
     queryKey: ['calendly-events', projectId],
     queryFn: async () => {
@@ -91,8 +92,10 @@ export const useCalendlyData = (projectId?: string) => {
       return filteredEvents;
     },
     enabled: !!projectId,
-    staleTime: 30000, // 30 seconds
-    refetchInterval: 60000, // 1 minute
+    staleTime: 3 * 60 * 1000, // Events are fresh for 3 minutes
+    gcTime: 20 * 60 * 1000, // Keep in cache for 20 minutes
+    refetchOnWindowFocus: false, // Don't refetch on window focus
+    refetchInterval: 5 * 60 * 1000, // Auto-refetch every 5 minutes
   });
 
   const { data: eventMappings } = useQuery({
