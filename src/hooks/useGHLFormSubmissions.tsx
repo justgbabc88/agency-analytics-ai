@@ -73,90 +73,66 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
     gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
   });
 
-  // Fetch cached submissions data
+  // Fetch cached submissions data with optimized query
   const { data: submissionsData, isLoading: submissionsLoading } = useQuery({
-    queryKey: ['ghl-submissions', projectId],
+    queryKey: ['ghl-submissions', projectId, dateRange?.from, dateRange?.to],
     queryFn: async () => {
       if (!projectId) return [];
       
       console.log('🔍 [useGHLFormSubmissions] Fetching submissions for project:', projectId);
       
-      // Fetch all submissions with efficient pagination
-      const allSubmissions: any[] = [];
-      let page = 0;
-      const pageSize = 1000;
-      let hasMore = true;
-      
-      while (hasMore) {
-        const { data: submissionsData, error: submissionsError } = await supabase
-          .from('ghl_form_submissions')
-          .select('*')
-          .eq('project_id', projectId)
-          .order('submitted_at', { ascending: false })
-          .range(page * pageSize, (page + 1) * pageSize - 1);
+      // Build optimized query with date filtering at database level
+      let query = supabase
+        .from('ghl_form_submissions')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('submitted_at', { ascending: false });
 
-        if (submissionsError) {
-          throw new Error(`Failed to fetch submissions: ${submissionsError.message}`);
-        }
+      // Apply date filter at database level for much better performance
+      if (dateRange) {
+        query = query
+          .gte('submitted_at', dateRange.from.toISOString())
+          .lte('submitted_at', dateRange.to.toISOString());
+        
+        console.log('🔍 [useGHLFormSubmissions] Applying date filter at DB level:', {
+          from: dateRange.from.toISOString(),
+          to: dateRange.to.toISOString()
+        });
+      } else {
+        // If no date range, only fetch recent submissions (last 90 days) for performance
+        const ninetyDaysAgo = new Date();
+        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+        query = query.gte('submitted_at', ninetyDaysAgo.toISOString());
+        
+        console.log('🔍 [useGHLFormSubmissions] No date range provided, fetching last 90 days for performance');
+      }
 
-        if (submissionsData && submissionsData.length > 0) {
-          allSubmissions.push(...submissionsData);
-          hasMore = submissionsData.length === pageSize;
-          page++;
-        } else {
-          hasMore = false;
-        }
+      // Limit results for performance - can be increased if needed
+      query = query.limit(5000);
+
+      const { data: submissionsData, error: submissionsError } = await query;
+
+      if (submissionsError) {
+        throw new Error(`Failed to fetch submissions: ${submissionsError.message}`);
       }
 
       console.log('🔍 [useGHLFormSubmissions] Submissions fetched:', {
-        submissionsCount: allSubmissions.length,
-        pagesLoaded: page,
-        firstSubmission: allSubmissions[0]?.submitted_at,
-        lastSubmission: allSubmissions[allSubmissions.length - 1]?.submitted_at,
+        submissionsCount: submissionsData?.length || 0,
+        dateRange: dateRange ? 'filtered' : 'last_90_days',
+        firstSubmission: submissionsData?.[0]?.submitted_at,
+        lastSubmission: submissionsData?.[submissionsData?.length - 1]?.submitted_at,
       });
 
-      return allSubmissions;
+      return submissionsData || [];
     },
     enabled: !!projectId,
-    staleTime: 1 * 60 * 1000, // Submissions data is fresh for 1 minute (was 2 minutes)
-    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes (was 15 minutes)
-    refetchInterval: 2 * 60 * 1000, // Auto-refetch every 2 minutes
+    staleTime: 3 * 60 * 1000, // Submissions data is fresh for 3 minutes
+    gcTime: 20 * 60 * 1000, // Keep in cache for 20 minutes
+    refetchOnWindowFocus: false, // Don't refetch on window focus
   });
 
-  // Background sync for fresh data
-  const { data: syncStatus } = useQuery({
-    queryKey: ['ghl-sync-status', projectId],
-    queryFn: async () => {
-      if (!projectId || !submissionsData) return null;
-
-      // Check if submissions data is stale (older than 5 minutes)
-      const queryCache = queryClient.getQueryData(['ghl-submissions', projectId]);
-      const queryState = queryClient.getQueryState(['ghl-submissions', projectId]);
-      
-      if (queryState?.dataUpdatedAt) {
-        const dataAge = Date.now() - queryState.dataUpdatedAt;
-        const isStale = dataAge > 5 * 60 * 1000;
-
-        if (!isStale) {
-          console.log('🔍 [useGHLFormSubmissions] Data is fresh, skipping background sync');
-          return { synced: false, reason: 'data_fresh' };
-        }
-      }
-
-      console.log('🔍 [useGHLFormSubmissions] Data is stale, triggering background refresh');
-      
-      // Trigger background refresh
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['ghl-submissions', projectId] });
-        queryClient.invalidateQueries({ queryKey: ['ghl-forms', projectId] });
-      }, 100);
-
-      return { synced: true, timestamp: new Date().toISOString() };
-    },
-    enabled: !!projectId && !!submissionsData,
-    staleTime: 1 * 60 * 1000, // Check for refresh every 1 minute (was 3 minutes)
-    retry: 1,
-  });
+  // Remove the automatic background sync query since it's causing extra overhead
+  // Instead, rely on the optimized main query with longer stale time
 
   // Client-side filtering for instant performance
   const metrics = useMemo((): FormSubmissionMetrics => {
@@ -176,7 +152,8 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
 
     let filteredSubmissions = submissions;
 
-    // Filter by selected forms if provided
+    // Since we're now filtering at the database level, we don't need client-side date filtering
+    // Just filter by selected forms if provided
     if (selectedFormIds?.length) {
       filteredSubmissions = filteredSubmissions.filter(submission => 
         selectedFormIds.includes(submission.form_id)
@@ -186,48 +163,6 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
         selectedFormIds,
         originalCount: submissions.length,
         afterFormFilter: filteredSubmissions.length
-      });
-    }
-
-    // Filter by date range if provided
-    if (dateRange) {
-      console.log('🔍 [useGHLFormSubmissions] Starting date filter:', {
-        dateRange: {
-          from: dateRange.from.toISOString(),
-          to: dateRange.to.toISOString()
-        },
-        userTimezone,
-        totalSubmissions: submissions.length
-      });
-      
-      filteredSubmissions = filteredSubmissions.filter((submission, index) => {
-        const submissionDateUTC = parseISO(submission.submitted_at);
-        const submissionDateInUserTz = toZonedTime(submissionDateUTC, userTimezone);
-        const rangeStartInUserTz = toZonedTime(dateRange.from, userTimezone);
-        const rangeEndInUserTz = toZonedTime(dateRange.to, userTimezone);
-        
-        const isWithinRange = isWithinInterval(submissionDateInUserTz, {
-          start: rangeStartInUserTz,
-          end: rangeEndInUserTz
-        });
-        
-        // Log first few for debugging
-        if (index < 5) {
-          console.log(`🔍 [useGHLFormSubmissions] Submission ${index + 1}:`, {
-            id: submission.id.substring(0, 8),
-            submitted_at: submission.submitted_at,
-            submissionDateInUserTz: submissionDateInUserTz.toISOString(),
-            isWithinRange
-          });
-        }
-        
-        return isWithinRange;
-      });
-      
-      console.log('🔍 [useGHLFormSubmissions] Date filtering completed:', {
-        originalCount: submissions.length,
-        filteredCount: filteredSubmissions.length,
-        userTimezone
       });
     }
 
@@ -267,14 +202,14 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
       recentSubmissions: filteredSubmissions.slice(0, 10),
       topPerformingForms
     };
-  }, [submissionsData, formsData, dateRange, userTimezone, selectedFormIds]);
+  }, [submissionsData, formsData, selectedFormIds]);
 
   // Refetch function for manual refresh
   const refetch = React.useCallback(() => {
     console.log('🔍 [useGHLFormSubmissions] Manual refetch triggered');
-    queryClient.invalidateQueries({ queryKey: ['ghl-submissions', projectId] });
+    queryClient.invalidateQueries({ queryKey: ['ghl-submissions', projectId, dateRange?.from, dateRange?.to] });
     queryClient.invalidateQueries({ queryKey: ['ghl-forms', projectId] });
-  }, [projectId, queryClient]);
+  }, [projectId, queryClient, dateRange]);
 
   const isLoading = formsLoading || submissionsLoading;
 
