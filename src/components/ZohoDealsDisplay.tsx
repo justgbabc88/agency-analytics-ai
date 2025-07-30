@@ -280,7 +280,7 @@ export const ZohoDealsDisplay = ({ projectId }: ZohoDealsDisplayProps) => {
                 </Button>
               </div>
             </div>
-            <div className="max-h-48 overflow-y-auto border rounded-md p-3 space-y-2 bg-background">
+            <div className="border rounded-md p-3 space-y-2 bg-background">
               {leadSources.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No lead sources available</p>
               ) : (
