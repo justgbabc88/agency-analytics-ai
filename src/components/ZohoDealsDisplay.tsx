@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, DollarSign, Users, Filter, Search, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { isEventInDateRange } from '@/utils/dateFiltering';
 
@@ -186,7 +187,15 @@ export const ZohoDealsDisplay = ({ projectId }: ZohoDealsDisplayProps) => {
 
   const formatDate = (dateString: string) => {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString();
+    
+    // Use timezone-aware formatting to avoid date shifts
+    const userTimezone = getUserTimezone();
+    try {
+      return formatInTimeZone(new Date(dateString), userTimezone, 'MM/dd/yyyy');
+    } catch (error) {
+      // Fallback to simple date parsing if timezone formatting fails
+      return new Date(dateString).toLocaleDateString();
+    }
   };
 
   const getStageColor = (stage: string) => {
