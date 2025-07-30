@@ -26,17 +26,79 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    const clientId = Deno.env.get('ZOHO_CLIENT_ID')
+    const clientSecret = Deno.env.get('ZOHO_CLIENT_SECRET')
+    const redirectUri = Deno.env.get('ZOHO_REDIRECT_URI')
+
+    if (!clientId || !clientSecret || !redirectUri) {
+      throw new Error('Zoho OAuth credentials not configured')
+    }
+
+    // Handle GET requests (OAuth callbacks from Zoho)
+    if (req.method === 'GET') {
+      const url = new URL(req.url)
+      const code = url.searchParams.get('code')
+      const error = url.searchParams.get('error')
+      const state = url.searchParams.get('state')
+
+      console.log('Received OAuth callback:', { code: !!code, error, state })
+
+      if (error) {
+        // Return an HTML page that will close the popup with error
+        return new Response(`
+          <html>
+            <body>
+              <script>
+                if (window.opener) {
+                  window.opener.postMessage({
+                    type: 'ZOHO_OAUTH_ERROR',
+                    error: '${error}'
+                  }, window.location.origin);
+                  window.close();
+                } else {
+                  window.location.href = '/integrations?zoho_error=${encodeURIComponent(error)}';
+                }
+              </script>
+              <p>Authorization failed. Redirecting...</p>
+            </body>
+          </html>
+        `, {
+          headers: { 'Content-Type': 'text/html' }
+        })
+      }
+
+      if (code && state) {
+        // Return an HTML page that will close the popup with success
+        return new Response(`
+          <html>
+            <body>
+              <script>
+                if (window.opener) {
+                  window.opener.postMessage({
+                    type: 'ZOHO_OAUTH_SUCCESS',
+                    code: '${code}',
+                    state: '${state}'
+                  }, window.location.origin);
+                  window.close();
+                } else {
+                  window.location.href = '/integrations?zoho_code=${encodeURIComponent(code)}&zoho_state=${encodeURIComponent(state)}';
+                }
+              </script>
+              <p>Authorization successful. Redirecting...</p>
+            </body>
+          </html>
+        `, {
+          headers: { 'Content-Type': 'text/html' }
+        })
+      }
+
+      throw new Error('Missing authorization code or state')
+    }
+
+    // Handle POST requests (API calls from the frontend)
     const { action, code, projectId, refreshToken, accessToken, module }: ZohoOAuthRequest = await req.json()
 
     console.log(`Zoho OAuth action: ${action}`)
-
-    const clientId = Deno.env.get('ZOHO_CLIENT_ID')
-    const clientSecret = Deno.env.get('ZOHO_CLIENT_SECRET')
-    const redirectUri = Deno.env.get('ZOHO_REDIRECT_URI') || `${req.headers.get('origin')}/zoho-oauth-callback`
-
-    if (!clientId || !clientSecret) {
-      throw new Error('Zoho OAuth credentials not configured')
-    }
 
     switch (action) {
       case 'get_auth_url':
