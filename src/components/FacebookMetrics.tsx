@@ -21,9 +21,18 @@ interface FacebookMetricsProps {
   selectedAdSetIds?: string[];
   onAdSetChange?: (adSetIds: string[]) => void;
   selectedFormIds?: string[];
+  zohoLeadSourceFilter?: {
+    leadSources: string[];
+    selectedLeadSources: string[];
+    filteredDeals: any[];
+    loading: boolean;
+    handleLeadSourceToggle: (source: string, checked: boolean) => void;
+    clearAllLeadSources: () => void;
+    selectAllLeadSources: () => void;
+  };
 }
 
-export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onCampaignChange, selectedAdSetIds, onAdSetChange, selectedFormIds = [] }: FacebookMetricsProps) => {
+export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onCampaignChange, selectedAdSetIds, onAdSetChange, selectedFormIds = [], zohoLeadSourceFilter }: FacebookMetricsProps) => {
   const [internalSelectedCampaignIds, setInternalSelectedCampaignIds] = useState<string[]>(selectedCampaignIds || []);
   const [internalSelectedAdSetIds, setInternalSelectedAdSetIds] = useState<string[]>(selectedAdSetIds || []);
   
@@ -534,6 +543,7 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
           <FacebookZohoAnalytics 
             projectId={projectId} 
             dateRange={dateRange}
+            zohoLeadSourceFilter={zohoLeadSourceFilter}
           />
       </div>
 

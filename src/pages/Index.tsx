@@ -20,6 +20,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { subDays, startOfDay, endOfDay } from "date-fns";
 import { useGHLFormSubmissions } from "@/hooks/useGHLFormSubmissions";
+import { useZohoLeadSourceFilter } from "@/hooks/useZohoLeadSourceFilter";
 
 
 interface FunnelProductConfig {
@@ -53,6 +54,9 @@ const Index = () => {
 
   // Project data hook
   const { projects, selectedProjectId, isLoading: projectsLoading } = useProjects();
+  
+  // Zoho lead source filter hook
+  const zohoLeadSourceFilter = useZohoLeadSourceFilter(selectedProjectId || undefined);
   
   
   // React Query hooks
@@ -263,6 +267,7 @@ const Index = () => {
               selectedCampaignIds={selectedCampaignIds}
               onCampaignChange={setSelectedCampaignIds}
               selectedFormIds={selectedFormIds}
+              zohoLeadSourceFilter={zohoLeadSourceFilter}
             />
           </TabsContent>
 
@@ -424,6 +429,7 @@ const Index = () => {
               selectedFormIds={selectedFormIds}
               onFormSelectionChange={setSelectedFormIds}
               onGHLDataRefresh={refetchGHLData}
+              zohoLeadSourceFilter={zohoLeadSourceFilter}
             />
           </TabsContent>
         </Tabs>

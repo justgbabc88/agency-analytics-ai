@@ -15,6 +15,15 @@ import { isEventInDateRange } from '@/utils/dateFiltering';
 
 interface ZohoDealsDisplayProps {
   projectId?: string;
+  zohoLeadSourceFilter?: {
+    leadSources: string[];
+    selectedLeadSources: string[];
+    filteredDeals: any[];
+    loading: boolean;
+    handleLeadSourceToggle: (source: string, checked: boolean) => void;
+    clearAllLeadSources: () => void;
+    selectAllLeadSources: () => void;
+  };
 }
 
 interface Deal {
@@ -34,33 +43,20 @@ interface Deal {
   };
 }
 
-export const ZohoDealsDisplay = ({ projectId }: ZohoDealsDisplayProps) => {
+export const ZohoDealsDisplay = ({ projectId, zohoLeadSourceFilter }: ZohoDealsDisplayProps) => {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [analytics, setAnalytics] = useState<any>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
   const [loading, setLoading] = useState(true);
-  const [leadSources, setLeadSources] = useState<string[]>([]);
-  const [selectedLeadSources, setSelectedLeadSources] = useState<string[]>([]);
   const { toast } = useToast();
   const { getUserTimezone } = useUserProfile();
 
-  const handleLeadSourceToggle = (source: string, checked: boolean) => {
-    if (checked) {
-      setSelectedLeadSources(prev => [...prev, source]);
-    } else {
-      setSelectedLeadSources(prev => prev.filter(s => s !== source));
-    }
-  };
-
-  const clearAllLeadSources = () => {
-    setSelectedLeadSources([]);
-  };
-
-  const selectAllLeadSources = () => {
-    setSelectedLeadSources([...leadSources]);
-  };
+  // Use shared filter state if available, otherwise use local state
+  const leadSources = zohoLeadSourceFilter?.leadSources || [];
+  const selectedLeadSources = zohoLeadSourceFilter?.selectedLeadSources || [];
+  const filteredDeals = zohoLeadSourceFilter?.filteredDeals || [];
+  const handleLeadSourceToggle = zohoLeadSourceFilter?.handleLeadSourceToggle || (() => {});
+  const clearAllLeadSources = zohoLeadSourceFilter?.clearAllLeadSources || (() => {});
+  const selectAllLeadSources = zohoLeadSourceFilter?.selectAllLeadSources || (() => {});
 
   useEffect(() => {
     if (projectId) {
@@ -102,14 +98,6 @@ export const ZohoDealsDisplay = ({ projectId }: ZohoDealsDisplayProps) => {
 
         setDeals(dealsData);
         setAnalytics(analyticsData);
-
-        // Extract unique lead sources
-        const sources = Array.from(new Set(
-          dealsData
-            .map((deal: Deal) => deal.Lead_Source)
-            .filter(Boolean)
-        )) as string[];
-        setLeadSources(sources);
       }
     } catch (error) {
       console.error('Error fetching Zoho data:', error);
@@ -122,53 +110,6 @@ export const ZohoDealsDisplay = ({ projectId }: ZohoDealsDisplayProps) => {
       setLoading(false);
     }
   };
-
-  // Filter deals by lead source, search term and date range
-  const filteredDeals = useMemo(() => {
-    // Start with all deals
-    let filtered = deals;
-
-    // Filter by selected lead sources
-    if (selectedLeadSources.length > 0) {
-      filtered = filtered.filter(deal => 
-        deal.Lead_Source && selectedLeadSources.includes(deal.Lead_Source)
-      );
-    }
-
-    // Filter by search term
-    if (searchTerm) {
-      filtered = filtered.filter(deal =>
-        deal.Deal_Name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        deal.Stage?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        deal.Lead_Source?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        deal.UTM_Campaign?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    // Filter by agreement date range using timezone-aware filtering
-    if (dateFrom || dateTo) {
-      const userTimezone = getUserTimezone();
-      const fromDate = dateFrom ? new Date(dateFrom) : null;
-      const toDate = dateTo ? new Date(dateTo) : null;
-      
-      filtered = filtered.filter(deal => {
-        if (!deal.Agreement_Received_Date) return false;
-        
-        // Use timezone-aware date range checking
-        if (fromDate && toDate) {
-          return isEventInDateRange(deal.Agreement_Received_Date, fromDate, toDate, userTimezone);
-        } else if (fromDate) {
-          return isEventInDateRange(deal.Agreement_Received_Date, fromDate, new Date('2099-12-31'), userTimezone);
-        } else if (toDate) {
-          return isEventInDateRange(deal.Agreement_Received_Date, new Date('1900-01-01'), toDate, userTimezone);
-        }
-        
-        return true;
-      });
-    }
-
-    return filtered;
-  }, [deals, selectedLeadSources, searchTerm, dateFrom, dateTo, getUserTimezone]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
