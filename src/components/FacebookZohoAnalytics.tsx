@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from "react";
 import { useFacebookData } from "@/hooks/useFacebookData";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ConversionChart } from "./ConversionChart";
 import { format, eachDayOfInterval, startOfDay } from "date-fns";
 
@@ -15,6 +17,7 @@ interface DealData {
   Fixed_Fee_Inc_GST?: number;
   Total_Commission?: number;
   Deal_Name: string;
+  Lead_Source?: string;
 }
 
 interface ChartDataPoint {
@@ -27,6 +30,8 @@ interface ChartDataPoint {
 export const FacebookZohoAnalytics = ({ projectId, dateRange }: FacebookZohoAnalyticsProps) => {
   const [deals, setDeals] = useState<DealData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [leadSources, setLeadSources] = useState<string[]>([]);
+  const [selectedLeadSources, setSelectedLeadSources] = useState<string[]>([]);
 
   const { facebookData, insights } = useFacebookData({ dateRange });
   
@@ -68,6 +73,14 @@ export const FacebookZohoAnalytics = ({ projectId, dateRange }: FacebookZohoAnal
         });
         
         setDeals(validDeals);
+        
+        // Extract unique lead sources
+        const sources = Array.from(new Set(
+          validDeals
+            .map((deal: any) => deal.Lead_Source)
+            .filter(Boolean)
+        )) as string[];
+        setLeadSources(sources);
       }
     } catch (error) {
       console.error('Error fetching Zoho deals:', error);
@@ -75,6 +88,31 @@ export const FacebookZohoAnalytics = ({ projectId, dateRange }: FacebookZohoAnal
       setLoading(false);
     }
   };
+
+  // Lead source filtering functions
+  const handleLeadSourceToggle = (source: string, checked: boolean) => {
+    if (checked) {
+      setSelectedLeadSources(prev => [...prev, source]);
+    } else {
+      setSelectedLeadSources(prev => prev.filter(s => s !== source));
+    }
+  };
+
+  const clearAllLeadSources = () => {
+    setSelectedLeadSources([]);
+  };
+
+  const selectAllLeadSources = () => {
+    setSelectedLeadSources([...leadSources]);
+  };
+
+  // Filter deals by selected lead sources
+  const filteredDeals = useMemo(() => {
+    if (selectedLeadSources.length === 0) return deals;
+    return deals.filter(deal => 
+      deal.Lead_Source && selectedLeadSources.includes(deal.Lead_Source)
+    );
+  }, [deals, selectedLeadSources]);
 
   const chartData = useMemo(() => {
     console.log('FacebookZohoAnalytics - Daily insights data:', dailyInsights?.slice(0, 5));
@@ -85,11 +123,11 @@ export const FacebookZohoAnalytics = ({ projectId, dateRange }: FacebookZohoAnal
     });
     console.log('FacebookZohoAnalytics - Chart date range:', dateRange);
     
-    if (!dateRange || !dailyInsights || deals.length === 0) {
+    if (!dateRange || !dailyInsights || filteredDeals.length === 0) {
       console.log('FacebookZohoAnalytics - No chart data available:', {
         hasDateRange: !!dateRange,
         hasDailyInsights: !!dailyInsights,
-        dealsCount: deals.length
+        dealsCount: filteredDeals.length
       });
       return [];
     }
@@ -104,8 +142,8 @@ export const FacebookZohoAnalytics = ({ projectId, dateRange }: FacebookZohoAnal
       const dateStr = format(date, 'MMM dd');
       const isoDateStr = format(date, 'yyyy-MM-dd');
 
-      // Count deals for this date first
-      const dealsOnDate = deals.filter(deal => {
+      // Count filtered deals for this date
+      const dealsOnDate = filteredDeals.filter(deal => {
         const dealDate = new Date(deal.Agreement_Received_Date);
         return format(dealDate, 'yyyy-MM-dd') === isoDateStr;
       });
@@ -150,16 +188,16 @@ export const FacebookZohoAnalytics = ({ projectId, dateRange }: FacebookZohoAnal
     
     console.log('FacebookZohoAnalytics - Final chart data:', chartData);
     return chartData;
-  }, [dailyInsights, deals, dateRange]);
+  }, [dailyInsights, filteredDeals, dateRange]);
 
   const totalDeals = useMemo(() => {
-    if (!dateRange || deals.length === 0) return deals.length; // Show total deals even without date range
+    if (!dateRange || filteredDeals.length === 0) return filteredDeals.length; // Show total deals even without date range
     
-    return deals.filter(deal => {
+    return filteredDeals.filter(deal => {
       const dealDate = new Date(deal.Agreement_Received_Date);
       return dealDate >= dateRange.from && dealDate <= dateRange.to;
     }).length;
-  }, [deals, dateRange]);
+  }, [filteredDeals, dateRange]);
 
   const averageCostPerDeal = useMemo(() => {
     const totalSpend = insights?.spend || 0;
@@ -229,6 +267,55 @@ export const FacebookZohoAnalytics = ({ projectId, dateRange }: FacebookZohoAnal
         </div>
       </CardHeader>
       <CardContent>
+        {/* Lead Sources Filter */}
+        {leadSources.length > 0 && (
+          <div className="mb-4 p-3 border rounded-lg bg-muted/20">
+            <div className="flex items-center justify-between mb-3">
+              <label className="text-sm font-medium">Filter by Lead Source</label>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={selectAllLeadSources}
+                  disabled={selectedLeadSources.length === leadSources.length}
+                >
+                  Select All
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={clearAllLeadSources}
+                  disabled={selectedLeadSources.length === 0}
+                >
+                  Clear All
+                </Button>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              {leadSources.map((source) => (
+                <div key={source} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`deal-lead-source-${source}`}
+                    checked={selectedLeadSources.includes(source)}
+                    onCheckedChange={(checked) => handleLeadSourceToggle(source, checked as boolean)}
+                  />
+                  <label 
+                    htmlFor={`deal-lead-source-${source}`}
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    {source}
+                  </label>
+                </div>
+              ))}
+            </div>
+            {selectedLeadSources.length > 0 && (
+              <div className="text-xs text-muted-foreground mt-2">
+                {selectedLeadSources.length} lead source(s) selected • Showing {totalDeals} deal(s)
+              </div>
+            )}
+          </div>
+        )}
+        
         {chartData.length > 0 ? (
           <ConversionChart 
             data={chartData}
