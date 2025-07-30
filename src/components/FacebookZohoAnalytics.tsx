@@ -20,7 +20,7 @@ interface DealData {
 interface ChartDataPoint {
   date: string;
   totalDeals: number;
-  costPerDeal: number | null;
+  costPerDeal: number;
   spend: number;
 }
 
@@ -74,6 +74,10 @@ export const FacebookZohoAnalytics = ({ projectId, dateRange }: FacebookZohoAnal
   };
 
   const chartData = useMemo(() => {
+    console.log('FacebookZohoAnalytics - Facebook daily insights:', facebookData?.daily_insights);
+    console.log('FacebookZohoAnalytics - Date range:', dateRange);
+    console.log('FacebookZohoAnalytics - Total insights spend:', insights?.spend);
+    
     if (!dateRange || !facebookData?.daily_insights || deals.length === 0) {
       console.log('FacebookZohoAnalytics - No chart data available:', {
         hasDateRange: !!dateRange,
@@ -106,20 +110,38 @@ export const FacebookZohoAnalytics = ({ projectId, dateRange }: FacebookZohoAnal
       });
 
       const totalDeals = dealsOnDate.length;
-      // Only calculate cost per deal if there are both deals and spend
-      const costPerDeal = totalDeals > 0 && dailySpend > 0 ? dailySpend / totalDeals : null;
+      
+      // Calculate cost per deal - if there's no daily spend data but we have total spend,
+      // distribute it proportionally across days with deals
+      let costPerDeal = 0;
+      if (totalDeals > 0 && dailySpend > 0) {
+        costPerDeal = dailySpend / totalDeals;
+      } else if (totalDeals > 0 && (insights?.spend || 0) > 0) {
+        // Fallback: use average cost per deal when no daily spend data
+        const totalSpend = insights?.spend || 0;
+        const allDealsInRange = deals.filter(deal => {
+          if (!dateRange) return true;
+          const dealDate = new Date(deal.Agreement_Received_Date);
+          return dealDate >= dateRange.from && dealDate <= dateRange.to;
+        }).length;
+        if (allDealsInRange > 0) {
+          costPerDeal = totalSpend / allDealsInRange;
+        }
+      }
 
       const dataPoint = {
         date: dateStr,
         totalDeals,
-        costPerDeal: costPerDeal !== null ? Math.round(costPerDeal * 100) / 100 : null,
+        costPerDeal: Math.round(costPerDeal * 100) / 100,
         spend: dailySpend
       };
       
       console.log(`FacebookZohoAnalytics - ${dateStr}:`, {
         ...dataPoint,
         dealsOnThisDate: dealsOnDate.map(d => d.Deal_Name),
-        facebookSpend: dailySpend
+        facebookSpend: dailySpend,
+        totalSpendAvailable: insights?.spend,
+        calculationMethod: dailySpend > 0 ? 'daily' : 'average'
       });
       return dataPoint;
     });
