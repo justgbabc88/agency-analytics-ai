@@ -10,6 +10,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, DollarSign, Users, Filter, Search, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
+import { useUserProfile } from '@/hooks/useUserProfile';
+import { isEventInDateRange } from '@/utils/dateFiltering';
 
 interface ZohoDealsDisplayProps {
   projectId?: string;
@@ -43,6 +45,7 @@ export const ZohoDealsDisplay = ({ projectId }: ZohoDealsDisplayProps) => {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const { toast } = useToast();
+  const { getUserTimezone } = useUserProfile();
 
   useEffect(() => {
     if (projectId) {
@@ -129,17 +132,23 @@ export const ZohoDealsDisplay = ({ projectId }: ZohoDealsDisplayProps) => {
       );
     }
 
-    // Filter by agreement date range
+    // Filter by agreement date range using timezone-aware filtering
     if (dateFrom || dateTo) {
+      const userTimezone = getUserTimezone();
+      const fromDate = dateFrom ? new Date(dateFrom) : null;
+      const toDate = dateTo ? new Date(dateTo) : null;
+      
       filtered = filtered.filter(deal => {
         if (!deal.Agreement_Received_Date) return false;
         
-        const agreementDate = new Date(deal.Agreement_Received_Date);
-        const fromDate = dateFrom ? new Date(dateFrom) : null;
-        const toDate = dateTo ? new Date(dateTo) : null;
-        
-        if (fromDate && agreementDate < fromDate) return false;
-        if (toDate && agreementDate > toDate) return false;
+        // Use timezone-aware date range checking
+        if (fromDate && toDate) {
+          return isEventInDateRange(deal.Agreement_Received_Date, fromDate, toDate, userTimezone);
+        } else if (fromDate) {
+          return isEventInDateRange(deal.Agreement_Received_Date, fromDate, new Date('2099-12-31'), userTimezone);
+        } else if (toDate) {
+          return isEventInDateRange(deal.Agreement_Received_Date, new Date('1900-01-01'), toDate, userTimezone);
+        }
         
         return true;
       });
