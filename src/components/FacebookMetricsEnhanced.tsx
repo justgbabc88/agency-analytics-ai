@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useFacebookData } from "@/hooks/useFacebookData";
-
 import { FacebookCampaignFilter } from "./FacebookCampaignFilter";
 import { FacebookBatchSyncButton } from "./FacebookBatchSyncButton";
+import { FacebookZohoAnalytics } from "./FacebookZohoAnalytics";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -10,9 +10,10 @@ import { CheckCircle, AlertTriangle } from "lucide-react";
 
 interface FacebookMetricsEnhancedProps {
   dateRange?: { from: Date; to: Date };
+  projectId?: string;
 }
 
-export const FacebookMetricsEnhanced = ({ dateRange }: FacebookMetricsEnhancedProps) => {
+export const FacebookMetricsEnhanced = ({ dateRange, projectId }: FacebookMetricsEnhancedProps) => {
   const [selectedCampaignIds, setSelectedCampaignIds] = useState<string[]>([]);
   const [selectedAdSetIds, setSelectedAdSetIds] = useState<string[]>([]);
   const [isRetrying, setIsRetrying] = useState(false);
@@ -144,6 +145,12 @@ export const FacebookMetricsEnhanced = ({ dateRange }: FacebookMetricsEnhancedPr
           </CardContent>
         </Card>
       </div>
+
+      {/* Deal Performance */}
+      <FacebookZohoAnalytics 
+        projectId={projectId}
+        dateRange={dateRange}
+      />
 
       {/* Data Status Info */}
       <Card>
