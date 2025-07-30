@@ -472,7 +472,10 @@ async function syncZohoCRM(projectId: string, supabase: any) {
       try {
         console.log(`Fetching ${moduleName} records`)
         
-        const recordsResponse = await fetch(`${baseUrl}/crm/v2/${moduleName}?per_page=200`, {
+        // Filter to only fetch deals with Agreement_Received_Date
+        const filterParam = moduleName === 'Deals' ? '&criteria=(Agreement_Received_Date:not_null)' : ''
+        
+        const recordsResponse = await fetch(`${baseUrl}/crm/v2/${moduleName}?per_page=200${filterParam}`, {
           headers: {
             'Authorization': `Zoho-oauthtoken ${access_token}`,
             'Content-Type': 'application/json'
