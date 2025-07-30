@@ -8,7 +8,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, DollarSign, Users, Filter, Search } from 'lucide-react';
+import { Loader2, DollarSign, Users, Filter, Search, Calendar } from 'lucide-react';
+import { format } from 'date-fns';
 
 interface ZohoDealsDisplayProps {
   projectId?: string;
@@ -39,6 +40,8 @@ export const ZohoDealsDisplay = ({ projectId }: ZohoDealsDisplayProps) => {
   const [leadSources, setLeadSources] = useState<string[]>([]);
   const [selectedLeadSources, setSelectedLeadSources] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -49,7 +52,7 @@ export const ZohoDealsDisplay = ({ projectId }: ZohoDealsDisplayProps) => {
 
   useEffect(() => {
     filterDeals();
-  }, [deals, selectedLeadSources, searchTerm]);
+  }, [deals, selectedLeadSources, searchTerm, dateFrom, dateTo]);
 
   const fetchZohoData = async () => {
     if (!projectId) return;
@@ -124,6 +127,22 @@ export const ZohoDealsDisplay = ({ projectId }: ZohoDealsDisplayProps) => {
         deal.Lead_Source?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         deal.UTM_Campaign?.toLowerCase().includes(searchTerm.toLowerCase())
       );
+    }
+
+    // Filter by agreement date range
+    if (dateFrom || dateTo) {
+      filtered = filtered.filter(deal => {
+        if (!deal.Agreement_Received_Date) return false;
+        
+        const agreementDate = new Date(deal.Agreement_Received_Date);
+        const fromDate = dateFrom ? new Date(dateFrom) : null;
+        const toDate = dateTo ? new Date(dateTo) : null;
+        
+        if (fromDate && agreementDate < fromDate) return false;
+        if (toDate && agreementDate > toDate) return false;
+        
+        return true;
+      });
     }
 
     setFilteredDeals(filtered);
@@ -271,7 +290,7 @@ export const ZohoDealsDisplay = ({ projectId }: ZohoDealsDisplayProps) => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">Lead Sources</label>
@@ -332,6 +351,46 @@ export const ZohoDealsDisplay = ({ projectId }: ZohoDealsDisplayProps) => {
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
                 />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                Agreement Date Filter
+              </label>
+              <div className="space-y-2">
+                <div>
+                  <label className="text-xs text-muted-foreground">From Date</label>
+                  <Input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    placeholder="From date"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">To Date</label>
+                  <Input
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    placeholder="To date"
+                  />
+                </div>
+                {(dateFrom || dateTo) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setDateFrom('');
+                      setDateTo('');
+                    }}
+                    className="w-full"
+                  >
+                    Clear Date Filter
+                  </Button>
+                )}
               </div>
             </div>
           </div>
