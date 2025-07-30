@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,6 +21,65 @@ export const ZohoCRMConnector = ({
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionData, setConnectionData] = useState<any>(null);
   const { toast } = useToast();
+
+  // Check for OAuth callback parameters on mount
+  useEffect(() => {
+    const checkOAuthCallback = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('zoho_code');
+      const state = urlParams.get('zoho_state');
+      const error = urlParams.get('zoho_error');
+
+      if (error) {
+        toast({
+          title: "Connection Failed",
+          description: `OAuth error: ${error}`,
+          variant: "destructive",
+        });
+        // Clear URL parameters
+        window.history.replaceState({}, '', window.location.pathname);
+        return;
+      }
+
+      if (code && state && projectId) {
+        setIsConnecting(true);
+        try {
+          // Exchange code for tokens
+          const { data: tokenData, error: tokenError } = await supabase.functions.invoke('zoho-oauth', {
+            body: {
+              action: 'exchange_code',
+              code,
+              projectId
+            }
+          });
+
+          if (tokenError) throw tokenError;
+
+          setConnectionData(tokenData);
+          onConnectionChange?.(true);
+          
+          toast({
+            title: "Success",
+            description: "Successfully connected to Zoho CRM",
+          });
+
+          // Clear URL parameters
+          window.history.replaceState({}, '', window.location.pathname);
+        } catch (error) {
+          console.error('Token exchange error:', error);
+          toast({
+            title: "Connection Failed",
+            description: error instanceof Error ? error.message : "Failed to complete OAuth flow",
+            variant: "destructive",
+          });
+        } finally {
+          setIsConnecting(false);
+        }
+      }
+    };
+
+    checkOAuthCallback();
+  }, [projectId, onConnectionChange, toast]);
 
   const handleConnect = async () => {
     if (!projectId) {
