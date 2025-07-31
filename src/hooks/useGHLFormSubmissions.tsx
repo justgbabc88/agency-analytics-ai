@@ -107,8 +107,10 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
         console.log('🔍 [useGHLFormSubmissions] No date range provided, fetching last 90 days for performance');
       }
 
-      // Limit results for performance - can be increased if needed
-      query = query.limit(5000);
+      // Remove the artificial limit to fetch all data
+      // User reported only seeing 1000 leads, which was likely due to Supabase's default limit
+      // Now explicitly setting a much higher limit to get all data
+      query = query.limit(50000);
 
       const { data: submissionsData, error: submissionsError } = await query;
 
