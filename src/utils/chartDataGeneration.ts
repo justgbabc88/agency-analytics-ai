@@ -72,27 +72,39 @@ export const generateCallDataFromEvents = (
       timezone, 
       'yyyy-MM-dd'
     );
-    // Create a proper Date object for this day in the timezone
-    const currentDate = new Date(currentDateStr + 'T12:00:00');
     
     console.log(`\n--- Processing ${currentDateStr} with timezone ${timezone} ---`);
     
-    // Use improved date filtering for this specific day with timezone support
-    // For chart purposes, we'll use created_at to show when bookings were made
-    const eventsCreatedThisDay = calendlyEvents.filter(event => 
-      isEventCreatedOnDate(event.created_at, currentDate, timezone)
-    );
+    // Filter events by comparing date strings directly in the same timezone
+    const eventsCreatedThisDay = calendlyEvents.filter(event => {
+      if (!event.created_at) return false;
+      try {
+        const eventDateStr = formatInTimeZone(new Date(event.created_at), timezone, 'yyyy-MM-dd');
+        return eventDateStr === currentDateStr;
+      } catch {
+        return false;
+      }
+    });
     
-    // Also check for events scheduled on this day to show completed calls
-    const eventsScheduledThisDay = calendlyEvents.filter(event => 
-      isEventScheduledOnDate(event.scheduled_at, currentDate, timezone)
-    );
+    const eventsScheduledThisDay = calendlyEvents.filter(event => {
+      if (!event.scheduled_at) return false;
+      try {
+        const eventDateStr = formatInTimeZone(new Date(event.scheduled_at), timezone, 'yyyy-MM-dd');
+        return eventDateStr === currentDateStr;
+      } catch {
+        return false;
+      }
+    });
     
-    // Cancelled = events that were cancelled on this day (using updated_at)
-    const eventsCancelledThisDay = calendlyEvents.filter(event => 
-      (event.status === 'cancelled' || event.status === 'canceled') &&
-      isEventCreatedOnDate(event.updated_at, currentDate, timezone)
-    );
+    const eventsCancelledThisDay = calendlyEvents.filter(event => {
+      if ((event.status !== 'cancelled' && event.status !== 'canceled') || !event.updated_at) return false;
+      try {
+        const eventDateStr = formatInTimeZone(new Date(event.updated_at), timezone, 'yyyy-MM-dd');
+        return eventDateStr === currentDateStr;
+      } catch {
+        return false;
+      }
+    });
     const cancelled = eventsCancelledThisDay.length;
     
     console.log(`Events created on ${currentDateStr}: ${eventsCreatedThisDay.length}`);
@@ -149,7 +161,7 @@ export const generateCallDataFromEvents = (
     const pageViews = pageViewsThisDay;
     
     const dayData = {
-      date: format(currentDate, 'MMM d'),
+      date: format(new Date(startDate.getTime() + (i * 24 * 60 * 60 * 1000)), 'MMM d'),
       totalBookings: callsBooked,
       callsBooked,
       callsTaken,
