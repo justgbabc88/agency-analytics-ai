@@ -1,6 +1,7 @@
 
-import { format, isWithinInterval, startOfDay, endOfDay } from "date-fns";
+import { format } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
+import { isEventCreatedOnDate, isEventCreatedToday, isEventScheduledOnDate, isEventScheduledToday, isEventCancelledOnDate } from "./dateFiltering";
 
 // Generate chart data based on real Calendly events with improved date filtering and timezone support
 export const generateCallDataFromEvents = (
@@ -23,56 +24,71 @@ export const generateCallDataFromEvents = (
   console.log('Total days in range:', daysDiff);
   console.log('Total Calendly events available:', calendlyEvents.length);
   
+  // Log today's events specifically with improved detection and timezone awareness
+  const todaysScheduledEvents = calendlyEvents.filter(event => isEventScheduledToday(event.scheduled_at, timezone));
+  const todaysCreatedEvents = calendlyEvents.filter(event => isEventCreatedToday(event.created_at, timezone));
+  
+  console.log('🎯 Events SCHEDULED today (with timezone support):', todaysScheduledEvents.length);
+  console.log('🎯 Events CREATED today (with timezone support):', todaysCreatedEvents.length);
+  
+  if (todaysScheduledEvents.length > 0) {
+    console.log('🎯 TODAY\'S SCHEDULED EVENTS FOUND:', todaysScheduledEvents.map(e => ({
+      id: e.calendly_event_id,
+      created_at: e.created_at,
+      scheduled_at: e.scheduled_at,
+      scheduled_in_timezone: formatInTimeZone(new Date(e.scheduled_at), timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
+      status: e.status
+    })));
+  }
+  
+  if (todaysCreatedEvents.length > 0) {
+    console.log('🎯 TODAY\'S CREATED EVENTS FOUND:', todaysCreatedEvents.map(e => ({
+      id: e.calendly_event_id,
+      created_at: e.created_at,
+      created_in_timezone: formatInTimeZone(new Date(e.created_at), timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
+      scheduled_at: e.scheduled_at,
+      status: e.status
+    })));
+  }
+  
+  if (todaysScheduledEvents.length === 0 && todaysCreatedEvents.length === 0) {
+    console.log('⚠️ NO TODAY\'S EVENTS FOUND - Debugging timezone conversion');
+    console.log('Sample events for debugging:', calendlyEvents.slice(0, 3).map(e => ({
+      id: e.calendly_event_id,
+      created_at: e.created_at,
+      created_in_timezone: e.created_at ? formatInTimeZone(new Date(e.created_at), timezone, 'yyyy-MM-dd HH:mm:ss zzz') : 'Invalid date',
+      scheduled_at: e.scheduled_at,
+      scheduled_in_timezone: e.scheduled_at ? formatInTimeZone(new Date(e.scheduled_at), timezone, 'yyyy-MM-dd HH:mm:ss zzz') : 'Invalid date',
+      status: e.status
+    })));
+  }
+  
   const totalDays = daysDiff === 0 ? 1 : daysDiff + 1;
   
   for (let i = 0; i < totalDays; i++) {
-    // Create the current day's date range using the same approach as metrics cards
-    const currentDayStart = new Date(startDate.getTime() + (i * 24 * 60 * 60 * 1000));
-    const currentDayEnd = new Date(currentDayStart);
-    currentDayEnd.setHours(23, 59, 59, 999);
+    const currentDate = new Date(startDate);
+    currentDate.setDate(currentDate.getDate() + i);
+    // Format the date in the user's timezone to ensure proper alignment
+    const currentDateStr = formatInTimeZone(currentDate, timezone, 'yyyy-MM-dd');
     
-    const currentDateStr = format(currentDayStart, 'yyyy-MM-dd');
-    console.log(`\n--- Processing ${currentDateStr} ---`);
+    console.log(`\n--- Processing ${currentDateStr} with timezone ${timezone} ---`);
     
-    // Use the same date filtering approach as the working metrics cards
-    const eventsCreatedThisDay = calendlyEvents.filter(event => {
-      if (!event.created_at) return false;
-      try {
-        const createdAt = new Date(event.created_at);
-        return isWithinInterval(createdAt, {
-          start: startOfDay(currentDayStart),
-          end: endOfDay(currentDayStart)
-        });
-      } catch {
-        return false;
-      }
-    });
+    // Use improved date filtering for this specific day with timezone support
+    // For chart purposes, we'll use created_at to show when bookings were made
+    const eventsCreatedThisDay = calendlyEvents.filter(event => 
+      isEventCreatedOnDate(event.created_at, currentDate, timezone)
+    );
     
-    const eventsScheduledThisDay = calendlyEvents.filter(event => {
-      if (!event.scheduled_at) return false;
-      try {
-        const scheduledAt = new Date(event.scheduled_at);
-        return isWithinInterval(scheduledAt, {
-          start: startOfDay(currentDayStart),
-          end: endOfDay(currentDayStart)
-        });
-      } catch {
-        return false;
-      }
-    });
+    // Also check for events scheduled on this day to show completed calls
+    const eventsScheduledThisDay = calendlyEvents.filter(event => 
+      isEventScheduledOnDate(event.scheduled_at, currentDate, timezone)
+    );
     
-    const eventsCancelledThisDay = calendlyEvents.filter(event => {
-      if ((event.status !== 'cancelled' && event.status !== 'canceled') || !event.updated_at) return false;
-      try {
-        const updatedAt = new Date(event.updated_at);
-        return isWithinInterval(updatedAt, {
-          start: startOfDay(currentDayStart),
-          end: endOfDay(currentDayStart)
-        });
-      } catch {
-        return false;
-      }
-    });
+    // Cancelled = events that were cancelled on this day (using updated_at)
+    const eventsCancelledThisDay = calendlyEvents.filter(event => 
+      (event.status === 'cancelled' || event.status === 'canceled') &&
+      isEventCreatedOnDate(event.updated_at, currentDate, timezone)
+    );
     const cancelled = eventsCancelledThisDay.length;
     
     console.log(`Events created on ${currentDateStr}: ${eventsCreatedThisDay.length}`);
@@ -121,21 +137,15 @@ export const generateCallDataFromEvents = (
     // Calculate actual page views from tracking events for this day
     const pageViewsThisDay = trackingEvents ? trackingEvents.filter(event => {
       if (event.event_type !== 'page_view') return false;
-      try {
-        const eventDate = new Date(event.created_at);
-        return isWithinInterval(eventDate, {
-          start: startOfDay(currentDayStart),
-          end: endOfDay(currentDayStart)
-        });
-      } catch {
-        return false;
-      }
+      
+      const eventDate = formatInTimeZone(new Date(event.created_at), timezone, 'yyyy-MM-dd');
+      return eventDate === currentDateStr;
     }).length : Math.floor(Math.random() * 300) + 150; // Fallback to random if no tracking data
     
     const pageViews = pageViewsThisDay;
     
     const dayData = {
-      date: format(currentDayStart, 'MMM d'),
+      date: format(currentDate, 'MMM d'),
       totalBookings: callsBooked,
       callsBooked,
       callsTaken,
