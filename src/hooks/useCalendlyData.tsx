@@ -92,9 +92,10 @@ export const useCalendlyData = (projectId?: string) => {
       return filteredEvents;
     },
     enabled: !!projectId,
-    staleTime: 5 * 60 * 1000, // Events are fresh for 5 minutes
-    gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
+    staleTime: 3 * 60 * 1000, // Events are fresh for 3 minutes
+    gcTime: 20 * 60 * 1000, // Keep in cache for 20 minutes
     refetchOnWindowFocus: false, // Don't refetch on window focus
+    refetchInterval: 5 * 60 * 1000, // Auto-refetch every 5 minutes
   });
 
   const { data: eventMappings } = useQuery({
