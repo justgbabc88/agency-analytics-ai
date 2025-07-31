@@ -31,7 +31,8 @@ export const generateCallDataFromEvents = (
     const currentDayEnd = new Date(currentDayStart);
     currentDayEnd.setHours(23, 59, 59, 999);
     
-    console.log(`\n--- Processing ${format(currentDayStart, 'yyyy-MM-dd')} ---`);
+    const currentDateStr = format(currentDayStart, 'yyyy-MM-dd');
+    console.log(`\n--- Processing ${currentDateStr} ---`);
     
     // Use the same date filtering approach as the working metrics cards
     const eventsCreatedThisDay = calendlyEvents.filter(event => {
@@ -74,7 +75,6 @@ export const generateCallDataFromEvents = (
     });
     const cancelled = eventsCancelledThisDay.length;
     
-    const currentDateStr = format(currentDayStart, 'yyyy-MM-dd');
     console.log(`Events created on ${currentDateStr}: ${eventsCreatedThisDay.length}`);
     console.log(`Events scheduled on ${currentDateStr}: ${eventsScheduledThisDay.length}`);
     console.log(`Events cancelled on ${currentDateStr}: ${cancelled}`);
