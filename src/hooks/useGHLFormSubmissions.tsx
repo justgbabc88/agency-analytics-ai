@@ -75,7 +75,7 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
 
   // Fetch cached submissions data with optimized query
   const { data: submissionsData, isLoading: submissionsLoading } = useQuery({
-    queryKey: ['ghl-submissions', projectId, dateRange?.from, dateRange?.to],
+    queryKey: ['ghl-submissions-v2', projectId, dateRange?.from, dateRange?.to], // Changed key to invalidate cache
     queryFn: async () => {
       if (!projectId) return [];
       
@@ -209,7 +209,7 @@ export const useGHLFormSubmissions = (projectId: string, dateRange?: { from: Dat
   // Refetch function for manual refresh
   const refetch = React.useCallback(() => {
     console.log('🔍 [useGHLFormSubmissions] Manual refetch triggered');
-    queryClient.invalidateQueries({ queryKey: ['ghl-submissions', projectId, dateRange?.from, dateRange?.to] });
+    queryClient.invalidateQueries({ queryKey: ['ghl-submissions-v2', projectId, dateRange?.from, dateRange?.to] });
     queryClient.invalidateQueries({ queryKey: ['ghl-forms', projectId] });
   }, [projectId, queryClient, dateRange]);
 
