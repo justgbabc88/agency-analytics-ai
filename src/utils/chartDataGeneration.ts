@@ -68,7 +68,8 @@ export const generateCallDataFromEvents = (
   for (let i = 0; i < totalDays; i++) {
     const currentDate = new Date(startDate);
     currentDate.setDate(currentDate.getDate() + i);
-    const currentDateStr = format(currentDate, 'yyyy-MM-dd');
+    // Format the date in the user's timezone to ensure proper alignment
+    const currentDateStr = formatInTimeZone(currentDate, timezone, 'yyyy-MM-dd');
     
     console.log(`\n--- Processing ${currentDateStr} with timezone ${timezone} ---`);
     
