@@ -62,11 +62,12 @@ export const isEventCancelledOnDate = (event: any, targetDate: Date, userTimezon
   // Only check cancelled events
   if (event.status !== 'canceled' && event.status !== 'cancelled') return false;
   
-  // Use updated_at as the cancellation date
-  if (!event.updated_at) return false;
+  // Use cancelled_at if available, otherwise fall back to updated_at
+  const cancellationDate = event.cancelled_at || event.updated_at;
+  if (!cancellationDate) return false;
   
   try {
-    const cancelledDate = parseISO(event.updated_at);
+    const cancelledDate = parseISO(cancellationDate);
     if (!isValid(cancelledDate)) return false;
     
     // Use user's timezone or fall back to browser timezone
@@ -80,7 +81,7 @@ export const isEventCancelledOnDate = (event: any, targetDate: Date, userTimezon
     
     return isOnDate;
   } catch (error) {
-    console.warn('Error checking event cancellation date:', event.updated_at, error);
+    console.warn('Error checking event cancellation date:', cancellationDate, error);
     return false;
   }
 };
@@ -270,12 +271,14 @@ export const filterCancelledEventsByDateRange = (events: any[], dateRange: { fro
   
   console.log('Total cancelled events:', cancelledEvents.length);
   
-  // Then filter by cancellation date (updated_at)
+  // Then filter by cancellation date (cancelled_at or updated_at)
   const filtered = cancelledEvents.filter(event => {
-    if (!event.updated_at) return false;
+    // Use cancelled_at if available, otherwise fall back to updated_at
+    const cancellationDate = event.cancelled_at || event.updated_at;
+    if (!cancellationDate) return false;
     
     try {
-      const cancelledDate = parseISO(event.updated_at);
+      const cancelledDate = parseISO(cancellationDate);
       if (!isValid(cancelledDate)) return false;
       
       // Convert to user timezone and compare date strings
@@ -285,7 +288,7 @@ export const filterCancelledEventsByDateRange = (events: any[], dateRange: { fro
       
       return eventDateInUserTz >= startDateInUserTz && eventDateInUserTz <= endDateInUserTz;
     } catch (error) {
-      console.warn('Error filtering cancelled event by date:', event.updated_at, error);
+      console.warn('Error filtering cancelled event by date:', cancellationDate, error);
       return false;
     }
   });

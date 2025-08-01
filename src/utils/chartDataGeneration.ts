@@ -1,6 +1,6 @@
 
-import { format } from "date-fns";
-import { formatInTimeZone } from "date-fns-tz";
+import { format, isValid } from "date-fns";
+import { formatInTimeZone, toZonedTime } from "date-fns-tz";
 import { isEventCreatedOnDate, isEventCreatedToday, isEventScheduledOnDate, isEventScheduledToday, isEventCancelledOnDate } from "./dateFiltering";
 
 // Generate chart data based on real Calendly events with improved date filtering and timezone support
@@ -90,7 +90,21 @@ export const generateCallDataFromEvents = (
       
       // Use cancelled_at if available, otherwise fall back to updated_at
       const cancellationDate = event.cancelled_at || event.updated_at;
-      return isEventCreatedOnDate(cancellationDate, currentDate, timezone);
+      if (!cancellationDate) return false;
+      
+      try {
+        const cancelledDateTime = new Date(cancellationDate);
+        if (!isValid(cancelledDateTime)) return false;
+        
+        // Convert to user timezone and compare date strings
+        const eventDateInUserTz = format(toZonedTime(cancelledDateTime, timezone), 'yyyy-MM-dd');
+        const targetDateInUserTz = format(toZonedTime(currentDate, timezone), 'yyyy-MM-dd');
+        
+        return eventDateInUserTz === targetDateInUserTz;
+      } catch (error) {
+        console.warn('Error checking cancellation date:', cancellationDate, error);
+        return false;
+      }
     });
     const cancelled = eventsCancelledThisDay.length;
     
@@ -105,7 +119,7 @@ export const generateCallDataFromEvents = (
           cancelled_at: e.cancelled_at,
           updated_at: e.updated_at,
           used_date: cancellationDate,
-          cancelled_in_timezone: formatInTimeZone(new Date(cancellationDate), timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
+          cancelled_in_timezone: cancellationDate ? formatInTimeZone(new Date(cancellationDate), timezone, 'yyyy-MM-dd HH:mm:ss zzz') : 'N/A',
           scheduled_at: e.scheduled_at,
           status: e.status
         };
