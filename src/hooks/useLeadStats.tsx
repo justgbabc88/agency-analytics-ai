@@ -75,8 +75,7 @@ export const useLeadStats = (
   const callStats = useCallStatsCalculations(
     calendlyEvents || [],
     dateRange || { from: new Date(), to: new Date() },
-    userTimezone,
-    projectId
+    userTimezone
   );
 
   // Cache the combined lead stats with React Query for additional performance
