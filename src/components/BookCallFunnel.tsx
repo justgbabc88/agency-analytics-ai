@@ -396,8 +396,6 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
     return data;
   }, [filteredEvents, calendlyEvents, dateRangeKey, userTimezone, trackingEvents]);
 
-  // Call the hook at the top level of the component (outside useMemo)
-  const callStatsCalculation = useCallStatsCalculations(calendlyEvents, dateRange, userTimezone);
   
   // Calculate stats using the same exact logic as CallsList for consistency
   const callStatsData = useMemo(() => {
@@ -430,11 +428,18 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       return callDate >= fromDate && callDate <= toDate;
     };
 
-    // Use the proper call stats calculations that handle timezone and cancellation dates correctly
-    const totalBookings = callStatsCalculation.callStats.totalBookings;
-    const callsTaken = callStatsCalculation.callsTaken;
-    const callsCancelled = callStatsCalculation.callStats.cancelled; // Use the proper cancellation date filtering
-    const showUpRate = callStatsCalculation.showUpRate;
+    // Calculate the exact same numbers as CallsList filter buttons
+    const totalBookings = calendlyEvents.filter(call => isCallCreatedInDateRange(call)).length;
+    const callsTaken = calendlyEvents.filter(call => 
+      isCallScheduledInDateRange(call) && call.status.toLowerCase() !== 'cancelled'
+    ).length;
+    const callsCancelled = calendlyEvents.filter(c => 
+      c.status.toLowerCase() === 'cancelled' && isCallScheduledInDateRange(c)
+    ).length;
+
+    // Calculate show up rate
+    const totalScheduled = callsTaken + callsCancelled;
+    const showUpRate = totalScheduled > 0 ? Math.round((callsTaken / totalScheduled) * 100) : 0;
 
     return {
       totalBookings,
@@ -442,7 +447,7 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       callsCancelled,
       showUpRate
     };
-  }, [callStatsCalculation, dateRange, userTimezone]);
+  }, [calendlyEvents, dateRange, userTimezone]);
 
   const recentBookings = getRecentBookings(7);
   const monthlyComparison = getMonthlyComparison();
