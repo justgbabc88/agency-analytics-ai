@@ -397,57 +397,19 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
   }, [filteredEvents, calendlyEvents, dateRangeKey, userTimezone, trackingEvents]);
 
   
-  // Calculate stats using the same exact logic as CallsList for consistency
+  // Use the enhanced hook for call stats calculations including close rate
+  const callStatsFromHook = useCallStatsCalculations(calendlyEvents, dateRange, userTimezone);
+  
+  // Create consistent interface for the component
   const callStatsData = useMemo(() => {
-    // Helper functions matching CallsList exactly
-    const isCallCreatedInDateRange = (call: any): boolean => {
-      if (!dateRange) return true;
-      
-      const callCreatedInUserTz = toZonedTime(new Date(call.created_at), userTimezone);
-      const selectedFromDate = toZonedTime(dateRange.from, userTimezone);
-      const selectedToDate = toZonedTime(dateRange.to, userTimezone);
-      
-      const callDate = startOfDay(callCreatedInUserTz);
-      const fromDate = startOfDay(selectedFromDate);
-      const toDate = startOfDay(selectedToDate);
-      
-      return callDate >= fromDate && callDate <= toDate;
-    };
-
-    const isCallScheduledInDateRange = (call: any): boolean => {
-      if (!dateRange) return true;
-      
-      const callScheduledInUserTz = toZonedTime(new Date(call.scheduled_at), userTimezone);
-      const selectedFromDate = toZonedTime(dateRange.from, userTimezone);
-      const selectedToDate = toZonedTime(dateRange.to, userTimezone);
-      
-      const callDate = startOfDay(callScheduledInUserTz);
-      const fromDate = startOfDay(selectedFromDate);
-      const toDate = startOfDay(selectedToDate);
-      
-      return callDate >= fromDate && callDate <= toDate;
-    };
-
-    // Calculate the exact same numbers as CallsList filter buttons
-    const totalBookings = calendlyEvents.filter(call => isCallCreatedInDateRange(call)).length;
-    const callsTaken = calendlyEvents.filter(call => 
-      isCallScheduledInDateRange(call) && call.status.toLowerCase() !== 'cancelled'
-    ).length;
-    const callsCancelled = calendlyEvents.filter(c => 
-      c.status.toLowerCase() === 'cancelled' && isCallScheduledInDateRange(c)
-    ).length;
-
-    // Calculate show up rate
-    const totalScheduled = callsTaken + callsCancelled;
-    const showUpRate = totalScheduled > 0 ? Math.round((callsTaken / totalScheduled) * 100) : 0;
-
     return {
-      totalBookings,
-      callsTaken,
-      callsCancelled,
-      showUpRate
+      totalBookings: callStatsFromHook.callStats.totalBookings,
+      callsTaken: callStatsFromHook.callsTaken,
+      callsCancelled: callStatsFromHook.callStats.cancelled,
+      showUpRate: callStatsFromHook.showUpRate,
+      closeRate: callStatsFromHook.closeRate
     };
-  }, [calendlyEvents, dateRange, userTimezone]);
+  }, [callStatsFromHook]);
 
   const recentBookings = getRecentBookings(7);
   const monthlyComparison = getMonthlyComparison();
@@ -772,13 +734,15 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
 
       <CallStatsMetrics
         totalBookings={callStatsData.totalBookings}
-        previousTotalBookings={0}
+        previousTotalBookings={callStatsFromHook.previousStats.totalBookings}
         callsTaken={callStatsData.callsTaken}
-        previousCallsTaken={0}
+        previousCallsTaken={callStatsFromHook.previousCallsTaken}
         cancelled={callStatsData.callsCancelled}
-        previousCancelled={0}
+        previousCancelled={callStatsFromHook.previousStats.cancelled}
         showUpRate={callStatsData.showUpRate}
-        previousShowUpRate={0}
+        previousShowUpRate={callStatsFromHook.previousShowUpRate}
+        closeRate={callStatsData.closeRate}
+        previousCloseRate={callStatsFromHook.previousCloseRate}
         chartData={chartData}
         chartKey={chartKey}
       />

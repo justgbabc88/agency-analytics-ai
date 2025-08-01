@@ -12,6 +12,8 @@ interface CallStatsMetricsProps {
   previousCancelled: number;
   showUpRate: number;
   previousShowUpRate: number;
+  closeRate: number;
+  previousCloseRate: number;
   chartData: any[];
   chartKey: string;
 }
@@ -25,6 +27,8 @@ export const CallStatsMetrics = ({
   previousCancelled,
   showUpRate,
   previousShowUpRate,
+  closeRate,
+  previousCloseRate,
   chartData,
   chartKey,
 }: CallStatsMetricsProps) => {
@@ -34,7 +38,7 @@ export const CallStatsMetrics = ({
         <CardTitle className="text-lg font-semibold">Call Stats</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <MetricCard 
             title="New Bookings" 
             value={totalBookings} 
@@ -59,6 +63,13 @@ export const CallStatsMetrics = ({
             previousValue={previousShowUpRate} 
             format="percentage"
             description="% of scheduled calls attended"
+          />
+          <MetricCard 
+            title="Close Rate" 
+            value={closeRate} 
+            previousValue={previousCloseRate} 
+            format="percentage"
+            description="% of completed calls that resulted in a close"
           />
         </div>
         <ConversionChart 

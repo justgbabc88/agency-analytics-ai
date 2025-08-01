@@ -16,6 +16,7 @@ interface CalendlyEvent {
   invitee_name?: string;
   invitee_email?: string;
   status: string;
+  is_closed?: boolean;
 }
 
 export const useCallStatsCalculations = (
@@ -194,15 +195,22 @@ export const useCallStatsCalculations = (
     const pastCalls = completedCalls.length + cancelledCalls.length;
     const showUpRate = pastCalls > 0 ? Math.round((completedCalls.length / pastCalls) * 100) : 0;
 
+    // Close rate = (number of closed calls / total completed calls) * 100
+    // Only count calls that actually happened (completed) for close rate calculation
+    const closedCalls = completedCalls.filter(event => event.is_closed === true);
+    const closeRate = completedCalls.length > 0 ? Math.round((closedCalls.length / completedCalls.length) * 100) : 0;
+
     console.log('📈 Current period stats:', {
       totalBookings,
       callsTaken,
       cancelled,
       showUpRate,
+      closeRate,
       categoryBreakdown: {
         cancelled: cancelledCalls.length,
         completed: completedCalls.length,
-        upcoming: upcomingCalls.length
+        upcoming: upcomingCalls.length,
+        closed: closedCalls.length
       },
       eventsCreatedInRange: eventsCreatedInRange.map(e => ({
         name: e.event_type_name,
@@ -264,15 +272,22 @@ export const useCallStatsCalculations = (
     const previousShowUpRate = previousPastCalls > 0 ? 
       Math.round((previousCompletedCalls.length / previousPastCalls) * 100) : 0;
 
+    // Calculate previous period close rate
+    const previousClosedCalls = previousCompletedCalls.filter(event => event.is_closed === true);
+    const previousCloseRate = previousCompletedCalls.length > 0 ? 
+      Math.round((previousClosedCalls.length / previousCompletedCalls.length) * 100) : 0;
+
     console.log('📉 Previous period stats:', {
       previousTotalBookings,
       previousCallsTaken,
       previousCancelled,
       previousShowUpRate,
+      previousCloseRate,
       previousCallBreakdown: {
         cancelled: previousCancelledCalls.length,
         completed: previousCompletedCalls.length,
-        upcoming: previousUpcomingCalls.length
+        upcoming: previousUpcomingCalls.length,
+        closed: previousClosedCalls.length
       },
       periodStart: previousPeriodStart.toISOString(),
       periodEnd: previousPeriodEnd.toISOString()
@@ -289,26 +304,32 @@ export const useCallStatsCalculations = (
       },
       callsTaken,
       showUpRate,
+      closeRate,
       previousCallsTaken,
       previousShowUpRate,
+      previousCloseRate,
       // Expose the filtered arrays for UI components
       cancelledCalls,
       completedCalls,
       upcomingCalls,
+      closedCalls,
       // Expose counts for easier access
       callCounts: {
         cancelled: cancelledCalls.length,
         completed: completedCalls.length,
-        upcoming: upcomingCalls.length
+        upcoming: upcomingCalls.length,
+        closed: closedCalls.length
       },
       // Previous period arrays and counts
       previousCancelledCalls,
       previousCompletedCalls,
       previousUpcomingCalls,
+      previousClosedCalls,
       previousCallCounts: {
         cancelled: previousCancelledCalls.length,
         completed: previousCompletedCalls.length,
-        upcoming: previousUpcomingCalls.length
+        upcoming: previousUpcomingCalls.length,
+        closed: previousClosedCalls.length
       }
     };
   }, [calendlyEvents, dateRange.from, dateRange.to, userTimezone]);

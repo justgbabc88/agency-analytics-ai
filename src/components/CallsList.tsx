@@ -1,11 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CalendarDays, Mail, Phone, User } from "lucide-react";
+import { CalendarDays, Mail, Phone, User, DollarSign } from "lucide-react";
 import { format, startOfDay } from "date-fns";
 import { formatInTimeZone, toZonedTime } from "date-fns-tz";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface Call {
   id: string;
@@ -17,6 +19,7 @@ interface Call {
   status: string;
   created_at: string;
   updated_at: string;
+  is_closed?: boolean;
 }
 
 interface CallsListProps {
@@ -29,6 +32,48 @@ export const CallsList = ({ calls, isLoading, dateRange }: CallsListProps) => {
   const { profile } = useUserProfile();
   const userTimezone = profile?.timezone || 'UTC';
   const [statusFilter, setStatusFilter] = useState<string>('total_bookings');
+  const [updatingCallId, setUpdatingCallId] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  // Function to toggle close status
+  const toggleCloseStatus = async (call: Call) => {
+    setUpdatingCallId(call.id);
+    
+    try {
+      const newCloseStatus = !call.is_closed;
+      
+      const { error } = await supabase
+        .from('calendly_events')
+        .update({ is_closed: newCloseStatus })
+        .eq('id', call.id);
+
+      if (error) {
+        console.error('Error updating close status:', error);
+        toast({
+          title: "Error",
+          description: "Failed to update close status",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: newCloseStatus ? "Call Marked as Closed" : "Call Marked as Open",
+        description: `${call.event_type_name} has been ${newCloseStatus ? 'marked as closed' : 'marked as open'}`,
+      });
+
+      // The call status will be updated through real-time subscriptions
+    } catch (error) {
+      console.error('Error updating close status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update close status",
+        variant: "destructive",
+      });
+    } finally {
+      setUpdatingCallId(null);
+    }
+  };
 
   // Helper function to check if a call is scheduled within the date range
   const isCallScheduledInDateRange = (call: Call): boolean => {
@@ -185,9 +230,25 @@ export const CallsList = ({ calls, isLoading, dateRange }: CallsListProps) => {
                   </div>
                 </div>
                 
-                <div className="text-right text-sm text-muted-foreground">
-                  <div>Booked</div>
-                  <div>{formatInTimeZone(new Date(call.created_at), userTimezone, 'MMM d, h:mm a')}</div>
+                <div className="flex flex-col items-end gap-2">
+                  <div className="text-right text-sm text-muted-foreground">
+                    <div>Booked</div>
+                    <div>{formatInTimeZone(new Date(call.created_at), userTimezone, 'MMM d, h:mm a')}</div>
+                  </div>
+                  
+                  {/* Show close status toggle for completed calls */}
+                  {call.status.toLowerCase() === 'completed' && (
+                    <Button
+                      size="sm"
+                      variant={call.is_closed ? "default" : "outline"}
+                      onClick={() => toggleCloseStatus(call)}
+                      disabled={updatingCallId === call.id}
+                      className="text-xs"
+                    >
+                      <DollarSign className="h-3 w-3 mr-1" />
+                      {call.is_closed ? 'Closed' : 'Mark Closed'}
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}

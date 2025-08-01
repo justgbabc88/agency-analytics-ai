@@ -288,6 +288,7 @@ export type Database = {
           id: string
           invitee_email: string | null
           invitee_name: string | null
+          is_closed: boolean
           project_id: string
           scheduled_at: string
           status: string
@@ -302,6 +303,7 @@ export type Database = {
           id?: string
           invitee_email?: string | null
           invitee_name?: string | null
+          is_closed?: boolean
           project_id: string
           scheduled_at: string
           status?: string
@@ -316,6 +318,7 @@ export type Database = {
           id?: string
           invitee_email?: string | null
           invitee_name?: string | null
+          is_closed?: boolean
           project_id?: string
           scheduled_at?: string
           status?: string
