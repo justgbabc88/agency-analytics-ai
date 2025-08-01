@@ -400,6 +400,14 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
   // Use the hook only for cancelled calls calculation (which is correct)
   const cancelledCallsFromHook = useCallStatsCalculations(calendlyEvents, dateRange, userTimezone);
   
+  // Debug logging to see what the hook returns
+  console.log('🔍 Hook returned cancelled calls:', cancelledCallsFromHook.callStats.cancelled);
+  console.log('🔍 Hook callStats object:', cancelledCallsFromHook.callStats);
+  console.log('🔍 Full hook result:', cancelledCallsFromHook);
+  console.log('🔍 Date range being used:', dateRange);
+  console.log('🔍 Total calendly events:', calendlyEvents.length);
+  console.log('🔍 Cancelled events in raw data:', calendlyEvents.filter(e => e.status.toLowerCase() === 'cancelled').length);
+  
   // Calculate stats using the original logic for bookings and calls taken (which was working correctly)
   const callStatsData = useMemo(() => {
     // Helper functions matching CallsList exactly
