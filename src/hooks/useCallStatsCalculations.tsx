@@ -2,6 +2,7 @@
 import { useMemo } from 'react';
 import { startOfDay, endOfDay, subDays, isWithinInterval, format } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
+import { filterCancelledEventsByDateRange } from '../utils/dateFiltering';
 
 interface CalendlyEvent {
   id: string;
@@ -120,67 +121,8 @@ export const useCallStatsCalculations = (
     });
 
     // 3. Calls Canceled = Events that were canceled within the date range (by cancellation date)
-    // Filter by when the cancellation actually happened, not when they were scheduled
-    const cancelledCalls = uniqueEvents.filter(event => {
-      const isCancelled = event.status === 'canceled' || event.status === 'cancelled';
-      if (!isCancelled) return false;
-      
-      // Use cancelled_at if available, otherwise fall back to updated_at
-      const cancellationDate = event.cancelled_at || event.updated_at;
-      if (!cancellationDate) return false;
-      
-      try {
-        const cancelledDateTime = new Date(cancellationDate);
-        
-        // Use timezone-aware date comparison if userTimezone is provided
-        if (userTimezone) {
-          // Convert to user timezone and compare date strings
-          const timezone = userTimezone;
-          const eventDateInUserTz = format(toZonedTime(cancelledDateTime, timezone), 'yyyy-MM-dd');
-          const startDateInUserTz = format(toZonedTime(dateRange.from, timezone), 'yyyy-MM-dd');
-          const endDateInUserTz = format(toZonedTime(dateRange.to, timezone), 'yyyy-MM-dd');
-          
-          const isInRange = eventDateInUserTz >= startDateInUserTz && eventDateInUserTz <= endDateInUserTz;
-          
-          console.log('🚫 Checking event for cancellation (with timezone):', {
-            id: event.calendly_event_id,
-            status: event.status,
-            cancelled_at: event.cancelled_at,
-            updated_at: event.updated_at,
-            used_date: cancellationDate,
-            timezone,
-            eventDateInUserTz,
-            startDateInUserTz,
-            endDateInUserTz,
-            isInRange,
-            scheduled_at: event.scheduled_at
-          });
-          
-          return isInRange;
-        } else {
-          // Fallback to UTC comparison
-          const isInRange = isWithinInterval(cancelledDateTime, {
-            start: startOfDay(dateRange.from),
-            end: endOfDay(dateRange.to)
-          });
-          
-          console.log('🚫 Checking event for cancellation (UTC):', {
-            id: event.calendly_event_id,
-            status: event.status,
-            cancelled_at: event.cancelled_at,
-            updated_at: event.updated_at,
-            used_date: cancellationDate,
-            isInRange,
-            scheduled_at: event.scheduled_at
-          });
-          
-          return isInRange;
-        }
-      } catch (error) {
-        console.warn('Error checking cancellation date:', cancellationDate, error);
-        return false;
-      }
-    });
+    // Use the optimized filtering function that handles timezone conversion properly
+    const cancelledCalls = filterCancelledEventsByDateRange(uniqueEvents, dateRange, userTimezone);
 
     console.log('🚫 Total cancelled calls found:', cancelledCalls.length);
     console.log('🚫 Cancelled calls details:', cancelledCalls.map(e => ({
