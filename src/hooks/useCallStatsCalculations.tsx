@@ -122,7 +122,25 @@ export const useCallStatsCalculations = (
 
     // 3. Calls Canceled = Events that were canceled within the date range (by cancellation date)
     // Use the optimized filtering function that handles timezone conversion properly
+    console.log('🚫 About to filter cancelled calls with date range:', {
+      from: dateRange.from.toISOString(),
+      to: dateRange.to.toISOString(),
+      userTimezone,
+      totalEvents: uniqueEvents.length,
+      totalCancelledEvents: uniqueEvents.filter(e => e.status === 'canceled' || e.status === 'cancelled').length
+    });
+    
     const cancelledCalls = filterCancelledEventsByDateRange(uniqueEvents, dateRange, userTimezone);
+    
+    console.log('🚫 Cancelled calls filtering result:', {
+      cancelledCount: cancelledCalls.length,
+      cancelledEvents: cancelledCalls.map(e => ({
+        id: e.calendly_event_id,
+        status: e.status,
+        cancelled_at: e.cancelled_at,
+        updated_at: e.updated_at
+      }))
+    });
 
     console.log('🚫 Total cancelled calls found:', cancelledCalls.length);
     console.log('🚫 Cancelled calls details:', cancelledCalls.map(e => ({
