@@ -2,6 +2,7 @@
 import { useMemo } from 'react';
 import { startOfDay, endOfDay, subDays, isWithinInterval, format } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
+import { useCalendlyCancelledEvents } from './useCalendlyCancelledEvents';
 
 interface CalendlyEvent {
   id: string;
@@ -20,8 +21,12 @@ interface CalendlyEvent {
 export const useCallStatsCalculations = (
   calendlyEvents: CalendlyEvent[],
   dateRange: { from: Date; to: Date },
-  userTimezone?: string
+  userTimezone?: string,
+  projectId?: string
 ) => {
+  // Get cancelled events directly from Calendly
+  const { getTotalCancelled, getCancelledEventsByUserTimezone, isLoading: cancelledEventsLoading } = 
+    useCalendlyCancelledEvents(projectId, dateRange, userTimezone);
   const calculations = useMemo(() => {
     console.log('🔄 useCallStatsCalculations - Calculating stats for date range:', {
       from: dateRange.from.toISOString(),
@@ -226,8 +231,19 @@ export const useCallStatsCalculations = (
     // This matches Calendly's logic: scheduled events minus cancellations
     const callsTaken = callsTakenEvents.length;
     
-    // Canceled = Events canceled that were scheduled for this period  
-    const cancelled = cancelledCalls.length;
+    // Use Calendly's direct cancelled count instead of database filtering
+    const calendlyCancelledCount = getTotalCancelled();
+    const calendlyCancelledByDate = getCancelledEventsByUserTimezone();
+    
+    console.log('📊 Cancelled events comparison:', {
+      databaseCancelled: cancelledCalls.length,
+      calendlyCancelled: calendlyCancelledCount,
+      usingCalendly: calendlyCancelledCount > 0,
+      calendlyCancelledByDate
+    });
+    
+    // Use Calendly data if available, otherwise fall back to database
+    const cancelled = calendlyCancelledCount > 0 ? calendlyCancelledCount : cancelledCalls.length;
 
     // Show up rate = (completed calls / total past scheduled calls) * 100
     // Only count past calls (completed + cancelled) for show up rate calculation
@@ -351,7 +367,7 @@ export const useCallStatsCalculations = (
         upcoming: previousUpcomingCalls.length
       }
     };
-  }, [calendlyEvents, dateRange.from, dateRange.to, userTimezone]);
+  }, [calendlyEvents, dateRange.from, dateRange.to, userTimezone, projectId, getTotalCancelled, getCancelledEventsByUserTimezone]);
 
   return calculations;
 };
