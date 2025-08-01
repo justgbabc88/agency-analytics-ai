@@ -397,8 +397,52 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
   }, [filteredEvents, calendlyEvents, dateRangeKey, userTimezone, trackingEvents]);
 
   
-  // Use the existing hook that has correct cancellation date filtering
-  const callStatsData = useCallStatsCalculations(calendlyEvents, dateRange, userTimezone);
+  // Calculate stats using the same exact logic as CallsList for consistency
+  const callStatsData = useMemo(() => {
+    // Helper functions matching CallsList exactly
+    const isCallCreatedInDateRange = (call: any): boolean => {
+      if (!dateRange) return true;
+      
+      const callCreatedInUserTz = toZonedTime(new Date(call.created_at), userTimezone);
+      const selectedFromDate = toZonedTime(dateRange.from, userTimezone);
+      const selectedToDate = toZonedTime(dateRange.to, userTimezone);
+      
+      const callDate = startOfDay(callCreatedInUserTz);
+      const fromDate = startOfDay(selectedFromDate);
+      const toDate = startOfDay(selectedToDate);
+      
+      return callDate >= fromDate && callDate <= toDate;
+    };
+
+    const isCallScheduledInDateRange = (call: any): boolean => {
+      if (!dateRange) return true;
+      
+      const callScheduledInUserTz = toZonedTime(new Date(call.scheduled_at), userTimezone);
+      const selectedFromDate = toZonedTime(dateRange.from, userTimezone);
+      const selectedToDate = toZonedTime(dateRange.to, userTimezone);
+      
+      const callDate = startOfDay(callScheduledInUserTz);
+      const fromDate = startOfDay(selectedFromDate);
+      const toDate = startOfDay(selectedToDate);
+      
+      return callDate >= fromDate && callDate <= toDate;
+    };
+
+    // Use the proper call stats calculations that handle timezone and cancellation dates correctly
+    const callStatsData = useCallStatsCalculations(calendlyEvents, dateRange, userTimezone);
+    
+    const totalBookings = callStatsData.callStats.totalBookings;
+    const callsTaken = callStatsData.callsTaken;
+    const callsCancelled = callStatsData.callStats.cancelled; // Use the proper cancellation date filtering
+    const showUpRate = callStatsData.showUpRate;
+
+    return {
+      totalBookings,
+      callsTaken,
+      callsCancelled,
+      showUpRate
+    };
+  }, [calendlyEvents, dateRange, userTimezone]);
 
   const recentBookings = getRecentBookings(7);
   const monthlyComparison = getMonthlyComparison();
@@ -662,20 +706,20 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
     console.log('📊 Unique visitors calculated from events (fallback):', uniqueVisitorIds.size, 'from', filteredPageViews.length, 'page views');
     return uniqueVisitorIds.size;
   }, [aggregatedMetrics, pixelConfig, filteredPageViews]);
-  const bookingRate = uniqueVisitors > 0 ? ((callStatsData.callStats.totalBookings / uniqueVisitors) * 100) : 0;
+  const bookingRate = uniqueVisitors > 0 ? ((callStatsData.totalBookings / uniqueVisitors) * 100) : 0;
   const previousBookingRate = 0; // Simplified for now since we're focusing on current period accuracy
   
   const totalSpend = facebookData?.insights?.spend || 1500; // Use actual Facebook spend or fallback
-  const costPerBooking = callStatsData.callStats.totalBookings > 0 ? (totalSpend / callStatsData.callStats.totalBookings) : 0;
+  const costPerBooking = callStatsData.totalBookings > 0 ? (totalSpend / callStatsData.totalBookings) : 0;
   const previousCostPerBooking = 0; // Simplified for now
 
   console.log('\n=== FINAL COMPONENT STATE ===');
   console.log('Chart data length:', chartData.length);
-  console.log('Total bookings for metrics:', callStatsData.callStats.totalBookings);
+  console.log('Total bookings for metrics:', callStatsData.totalBookings);
   console.log('Date range key:', dateRangeKey);
   console.log('User timezone being used:', userTimezone);
 
-  const chartKey = `${dateRangeKey}-${callStatsData.callStats.totalBookings}`;
+  const chartKey = `${dateRangeKey}-${callStatsData.totalBookings}`;
 
   if (!projectId) {
     return (
@@ -713,7 +757,7 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
         totalPageViews={uniqueVisitors}
         bookingRate={bookingRate}
         previousBookingRate={previousBookingRate}
-        totalBookings={callStatsData.callStats.totalBookings}
+        totalBookings={callStatsData.totalBookings}
         previousTotalBookings={0}
         costPerBooking={costPerBooking}
         previousCostPerBooking={previousCostPerBooking}
@@ -722,11 +766,11 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       />
 
       <CallStatsMetrics
-        totalBookings={callStatsData.callStats.totalBookings}
+        totalBookings={callStatsData.totalBookings}
         previousTotalBookings={0}
         callsTaken={callStatsData.callsTaken}
         previousCallsTaken={0}
-        cancelled={callStatsData.callStats.cancelled}
+        cancelled={callStatsData.callsCancelled}
         previousCancelled={0}
         showUpRate={callStatsData.showUpRate}
         previousShowUpRate={0}
