@@ -19,16 +19,7 @@ export const MetricCard = ({
   description
 }: MetricCardProps) => {
   const formatValue = (val: string | number) => {
-    if (val === undefined || val === null) {
-      return '0';
-    }
-    
     const numVal = typeof val === 'string' ? parseFloat(val) : val;
-    
-    // Check if numVal is NaN after parsing
-    if (isNaN(numVal)) {
-      return '0';
-    }
     
     switch (format) {
       case 'currency':
