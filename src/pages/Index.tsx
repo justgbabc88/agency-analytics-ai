@@ -204,6 +204,7 @@ const Index = () => {
             dateRange={dateRange} 
             selectedCampaignIds={selectedCampaignIds}
             selectedFormIds={selectedFormIds}
+            zohoLeadSourceFilter={zohoLeadSourceFilter}
           />
         );
       case "high_ticket":

@@ -18,9 +18,13 @@ interface BookCallFunnelProps {
   dateRange: { from: Date; to: Date };
   selectedCampaignIds?: string[];
   selectedFormIds?: string[];
+  zohoLeadSourceFilter?: {
+    filteredDeals: any[];
+    loading: boolean;
+  };
 }
 
-export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [], selectedFormIds = [] }: BookCallFunnelProps) => {
+export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [], selectedFormIds = [], zohoLeadSourceFilter }: BookCallFunnelProps) => {
   const { calendlyEvents, getRecentBookings, getMonthlyComparison, refetch } = useCalendlyData(projectId);
   const { getUserTimezone, profile } = useUserProfile();
   const { toast } = useToast();
@@ -441,14 +445,18 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
     const totalScheduled = callsTaken + callsCancelled;
     const showUpRate = totalScheduled > 0 ? Math.round((callsTaken / totalScheduled) * 100) : 0;
 
-    // Calculate close rate - only for completed calls
-    const completedCalls = calendlyEvents.filter(call => 
-      isCallScheduledInDateRange(call) && 
-      call.status.toLowerCase() !== 'cancelled' &&
-      new Date(call.scheduled_at) < new Date() // Past calls only
-    );
-    const closedCalls = completedCalls.filter(call => call.is_closed === true);
-    const closeRate = completedCalls.length > 0 ? Math.round((closedCalls.length / completedCalls.length) * 100) : 0;
+    // Calculate close rate - using total deals from Zoho like in Facebook tab
+    const deals = zohoLeadSourceFilter?.filteredDeals || [];
+    
+    // Count deals closed within the date range (same logic as Facebook tab)
+    const totalDeals = deals.filter(deal => {
+      const dealDate = new Date(deal.Agreement_Received_Date);
+      return dealDate >= dateRange.from && dealDate <= dateRange.to;
+    }).length;
+    
+    // Close rate = (total deals / total bookings) * 100
+    // This shows what percentage of bookings converted to actual deals
+    const closeRate = totalBookings > 0 ? Math.round((totalDeals / totalBookings) * 100) : 0;
 
     return {
       totalBookings,
