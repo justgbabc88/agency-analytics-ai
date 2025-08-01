@@ -397,8 +397,62 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
   }, [filteredEvents, calendlyEvents, dateRangeKey, userTimezone, trackingEvents]);
 
   
-  // Use the existing hook that has correct cancellation date filtering
-  const callStatsData = useCallStatsCalculations(calendlyEvents, dateRange, userTimezone);
+  // Use the hook only for cancelled calls calculation (which is correct)
+  const cancelledCallsFromHook = useCallStatsCalculations(calendlyEvents, dateRange, userTimezone);
+  
+  // Calculate stats using the original logic for bookings and calls taken (which was working correctly)
+  const callStatsData = useMemo(() => {
+    // Helper functions matching CallsList exactly
+    const isCallCreatedInDateRange = (call: any): boolean => {
+      if (!dateRange) return true;
+      
+      const callCreatedInUserTz = toZonedTime(new Date(call.created_at), userTimezone);
+      const selectedFromDate = toZonedTime(dateRange.from, userTimezone);
+      const selectedToDate = toZonedTime(dateRange.to, userTimezone);
+      
+      const callDate = startOfDay(callCreatedInUserTz);
+      const fromDate = startOfDay(selectedFromDate);
+      const toDate = startOfDay(selectedToDate);
+      
+      return callDate >= fromDate && callDate <= toDate;
+    };
+
+    const isCallScheduledInDateRange = (call: any): boolean => {
+      if (!dateRange) return true;
+      
+      const callScheduledInUserTz = toZonedTime(new Date(call.scheduled_at), userTimezone);
+      const selectedFromDate = toZonedTime(dateRange.from, userTimezone);
+      const selectedToDate = toZonedTime(dateRange.to, userTimezone);
+      
+      const callDate = startOfDay(callScheduledInUserTz);
+      const fromDate = startOfDay(selectedFromDate);
+      const toDate = startOfDay(selectedToDate);
+      
+      return callDate >= fromDate && callDate <= toDate;
+    };
+
+    // Calculate the exact same numbers as CallsList filter buttons
+    const totalBookings = calendlyEvents.filter(call => isCallCreatedInDateRange(call)).length;
+    const callsTaken = calendlyEvents.filter(call => 
+      isCallScheduledInDateRange(call) && call.status.toLowerCase() !== 'cancelled'
+    ).length;
+    
+    // Use the correct cancelled calls count from the hook (filtered by cancellation date)
+    const callsCancelled = cancelledCallsFromHook.callStats.cancelled;
+
+    // Calculate show up rate
+    const totalScheduled = callsTaken + callsCancelled;
+    const showUpRate = totalScheduled > 0 ? Math.round((callsTaken / totalScheduled) * 100) : 0;
+
+    return {
+      callStats: {
+        totalBookings,
+        cancelled: callsCancelled
+      },
+      callsTaken,
+      showUpRate
+    };
+  }, [calendlyEvents, dateRange, userTimezone, cancelledCallsFromHook.callStats.cancelled]);
 
   const recentBookings = getRecentBookings(7);
   const monthlyComparison = getMonthlyComparison();
