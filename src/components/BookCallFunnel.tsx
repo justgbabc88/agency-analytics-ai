@@ -428,13 +428,18 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       return callDate >= fromDate && callDate <= toDate;
     };
 
-    // Use the proper call stats calculations that handle timezone and cancellation dates correctly
-    const callStatsData = useCallStatsCalculations(calendlyEvents, dateRange, userTimezone);
-    
-    const totalBookings = callStatsData.callStats.totalBookings;
-    const callsTaken = callStatsData.callsTaken;
-    const callsCancelled = callStatsData.callStats.cancelled; // Use the proper cancellation date filtering
-    const showUpRate = callStatsData.showUpRate;
+    // Calculate the exact same numbers as CallsList filter buttons
+    const totalBookings = calendlyEvents.filter(call => isCallCreatedInDateRange(call)).length;
+    const callsTaken = calendlyEvents.filter(call => 
+      isCallScheduledInDateRange(call) && call.status.toLowerCase() !== 'cancelled'
+    ).length;
+    const callsCancelled = calendlyEvents.filter(c => 
+      c.status.toLowerCase() === 'cancelled' && isCallScheduledInDateRange(c)
+    ).length;
+
+    // Calculate show up rate
+    const totalScheduled = callsTaken + callsCancelled;
+    const showUpRate = totalScheduled > 0 ? Math.round((callsTaken / totalScheduled) * 100) : 0;
 
     return {
       totalBookings,
