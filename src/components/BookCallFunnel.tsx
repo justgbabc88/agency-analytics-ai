@@ -396,6 +396,8 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
     return data;
   }, [filteredEvents, calendlyEvents, dateRangeKey, userTimezone, trackingEvents]);
 
+  // Call the hook at the top level of the component (outside useMemo)
+  const callStatsCalculation = useCallStatsCalculations(calendlyEvents, dateRange, userTimezone);
   
   // Calculate stats using the same exact logic as CallsList for consistency
   const callStatsData = useMemo(() => {
@@ -429,12 +431,10 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
     };
 
     // Use the proper call stats calculations that handle timezone and cancellation dates correctly
-    const callStatsData = useCallStatsCalculations(calendlyEvents, dateRange, userTimezone);
-    
-    const totalBookings = callStatsData.callStats.totalBookings;
-    const callsTaken = callStatsData.callsTaken;
-    const callsCancelled = callStatsData.callStats.cancelled; // Use the proper cancellation date filtering
-    const showUpRate = callStatsData.showUpRate;
+    const totalBookings = callStatsCalculation.callStats.totalBookings;
+    const callsTaken = callStatsCalculation.callsTaken;
+    const callsCancelled = callStatsCalculation.callStats.cancelled; // Use the proper cancellation date filtering
+    const showUpRate = callStatsCalculation.showUpRate;
 
     return {
       totalBookings,
@@ -442,7 +442,7 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       callsCancelled,
       showUpRate
     };
-  }, [calendlyEvents, dateRange, userTimezone]);
+  }, [callStatsCalculation, dateRange, userTimezone]);
 
   const recentBookings = getRecentBookings(7);
   const monthlyComparison = getMonthlyComparison();
