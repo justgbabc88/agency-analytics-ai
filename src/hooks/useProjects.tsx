@@ -45,20 +45,22 @@ export const useProjects = () => {
 
   // Auto-select first project if none selected and projects are available
   useEffect(() => {
-    if (projects && projects.length > 0 && !selectedProjectId) {
-      const projectToSelect = projects[0].id;
-      setSelectedProjectId(projectToSelect);
-      localStorage.setItem('selectedProjectId', projectToSelect);
-    } else if (selectedProjectId && projects) {
-      // Verify the selected project still exists
-      const projectExists = projects.find(p => p.id === selectedProjectId);
-      if (!projectExists) {
-        const projectToSelect = projects[0]?.id || '';
+    if (projects && projects.length > 0) {
+      if (!selectedProjectId) {
+        const projectToSelect = projects[0].id;
         setSelectedProjectId(projectToSelect);
         localStorage.setItem('selectedProjectId', projectToSelect);
+      } else {
+        // Verify the selected project still exists
+        const projectExists = projects.find(p => p.id === selectedProjectId);
+        if (!projectExists) {
+          const projectToSelect = projects[0]?.id || '';
+          setSelectedProjectId(projectToSelect);
+          localStorage.setItem('selectedProjectId', projectToSelect);
+        }
       }
     }
-  }, [projects, selectedProjectId]);
+  }, [projects]);
 
   // Custom setter that also updates localStorage
   const setSelectedProjectIdWithPersistence = (projectId: string) => {
