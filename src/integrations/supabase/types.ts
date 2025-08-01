@@ -282,6 +282,7 @@ export type Database = {
         Row: {
           calendly_event_id: string
           calendly_event_type_id: string
+          cancelled_at: string | null
           created_at: string
           event_type_name: string
           id: string
@@ -295,6 +296,7 @@ export type Database = {
         Insert: {
           calendly_event_id: string
           calendly_event_type_id: string
+          cancelled_at?: string | null
           created_at?: string
           event_type_name: string
           id?: string
@@ -308,6 +310,7 @@ export type Database = {
         Update: {
           calendly_event_id?: string
           calendly_event_type_id?: string
+          cancelled_at?: string | null
           created_at?: string
           event_type_name?: string
           id?: string

@@ -84,11 +84,14 @@ export const generateCallDataFromEvents = (
       isEventScheduledOnDate(event.scheduled_at, currentDate, timezone)
     );
     
-    // Cancelled = events that were cancelled on this day (using updated_at)
-    const eventsCancelledThisDay = calendlyEvents.filter(event => 
-      (event.status === 'cancelled' || event.status === 'canceled') &&
-      isEventCreatedOnDate(event.updated_at, currentDate, timezone)
-    );
+    // Cancelled = events that were cancelled on this day (using cancelled_at if available, fallback to updated_at)
+    const eventsCancelledThisDay = calendlyEvents.filter(event => {
+      if (event.status !== 'cancelled' && event.status !== 'canceled') return false;
+      
+      // Use cancelled_at if available, otherwise fall back to updated_at
+      const cancellationDate = event.cancelled_at || event.updated_at;
+      return isEventCreatedOnDate(cancellationDate, currentDate, timezone);
+    });
     const cancelled = eventsCancelledThisDay.length;
     
     console.log(`Events created on ${currentDateStr}: ${eventsCreatedThisDay.length}`);
@@ -96,12 +99,17 @@ export const generateCallDataFromEvents = (
     console.log(`Events cancelled on ${currentDateStr}: ${cancelled}`);
     
     if (eventsCancelledThisDay.length > 0) {
-      console.log('Sample events cancelled this day:', eventsCancelledThisDay.slice(0, 2).map(e => ({
-        updated_at: e.updated_at,
-        cancelled_in_timezone: formatInTimeZone(new Date(e.updated_at), timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
-        scheduled_at: e.scheduled_at,
-        status: e.status
-      })));
+      console.log('Sample events cancelled this day:', eventsCancelledThisDay.slice(0, 2).map(e => {
+        const cancellationDate = e.cancelled_at || e.updated_at;
+        return {
+          cancelled_at: e.cancelled_at,
+          updated_at: e.updated_at,
+          used_date: cancellationDate,
+          cancelled_in_timezone: formatInTimeZone(new Date(cancellationDate), timezone, 'yyyy-MM-dd HH:mm:ss zzz'),
+          scheduled_at: e.scheduled_at,
+          status: e.status
+        };
+      }));
     }
     
     if (eventsCreatedThisDay.length > 0) {

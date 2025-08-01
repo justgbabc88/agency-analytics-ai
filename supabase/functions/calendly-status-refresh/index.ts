@@ -90,12 +90,19 @@ Deno.serve(async (req) => {
             if (normalizedStatus !== event.status) {
               console.log(`📊 Updating event ${event.calendly_event_id}: ${event.status} → ${normalizedStatus}`);
               
+              const updateData: any = { 
+                status: normalizedStatus,
+                updated_at: new Date().toISOString()
+              };
+              
+              // Set cancelled_at timestamp when event becomes cancelled
+              if (normalizedStatus === 'cancelled' && event.status !== 'cancelled') {
+                updateData.cancelled_at = new Date().toISOString();
+              }
+              
               const { error: updateError } = await supabaseClient
                 .from('calendly_events')
-                .update({ 
-                  status: normalizedStatus,
-                  updated_at: new Date().toISOString()
-                })
+                .update(updateData)
                 .eq('id', event.id);
 
               if (updateError) {
@@ -109,12 +116,19 @@ Deno.serve(async (req) => {
             console.log(`⚠️ Event not found in Calendly, marking as cancelled: ${event.calendly_event_id}`);
             
             // Event was deleted from Calendly, mark as cancelled
+            const updateData: any = { 
+              status: 'cancelled',
+              updated_at: new Date().toISOString()
+            };
+            
+            // Set cancelled_at if not already set
+            if (event.status !== 'cancelled') {
+              updateData.cancelled_at = new Date().toISOString();
+            }
+            
             const { error: updateError } = await supabaseClient
               .from('calendly_events')
-              .update({ 
-                status: 'cancelled',
-                updated_at: new Date().toISOString()
-              })
+              .update(updateData)
               .eq('id', event.id);
 
             if (!updateError) {
