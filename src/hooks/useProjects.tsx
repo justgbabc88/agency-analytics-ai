@@ -6,7 +6,11 @@ import { useState, useEffect } from 'react';
 export const useProjects = () => {
   const { agency } = useAgency();
   const queryClient = useQueryClient();
-  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(() => {
+    // Initialize from localStorage if available
+    const stored = localStorage.getItem('selectedProjectId');
+    return stored || '';
+  });
 
   const { data: projects, isLoading } = useQuery({
     queryKey: ['projects', agency?.id],
@@ -42,9 +46,26 @@ export const useProjects = () => {
   // Auto-select first project if none selected and projects are available
   useEffect(() => {
     if (projects && projects.length > 0 && !selectedProjectId) {
-      setSelectedProjectId(projects[0].id);
+      const projectToSelect = projects[0].id;
+      setSelectedProjectId(projectToSelect);
+      localStorage.setItem('selectedProjectId', projectToSelect);
+    } else if (selectedProjectId && projects) {
+      // Verify the selected project still exists
+      const projectExists = projects.find(p => p.id === selectedProjectId);
+      if (!projectExists) {
+        const projectToSelect = projects[0]?.id || '';
+        setSelectedProjectId(projectToSelect);
+        localStorage.setItem('selectedProjectId', projectToSelect);
+      }
     }
   }, [projects, selectedProjectId]);
+
+  // Custom setter that also updates localStorage
+  const setSelectedProjectIdWithPersistence = (projectId: string) => {
+    setSelectedProjectId(projectId);
+    localStorage.setItem('selectedProjectId', projectId);
+    console.log('🔄 Project selected:', projectId);
+  };
 
   const createProject = useMutation({
     mutationFn: async (projectData: { name: string; funnel_type: string }) => {
@@ -243,6 +264,6 @@ export const useProjects = () => {
     updateProject,
     deleteProject,
     selectedProjectId,
-    setSelectedProjectId,
+    setSelectedProjectId: setSelectedProjectIdWithPersistence,
   };
 };
