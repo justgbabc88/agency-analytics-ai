@@ -613,17 +613,20 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
     return filteredPageViews.length;
   }, [aggregatedMetrics, pixelConfig, filteredPageViews]);
   
-  // Calculate unique visitors - for date ranges, sum unique visitors per day
+  // Calculate unique visitors - comprehensive debugging for date range issues
   const uniqueVisitors = useMemo(() => {
     console.log('🔍 [uniqueVisitors] Starting calculation with:', {
       filteredPageViewsCount: filteredPageViews.length,
+      trackingEventsCount: trackingEvents.length,
       dateRange: {
         from: dateRange.from.toISOString(),
         to: dateRange.to.toISOString(),
-        sameDay: dateRange.from.toDateString() === dateRange.to.toDateString()
+        sameDay: dateRange.from.toDateString() === dateRange.to.toDateString(),
+        fromDate: dateRange.from.toISOString().split('T')[0],
+        toDate: dateRange.to.toISOString().split('T')[0]
       },
       userTimezone,
-      sampleEvents: filteredPageViews.slice(0, 3).map(e => ({
+      sampleEvents: filteredPageViews.slice(0, 5).map(e => ({
         created_at: e.created_at,
         session_id: e.session_id,
         event_name: e.event_name,
@@ -631,45 +634,68 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       }))
     });
 
-    // Get unique visitors by summing unique visitors per day (not deduplicating across days)
+    // DEBUG: Check what's in the raw tracking events for the date range
+    const startDateString = dateRange.from.toISOString().split('T')[0];
+    const endDateString = dateRange.to.toISOString().split('T')[0];
+    
+    console.log('🔍 [DEBUG] Raw tracking events by date:');
+    const eventsByDateDebug = new Map();
+    trackingEvents.forEach(event => {
+      const eventDate = new Date(event.created_at).toISOString().split('T')[0];
+      if (!eventsByDateDebug.has(eventDate)) {
+        eventsByDateDebug.set(eventDate, []);
+      }
+      eventsByDateDebug.get(eventDate).push(event);
+    });
+    
+    for (const [date, events] of eventsByDateDebug.entries()) {
+      const uniqueSessions = new Set(events.map(e => e.session_id)).size;
+      console.log(`🔍 [DEBUG] ${date}: ${events.length} events, ${uniqueSessions} unique sessions`);
+    }
+
+    // Filter events that fall within the exact date range
+    const dateFilteredEvents = trackingEvents.filter(event => {
+      const eventDate = new Date(event.created_at).toISOString().split('T')[0];
+      return eventDate >= startDateString && eventDate <= endDateString;
+    });
+    
+    console.log('🔍 [uniqueVisitors] After date filtering:', {
+      originalCount: trackingEvents.length,
+      dateFilteredCount: dateFilteredEvents.length,
+      dateRange: `${startDateString} to ${endDateString}`
+    });
+
+    // Apply page filtering to date-filtered events
     const enabledPages = pixelConfig?.funnelPages?.filter((page: any) => page.includeInPageViewMetrics !== false) || [];
     
-    let filteredEvents = filteredPageViews;
+    let finalFilteredEvents = dateFilteredEvents;
     
     if (enabledPages.length > 0) {
-      // Filter events to only include enabled pages
-      filteredEvents = filteredPageViews.filter((event: any) => {
-        return enabledPages.some((page: any) => {
-          // Check if event matches the page by name or URL
-          const pageNameMatch = event.event_name?.toLowerCase().includes(page.name?.toLowerCase() || '');
-          const pageUrlMatch = event.page_url?.toLowerCase().includes(page.url?.toLowerCase() || '');
-          return pageNameMatch || pageUrlMatch;
-        });
+      finalFilteredEvents = dateFilteredEvents.filter((event: any) => {
+        return enabledPages.some((page: any) => isEventForPage(event, page));
+      });
+      
+      console.log('🔍 [uniqueVisitors] After page filtering:', {
+        dateFilteredCount: dateFilteredEvents.length,
+        finalFilteredCount: finalFilteredEvents.length,
+        enabledPagesCount: enabledPages.length,
+        enabledPages: enabledPages.map(p => ({ name: p.name, url: p.url }))
       });
     }
     
-    console.log('🔍 [uniqueVisitors] After page filtering:', {
-      originalCount: filteredPageViews.length,
-      filteredCount: filteredEvents.length,
-      enabledPagesCount: enabledPages.length,
-      enabledPages: enabledPages.map(p => ({ name: p.name, url: p.url }))
-    });
-    
-    // Group events by day and count unique visitors per day
+    // Group filtered events by day and count unique visitors per day
     const eventsByDay = new Map();
     
-    filteredEvents.forEach((event: any) => {
-      // Convert event timestamp to user's timezone to get correct date
-      const eventDate = toZonedTime(new Date(event.created_at), userTimezone);
-      const dayKey = formatInTimeZone(eventDate, userTimezone, 'yyyy-MM-dd');
+    finalFilteredEvents.forEach((event: any) => {
+      const eventDate = new Date(event.created_at).toISOString().split('T')[0];
       
-      if (!eventsByDay.has(dayKey)) {
-        eventsByDay.set(dayKey, new Set());
+      if (!eventsByDay.has(eventDate)) {
+        eventsByDay.set(eventDate, new Set());
       }
-      eventsByDay.get(dayKey).add(event.session_id);
+      eventsByDay.get(eventDate).add(event.session_id);
     });
     
-    // Sum unique visitors across all days in the date range
+    // Calculate totals
     let totalUniqueVisitors = 0;
     const dailyBreakdown = [];
     
@@ -679,32 +705,36 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       dailyBreakdown.push({ day, visitors: dayVisitors });
     }
     
-    console.log('📊 [uniqueVisitors] Final calculation:', {
-      totalEvents: filteredPageViews.length,
-      filteredEvents: filteredEvents.length,
+    // Sort daily breakdown for easier reading
+    dailyBreakdown.sort((a, b) => a.day.localeCompare(b.day));
+    
+    console.log('🔍 [uniqueVisitors] FINAL CALCULATION RESULTS:', {
+      totalRawEvents: trackingEvents.length,
+      dateFilteredEvents: dateFilteredEvents.length,
+      finalFilteredEvents: finalFilteredEvents.length,
       totalUniqueVisitors,
       dailyBreakdown,
-      eventsByDayKeys: Array.from(eventsByDay.keys()),
+      expectedSum: dailyBreakdown.reduce((sum, day) => sum + day.visitors, 0),
       dateRange: {
         from: dateRange.from.toISOString(),
-        to: dateRange.to.toISOString()
+        to: dateRange.to.toISOString(),
+        startDate: startDateString,
+        endDate: endDateString
       }
     });
     
-    return totalUniqueVisitors;
+    // VALIDATION: Compare individual date calculations
+    if (dateRange.from.toDateString() !== dateRange.to.toDateString()) {
+      console.log('🔍 [VALIDATION] Multi-day range - checking individual days:');
+      dailyBreakdown.forEach(day => {
+        console.log(`🔍 [VALIDATION] ${day.day}: ${day.visitors} unique visitors`);
+      });
+      console.log(`🔍 [VALIDATION] Sum of individual days: ${dailyBreakdown.reduce((sum, day) => sum + day.visitors, 0)}`);
+      console.log(`🔍 [VALIDATION] Calculated total: ${totalUniqueVisitors}`);
+    }
     
-    // Fallback to event-level calculation if no aggregated metrics available
-    const uniqueVisitorIds = new Set();
-    filteredPageViews.forEach((event: any) => {
-      // Create a visitor ID from session, email, or page/date combination
-      const visitorId = event.session_id || 
-                       event.contact_email || 
-                       `${event.page_url}-${event.created_at.split('T')[0]}`;
-      uniqueVisitorIds.add(visitorId);
-    });
-    console.log('📊 Unique visitors calculated from events (fallback):', uniqueVisitorIds.size, 'from', filteredPageViews.length, 'page views');
-    return uniqueVisitorIds.size;
-  }, [aggregatedMetrics, pixelConfig, filteredPageViews]);
+    return totalUniqueVisitors;
+  }, [trackingEvents, pixelConfig, dateRange, userTimezone, isEventForPage]);
   const bookingRate = uniqueVisitors > 0 ? ((callStatsData.totalBookings / uniqueVisitors) * 100) : 0;
   const previousBookingRate = 0; // Simplified for now since we're focusing on current period accuracy
   
