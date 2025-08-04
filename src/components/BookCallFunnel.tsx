@@ -613,9 +613,9 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
     return filteredPageViews.length;
   }, [aggregatedMetrics, pixelConfig, filteredPageViews]);
   
-  // Calculate unique visitors from tracking events (true unique count, not summed per page)
+  // Calculate unique visitors - for date ranges, sum unique visitors per day
   const uniqueVisitors = useMemo(() => {
-    // Get unique visitors directly from tracking events to avoid double-counting users who visit multiple pages
+    // Get unique visitors by summing unique visitors per day (not deduplicating across days)
     const enabledPages = pixelConfig?.funnelPages?.filter((page: any) => page.includeInPageViewMetrics !== false) || [];
     
     let filteredEvents = filteredPageViews;
@@ -632,14 +632,35 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       });
     }
     
-    // Count distinct session IDs for true unique visitors
-    const uniqueSessionIds = new Set(filteredEvents.map((event: any) => event.session_id));
-    const uniqueVisitorCount = uniqueSessionIds.size;
+    // Group events by day and count unique visitors per day
+    const eventsByDay = new Map();
     
-    console.log('📊 Unique visitors calculation:', {
+    filteredEvents.forEach((event: any) => {
+      // Convert event timestamp to user's timezone to get correct date
+      const eventDate = toZonedTime(new Date(event.created_at), userTimezone);
+      const dayKey = formatInTimeZone(eventDate, userTimezone, 'yyyy-MM-dd');
+      
+      if (!eventsByDay.has(dayKey)) {
+        eventsByDay.set(dayKey, new Set());
+      }
+      eventsByDay.get(dayKey).add(event.session_id);
+    });
+    
+    // Sum unique visitors across all days in the date range
+    let totalUniqueVisitors = 0;
+    const dailyBreakdown = [];
+    
+    for (const [day, sessionIds] of eventsByDay.entries()) {
+      const dayVisitors = sessionIds.size;
+      totalUniqueVisitors += dayVisitors;
+      dailyBreakdown.push({ day, visitors: dayVisitors });
+    }
+    
+    console.log('📊 Unique visitors calculation by day:', {
       totalEvents: filteredPageViews.length,
       filteredEvents: filteredEvents.length,
-      uniqueSessionIds: uniqueSessionIds.size,
+      totalUniqueVisitors,
+      dailyBreakdown,
       enabledPagesCount: enabledPages.length,
       dateRange: {
         from: dateRange.from.toISOString(),
@@ -647,7 +668,7 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       }
     });
     
-    return uniqueVisitorCount;
+    return totalUniqueVisitors;
     
     // Fallback to event-level calculation if no aggregated metrics available
     const uniqueVisitorIds = new Set();
