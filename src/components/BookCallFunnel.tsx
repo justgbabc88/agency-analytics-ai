@@ -613,112 +613,41 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
     return filteredPageViews.length;
   }, [aggregatedMetrics, pixelConfig, filteredPageViews]);
   
-  // Calculate unique visitors from aggregated metrics (more accurate than event-level calculation)
+  // Calculate unique visitors from tracking events (true unique count, not summed per page)
   const uniqueVisitors = useMemo(() => {
-    if (aggregatedMetrics.length > 0) {
-      // Use aggregated metrics for accurate unique visitor count
-      const enabledPages = pixelConfig?.funnelPages?.filter((page: any) => page.includeInPageViewMetrics !== false) || [];
-      
-      // If no pages configured, include all metrics
-      let filteredMetrics = aggregatedMetrics;
-      
-      if (enabledPages.length > 0) {
-        // Filter metrics to only include enabled pages
-        filteredMetrics = aggregatedMetrics.filter((metric: any) => {
-          return enabledPages.some((page: any) => {
-            // Check if metric matches the page by name or URL
-            const pageNameMatch = metric.landing_page_name?.toLowerCase().includes(page.name?.toLowerCase() || '');
-            const pageUrlMatch = metric.landing_page_url?.toLowerCase().includes(page.url?.toLowerCase() || '');
-            return pageNameMatch || pageUrlMatch;
-          });
+    // Get unique visitors directly from tracking events to avoid double-counting users who visit multiple pages
+    const enabledPages = pixelConfig?.funnelPages?.filter((page: any) => page.includeInPageViewMetrics !== false) || [];
+    
+    let filteredEvents = filteredPageViews;
+    
+    if (enabledPages.length > 0) {
+      // Filter events to only include enabled pages
+      filteredEvents = filteredPageViews.filter((event: any) => {
+        return enabledPages.some((page: any) => {
+          // Check if event matches the page by name or URL
+          const pageNameMatch = event.event_name?.toLowerCase().includes(page.name?.toLowerCase() || '');
+          const pageUrlMatch = event.page_url?.toLowerCase().includes(page.url?.toLowerCase() || '');
+          return pageNameMatch || pageUrlMatch;
         });
-      }
-      
-      // Filter metrics to only include the selected date range
-      // For single day selections, use timezone-aware filtering
-      // For date ranges, use the original logic to avoid underreporting
-      const isSameDaySelection = dateRange.from.toDateString() === dateRange.to.toDateString();
-      
-      let dateFilteredMetrics;
-      let startDateForComparison, endDateForComparison;
-      
-      if (isSameDaySelection) {
-        // Single day: use timezone-aware filtering
-        const startDateInTz = formatInTimeZone(dateRange.from, userTimezone, 'yyyy-MM-dd');
-        const endDateInTz = formatInTimeZone(dateRange.to, userTimezone, 'yyyy-MM-dd');
-        
-        dateFilteredMetrics = filteredMetrics.filter((metric: any) => {
-          return metric.date >= startDateInTz && metric.date <= endDateInTz;
-        });
-        
-        startDateForComparison = startDateInTz;
-        endDateForComparison = endDateInTz;
-        
-        console.log('🔍 DEBUG: Single day timezone-aware filtering:', {
-          startDateInTz,
-          endDateInTz,
-          userTimezone,
-          filteredCount: dateFilteredMetrics.length
-        });
-      } else {
-        // Date range: use original UTC-based filtering to avoid underreporting
-        const startDate = dateRange.from.toISOString().split('T')[0];
-        const endDate = dateRange.to.toISOString().split('T')[0];
-        
-        dateFilteredMetrics = filteredMetrics.filter((metric: any) => {
-          return metric.date >= startDate && metric.date <= endDate;
-        });
-        
-        startDateForComparison = startDate;
-        endDateForComparison = endDate;
-        
-        console.log('🔍 DEBUG: Date range UTC-based filtering:', {
-          startDate,
-          endDate,
-          filteredCount: dateFilteredMetrics.length
-        });
-      }
-      
-      // Sum all unique visitors from the date and page filtered metrics
-      const totalUniqueVisitors = dateFilteredMetrics.reduce((sum: number, metric: any) => {
-        return sum + (metric.unique_visitors || 0);
-      }, 0);
-      
-      console.log('🔍 DEBUG: Starting unique visitors calculation');
-      console.log('🔍 DEBUG: Date range object:', dateRange);
-      console.log('🔍 DEBUG: Start date string:', startDateForComparison);
-      console.log('🔍 DEBUG: End date string:', endDateForComparison);
-      console.log('🔍 DEBUG: Date comparison - start === end:', startDateForComparison === endDateForComparison);
-      console.log('🔍 DEBUG: Date from ISO:', dateRange.from.toISOString());
-      console.log('🔍 DEBUG: Date to ISO:', dateRange.to.toISOString());
-      console.log('🔍 DEBUG: All aggregated metrics:', aggregatedMetrics.length, 'total');
-      console.log('🔍 DEBUG: After page filtering:', filteredMetrics.length, 'metrics');
-      console.log('🔍 DEBUG: After date filtering:', dateFilteredMetrics.length, 'metrics');
-      console.log('🔍 DEBUG: Filtered metrics details:', dateFilteredMetrics.map(m => ({ 
-        date: m.date, 
-        page: m.landing_page_name, 
-        visitors: m.unique_visitors,
-        dateMatches: m.date >= startDateForComparison && m.date <= endDateForComparison
-      })));
-      console.log('📊 Unique visitors from aggregated metrics:', totalUniqueVisitors);
-      
-      // Check if this is a single day selection by looking at unique dates in filtered metrics
-      const uniqueDates = [...new Set(dateFilteredMetrics.map(m => m.date))];
-      const isSingleDay = uniqueDates.length === 1;
-      console.log('📊 Is single day selection:', isSingleDay, 'unique dates:', uniqueDates);
-      
-      if (isSingleDay && uniqueDates.length > 0) {
-        // For single day selections, only return visitors for that specific day
-        const singleDayVisitors = dateFilteredMetrics
-          .filter(m => m.date === uniqueDates[0])
-          .reduce((sum: number, metric: any) => sum + (metric.unique_visitors || 0), 0);
-        console.log('📊 Single day visitors for', uniqueDates[0], ':', singleDayVisitors);
-        return singleDayVisitors;
-      }
-      
-      console.log('📊 Date range visitors (total across range):', totalUniqueVisitors);
-      return totalUniqueVisitors;
+      });
     }
+    
+    // Count distinct session IDs for true unique visitors
+    const uniqueSessionIds = new Set(filteredEvents.map((event: any) => event.session_id));
+    const uniqueVisitorCount = uniqueSessionIds.size;
+    
+    console.log('📊 Unique visitors calculation:', {
+      totalEvents: filteredPageViews.length,
+      filteredEvents: filteredEvents.length,
+      uniqueSessionIds: uniqueSessionIds.size,
+      enabledPagesCount: enabledPages.length,
+      dateRange: {
+        from: dateRange.from.toISOString(),
+        to: dateRange.to.toISOString()
+      }
+    });
+    
+    return uniqueVisitorCount;
     
     // Fallback to event-level calculation if no aggregated metrics available
     const uniqueVisitorIds = new Set();
