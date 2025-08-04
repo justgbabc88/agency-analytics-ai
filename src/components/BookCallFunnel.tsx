@@ -615,6 +615,22 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
   
   // Calculate unique visitors - for date ranges, sum unique visitors per day
   const uniqueVisitors = useMemo(() => {
+    console.log('🔍 [uniqueVisitors] Starting calculation with:', {
+      filteredPageViewsCount: filteredPageViews.length,
+      dateRange: {
+        from: dateRange.from.toISOString(),
+        to: dateRange.to.toISOString(),
+        sameDay: dateRange.from.toDateString() === dateRange.to.toDateString()
+      },
+      userTimezone,
+      sampleEvents: filteredPageViews.slice(0, 3).map(e => ({
+        created_at: e.created_at,
+        session_id: e.session_id,
+        event_name: e.event_name,
+        page_url: e.page_url
+      }))
+    });
+
     // Get unique visitors by summing unique visitors per day (not deduplicating across days)
     const enabledPages = pixelConfig?.funnelPages?.filter((page: any) => page.includeInPageViewMetrics !== false) || [];
     
@@ -631,6 +647,13 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
         });
       });
     }
+    
+    console.log('🔍 [uniqueVisitors] After page filtering:', {
+      originalCount: filteredPageViews.length,
+      filteredCount: filteredEvents.length,
+      enabledPagesCount: enabledPages.length,
+      enabledPages: enabledPages.map(p => ({ name: p.name, url: p.url }))
+    });
     
     // Group events by day and count unique visitors per day
     const eventsByDay = new Map();
@@ -656,12 +679,12 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       dailyBreakdown.push({ day, visitors: dayVisitors });
     }
     
-    console.log('📊 Unique visitors calculation by day:', {
+    console.log('📊 [uniqueVisitors] Final calculation:', {
       totalEvents: filteredPageViews.length,
       filteredEvents: filteredEvents.length,
       totalUniqueVisitors,
       dailyBreakdown,
-      enabledPagesCount: enabledPages.length,
+      eventsByDayKeys: Array.from(eventsByDay.keys()),
       dateRange: {
         from: dateRange.from.toISOString(),
         to: dateRange.to.toISOString()
