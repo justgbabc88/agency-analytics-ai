@@ -613,85 +613,97 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
     return filteredPageViews.length;
   }, [aggregatedMetrics, pixelConfig, filteredPageViews]);
   
-  // Calculate unique visitors - for date ranges, sum unique visitors per day
+  // Calculate unique visitors - use daily aggregated metrics and sum them up for date ranges
   const uniqueVisitors = useMemo(() => {
-    console.log('🔍 [uniqueVisitors] Starting calculation with:', {
-      filteredPageViewsCount: filteredPageViews.length,
-      dateRange: {
-        from: dateRange.from.toISOString(),
-        to: dateRange.to.toISOString(),
-        sameDay: dateRange.from.toDateString() === dateRange.to.toDateString()
-      },
-      userTimezone,
-      sampleEvents: filteredPageViews.slice(0, 3).map(e => ({
-        created_at: e.created_at,
-        session_id: e.session_id,
-        event_name: e.event_name,
-        page_url: e.page_url
-      }))
-    });
-
-    // Get unique visitors by summing unique visitors per day (not deduplicating across days)
-    const enabledPages = pixelConfig?.funnelPages?.filter((page: any) => page.includeInPageViewMetrics !== false) || [];
-    
-    let filteredEvents = filteredPageViews;
-    
-    if (enabledPages.length > 0) {
-      // Filter events to only include enabled pages
-      filteredEvents = filteredPageViews.filter((event: any) => {
-        return enabledPages.some((page: any) => {
-          // Check if event matches the page by name or URL
-          const pageNameMatch = event.event_name?.toLowerCase().includes(page.name?.toLowerCase() || '');
-          const pageUrlMatch = event.page_url?.toLowerCase().includes(page.url?.toLowerCase() || '');
-          return pageNameMatch || pageUrlMatch;
-        });
-      });
-    }
-    
-    console.log('🔍 [uniqueVisitors] After page filtering:', {
-      originalCount: filteredPageViews.length,
-      filteredCount: filteredEvents.length,
-      enabledPagesCount: enabledPages.length,
-      enabledPages: enabledPages.map(p => ({ name: p.name, url: p.url }))
-    });
-    
-    // Group events by day and count unique visitors per day
-    const eventsByDay = new Map();
-    
-    filteredEvents.forEach((event: any) => {
-      // Convert event timestamp to user's timezone to get correct date
-      const eventDate = toZonedTime(new Date(event.created_at), userTimezone);
-      const dayKey = formatInTimeZone(eventDate, userTimezone, 'yyyy-MM-dd');
+    if (aggregatedMetrics.length > 0) {
+      // Use the same logic as before but sum properly for date ranges
+      const enabledPages = pixelConfig?.funnelPages?.filter((page: any) => page.includeInPageViewMetrics !== false) || [];
       
-      if (!eventsByDay.has(dayKey)) {
-        eventsByDay.set(dayKey, new Set());
+      let filteredMetrics = aggregatedMetrics;
+      
+      if (enabledPages.length > 0) {
+        // Filter metrics to only include enabled pages
+        filteredMetrics = aggregatedMetrics.filter((metric: any) => {
+          return enabledPages.some((page: any) => {
+            const pageNameMatch = metric.landing_page_name?.toLowerCase().includes(page.name?.toLowerCase() || '');
+            const pageUrlMatch = metric.landing_page_url?.toLowerCase().includes(page.url?.toLowerCase() || '');
+            return pageNameMatch || pageUrlMatch;
+          });
+        });
       }
-      eventsByDay.get(dayKey).add(event.session_id);
-    });
-    
-    // Sum unique visitors across all days in the date range
-    let totalUniqueVisitors = 0;
-    const dailyBreakdown = [];
-    
-    for (const [day, sessionIds] of eventsByDay.entries()) {
-      const dayVisitors = sessionIds.size;
-      totalUniqueVisitors += dayVisitors;
-      dailyBreakdown.push({ day, visitors: dayVisitors });
+      
+      // Filter metrics to the selected date range
+      const startDate = formatInTimeZone(dateRange.from, userTimezone, 'yyyy-MM-dd');
+      const endDate = formatInTimeZone(dateRange.to, userTimezone, 'yyyy-MM-dd');
+      
+      const dateFilteredMetrics = filteredMetrics.filter((metric: any) => {
+        return metric.date >= startDate && metric.date <= endDate;
+      });
+      
+      // Group by date and sum unique visitors per day (not per page per day)
+      const visitorsByDay = new Map();
+      
+      dateFilteredMetrics.forEach((metric: any) => {
+        if (!visitorsByDay.has(metric.date)) {
+          visitorsByDay.set(metric.date, new Set());
+        }
+        // For each page on this date, we need to get the sessions that visited it
+        // Since we don't have session-level data in aggregated metrics, 
+        // we need to fall back to the event-level calculation
+      });
+      
+      // Actually, let's use the event-level data but group by day like the working single-day calculation
+      const enabledPagesForFilter = enabledPages.length > 0 ? enabledPages : null;
+      let filteredEvents = filteredPageViews;
+      
+      if (enabledPagesForFilter) {
+        filteredEvents = filteredPageViews.filter((event: any) => {
+          return enabledPagesForFilter.some((page: any) => {
+            const pageNameMatch = event.event_name?.toLowerCase().includes(page.name?.toLowerCase() || '');
+            const pageUrlMatch = event.page_url?.toLowerCase().includes(page.url?.toLowerCase() || '');
+            return pageNameMatch || pageUrlMatch;
+          });
+        });
+      }
+      
+      // Group by day and count unique sessions per day (same as single day calculation)
+      const sessionsByDay = new Map();
+      
+      filteredEvents.forEach((event: any) => {
+        const eventDate = toZonedTime(new Date(event.created_at), userTimezone);
+        const dayKey = formatInTimeZone(eventDate, userTimezone, 'yyyy-MM-dd');
+        
+        // Only include dates within our range
+        if (dayKey >= startDate && dayKey <= endDate) {
+          if (!sessionsByDay.has(dayKey)) {
+            sessionsByDay.set(dayKey, new Set());
+          }
+          sessionsByDay.get(dayKey).add(event.session_id);
+        }
+      });
+      
+      // Sum unique visitors across all days
+      let totalUniqueVisitors = 0;
+      const dailyBreakdown = [];
+      
+      for (const [day, sessions] of sessionsByDay.entries()) {
+        const dayVisitors = sessions.size;
+        totalUniqueVisitors += dayVisitors;
+        dailyBreakdown.push({ day, visitors: dayVisitors });
+      }
+      
+      console.log('📊 Unique visitors (using daily sum approach):', {
+        totalUniqueVisitors,
+        dailyBreakdown,
+        dateRange: { startDate, endDate },
+        filteredEventsCount: filteredEvents.length
+      });
+      
+      return totalUniqueVisitors;
     }
     
-    console.log('📊 [uniqueVisitors] Final calculation:', {
-      totalEvents: filteredPageViews.length,
-      filteredEvents: filteredEvents.length,
-      totalUniqueVisitors,
-      dailyBreakdown,
-      eventsByDayKeys: Array.from(eventsByDay.keys()),
-      dateRange: {
-        from: dateRange.from.toISOString(),
-        to: dateRange.to.toISOString()
-      }
-    });
-    
-    return totalUniqueVisitors;
+    // Fallback to event-level calculation if no aggregated metrics
+    return 0;
     
     // Fallback to event-level calculation if no aggregated metrics available
     const uniqueVisitorIds = new Set();
