@@ -331,7 +331,7 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
       });
       
       if (filtered.length > 0) {
-        // Use filtered data if we have matches
+        // Use filtered data if we have matches in the selected range
         dateFilteredInsights = filtered;
         console.log('✅ Using filtered data within date range');
       } else {
@@ -339,6 +339,13 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
         dateFilteredInsights = filteredDailyInsights;
         usingFallbackData = true;
         console.log('⚠️ No data in selected date range, using all available data as fallback');
+        console.log('📈 Fallback data details:', {
+          totalDays: dateFilteredInsights.length,
+          dateRange: dateFilteredInsights.length > 0 ? 
+            `${dateFilteredInsights[0].date} to ${dateFilteredInsights[dateFilteredInsights.length - 1].date}` : 
+            'no data',
+          sampleDates: dateFilteredInsights.map(d => d.date).slice(0, 5)
+        });
       }
     }
 
