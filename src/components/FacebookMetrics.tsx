@@ -175,13 +175,21 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
 
   // Generate chart data using real Facebook daily insights or fall back to mock data
   const generateChartData = () => {
+    console.log('🔥 generateChartData called with:', {
+      dateRange: dateRange ? 'present' : 'null',
+      dailyInsights: dailyInsights?.length || 0,
+      sampleDaily: dailyInsights?.[0] || 'none'
+    });
+    
     // If no date range is selected, don't show any data
     if (!dateRange) {
+      console.log('❌ No date range selected, returning empty array');
       return [];
     }
 
     // Use the already filtered daily insights data from the hook
     if (dailyInsights && dailyInsights.length > 0) {
+      console.log('✅ Using real daily insights data:', dailyInsights.length, 'days');
       // Group by date to ensure one data point per date
       const groupedByDate = dailyInsights.reduce((acc: any, dayData: any) => {
         const dateKey = dayData.date; // Use the date as-is from Facebook data

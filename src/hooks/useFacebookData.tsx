@@ -344,16 +344,21 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
 
     // Always recalculate insights from daily data if available
     if (dateFilteredInsights.length > 0) {
-      const dailyAggregated = dateFilteredInsights.reduce((totals, day) => ({
-        impressions: (totals.impressions || 0) + (day.impressions || 0),
-        clicks: (totals.clicks || 0) + (day.clicks || 0),
-        spend: (totals.spend || 0) + (day.spend || 0),
-        reach: Math.max(totals.reach || 0, day.reach || 0),
-        conversions: (totals.conversions || 0) + (day.conversions || 0),
-        conversion_values: (totals.conversion_values || 0) + (day.conversion_values || 0),
-        ctr: 0, // Will be calculated below
-        cpc: 0, // Will be calculated below
-      }), { impressions: 0, clicks: 0, spend: 0, reach: 0, conversions: 0, conversion_values: 0, ctr: 0, cpc: 0 });
+      console.log('📊 Raw daily insights sample:', dateFilteredInsights.slice(0, 3));
+      
+      const dailyAggregated = dateFilteredInsights.reduce((totals, day) => {
+        console.log('Processing day:', day.date, 'spend:', day.spend, 'impressions:', day.impressions);
+        return {
+          impressions: (totals.impressions || 0) + (day.impressions || 0),
+          clicks: (totals.clicks || 0) + (day.clicks || 0),
+          spend: (totals.spend || 0) + (day.spend || 0),
+          reach: Math.max(totals.reach || 0, day.reach || 0),
+          conversions: (totals.conversions || 0) + (day.conversions || 0),
+          conversion_values: (totals.conversion_values || 0) + (day.conversion_values || 0),
+          ctr: 0, // Will be calculated below
+          cpc: 0, // Will be calculated below
+        };
+      }, { impressions: 0, clicks: 0, spend: 0, reach: 0, conversions: 0, conversion_values: 0, ctr: 0, cpc: 0 });
       
       // Calculate derived metrics
       dailyAggregated.ctr = dailyAggregated.impressions > 0 ? (dailyAggregated.clicks / dailyAggregated.impressions) * 100 : 0;
