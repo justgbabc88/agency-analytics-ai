@@ -1225,6 +1225,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      setup_ghl_sync_cron: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       user_owns_project: {
         Args: { project_uuid: string }
         Returns: boolean
