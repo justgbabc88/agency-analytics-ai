@@ -319,21 +319,35 @@ export const FacebookConnector = () => {
   };
 
   const handleDisconnect = async () => {
+    console.log('🔄 Starting Facebook disconnect process...');
     try {
+      console.log('📤 Calling updateIntegration with:', { platform: 'facebook', isConnected: false });
+      
       await updateIntegration.mutateAsync({ 
         platform: 'facebook', 
         isConnected: false 
       });
 
+      console.log('✅ Successfully updated integration status');
+      console.log('🗑️ Clearing saved API keys and state...');
+      
       saveApiKeys('facebook', {});
       setAdAccounts([]);
       setSelectedAccount('');
 
+      console.log('✅ Facebook disconnect completed successfully');
       toast({
         title: "Disconnected",
         description: "Your Facebook account has been disconnected.",
       });
     } catch (error) {
+      console.error('❌ Facebook disconnect failed:', error);
+      console.error('Error details:', {
+        message: error?.message,
+        name: error?.name,
+        stack: error?.stack
+      });
+      
       toast({
         title: "Error",
         description: "Failed to disconnect Facebook account.",
