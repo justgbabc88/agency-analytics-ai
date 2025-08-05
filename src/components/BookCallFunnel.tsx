@@ -750,14 +750,31 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       eventsByDay.get(eventDateInUserTz).add(event.session_id);
     });
     
-    // Calculate totals
+    // Calculate totals - FIXED: Don't add daily totals, count unique sessions across entire range
+    const allUniqueSessionsInRange = new Set();
     let totalUniqueVisitors = 0;
     const dailyBreakdown = [];
     
-    for (const [day, sessionIds] of eventsByDay.entries()) {
-      const dayVisitors = sessionIds.size;
-      totalUniqueVisitors += dayVisitors;
-      dailyBreakdown.push({ day, visitors: dayVisitors });
+    // First, collect all unique sessions across the entire date range
+    finalFilteredEvents.forEach((event: any) => {
+      allUniqueSessionsInRange.add(event.session_id);
+    });
+    
+    // For multi-day ranges, the total should be the unique sessions across ALL days
+    if (dateRange.from.toDateString() !== dateRange.to.toDateString()) {
+      totalUniqueVisitors = allUniqueSessionsInRange.size;
+      
+      // Still calculate daily breakdown for debugging, but don't sum them
+      for (const [day, sessionIds] of eventsByDay.entries()) {
+        const dayVisitors = sessionIds.size;
+        dailyBreakdown.push({ day, visitors: dayVisitors });
+      }
+    } else {
+      // For single day, use the day's unique sessions
+      const dayKey = formatInTimeZone(dateRange.from, userTimezone, 'yyyy-MM-dd');
+      const daySessionIds = eventsByDay.get(dayKey) || new Set();
+      totalUniqueVisitors = daySessionIds.size;
+      dailyBreakdown.push({ day: dayKey, visitors: totalUniqueVisitors });
     }
     
     // Sort daily breakdown for easier reading
