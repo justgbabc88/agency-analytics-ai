@@ -615,28 +615,52 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
   
   // Calculate unique visitors - comprehensive debugging for date range issues
   const uniqueVisitors = useMemo(() => {
+    const isSingleDay = dateRange.from.toDateString() === dateRange.to.toDateString();
+    const startDateString = dateRange.from.toISOString().split('T')[0];
+    const endDateString = dateRange.to.toISOString().split('T')[0];
+    
     console.log('🔍 [uniqueVisitors] Starting calculation with:', {
+      isSingleDay,
       filteredPageViewsCount: filteredPageViews.length,
       trackingEventsCount: trackingEvents.length,
       dateRange: {
         from: dateRange.from.toISOString(),
         to: dateRange.to.toISOString(),
-        sameDay: dateRange.from.toDateString() === dateRange.to.toDateString(),
-        fromDate: dateRange.from.toISOString().split('T')[0],
-        toDate: dateRange.to.toISOString().split('T')[0]
+        fromDate: startDateString,
+        toDate: endDateString
       },
-      userTimezone,
-      sampleEvents: filteredPageViews.slice(0, 5).map(e => ({
-        created_at: e.created_at,
-        session_id: e.session_id,
-        event_name: e.event_name,
-        page_url: e.page_url
-      }))
+      userTimezone
     });
 
-    // DEBUG: Check what's in the raw tracking events for the date range
-    const startDateString = dateRange.from.toISOString().split('T')[0];
-    const endDateString = dateRange.to.toISOString().split('T')[0];
+    // CRITICAL DEBUG: Compare what filteredPageViews contains vs trackingEvents
+    console.log('🔍 [CRITICAL DEBUG] Comparing data sources:');
+    console.log('🔍 filteredPageViews sample:', filteredPageViews.slice(0, 3).map(e => ({
+      created_at: e.created_at,
+      session_id: e.session_id,
+      event_name: e.event_name,
+      dateInUserTz: formatInTimeZone(new Date(e.created_at), userTimezone, 'yyyy-MM-dd')
+    })));
+    
+    console.log('🔍 trackingEvents sample:', trackingEvents.slice(0, 3).map(e => ({
+      created_at: e.created_at,
+      session_id: e.session_id,
+      event_name: e.event_name,
+      dateInUserTz: formatInTimeZone(new Date(e.created_at), userTimezone, 'yyyy-MM-dd')
+    })));
+
+    // Check if filteredPageViews and trackingEvents are the same dataset
+    const filteredUniqueSessionsForRange = new Set();
+    filteredPageViews.forEach(event => {
+      const eventDateInUserTz = formatInTimeZone(new Date(event.created_at), userTimezone, 'yyyy-MM-dd');
+      if (eventDateInUserTz >= startDateString && eventDateInUserTz <= endDateString) {
+        filteredUniqueSessionsForRange.add(event.session_id);
+      }
+    });
+    
+    console.log('🔍 [QUICK CHECK] Using filteredPageViews directly:', {
+      uniqueVisitorsCount: filteredUniqueSessionsForRange.size,
+      note: 'This should match what single days show if they use the same data source'
+    });
     
     console.log('🔍 [DEBUG] Raw tracking events by date:');
     const eventsByDateDebug = new Map();
