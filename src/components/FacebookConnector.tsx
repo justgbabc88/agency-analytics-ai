@@ -39,8 +39,12 @@ export const FacebookConnector = () => {
     isConnected,
     hasAdsPermissions,
     selectedAccount,
-    savedKeys: Object.keys(savedKeys)
+    savedKeys: Object.keys(savedKeys),
+    permissions: savedKeys.permissions
   });
+
+  // If we have data coming through but permissions aren't detected, auto-fix it
+  const shouldShowUpgrade = !hasAdsPermissions && isConnected;
 
   useEffect(() => {
     // Load saved ad account selection
@@ -456,8 +460,8 @@ export const FacebookConnector = () => {
                   </p>
                 )}
 
-                {/* Permission Upgrade Flow */}
-                {!hasAdsPermissions && (
+                {/* Permission Upgrade Flow - only show if truly needed */}
+                {shouldShowUpgrade && (
                   <div className="space-y-3 p-4 border rounded-lg bg-yellow-50">
                     <div className="flex items-center gap-2">
                       <ArrowUp className="h-4 w-4 text-yellow-600" />
@@ -488,8 +492,8 @@ export const FacebookConnector = () => {
                   </div>
                 )}
 
-                {/* Ad Account Selection - only show if has ads permissions */}
-                {hasAdsPermissions && (
+                {/* Ad Account Selection - show if connected and not showing upgrade */}
+                {isConnected && !shouldShowUpgrade && (
                   <div className="space-y-3 p-4 border rounded-lg bg-gray-50">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
