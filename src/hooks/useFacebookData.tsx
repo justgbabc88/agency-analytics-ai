@@ -246,10 +246,21 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
   const filteredData = React.useMemo(() => {
     if (!facebookData) return null;
 
+    console.log('🔍 Facebook Data Filtering:', {
+      hasData: !!facebookData,
+      totalDailyInsights: facebookData.daily_insights?.length || 0,
+      dateRange: dateRange ? {
+        from: format(dateRange.from, 'yyyy-MM-dd'),
+        to: format(dateRange.to, 'yyyy-MM-dd')
+      } : null,
+      availableDates: facebookData.daily_insights?.map(d => d.date).slice(0, 5) || [],
+      campaignIds: campaignIds?.length || 0
+    });
+
     // Filter campaigns if campaign IDs are provided
     let filteredCampaigns = facebookData.campaigns;
     let filteredInsights = facebookData.insights;
-    let filteredDailyInsights = facebookData.daily_insights;
+    let filteredDailyInsights = facebookData.daily_insights || [];
 
     if (campaignIds && campaignIds.length > 0) {
       filteredCampaigns = facebookData.campaigns.filter(campaign => campaignIds.includes(campaign.id));
@@ -286,8 +297,13 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
       }
     }
 
-    // Filter by date range - but always show data if available even if slightly outside range
+    // Handle date range filtering with better fallback logic
+    let dateFilteredInsights = filteredDailyInsights;
+    let usingFallbackData = false;
+    
     if (dateRange && filteredDailyInsights?.length > 0) {
+      console.log('📅 Applying date range filter...');
+      
       const filtered = filteredDailyInsights.filter(day => {
         const dayDate = new Date(day.date + 'T00:00:00');
         const fromDateInUserTz = toZonedTime(dateRange.from, userTimezone);
@@ -297,31 +313,63 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
         fromDateInUserTz.setHours(0, 0, 0, 0);
         toDateInUserTz.setHours(0, 0, 0, 0);
         
-        return dayDate >= fromDateInUserTz && dayDate <= toDateInUserTz;
+        const isInRange = dayDate >= fromDateInUserTz && dayDate <= toDateInUserTz;
+        
+        if (isInRange) {
+          console.log(`✅ Date ${day.date} is in range`);
+        }
+        
+        return isInRange;
       });
       
-      // If filtering results in no data, show all available data instead
-      filteredDailyInsights = filtered.length > 0 ? filtered : filteredDailyInsights;
-
-      // Recalculate insights from filtered daily data
-      if (filteredDailyInsights.length > 0) {
-        const dailyAggregated = filteredDailyInsights.reduce((totals, day) => ({
-          impressions: (totals.impressions || 0) + (day.impressions || 0),
-          clicks: (totals.clicks || 0) + (day.clicks || 0),
-          spend: (totals.spend || 0) + (day.spend || 0),
-          reach: Math.max(totals.reach || 0, day.reach || 0),
-          conversions: (totals.conversions || 0) + (day.conversions || 0),
-          conversion_values: (totals.conversion_values || 0) + (day.conversion_values || 0),
-          ctr: 0, // Will be calculated below
-          cpc: 0, // Will be calculated below
-        }), { impressions: 0, clicks: 0, spend: 0, reach: 0, conversions: 0, conversion_values: 0, ctr: 0, cpc: 0 });
-        
-        // Calculate derived metrics
-        dailyAggregated.ctr = dailyAggregated.impressions > 0 ? (dailyAggregated.clicks / dailyAggregated.impressions) * 100 : 0;
-        dailyAggregated.cpc = dailyAggregated.clicks > 0 ? dailyAggregated.spend / dailyAggregated.clicks : 0;
-        
-        filteredInsights = dailyAggregated;
+      console.log('📊 Date filtering results:', {
+        originalCount: filteredDailyInsights.length,
+        filteredCount: filtered.length,
+        dateRange: `${format(dateRange.from, 'yyyy-MM-dd')} to ${format(dateRange.to, 'yyyy-MM-dd')}`,
+        availableDates: filteredDailyInsights.map(d => d.date).slice(0, 10)
+      });
+      
+      if (filtered.length > 0) {
+        // Use filtered data if we have matches
+        dateFilteredInsights = filtered;
+        console.log('✅ Using filtered data within date range');
+      } else {
+        // No data in selected range - use all available data as fallback
+        dateFilteredInsights = filteredDailyInsights;
+        usingFallbackData = true;
+        console.log('⚠️ No data in selected date range, using all available data as fallback');
       }
+    }
+
+    // Always recalculate insights from daily data if available
+    if (dateFilteredInsights.length > 0) {
+      const dailyAggregated = dateFilteredInsights.reduce((totals, day) => ({
+        impressions: (totals.impressions || 0) + (day.impressions || 0),
+        clicks: (totals.clicks || 0) + (day.clicks || 0),
+        spend: (totals.spend || 0) + (day.spend || 0),
+        reach: Math.max(totals.reach || 0, day.reach || 0),
+        conversions: (totals.conversions || 0) + (day.conversions || 0),
+        conversion_values: (totals.conversion_values || 0) + (day.conversion_values || 0),
+        ctr: 0, // Will be calculated below
+        cpc: 0, // Will be calculated below
+      }), { impressions: 0, clicks: 0, spend: 0, reach: 0, conversions: 0, conversion_values: 0, ctr: 0, cpc: 0 });
+      
+      // Calculate derived metrics
+      dailyAggregated.ctr = dailyAggregated.impressions > 0 ? (dailyAggregated.clicks / dailyAggregated.impressions) * 100 : 0;
+      dailyAggregated.cpc = dailyAggregated.clicks > 0 ? dailyAggregated.spend / dailyAggregated.clicks : 0;
+      
+      filteredInsights = dailyAggregated;
+      
+      console.log('📈 Aggregated insights from daily data:', {
+        spend: dailyAggregated.spend,
+        impressions: dailyAggregated.impressions,
+        clicks: dailyAggregated.clicks,
+        ctr: dailyAggregated.ctr,
+        dataPoints: dateFilteredInsights.length,
+        usingFallbackData
+      });
+    } else {
+      console.log('⚠️ No daily insights available for aggregation');
     }
 
     // Filter ad sets by selected campaigns
@@ -337,7 +385,15 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
       insights: filteredInsights,
       filteredCampaigns,
       filteredAdSets,
-      daily_insights: filteredDailyInsights
+      daily_insights: dateFilteredInsights, // Use the date-filtered insights
+      meta: {
+        ...facebookData.meta,
+        usingFallbackData,
+        actualDataDateRange: dateFilteredInsights.length > 0 ? {
+          from: Math.min(...dateFilteredInsights.map(d => new Date(d.date).getTime())),
+          to: Math.max(...dateFilteredInsights.map(d => new Date(d.date).getTime()))
+        } : null
+      }
     };
   }, [facebookData, campaignIds, dateRange, userTimezone]);
 
