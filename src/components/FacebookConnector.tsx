@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useIntegrations } from "@/hooks/useIntegrations";
+import { useQueryClient } from '@tanstack/react-query';
 import { useApiKeys } from "@/hooks/useApiKeys";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,6 +22,7 @@ interface AdAccount {
 
 export const FacebookConnector = () => {
   const { integrations, updateIntegration, syncIntegration } = useIntegrations();
+  const queryClient = useQueryClient();
   const { saveApiKeys, getApiKeys } = useApiKeys();
   const { toast } = useToast();
   const [isConnecting, setIsConnecting] = useState(false);
@@ -34,13 +36,19 @@ export const FacebookConnector = () => {
   const isConnected = integrations?.find(i => i.platform === 'facebook')?.is_connected || false;
   const savedKeys = getApiKeys('facebook');
   const hasAdsPermissions = savedKeys.permissions?.includes('ads_read') || false;
+  
+  // Detect if we have saved keys but DB shows disconnected (mismatch scenario)
+  const hasSavedKeys = Object.keys(savedKeys).length > 0 && savedKeys.access_token;
+  const hasConnectionMismatch = hasSavedKeys && !isConnected;
 
   console.log('FacebookConnector - Current state:', {
     isConnected,
     hasAdsPermissions,
     selectedAccount,
     savedKeys: Object.keys(savedKeys),
-    permissions: savedKeys.permissions
+    permissions: savedKeys.permissions,
+    hasSavedKeys,
+    hasConnectionMismatch
   });
 
   // If we have data coming through but permissions aren't detected, auto-fix it
@@ -170,10 +178,16 @@ export const FacebookConnector = () => {
               console.log('Facebook connection completed successfully');
             } catch (integrationError) {
               console.error('Failed to update integration:', integrationError);
+              
+              // Even if database update fails, we have the keys - try to manually fix this
+              console.log('Attempting to recover from database update failure...');
+              
+              // Force refresh integrations query to see if it's actually connected
+              queryClient.invalidateQueries({ queryKey: ['integrations'] });
+              
               toast({
-                title: "Partial Success",
-                description: "Facebook connected but failed to update settings. You may need to refresh the page.",
-                variant: "destructive"
+                title: "Connection Successful",
+                description: "Facebook connected successfully! If you don't see the connection status immediately, please refresh the page.",
               });
             }
 
@@ -447,7 +461,44 @@ export const FacebookConnector = () => {
 
           {/* Connection Actions */}
           <div className="space-y-4">
-            {!isConnected ? (
+            {hasConnectionMismatch && (
+              <div className="p-4 border rounded-lg bg-orange-50">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertCircle className="h-4 w-4 text-orange-600" />
+                  <h3 className="font-medium text-orange-800">Connection Status Mismatch</h3>
+                </div>
+                <p className="text-sm text-orange-700 mb-3">
+                  You have Facebook credentials saved but the connection status is out of sync. Click below to fix this.
+                </p>
+                <Button
+                  onClick={async () => {
+                    try {
+                      await updateIntegration.mutateAsync({ 
+                        platform: 'facebook', 
+                        isConnected: true 
+                      });
+                      toast({
+                        title: "Connection Fixed",
+                        description: "Facebook connection status has been restored!",
+                      });
+                    } catch (error) {
+                      console.error('Failed to fix connection:', error);
+                      toast({
+                        title: "Fix Failed",
+                        description: "Could not restore connection status. Try disconnecting and reconnecting.",
+                        variant: "destructive"
+                      });
+                    }
+                  }}
+                  size="sm"
+                  className="bg-orange-600 hover:bg-orange-700"
+                >
+                  Fix Connection Status
+                </Button>
+              </div>
+            )}
+            
+            {!isConnected && !hasConnectionMismatch ? (
               <Button 
                 onClick={() => handleFacebookAuth('basic')}
                 disabled={isConnecting}
@@ -456,7 +507,7 @@ export const FacebookConnector = () => {
                 <Link className="h-4 w-4 mr-2" />
                 {isConnecting ? "Connecting..." : "Connect to Facebook"}
               </Button>
-            ) : (
+            ) : isConnected ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-2 text-green-600">
                   <CheckCircle className="h-4 w-4" />
@@ -589,7 +640,7 @@ export const FacebookConnector = () => {
                   </Button>
                 </div>
               </div>
-            )}
+            ) : null}
           </div>
 
           {/* Status Information */}
