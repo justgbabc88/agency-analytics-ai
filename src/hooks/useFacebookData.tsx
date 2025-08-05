@@ -335,16 +335,18 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
         dateFilteredInsights = filtered;
         console.log('✅ Using filtered data within date range');
       } else {
-        // No data in selected range - use all available data as fallback
-        dateFilteredInsights = filteredDailyInsights;
+        // No data in selected range - use ALL original daily insights as fallback (before any campaign filtering)
+        const allOriginalDailyInsights = facebookData.daily_insights || [];
+        dateFilteredInsights = allOriginalDailyInsights;
         usingFallbackData = true;
-        console.log('⚠️ No data in selected date range, using all available data as fallback');
+        console.log('⚠️ No data in selected date range, using ALL available data as fallback');
         console.log('📈 Fallback data details:', {
           totalDays: dateFilteredInsights.length,
           dateRange: dateFilteredInsights.length > 0 ? 
             `${dateFilteredInsights[0].date} to ${dateFilteredInsights[dateFilteredInsights.length - 1].date}` : 
             'no data',
-          sampleDates: dateFilteredInsights.map(d => d.date).slice(0, 5)
+          sampleDates: dateFilteredInsights.map(d => d.date).slice(0, 10),
+          campaigns: [...new Set(dateFilteredInsights.map(d => d.campaign_name))].slice(0, 3)
         });
       }
     }
