@@ -5,7 +5,7 @@ import { fromZonedTime, toZonedTime, formatInTimeZone } from "date-fns-tz";
 import { LandingPageMetrics } from "./LandingPageMetrics";
 import { CallStatsMetrics } from "./CallStatsMetrics";
 import { CallsList } from "./CallsList";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { generateCallDataFromEvents } from "@/utils/chartDataGeneration";
 import { useCallStatsCalculations } from "@/hooks/useCallStatsCalculations";
 import { supabase } from "@/integrations/supabase/client";
@@ -42,6 +42,8 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
   // State for tracking events
   const [trackingEvents, setTrackingEvents] = useState<any[]>([]);
   const [trackingEventsLoading, setTrackingEventsLoading] = useState(false);
+  const [pixelConfig, setPixelConfig] = useState<any>(null);
+  const [dataFullyLoaded, setDataFullyLoaded] = useState(false);
   
   const userTimezone = getUserTimezone();
   
@@ -56,8 +58,23 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
   });
   console.log('🔄 All Calendly events available:', calendlyEvents.length);
 
-  // State for tracking pixel configuration
-  const [pixelConfig, setPixelConfig] = useState<any>(null);
+  // Stabilize the isEventForPage function using useCallback
+  const isEventForPage = useCallback((event: any) => {
+    if (!pixelConfig?.funnelPages) return true; // Include all events if no config
+    
+    const enabledPages = pixelConfig.funnelPages.filter((page: any) => page.enabled !== false);
+    if (enabledPages.length === 0) return true; // Include all events if no pages enabled
+    
+    // Check if event matches any enabled page
+    return enabledPages.some((page: any) => {
+      const eventUrl = event.page_url || event.event_name;
+      if (!eventUrl) return false;
+      
+      // Match by URL or event name
+      return eventUrl.includes(page.url) || 
+             (page.name && eventUrl.toLowerCase().includes(page.name.toLowerCase()));
+    });
+  }, [pixelConfig]);
   
   // Fetch pixel configuration to get page settings
   useEffect(() => {
@@ -78,6 +95,7 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
         }
 
         setPixelConfig(data?.config || null);
+        console.log('🔧 Pixel config loaded:', data?.config ? 'YES' : 'NO');
       } catch (error) {
         console.error('Error fetching pixel config:', error);
       }
@@ -207,6 +225,9 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
 
       console.log('📊 Fetched raw tracking events (fallback):', data?.length || 0);
       setTrackingEvents(data || []);
+      
+      // Mark data as fully loaded when tracking events are loaded (pixel config may be null)
+      setDataFullyLoaded(true);
     } catch (error) {
       console.error('Error fetching raw tracking events:', error);
     }
@@ -482,7 +503,7 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
   const monthlyComparison = getMonthlyComparison();
 
   // Helper function to check if an event belongs to a specific page (same logic as AttributionDashboard)
-  const isEventForPage = (event: any, page: any): boolean => {
+  const isEventForSpecificPage = (event: any, page: any): boolean => {
     if (!event || !page) return false;
     
     // Primary method: Match by page URL (most reliable)
@@ -565,7 +586,7 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
 
     // Filter tracking events using the same isEventForPage logic as AttributionDashboard
     const filtered = trackingEvents.filter((event: any) => {
-      return enabledPages.some((page: any) => isEventForPage(event, page));
+      return enabledPages.some((page: any) => isEventForSpecificPage(event, page));
     });
 
     console.log('📊 Filtered page views:', filtered.length, 'from', trackingEvents.length, 'total');
@@ -621,18 +642,8 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
     return filteredPageViews.length;
   }, [aggregatedMetrics, pixelConfig, filteredPageViews]);
   
-  // DEBUG: Log every render to see what's happening
-  console.log('🚨 [RENDER DEBUG] Component rendering, dependencies:', {
-    trackingEventsLength: trackingEvents.length,
-    pixelConfigExists: !!pixelConfig,
-    dateRangeFrom: dateRange.from.toISOString(),
-    dateRangeTo: dateRange.to.toISOString(),
-    userTimezone,
-    renderTime: Date.now()
-  });
-  
   // Calculate unique visitors - comprehensive debugging for date range issues
-  const uniqueVisitors = useMemo(() => {
+  const realUniqueVisitors = useMemo(() => {
     const isSingleDay = dateRange.from.toDateString() === dateRange.to.toDateString();
     const startDateString = dateRange.from.toISOString().split('T')[0];
     const endDateString = dateRange.to.toISOString().split('T')[0];
@@ -716,7 +727,7 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
     
     if (enabledPages.length > 0) {
       finalFilteredEvents = dateFilteredEvents.filter((event: any) => {
-        return enabledPages.some((page: any) => isEventForPage(event, page));
+        return enabledPages.some((page: any) => isEventForSpecificPage(event, page));
       });
       
       console.log('🔍 [uniqueVisitors] After page filtering:', {
@@ -778,8 +789,12 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
     }
     
     return totalUniqueVisitors;
-  }, [trackingEvents, pixelConfig, dateRange, userTimezone, isEventForPage]);
-  const bookingRate = uniqueVisitors > 0 ? ((callStatsData.totalBookings / uniqueVisitors) * 100) : 0;
+  }, [trackingEvents, dateRange, userTimezone, isEventForPage, dataFullyLoaded]);
+  
+  // Use the stable unique visitors calculation
+  const finalUniqueVisitors = dataFullyLoaded ? realUniqueVisitors : 0;
+  
+  const bookingRate = finalUniqueVisitors > 0 ? ((callStatsData.totalBookings / finalUniqueVisitors) * 100) : 0;
   const previousBookingRate = 0; // Simplified for now since we're focusing on current period accuracy
   
   const totalSpend = facebookData?.insights?.spend || 1500; // Use actual Facebook spend or fallback
@@ -805,7 +820,7 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
 
   // Debug logging
   console.log('🔍 [BookCallFunnel] Passing to LandingPageMetrics:', {
-    uniqueVisitors,
+    uniqueVisitors: finalUniqueVisitors,
     totalPageViews,
     dateRange: {
       from: dateRange.from.toISOString(),
@@ -827,7 +842,7 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       </div>
 
       <LandingPageMetrics
-        totalPageViews={uniqueVisitors}
+        totalPageViews={finalUniqueVisitors}
         bookingRate={bookingRate}
         previousBookingRate={previousBookingRate}
         totalBookings={callStatsData.totalBookings}
