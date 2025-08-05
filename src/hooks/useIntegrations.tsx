@@ -31,6 +31,8 @@ export const useIntegrations = () => {
     mutationFn: async ({ platform, isConnected }: { platform: string; isConnected: boolean }) => {
       if (!agency) throw new Error('No agency found');
       
+      console.log('🔄 updateIntegration starting with:', { platform, isConnected, agencyId: agency.id });
+      
       if (isConnected) {
         // If connecting, try to sync data using the stored API keys
         const apiKeys = getApiKeys(platform);
@@ -52,19 +54,61 @@ export const useIntegrations = () => {
         }
       }
       
-      const { data, error } = await supabase
-        .from('integrations')
-        .upsert({
-          agency_id: agency.id,
-          platform,
-          is_connected: isConnected,
-          last_sync: isConnected ? new Date().toISOString() : null,
-        })
-        .select()
-        .single();
+      console.log('📤 Attempting database operation...');
+      
+      // For disconnection, update the existing record instead of upsert
+      if (!isConnected) {
+        const { data, error } = await supabase
+          .from('integrations')
+          .update({
+            is_connected: false,
+            last_sync: null,
+          })
+          .eq('agency_id', agency.id)
+          .eq('platform', platform)
+          .select()
+          .single();
 
-      if (error) throw error;
-      return data;
+        if (error) {
+          console.error('❌ Database update failed:', error);
+          console.error('Error details:', {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code
+          });
+          throw error;
+        }
+        
+        console.log('✅ Database update successful:', data);
+        return data;
+      } else {
+        // For connection, use upsert
+        const { data, error } = await supabase
+          .from('integrations')
+          .upsert({
+            agency_id: agency.id,
+            platform,
+            is_connected: isConnected,
+            last_sync: isConnected ? new Date().toISOString() : null,
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error('❌ Database upsert failed:', error);
+          console.error('Error details:', {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code
+          });
+          throw error;
+        }
+        
+        console.log('✅ Database upsert successful:', data);
+        return data;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['integrations'] });
