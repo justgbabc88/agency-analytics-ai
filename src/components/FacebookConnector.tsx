@@ -58,6 +58,18 @@ export const FacebookConnector = () => {
     if (isConnected && savedKeys.access_token && hasAdsPermissions) {
       loadAdAccounts();
     }
+    
+    // Auto-fix missing permissions when we detect Facebook data is working
+    if (isConnected && !hasAdsPermissions && Object.keys(savedKeys).length === 0) {
+      console.log('🔧 Detected missing Facebook permissions, attempting auto-fix...');
+      // If connected but no keys saved, it means permissions weren't stored properly
+      // This can happen after successful OAuth but failed key storage
+      toast({
+        title: "Permission Detection Issue",
+        description: "Your Facebook connection appears to be working but permissions aren't detected. Please reconnect to fix this.",
+        variant: "destructive"
+      });
+    }
   }, [isConnected, savedKeys.access_token, hasAdsPermissions]);
 
   const handleFacebookAuth = async (permissionLevel: 'basic' | 'ads' = 'basic') => {
