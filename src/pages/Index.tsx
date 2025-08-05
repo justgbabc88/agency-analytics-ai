@@ -9,6 +9,7 @@ import { FacebookMetrics } from "@/components/FacebookMetrics";
 import { PixelSetupWizard } from '@/components/PixelSetupWizard';
 import { TrackingPixelManager } from '@/components/TrackingPixelManager';
 import { AttributionDashboard } from '@/components/AttributionDashboard';
+import { ManualFacebookSync } from "@/components/ManualFacebookSync";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -262,6 +263,10 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="facebook" className="space-y-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold">Facebook Analytics</h2>
+              <ManualFacebookSync />
+            </div>
             <FacebookMetrics 
               dateRange={dateRange} 
               projectId={selectedProjectId} 
