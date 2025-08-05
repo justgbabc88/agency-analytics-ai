@@ -355,19 +355,43 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
     if (dateFilteredInsights.length > 0) {
       console.log('📊 Raw daily insights sample:', dateFilteredInsights.slice(0, 3));
       
-      const dailyAggregated = dateFilteredInsights.reduce((totals, day) => {
-        console.log('Processing day:', day.date, 'spend:', day.spend, 'impressions:', day.impressions);
-        return {
-          impressions: (totals.impressions || 0) + (day.impressions || 0),
-          clicks: (totals.clicks || 0) + (day.clicks || 0),
-          spend: (totals.spend || 0) + (day.spend || 0),
-          reach: Math.max(totals.reach || 0, day.reach || 0),
-          conversions: (totals.conversions || 0) + (day.conversions || 0),
-          conversion_values: (totals.conversion_values || 0) + (day.conversion_values || 0),
-          ctr: 0, // Will be calculated below
-          cpc: 0, // Will be calculated below
-        };
-      }, { impressions: 0, clicks: 0, spend: 0, reach: 0, conversions: 0, conversion_values: 0, ctr: 0, cpc: 0 });
+      // Group by date first to handle multiple campaigns per day
+      const groupedByDate = dateFilteredInsights.reduce((acc, day) => {
+        const date = day.date;
+        if (!acc[date]) {
+          acc[date] = {
+            impressions: 0,
+            clicks: 0,
+            spend: 0,
+            reach: 0,
+            conversions: 0,
+            conversion_values: 0
+          };
+        }
+        
+        acc[date].impressions += (day.impressions || 0);
+        acc[date].clicks += (day.clicks || 0);
+        acc[date].spend += (day.spend || 0);
+        acc[date].reach = Math.max(acc[date].reach, day.reach || 0);
+        acc[date].conversions += (day.conversions || 0);
+        acc[date].conversion_values += (day.conversion_values || 0);
+        
+        return acc;
+      }, {} as Record<string, any>);
+      
+      console.log('📅 Grouped by date:', Object.keys(groupedByDate).length, 'unique days');
+      
+      // Now aggregate across all days
+      const dailyAggregated: FacebookInsights = { impressions: 0, clicks: 0, spend: 0, reach: 0, conversions: 0, conversion_values: 0, ctr: 0, cpc: 0 };
+      
+      Object.values(groupedByDate).forEach((day: any) => {
+        dailyAggregated.impressions += (day.impressions || 0);
+        dailyAggregated.clicks += (day.clicks || 0);
+        dailyAggregated.spend += (day.spend || 0);
+        dailyAggregated.reach = Math.max(dailyAggregated.reach, day.reach || 0);
+        dailyAggregated.conversions += (day.conversions || 0);
+        dailyAggregated.conversion_values += (day.conversion_values || 0);
+      });
       
       // Calculate derived metrics
       dailyAggregated.ctr = dailyAggregated.impressions > 0 ? (dailyAggregated.clicks / dailyAggregated.impressions) * 100 : 0;
