@@ -750,31 +750,40 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       eventsByDay.get(eventDateInUserTz).add(event.session_id);
     });
     
-    // Calculate totals - FIXED: Don't add daily totals, count unique sessions across entire range
-    const allUniqueSessionsInRange = new Set();
+    // Calculate totals - FIXED: For multi-day, count unique sessions across entire range
     let totalUniqueVisitors = 0;
     const dailyBreakdown = [];
     
-    // First, collect all unique sessions across the entire date range
-    finalFilteredEvents.forEach((event: any) => {
-      allUniqueSessionsInRange.add(event.session_id);
-    });
-    
-    // For multi-day ranges, the total should be the unique sessions across ALL days
-    if (dateRange.from.toDateString() !== dateRange.to.toDateString()) {
-      totalUniqueVisitors = allUniqueSessionsInRange.size;
-      
-      // Still calculate daily breakdown for debugging, but don't sum them
-      for (const [day, sessionIds] of eventsByDay.entries()) {
-        const dayVisitors = sessionIds.size;
-        dailyBreakdown.push({ day, visitors: dayVisitors });
-      }
-    } else {
+    if (isSingleDay) {
       // For single day, use the day's unique sessions
       const dayKey = formatInTimeZone(dateRange.from, userTimezone, 'yyyy-MM-dd');
       const daySessionIds = eventsByDay.get(dayKey) || new Set();
       totalUniqueVisitors = daySessionIds.size;
       dailyBreakdown.push({ day: dayKey, visitors: totalUniqueVisitors });
+    } else {
+      // For multi-day ranges, count ALL unique sessions across the entire range
+      const allUniqueSessionsInRange = new Set();
+      
+      // Collect all unique session IDs from all filtered events across all days
+      finalFilteredEvents.forEach((event: any) => {
+        allUniqueSessionsInRange.add(event.session_id);
+      });
+      
+      totalUniqueVisitors = allUniqueSessionsInRange.size;
+      
+      // Still calculate daily breakdown for debugging (but don't use it for the total)
+      for (const [day, sessionIds] of eventsByDay.entries()) {
+        const dayVisitors = sessionIds.size;
+        dailyBreakdown.push({ day, visitors: dayVisitors });
+      }
+      
+      console.log('🔍 [MULTI-DAY DEBUG] Unique session calculation:', {
+        totalEventsInRange: finalFilteredEvents.length,
+        totalUniqueSessionsInRange: allUniqueSessionsInRange.size,
+        sampleSessionIds: Array.from(allUniqueSessionsInRange).slice(0, 5),
+        dailyBreakdownSum: dailyBreakdown.reduce((sum, day) => sum + day.visitors, 0),
+        shouldNotEqual: 'The total should NOT equal the sum of daily visitors for multi-day ranges'
+      });
     }
     
     // Sort daily breakdown for easier reading
