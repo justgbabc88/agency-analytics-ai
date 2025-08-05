@@ -253,8 +253,9 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
         from: format(dateRange.from, 'yyyy-MM-dd'),
         to: format(dateRange.to, 'yyyy-MM-dd')
       } : null,
-      availableDates: facebookData.daily_insights?.map(d => d.date).slice(0, 5) || [],
-      campaignIds: campaignIds?.length || 0
+      availableDates: facebookData.daily_insights?.map(d => d.date).slice(0, 10) || [],
+      campaignIds: campaignIds?.length || 0,
+      sampleDailyInsight: facebookData.daily_insights?.[0] || null
     });
 
     // Filter campaigns if campaign IDs are provided
@@ -407,8 +408,9 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
     adSets: facebookData?.adSets || [], // All ad sets for the filter
     filteredAdSets: filteredData?.filteredAdSets || [], // Filtered ad sets
     metrics: filteredData?.insights || defaultInsights,
+    daily_insights: filteredData?.daily_insights || [], // Add daily insights to return data
     // Include metadata for better UX
-    meta: facebookData?.meta || {
+    meta: filteredData?.meta || {
       adSetsAvailable: false,
       campaignInsightsAvailable: false,
       rateLimitHit: false,

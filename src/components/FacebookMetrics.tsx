@@ -42,14 +42,14 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
   const handleCampaignChange = onCampaignChange || setInternalSelectedCampaignIds;
   const handleAdSetChange = onAdSetChange || setInternalSelectedAdSetIds;
   
-  const { facebookData, isLoading, insights, campaigns, allCampaigns, metrics, adSets } = useFacebookData({ 
+  const { facebookData, isLoading, insights, campaigns, allCampaigns, metrics, adSets, daily_insights } = useFacebookData({ 
     dateRange, 
     campaignIds: activeCampaignIds,
     adSetIds: activeAdSetIds
   });
   
-  // Extract the filtered daily insights properly
-  const dailyInsights = facebookData?.daily_insights;
+  // Use daily_insights from the hook directly
+  const dailyInsights = daily_insights;
   const { calendlyEvents } = useCalendlyData(projectId);
   const { metrics: formSubmissions } = useGHLFormSubmissions(projectId || '', dateRange, selectedFormIds);
   const { profile } = useUserProfile();
@@ -61,7 +61,10 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
     campaigns,
     adSets,
     isLoading,
-    dateRange
+    dateRange,
+    dailyInsights: dailyInsights,
+    dailyInsightsLength: dailyInsights?.length || 0,
+    sampleDailyInsight: dailyInsights?.[0] || null
   });
 
   if (isLoading) {
