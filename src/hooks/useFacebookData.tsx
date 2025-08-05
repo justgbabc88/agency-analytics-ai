@@ -335,18 +335,16 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
         dateFilteredInsights = filtered;
         console.log('✅ Using filtered data within date range');
       } else {
-        // No data in selected range - use ALL original daily insights as fallback (before any campaign filtering)
-        const allOriginalDailyInsights = facebookData.daily_insights || [];
-        dateFilteredInsights = allOriginalDailyInsights;
+        // No data in selected range - return empty data instead of misleading fallback
+        dateFilteredInsights = [];
         usingFallbackData = true;
-        console.log('⚠️ No data in selected date range, using ALL available data as fallback');
-        console.log('📈 Fallback data details:', {
-          totalDays: dateFilteredInsights.length,
-          dateRange: dateFilteredInsights.length > 0 ? 
-            `${dateFilteredInsights[0].date} to ${dateFilteredInsights[dateFilteredInsights.length - 1].date}` : 
+        console.log('⚠️ No data in selected date range, showing empty results');
+        console.log('📈 Available data spans:', {
+          availableDateRange: filteredDailyInsights.length > 0 ? 
+            `${filteredDailyInsights[0].date} to ${filteredDailyInsights[filteredDailyInsights.length - 1].date}` : 
             'no data',
-          sampleDates: dateFilteredInsights.map(d => d.date).slice(0, 10),
-          campaigns: [...new Set(dateFilteredInsights.map(d => d.campaign_name))].slice(0, 3)
+          selectedRange: `${format(dateRange.from, 'yyyy-MM-dd')} to ${format(dateRange.to, 'yyyy-MM-dd')}`,
+          suggestion: 'Try selecting a date range with available data'
         });
       }
     }
