@@ -613,11 +613,23 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
     return filteredPageViews.length;
   }, [aggregatedMetrics, pixelConfig, filteredPageViews]);
   
+  // DEBUG: Log every render to see what's happening
+  console.log('🚨 [RENDER DEBUG] Component rendering, dependencies:', {
+    trackingEventsLength: trackingEvents.length,
+    pixelConfigExists: !!pixelConfig,
+    dateRangeFrom: dateRange.from.toISOString(),
+    dateRangeTo: dateRange.to.toISOString(),
+    userTimezone,
+    renderTime: Date.now()
+  });
+  
   // Calculate unique visitors - comprehensive debugging for date range issues
   const uniqueVisitors = useMemo(() => {
     const isSingleDay = dateRange.from.toDateString() === dateRange.to.toDateString();
     const startDateString = dateRange.from.toISOString().split('T')[0];
     const endDateString = dateRange.to.toISOString().split('T')[0];
+    
+    console.log('🚨 [UNIQUE VISITORS USEMEMO] RUNNING NOW!', Date.now());
     
     console.log('🔍 [uniqueVisitors] Starting calculation with:', {
       isSingleDay,
