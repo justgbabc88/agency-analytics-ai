@@ -268,12 +268,14 @@ async function syncFacebook(apiKeys: Record<string, string>, agencyId?: string) 
         
         console.log(`Existing data count: ${dailyInsights.length}`)
         
-        // Calculate 30-day date range
+        // Calculate 30-day date range, but exclude today and yesterday as Facebook data is often incomplete
         const today = new Date()
+        const twoDaysAgo = new Date()
+        twoDaysAgo.setDate(twoDaysAgo.getDate() - 2)
         const thirtyDaysAgo = new Date()
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
         
-        console.log(`Checking for missing data in range: ${thirtyDaysAgo.toISOString().split('T')[0]} to ${today.toISOString().split('T')[0]}`)
+        console.log(`Checking for missing data in range: ${thirtyDaysAgo.toISOString().split('T')[0]} to ${twoDaysAgo.toISOString().split('T')[0]} (excluding last 2 days due to Facebook data delays)`)
         
         // Get all existing dates within the last 30 days
         const existingDates = new Set(
@@ -281,13 +283,13 @@ async function syncFacebook(apiKeys: Record<string, string>, agencyId?: string) 
             .map(d => d.date)
             .filter(date => {
               const dateObj = new Date(date)
-              return dateObj >= thirtyDaysAgo && dateObj <= today
+              return dateObj >= thirtyDaysAgo && dateObj <= twoDaysAgo
             })
         )
         
-        // Generate all dates in the last 30 days (excluding weekends for now, can adjust later)
+        // Generate all dates in the range (excluding last 2 days)
         const allDatesInRange: string[] = []
-        for (let d = new Date(thirtyDaysAgo); d <= today; d.setDate(d.getDate() + 1)) {
+        for (let d = new Date(thirtyDaysAgo); d <= twoDaysAgo; d.setDate(d.getDate() + 1)) {
           allDatesInRange.push(d.toISOString().split('T')[0])
         }
         
@@ -299,8 +301,13 @@ async function syncFacebook(apiKeys: Record<string, string>, agencyId?: string) 
         console.log(`Missing dates: ${missingDates.length} - ${missingDates.slice(0, 5).join(', ')}${missingDates.length > 5 ? '...' : ''}`)
         
         if (missingDates.length === 0) {
-          console.log('No missing dates found, data is complete for last 30 days')
-          return existingData.data
+          console.log('No missing dates found, data is complete for stable date range')
+          // Still sync recent data (last 3 days) to get latest available data
+          const threeDaysAgo = new Date()
+          threeDaysAgo.setDate(threeDaysAgo.getDate() - 3)
+          sinceParam = `&time_range[since]=${threeDaysAgo.toISOString().split('T')[0]}`
+          untilParam = `&time_range[until]=${today.toISOString().split('T')[0]}`
+          console.log(`Syncing recent data for latest updates: ${threeDaysAgo.toISOString().split('T')[0]} to ${today.toISOString().split('T')[0]}`)
         }
         
         // For efficiency, if we're missing more than 10 days, just sync the whole last 30 days
