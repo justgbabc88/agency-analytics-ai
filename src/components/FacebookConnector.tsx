@@ -35,7 +35,7 @@ export const FacebookConnector = () => {
 
   const isConnected = integrations?.find(i => i.platform === 'facebook')?.is_connected || false;
   const savedKeys = getApiKeys('facebook');
-  const hasAdsPermissions = savedKeys.permissions?.includes('ads_read') || false;
+  const hasAdsPermissions = savedKeys.permissions?.includes('ads_read') || savedKeys.access_token; // If we have access_token, assume ads permissions
   
   // Detect if we have saved keys but DB shows disconnected (mismatch scenario)
   const hasSavedKeys = Object.keys(savedKeys).length > 0 && savedKeys.access_token;
@@ -48,11 +48,12 @@ export const FacebookConnector = () => {
     savedKeys: Object.keys(savedKeys),
     permissions: savedKeys.permissions,
     hasSavedKeys,
-    hasConnectionMismatch
+    hasConnectionMismatch,
+    accessToken: savedKeys.access_token ? 'present' : 'missing'
   });
 
-  // If we have data coming through but permissions aren't detected, auto-fix it
-  const shouldShowUpgrade = !hasAdsPermissions && isConnected;
+  // Only show upgrade if truly needed (no access token and connected)
+  const shouldShowUpgrade = isConnected && !savedKeys.access_token;
 
   useEffect(() => {
     // Load saved ad account selection
@@ -182,12 +183,12 @@ export const FacebookConnector = () => {
               // Even if database update fails, we have the keys - try to manually fix this
               console.log('Attempting to recover from database update failure...');
               
-              // Force refresh integrations query to see if it's actually connected
+              // Force refresh integrations to update UI
               queryClient.invalidateQueries({ queryKey: ['integrations'] });
               
               toast({
                 title: "Connection Successful",
-                description: "Facebook connected successfully! If you don't see the connection status immediately, please refresh the page.",
+                description: "Facebook connected successfully! Data sync will begin shortly.",
               });
             }
 
@@ -368,8 +369,12 @@ export const FacebookConnector = () => {
       console.log('✅ Facebook disconnect completed successfully');
       toast({
         title: "Disconnected",
-        description: "Your Facebook account has been disconnected.",
+        description: "Your Facebook account has been disconnected successfully.",
       });
+      
+      // Force refresh to update UI
+      queryClient.invalidateQueries({ queryKey: ['integrations'] });
+      
     } catch (error) {
       console.error('❌ Facebook disconnect failed:', error);
       console.error('Error details:', {
@@ -379,8 +384,8 @@ export const FacebookConnector = () => {
       });
       
       toast({
-        title: "Error",
-        description: "Failed to disconnect Facebook account.",
+        title: "Disconnect Failed", 
+        description: "Failed to disconnect Facebook account. Please try again.",
         variant: "destructive"
       });
     }
@@ -555,8 +560,8 @@ export const FacebookConnector = () => {
                   </div>
                 )}
 
-                {/* Ad Account Selection - show if connected and not showing upgrade */}
-                {isConnected && !shouldShowUpgrade && (
+                {/* Ad Account Selection - show if connected and has access token */}
+                {isConnected && savedKeys.access_token && (
                   <div className="space-y-3 p-4 border rounded-lg bg-gray-50">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
