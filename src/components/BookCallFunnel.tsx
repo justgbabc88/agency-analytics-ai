@@ -653,10 +653,10 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       console.log(`🔍 [DEBUG] ${date}: ${events.length} events, ${uniqueSessions} unique sessions`);
     }
 
-    // Filter events that fall within the exact date range
+    // Filter events that fall within the exact date range (using user timezone)
     const dateFilteredEvents = trackingEvents.filter(event => {
-      const eventDate = new Date(event.created_at).toISOString().split('T')[0];
-      return eventDate >= startDateString && eventDate <= endDateString;
+      const eventDateInUserTz = formatInTimeZone(new Date(event.created_at), userTimezone, 'yyyy-MM-dd');
+      return eventDateInUserTz >= startDateString && eventDateInUserTz <= endDateString;
     });
     
     console.log('🔍 [uniqueVisitors] After date filtering:', {
@@ -683,16 +683,16 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       });
     }
     
-    // Group filtered events by day and count unique visitors per day
+    // Group filtered events by day and count unique visitors per day (using user timezone)
     const eventsByDay = new Map();
     
     finalFilteredEvents.forEach((event: any) => {
-      const eventDate = new Date(event.created_at).toISOString().split('T')[0];
+      const eventDateInUserTz = formatInTimeZone(new Date(event.created_at), userTimezone, 'yyyy-MM-dd');
       
-      if (!eventsByDay.has(eventDate)) {
-        eventsByDay.set(eventDate, new Set());
+      if (!eventsByDay.has(eventDateInUserTz)) {
+        eventsByDay.set(eventDateInUserTz, new Set());
       }
-      eventsByDay.get(eventDate).add(event.session_id);
+      eventsByDay.get(eventDateInUserTz).add(event.session_id);
     });
     
     // Calculate totals
