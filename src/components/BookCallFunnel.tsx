@@ -25,11 +25,19 @@ interface BookCallFunnelProps {
 }
 
 export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [], selectedFormIds = [], zohoLeadSourceFilter }: BookCallFunnelProps) => {
+  // Stabilize dateRange to prevent unnecessary re-renders when parent passes new object with same values
+  const stableDateRange = useMemo(() => {
+    return {
+      from: dateRange.from,
+      to: dateRange.to
+    };
+  }, [dateRange.from.getTime(), dateRange.to.getTime()]);
+
   const { calendlyEvents, getRecentBookings, getMonthlyComparison, refetch } = useCalendlyData(projectId);
   const { getUserTimezone, profile } = useUserProfile();
   const { toast } = useToast();
-  const { metrics: formSubmissions, loading: formSubmissionsLoading, refetch: refetchGHLData } = useGHLFormSubmissions(projectId, dateRange, selectedFormIds);
-  const { facebookData } = useFacebookData({ dateRange, campaignIds: selectedCampaignIds });
+  const { metrics: formSubmissions, loading: formSubmissionsLoading, refetch: refetchGHLData } = useGHLFormSubmissions(projectId, stableDateRange, selectedFormIds);
+  const { facebookData } = useFacebookData({ dateRange: stableDateRange, campaignIds: selectedCampaignIds });
   
   // State for tracking events
   const [trackingEvents, setTrackingEvents] = useState<any[]>([]);
