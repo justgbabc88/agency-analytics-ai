@@ -482,8 +482,11 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
     console.log('🔄 Date range key:', dateRangeKey);
     console.log('🔄 Using timezone:', userTimezone);
     
-    // Check if it's a single day or multiple days
-    const isSameDay = dateRange.from.toDateString() === dateRange.to.toDateString();
+    // Check if it's a single day or multiple days - use the same logic as Facebook graphs
+    // Convert to user timezone first, then check if it's the same calendar day
+    const startInUserTz = toZonedTime(dateRange.from, userTimezone);
+    const endInUserTz = toZonedTime(dateRange.to, userTimezone);
+    const isSameDay = format(startInUserTz, 'yyyy-MM-dd') === format(endInUserTz, 'yyyy-MM-dd');
     
     if (isSameDay) {
       // Single day - show one data point
