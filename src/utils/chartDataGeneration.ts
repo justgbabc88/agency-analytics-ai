@@ -93,12 +93,21 @@ export const generateCallDataFromEvents = (
     console.log(`Events scheduled on ${currentDateStr}: ${eventsScheduledThisDay.length}`);
     console.log(`Events cancelled on ${currentDateStr}: ${eventsCancelledThisDay.length}`);
     
-    // Match the logic from useCallStatsCalculations
-    const callsBooked = eventsCreatedThisDay.length;
-    const callsTaken = eventsScheduledThisDay.filter(event => 
+    // For chart consistency with call stats, we need to use the same logic
+    // Calls taken = events that were scheduled and not cancelled (regardless of when they were scheduled)
+    // Cancelled = events that were cancelled within the date range
+    const allEventsCreatedThisDay = eventsCreatedThisDay;
+    const callsBooked = allEventsCreatedThisDay.length;
+    
+    // For calls taken, we need events that were created this day AND are not cancelled
+    const callsTaken = allEventsCreatedThisDay.filter(event => 
       event.status !== 'canceled' && event.status !== 'cancelled'
     ).length;
-    const cancelled = eventsCancelledThisDay.length;
+    
+    // For cancelled, we want events that were created this day AND are cancelled
+    const cancelled = allEventsCreatedThisDay.filter(event => 
+      event.status === 'canceled' || event.status === 'cancelled'
+    ).length;
     
     // Calculate page views for this day
     const pageViewsThisDay = trackingEvents ? trackingEvents.filter(event => {
@@ -185,12 +194,19 @@ export const generateCallDataFromEvents = (
       console.log(`Events scheduled on ${currentDateStr}: ${eventsScheduledThisDay.length}`);
       console.log(`Events cancelled on ${currentDateStr}: ${eventsCancelledThisDay.length}`);
       
-      // Match the logic from useCallStatsCalculations
-      const callsBooked = eventsCreatedThisDay.length;
-      const callsTaken = eventsScheduledThisDay.filter(event => 
+      // For chart consistency with call stats, use the same logic as single day
+      const allEventsCreatedThisDay = eventsCreatedThisDay;
+      const callsBooked = allEventsCreatedThisDay.length;
+      
+      // For calls taken, we need events that were created this day AND are not cancelled
+      const callsTaken = allEventsCreatedThisDay.filter(event => 
         event.status !== 'canceled' && event.status !== 'cancelled'
       ).length;
-      const cancelled = eventsCancelledThisDay.length;
+      
+      // For cancelled, we want events that were created this day AND are cancelled
+      const cancelled = allEventsCreatedThisDay.filter(event => 
+        event.status === 'canceled' || event.status === 'cancelled'
+      ).length;
       
       // Calculate page views for this day
       const pageViewsThisDay = trackingEvents ? trackingEvents.filter(event => {
