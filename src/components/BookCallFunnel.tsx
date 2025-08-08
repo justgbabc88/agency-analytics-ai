@@ -929,6 +929,26 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
     formSubmissionsLoading
   });
 
+  // Calculate total page views (not unique visitors) for comparison
+  const totalPageViewsCount = useMemo(() => {
+    if (!trackingEvents.length) return 0;
+    
+    const dateFilteredEvents = trackingEvents.filter(event => {
+      const eventDateInUserTz = formatInTimeZone(new Date(event.created_at), userTimezone, 'yyyy-MM-dd');
+      const startDateString = dateRange.from.toISOString().split('T')[0];
+      const endDateString = dateRange.to.toISOString().split('T')[0];
+      return eventDateInUserTz >= startDateString && eventDateInUserTz <= endDateString;
+    });
+    
+    console.log('🔍 [TOTAL PAGE VIEWS] Calculation:', {
+      totalPageViews: dateFilteredEvents.length,
+      uniqueVisitors: finalUniqueVisitors,
+      note: 'Total page views counts all events, unique visitors deduplicates sessions'
+    });
+    
+    return dateFilteredEvents.length;
+  }, [trackingEvents, dateRange, userTimezone, finalUniqueVisitors]);
+
   return (
     <div className="space-y-6">
       {/* Header without date picker */}
@@ -937,7 +957,7 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       </div>
 
       <LandingPageMetrics
-        totalPageViews={finalUniqueVisitors}
+        totalPageViews={totalPageViewsCount}
         bookingRate={bookingRate}
         previousBookingRate={previousBookingRate}
         totalBookings={callStatsData.totalBookings}
