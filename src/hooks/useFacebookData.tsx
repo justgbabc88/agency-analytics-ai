@@ -17,6 +17,7 @@ interface FacebookInsights {
   cpc: number;
   conversions: number;
   conversion_values: number;
+  frequency?: number;
 }
 
 interface FacebookCampaign {
@@ -230,6 +231,7 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
     cpc: 0,
     conversions: 0,
     conversion_values: 0,
+    frequency: 0,
   };
 
   console.log('useFacebookData - Return data:', {

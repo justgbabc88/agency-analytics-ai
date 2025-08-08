@@ -116,8 +116,8 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
   // Use real CPC from Facebook data instead of calculating it
   const cpc = insights.cpc || 0;
   
-  // Calculate Frequency - estimated based on reach vs impressions
-  const frequency = insights.reach && insights.reach > 0 ? insights.impressions / insights.reach : 1.2;
+  // Use frequency from hook instead of calculating manually
+  const frequency = (insights as any).frequency || (insights.reach && insights.reach > 0 ? insights.impressions / insights.reach : 1.2);
 
   // Calculate total bookings for the date range (based on creation date, not scheduled date)
   const totalBookings = calendlyEvents.filter(event => {
