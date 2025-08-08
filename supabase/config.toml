@@ -65,5 +65,8 @@ verify_jwt = false
 [functions.zoho-oauth]
 verify_jwt = false
 
+[functions.unified-integration-scheduler]
+verify_jwt = false
+
 [edge-runtime]
 policy = "per_request"
