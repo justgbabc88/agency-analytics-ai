@@ -6,6 +6,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useProjectIntegrations } from '@/hooks/useProjectIntegrations';
+import { useQueryClient } from '@tanstack/react-query';
 import { Users, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 
 interface ZohoCRMConnectorProps {
@@ -23,6 +24,7 @@ export const ZohoCRMConnector = ({
   const [connectionData, setConnectionData] = useState<any>(null);
   const { toast } = useToast();
   const { syncIntegration } = useProjectIntegrations(projectId);
+  const queryClient = useQueryClient();
 
   // Check for OAuth callback parameters on mount
   useEffect(() => {
@@ -183,6 +185,9 @@ export const ZohoCRMConnector = ({
 
       setConnectionData(null);
       onConnectionChange?.(false);
+      
+      // Refresh integrations data to update UI
+      await queryClient.invalidateQueries({ queryKey: ['project-integrations', projectId] });
       
       toast({
         title: "Disconnected",
