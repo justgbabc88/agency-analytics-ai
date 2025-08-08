@@ -203,27 +203,44 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
     }
   };
 
-  // Fallback method for raw events (when aggregation fails)
+  // Fallback method for raw events (when aggregation fails) - with pagination
   const fetchRawTrackingEvents = async () => {
     if (!projectId) return;
     
     try {
-      const { data, error } = await supabase
-        .from('tracking_events')
-        .select('*')
-        .eq('project_id', projectId)
-        .eq('event_type', 'page_view')
-        .gte('created_at', dateRange.from.toISOString())
-        .lte('created_at', dateRange.to.toISOString())
-        .order('created_at', { ascending: false });
+      let allEvents: any[] = [];
+      let page = 0;
+      const pageSize = 1000;
+      let hasMore = true;
 
-      if (error) {
-        console.error('Error fetching raw tracking events:', error);
-        return;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('tracking_events')
+          .select('*')
+          .eq('project_id', projectId)
+          .eq('event_type', 'page_view')
+          .gte('created_at', dateRange.from.toISOString())
+          .lte('created_at', dateRange.to.toISOString())
+          .order('created_at', { ascending: false })
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+
+        if (error) {
+          console.error('Error fetching raw tracking events:', error);
+          break;
+        }
+
+        if (data && data.length > 0) {
+          allEvents = [...allEvents, ...data];
+          hasMore = data.length === pageSize;
+          page++;
+          console.log(`📊 Fetched page ${page}: ${data.length} events (total so far: ${allEvents.length})`);
+        } else {
+          hasMore = false;
+        }
       }
 
-      console.log('📊 Fetched raw tracking events (fallback):', data?.length || 0);
-      setTrackingEvents(data || []);
+      console.log('📊 Fetched raw tracking events (total):', allEvents.length);
+      setTrackingEvents(allEvents);
       
       // Mark data as fully loaded when tracking events are loaded (pixel config may be null)
       setDataFullyLoaded(true);
