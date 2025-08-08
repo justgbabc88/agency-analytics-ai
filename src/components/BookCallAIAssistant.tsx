@@ -4,13 +4,14 @@ import { useGHLFormSubmissions } from "@/hooks/useGHLFormSubmissions";
 import { useFacebookData } from "@/hooks/useFacebookData";
 import { generateCallDataFromEvents } from "@/utils/chartDataGeneration";
 import { useUserProfile } from "@/hooks/useUserProfile";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { startOfDay } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MessageSquare, Brain } from "lucide-react";
 import { GoHighLevelConnector } from "./GoHighLevelConnector";
 import { useProjectIntegrations } from "@/hooks/useProjectIntegrations";
+import { supabase } from "@/integrations/supabase/client";
 
 interface BookCallAIAssistantProps {
   projectId: string;
@@ -28,6 +29,36 @@ export const BookCallAIAssistant = ({ projectId, dateRange, selectedCampaignIds 
   const { integrations } = useProjectIntegrations(projectId);
   
   const userTimezone = getUserTimezone();
+  const [trackingEvents, setTrackingEvents] = useState<any[]>([]);
+
+  // Fetch tracking events for page views
+  useEffect(() => {
+    const fetchTrackingEvents = async () => {
+      if (!projectId) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('tracking_events')
+          .select('*')
+          .eq('project_id', projectId)
+          .eq('event_type', 'page_view')
+          .gte('created_at', dateRange.from.toISOString())
+          .lte('created_at', dateRange.to.toISOString())
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching tracking events:', error);
+          return;
+        }
+
+        setTrackingEvents(data || []);
+      } catch (error) {
+        console.error('Error fetching tracking events:', error);
+      }
+    };
+
+    fetchTrackingEvents();
+  }, [projectId, dateRange]);
 
   // Calculate metrics for the AI context
   const metrics = useMemo(() => {
@@ -62,7 +93,7 @@ export const BookCallAIAssistant = ({ projectId, dateRange, selectedCampaignIds 
     const costPerCall = totalBookings > 0 ? (totalSpend / totalBookings) : 0;
 
     // Generate chart data for page views
-    const chartData = generateCallDataFromEvents(filteredEvents, dateRange, userTimezone);
+    const chartData = generateCallDataFromEvents(filteredEvents, dateRange, userTimezone, trackingEvents);
     const totalPageViews = chartData.reduce((sum, day) => sum + day.pageViews, 0);
     const bookingRate = totalPageViews > 0 ? ((totalBookings / totalPageViews) * 100) : 0;
 
@@ -100,7 +131,7 @@ export const BookCallAIAssistant = ({ projectId, dateRange, selectedCampaignIds 
         to: dateRange.to.toISOString()
       }
     };
-  }, [calendlyEvents, formSubmissions, facebookData, dateRange, userTimezone]);
+  }, [calendlyEvents, formSubmissions, facebookData, dateRange, userTimezone, trackingEvents]);
 
   const ghlIntegration = integrations?.find(i => i.platform === 'ghl');
   const isGHLConnected = ghlIntegration?.is_connected || false;
