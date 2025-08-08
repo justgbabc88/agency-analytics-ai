@@ -480,36 +480,78 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
   const chartData = useMemo(() => {
     console.log('🔄 Recalculating chart data due to dependency change');
     console.log('🔄 Date range key:', dateRangeKey);
-    console.log('🔄 Events available:', filteredEvents.length);
-    console.log('🔄 All Calendly events available:', calendlyEvents.length);
-    console.log('🔄 Tracking events available:', trackingEvents.length);
     console.log('🔄 Using timezone:', userTimezone);
-    console.log('🔄 Profile loaded:', !!profile);
     
-    // Use the calculated call stats data to ensure consistency
-    if (!callStatsData) {
-      return [];
-    }
-    
-    // For single day or date range, create chart data using the actual calculated values
+    // Check if it's a single day or multiple days
     const isSameDay = dateRange.from.toDateString() === dateRange.to.toDateString();
-    const dateLabel = isSameDay 
-      ? format(dateRange.from, 'MMM d')
-      : `${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d')}`;
     
-    const data = [{
-      date: dateLabel,
-      totalBookings: callStatsData.totalBookings,
-      callsBooked: callStatsData.totalBookings,
-      callsTaken: callStatsData.callsTaken,
-      cancelled: callStatsData.callsCancelled,
-      showUpRate: callStatsData.showUpRate,
-      pageViews: 0 // We can add this later if needed
-    }];
-    
-    console.log('🎯 Generated chart data using call stats:', data);
-    return data;
-  }, [dateRangeKey, userTimezone, callStatsData, dateRange]);
+    if (isSameDay) {
+      // Single day - show one data point
+      const dateLabel = format(dateRange.from, 'MMM d');
+      
+      const data = [{
+        date: dateLabel,
+        totalBookings: callStatsData.totalBookings,
+        callsBooked: callStatsData.totalBookings,
+        callsTaken: callStatsData.callsTaken,
+        cancelled: callStatsData.callsCancelled,
+        showUpRate: callStatsData.showUpRate,
+        pageViews: 0
+      }];
+      
+      console.log('🎯 Generated single day chart data:', data);
+      return data;
+    } else {
+      // Multiple days - show one data point per day
+      const data = [];
+      const startDate = new Date(dateRange.from);
+      const endDate = new Date(dateRange.to);
+      const timeDiff = endDate.getTime() - startDate.getTime();
+      const daysDiff = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
+      
+      for (let i = 0; i <= daysDiff; i++) {
+        const currentDate = new Date(startDate);
+        currentDate.setDate(currentDate.getDate() + i);
+        
+        // Calculate stats for this specific day
+        const dayStart = startOfDay(toZonedTime(currentDate, userTimezone));
+        const dayEnd = endOfDay(toZonedTime(currentDate, userTimezone));
+        
+        const dayBookings = calendlyEvents.filter(call => {
+          const callCreatedInUserTz = toZonedTime(new Date(call.created_at), userTimezone);
+          return callCreatedInUserTz >= dayStart && callCreatedInUserTz <= dayEnd;
+        }).length;
+        
+        const dayCallsTaken = calendlyEvents.filter(call => {
+          const callScheduledInUserTz = toZonedTime(new Date(call.scheduled_at), userTimezone);
+          return callScheduledInUserTz >= dayStart && callScheduledInUserTz <= dayEnd && 
+                 call.status.toLowerCase() !== 'cancelled';
+        }).length;
+        
+        const dayCancelled = calendlyEvents.filter(call => {
+          const callScheduledInUserTz = toZonedTime(new Date(call.scheduled_at), userTimezone);
+          return callScheduledInUserTz >= dayStart && callScheduledInUserTz <= dayEnd && 
+                 call.status.toLowerCase() === 'cancelled';
+        }).length;
+        
+        const dayTotalScheduled = dayCallsTaken + dayCancelled;
+        const dayShowUpRate = dayTotalScheduled > 0 ? Math.round((dayCallsTaken / dayTotalScheduled) * 100) : 0;
+        
+        data.push({
+          date: format(currentDate, 'MMM d'),
+          totalBookings: dayBookings,
+          callsBooked: dayBookings,
+          callsTaken: dayCallsTaken,
+          cancelled: dayCancelled,
+          showUpRate: dayShowUpRate,
+          pageViews: 0
+        });
+      }
+      
+      console.log('🎯 Generated multi-day chart data:', data);
+      return data;
+    }
+  }, [dateRangeKey, userTimezone, callStatsData, dateRange, calendlyEvents]);
 
   // Use the hook only for previous period comparison data
   const callStatsFromHook = useCallStatsCalculations(calendlyEvents, dateRange, userTimezone);
