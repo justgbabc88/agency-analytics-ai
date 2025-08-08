@@ -214,8 +214,7 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
         acc[dateKey].reach = Math.max(acc[dateKey].reach, dayData.reach || 0);
         acc[dateKey].conversions += dayData.conversions || 0;
         acc[dateKey].conversion_values += dayData.conversion_values || 0;
-        // Calculate frequency from impressions/reach rather than summing daily frequency
-        acc[dateKey].frequency = acc[dateKey].reach > 0 ? acc[dateKey].impressions / acc[dateKey].reach : (dayData.frequency || 0);
+        // Don't calculate frequency here - will calculate after aggregation
         
         return acc;
       }, {});
@@ -227,35 +226,37 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
           const dayData = groupedByDate[dateKey];
           const dayDate = new Date(dayData.date);
           
-          // Calculate derived metrics
-          const ctr = dayData.impressions > 0 ? (dayData.clicks / dayData.impressions) * 100 : 0;
-          const cpm = dayData.impressions > 0 ? (dayData.spend / dayData.impressions) * 1000 : 0;
-          const cpc = dayData.clicks > 0 ? dayData.spend / dayData.clicks : 0;
-          
-          // Find bookings for this specific day
-          const dayStart = startOfDay(toZonedTime(dayDate, userTimezone));
-          const dailyBookings = calendlyEvents.filter(event => {
-            const eventCreatedInUserTz = toZonedTime(new Date(event.created_at), userTimezone);
-            const eventDate = startOfDay(eventCreatedInUserTz);
-            return eventDate.getTime() === dayStart.getTime();
-          }).length;
-          
-          const costPerCall = dailyBookings > 0 ? dayData.spend / dailyBookings : 0;
-          
-          // Find form submissions for this specific day (align with user timezone)
-          const facebookDateInUserTz = toZonedTime(new Date(dateKey + 'T12:00:00Z'), userTimezone);
-          const dateKey_formatted = format(facebookDateInUserTz, 'yyyy-MM-dd');
-          const dailySubmissions = formSubmissions.submissionsByDay?.[dateKey_formatted] || 0;
-          const costPerLead = dailySubmissions > 0 ? dayData.spend / dailySubmissions : 0;
-          
-          return {
-            date: format(facebookDateInUserTz, 'MMM dd'),
-            spend: dayData.spend,
-            ctrAll: ctr,
-            ctrLink: ctr * 0.75,
-            cpm: cpm,
-            cpc: cpc,
-            frequency: dayData.frequency,
+           // Calculate derived metrics
+           const ctr = dayData.impressions > 0 ? (dayData.clicks / dayData.impressions) * 100 : 0;
+           const cpm = dayData.impressions > 0 ? (dayData.spend / dayData.impressions) * 1000 : 0;
+           const cpc = dayData.clicks > 0 ? dayData.spend / dayData.clicks : 0;
+           // Calculate frequency properly as impressions/reach for this day
+           const dailyFrequency = dayData.reach > 0 ? dayData.impressions / dayData.reach : 0;
+           
+           // Find bookings for this specific day
+           const dayStart = startOfDay(toZonedTime(dayDate, userTimezone));
+           const dailyBookings = calendlyEvents.filter(event => {
+             const eventCreatedInUserTz = toZonedTime(new Date(event.created_at), userTimezone);
+             const eventDate = startOfDay(eventCreatedInUserTz);
+             return eventDate.getTime() === dayStart.getTime();
+           }).length;
+           
+           const costPerCall = dailyBookings > 0 ? dayData.spend / dailyBookings : 0;
+           
+           // Find form submissions for this specific day (align with user timezone)
+           const facebookDateInUserTz = toZonedTime(new Date(dateKey + 'T12:00:00Z'), userTimezone);
+           const dateKey_formatted = format(facebookDateInUserTz, 'yyyy-MM-dd');
+           const dailySubmissions = formSubmissions.submissionsByDay?.[dateKey_formatted] || 0;
+           const costPerLead = dailySubmissions > 0 ? dayData.spend / dailySubmissions : 0;
+           
+           return {
+             date: format(facebookDateInUserTz, 'MMM dd'),
+             spend: dayData.spend,
+             ctrAll: ctr,
+             ctrLink: ctr * 0.75,
+             cpm: cpm,
+             cpc: cpc,
+             frequency: dailyFrequency,
             costPerCall: costPerCall,
             costPerLead: costPerLead,
             dailyBookings: dailyBookings,
