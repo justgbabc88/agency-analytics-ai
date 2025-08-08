@@ -291,11 +291,14 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
             conversion_values: (totals.conversion_values || 0) + (insight.conversion_values || 0),
             ctr: 0, // Will be calculated below
             cpc: 0, // Will be calculated below
-          }), { impressions: 0, clicks: 0, spend: 0, reach: 0, conversions: 0, conversion_values: 0, ctr: 0, cpc: 0 });
+            frequency: 0, // Will be calculated below
+          }), { impressions: 0, clicks: 0, spend: 0, reach: 0, conversions: 0, conversion_values: 0, ctr: 0, cpc: 0, frequency: 0 });
           
           // Calculate derived metrics
           filteredInsights.ctr = filteredInsights.impressions > 0 ? (filteredInsights.clicks / filteredInsights.impressions) * 100 : 0;
           filteredInsights.cpc = filteredInsights.clicks > 0 ? filteredInsights.spend / filteredInsights.clicks : 0;
+          // Calculate frequency as impressions/reach (not summing daily frequencies)
+          filteredInsights.frequency = filteredInsights.reach > 0 ? filteredInsights.impressions / filteredInsights.reach : 0;
         }
       }
     }
@@ -405,6 +408,8 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
         spend: dailyAggregated.spend,
         impressions: dailyAggregated.impressions,
         clicks: dailyAggregated.clicks,
+        reach: dailyAggregated.reach,
+        frequency: (dailyAggregated as any).frequency,
         ctr: dailyAggregated.ctr,
         dataPoints: dateFilteredInsights.length,
         usingFallbackData

@@ -118,6 +118,13 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
   
   // Use frequency from hook instead of calculating manually
   const frequency = (insights as any).frequency || (insights.reach && insights.reach > 0 ? insights.impressions / insights.reach : 1.2);
+  
+  console.log('🔢 FacebookMetrics frequency calculation:', {
+    frequency,
+    insightsFrequency: (insights as any).frequency,
+    fallbackCalculated: insights.reach && insights.reach > 0 ? insights.impressions / insights.reach : 1.2,
+    insights: { impressions: insights.impressions, reach: insights.reach }
+  });
 
   // Calculate total bookings for the date range (based on creation date, not scheduled date)
   const totalBookings = calendlyEvents.filter(event => {
