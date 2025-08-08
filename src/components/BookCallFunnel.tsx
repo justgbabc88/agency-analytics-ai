@@ -489,8 +489,8 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
     const isSameDay = format(startInUserTz, 'yyyy-MM-dd') === format(endInUserTz, 'yyyy-MM-dd');
     
     if (isSameDay) {
-      // Single day - show one data point
-      const dateLabel = format(dateRange.from, 'MMM d');
+      // Single day - show one data point with the correct date label
+      const dateLabel = format(endInUserTz, 'MMM d'); // Use end date in user timezone
       
       const data = [{
         date: dateLabel,
