@@ -36,7 +36,7 @@ const Tracking = () => {
         .select('*')
         .eq('project_id', selectedProjectId)
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(500);
 
       if (error) {
         console.error('Error fetching recent events:', error);

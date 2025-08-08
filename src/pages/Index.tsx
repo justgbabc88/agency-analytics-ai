@@ -73,7 +73,7 @@ const Index = () => {
         .gte('created_at', dateRange.from.toISOString())
         .lte('created_at', dateRange.to.toISOString())
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(10000);
 
       if (error) throw error;
       return data || [];
