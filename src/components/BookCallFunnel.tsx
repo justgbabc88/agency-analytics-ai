@@ -411,25 +411,6 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
     });
   }, [calendlyEvents, dateRange, userTimezone]);
   
-  const chartData = useMemo(() => {
-    console.log('🔄 Recalculating chart data due to dependency change');
-    console.log('🔄 Date range key:', dateRangeKey);
-    console.log('🔄 Events available:', filteredEvents.length);
-    console.log('🔄 All Calendly events available:', calendlyEvents.length);
-    console.log('🔄 Tracking events available:', trackingEvents.length);
-    console.log('🔄 Using timezone:', userTimezone);
-    console.log('🔄 Profile loaded:', !!profile);
-    
-    // Always generate chart data - use all calendly events if filtered events is empty
-    const eventsToUse = filteredEvents.length > 0 ? filteredEvents : calendlyEvents;
-    console.log('🔄 Using events for chart:', eventsToUse.length);
-    
-    const data = generateCallDataFromEvents(eventsToUse, dateRange, userTimezone, trackingEvents);
-    console.log('🎯 Generated chart data:', data);
-    return data;
-  }, [filteredEvents, calendlyEvents, dateRangeKey, userTimezone, trackingEvents]);
-
-  
   // Calculate stats using the same exact logic as CallsList for consistency
   const callStatsData = useMemo(() => {
     // Helper functions matching CallsList exactly
@@ -494,7 +475,41 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
       showUpRate,
       closeRate
     };
-  }, [calendlyEvents, dateRange, userTimezone]);
+  }, [calendlyEvents, dateRange, userTimezone, zohoLeadSourceFilter]);
+
+  const chartData = useMemo(() => {
+    console.log('🔄 Recalculating chart data due to dependency change');
+    console.log('🔄 Date range key:', dateRangeKey);
+    console.log('🔄 Events available:', filteredEvents.length);
+    console.log('🔄 All Calendly events available:', calendlyEvents.length);
+    console.log('🔄 Tracking events available:', trackingEvents.length);
+    console.log('🔄 Using timezone:', userTimezone);
+    console.log('🔄 Profile loaded:', !!profile);
+    
+    // Use the calculated call stats data to ensure consistency
+    if (!callStatsData) {
+      return [];
+    }
+    
+    // For single day or date range, create chart data using the actual calculated values
+    const isSameDay = dateRange.from.toDateString() === dateRange.to.toDateString();
+    const dateLabel = isSameDay 
+      ? format(dateRange.from, 'MMM d')
+      : `${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d')}`;
+    
+    const data = [{
+      date: dateLabel,
+      totalBookings: callStatsData.totalBookings,
+      callsBooked: callStatsData.totalBookings,
+      callsTaken: callStatsData.callsTaken,
+      cancelled: callStatsData.callsCancelled,
+      showUpRate: callStatsData.showUpRate,
+      pageViews: 0 // We can add this later if needed
+    }];
+    
+    console.log('🎯 Generated chart data using call stats:', data);
+    return data;
+  }, [dateRangeKey, userTimezone, callStatsData, dateRange]);
 
   // Use the hook only for previous period comparison data
   const callStatsFromHook = useCallStatsCalculations(calendlyEvents, dateRange, userTimezone);
