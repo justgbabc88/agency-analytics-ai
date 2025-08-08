@@ -18,6 +18,9 @@ Deno.serve(async (req) => {
 
     console.log('⏰ Unified integration scheduler activated at:', new Date().toISOString());
 
+    // Refresh expired Zoho tokens before starting syncs
+    await refreshExpiredZohoTokens(supabaseClient);
+
     // Setup cron job for unified scheduling
     const { data: cronData, error: cronError } = await supabaseClient
       .rpc('setup_unified_integration_sync_cron');
@@ -185,3 +188,104 @@ Deno.serve(async (req) => {
     );
   }
 })
+
+async function refreshExpiredZohoTokens(supabase: any) {
+  console.log('🔄 Checking for expired Zoho tokens...')
+  
+  try {
+    // Find integrations that need token refresh (expire within next hour)
+    const { data: expiredIntegrations, error } = await supabase
+      .from('project_integration_data')
+      .select('project_id, data, id')
+      .eq('platform', 'zoho_crm')
+      .not('data', 'is', null)
+    
+    if (error) {
+      console.error('Error fetching Zoho integrations:', error)
+      return
+    }
+    
+    if (!expiredIntegrations?.length) {
+      console.log('No Zoho integrations found')
+      return
+    }
+    
+    console.log(`Found ${expiredIntegrations.length} Zoho integrations to check`)
+    
+    for (const integration of expiredIntegrations) {
+      const data = integration.data
+      
+      if (!data?.access_token || !data?.refresh_token || !data?.connected_at) {
+        console.log(`Skipping integration ${integration.project_id} - missing required tokens`)
+        continue
+      }
+      
+      // Calculate if token expires within the next hour
+      const connectedAt = new Date(data.connected_at)
+      const expiresIn = data.expires_in || 3600 // Default 1 hour
+      const expiresAt = new Date(connectedAt.getTime() + (expiresIn * 1000))
+      const oneHourFromNow = new Date(Date.now() + (60 * 60 * 1000))
+      
+      if (expiresAt > oneHourFromNow) {
+        console.log(`Token for project ${integration.project_id} is still valid until ${expiresAt}`)
+        continue
+      }
+      
+      console.log(`🔄 Refreshing token for project ${integration.project_id}`)
+      
+      try {
+        // Refresh the token
+        const refreshResponse = await fetch('https://accounts.zoho.com/oauth/v2/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            refresh_token: data.refresh_token,
+            client_id: Deno.env.get('ZOHO_CLIENT_ID') || '',
+            client_secret: Deno.env.get('ZOHO_CLIENT_SECRET') || '',
+            grant_type: 'refresh_token'
+          })
+        })
+        
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json()
+          
+          // Update the stored token
+          const updatedData = {
+            ...data,
+            access_token: refreshData.access_token,
+            connected_at: new Date().toISOString(),
+            expires_in: refreshData.expires_in || 3600,
+            last_token_refresh: new Date().toISOString()
+          }
+          
+          await supabase
+            .from('project_integration_data')
+            .update({ 
+              data: updatedData,
+              synced_at: new Date().toISOString()
+            })
+            .eq('id', integration.id)
+          
+          console.log(`✅ Successfully refreshed token for project ${integration.project_id}`)
+        } else {
+          const errorText = await refreshResponse.text()
+          console.error(`❌ Failed to refresh token for project ${integration.project_id}:`, errorText)
+          
+          // Mark integration as needing reconnection
+          await supabase
+            .from('project_integrations')
+            .update({ 
+              is_connected: false,
+              sync_health_score: 0
+            })
+            .eq('project_id', integration.project_id)
+            .eq('platform', 'zoho_crm')
+        }
+      } catch (refreshError) {
+        console.error(`❌ Error refreshing token for project ${integration.project_id}:`, refreshError)
+      }
+    }
+  } catch (error) {
+    console.error('Error in refreshExpiredZohoTokens:', error)
+  }
+}
