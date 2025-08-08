@@ -215,8 +215,7 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
         .eq('event_type', 'page_view')
         .gte('created_at', dateRange.from.toISOString())
         .lte('created_at', dateRange.to.toISOString())
-        .order('created_at', { ascending: false })
-        .limit(10000); // Increased limit for better coverage
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('Error fetching raw tracking events:', error);
