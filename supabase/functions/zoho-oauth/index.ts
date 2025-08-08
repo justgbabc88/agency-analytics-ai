@@ -226,6 +226,8 @@ async function handleExchangeCode(
       platform: 'zoho_crm',
       data: integrationData,
       synced_at: new Date().toISOString()
+    }, {
+      onConflict: 'project_id,platform'
     })
 
   if (upsertError) {
@@ -233,15 +235,16 @@ async function handleExchangeCode(
     throw new Error('Failed to store integration data')
   }
 
-  // Update integration status
+  // Update integration status - use update instead of upsert to avoid constraint errors
   const { error: integrationError } = await supabase
     .from('project_integrations')
-    .upsert({
-      project_id: projectId,
-      platform: 'zoho_crm',
+    .update({
       is_connected: true,
-      last_sync: new Date().toISOString()
+      last_sync: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     })
+    .eq('project_id', projectId)
+    .eq('platform', 'zoho_crm')
 
   if (integrationError) {
     console.error('Failed to update integration status:', integrationError)
