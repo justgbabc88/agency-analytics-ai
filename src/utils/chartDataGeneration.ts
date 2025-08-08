@@ -18,9 +18,17 @@ export const generateCallDataFromEvents = (
 
   const { from: startDate, to: endDate } = dateRange;
   
-  // Calculate if this is a single day selection
+  // Calculate if this is a single day selection - check both date string and time difference
   const isSameDay = startDate.toDateString() === endDate.toDateString();
-  const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  const timeDiff = endDate.getTime() - startDate.getTime();
+  const daysDiff = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
+  
+  console.log('Date comparison debug:');
+  console.log('Start date string:', startDate.toDateString());
+  console.log('End date string:', endDate.toDateString());
+  console.log('Time difference (ms):', timeDiff);
+  console.log('Days difference:', daysDiff);
+  console.log('Is same day check:', isSameDay);
   
   // Use user's timezone or fall back to browser timezone
   const timezone = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -35,7 +43,8 @@ export const generateCallDataFromEvents = (
   const dates = [];
   
   // For single day selection, only process that one day (matches Facebook behavior)
-  if (isSameDay || daysDiff === 0) {
+  // Use isSameDay (string comparison) as the primary check, and also check if daysDiff <= 1
+  if (isSameDay || daysDiff <= 1) {
     console.log('📍 Single day mode - processing only selected day');
     const currentDateStr = formatInTimeZone(startDate, timezone, 'yyyy-MM-dd');
     
@@ -221,7 +230,10 @@ export const generateCallDataFromEvents = (
   console.log('Total calls taken across all days:', dates.reduce((sum, d) => sum + d.callsTaken, 0));
   console.log('Total cancelled calls across all days:', dates.reduce((sum, d) => sum + d.cancelled, 0));
   console.log('Sample data point:', dates[0]);
+  console.log('All data points:', dates);
   console.log('Timezone used for generation:', timezone);
+  console.log('Is same day?', isSameDay);
+  console.log('Start date equals end date?', startDate.toDateString() === endDate.toDateString());
   
   return dates;
 };
