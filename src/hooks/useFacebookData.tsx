@@ -394,6 +394,8 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
       // Calculate derived metrics
       dailyAggregated.ctr = dailyAggregated.impressions > 0 ? (dailyAggregated.clicks / dailyAggregated.impressions) * 100 : 0;
       dailyAggregated.cpc = dailyAggregated.clicks > 0 ? dailyAggregated.spend / dailyAggregated.clicks : 0;
+      // Calculate frequency as impressions/reach (not summing daily frequencies)
+      (dailyAggregated as any).frequency = dailyAggregated.reach > 0 ? dailyAggregated.impressions / dailyAggregated.reach : 0;
       
       filteredInsights = dailyAggregated;
       
