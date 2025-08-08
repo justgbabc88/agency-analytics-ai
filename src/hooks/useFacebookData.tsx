@@ -286,7 +286,7 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
             impressions: (totals.impressions || 0) + (insight.impressions || 0),
             clicks: (totals.clicks || 0) + (insight.clicks || 0),
             spend: (totals.spend || 0) + (insight.spend || 0),
-            reach: Math.max(totals.reach || 0, insight.reach || 0),
+            reach: (totals.reach || 0) + (insight.reach || 0), // Sum reach, don't use max
             conversions: (totals.conversions || 0) + (insight.conversions || 0),
             conversion_values: (totals.conversion_values || 0) + (insight.conversion_values || 0),
             ctr: 0, // Will be calculated below
@@ -375,7 +375,7 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
         acc[date].impressions += (day.impressions || 0);
         acc[date].clicks += (day.clicks || 0);
         acc[date].spend += (day.spend || 0);
-        acc[date].reach = Math.max(acc[date].reach, day.reach || 0);
+        acc[date].reach += (day.reach || 0); // Sum reach, don't use max
         acc[date].conversions += (day.conversions || 0);
         acc[date].conversion_values += (day.conversion_values || 0);
         
@@ -391,7 +391,7 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
         dailyAggregated.impressions += (day.impressions || 0);
         dailyAggregated.clicks += (day.clicks || 0);
         dailyAggregated.spend += (day.spend || 0);
-        dailyAggregated.reach = Math.max(dailyAggregated.reach, day.reach || 0);
+        dailyAggregated.reach += (day.reach || 0); // Sum reach, don't use max
         dailyAggregated.conversions += (day.conversions || 0);
         dailyAggregated.conversion_values += (day.conversion_values || 0);
       });
