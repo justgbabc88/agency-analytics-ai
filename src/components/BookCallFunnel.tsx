@@ -507,13 +507,22 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
     } else {
       // Multiple days - show one data point per day
       const data = [];
-      const startDate = new Date(dateRange.from);
-      const endDate = new Date(dateRange.to);
-      const timeDiff = endDate.getTime() - startDate.getTime();
-      const daysDiff = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
+      const startDateInTz = toZonedTime(dateRange.from, userTimezone);
+      const endDateInTz = toZonedTime(dateRange.to, userTimezone);
+      
+      // Calculate the number of days between start and end (inclusive)
+      const startDay = startOfDay(startDateInTz);
+      const endDay = startOfDay(endDateInTz);
+      const daysDiff = Math.round((endDay.getTime() - startDay.getTime()) / (1000 * 60 * 60 * 24));
+      
+      console.log('Multi-day calculation:', {
+        startDay: format(startDay, 'yyyy-MM-dd'),
+        endDay: format(endDay, 'yyyy-MM-dd'), 
+        daysDiff
+      });
       
       for (let i = 0; i <= daysDiff; i++) {
-        const currentDate = new Date(startDate);
+        const currentDate = new Date(startDay);
         currentDate.setDate(currentDate.getDate() + i);
         
         // Calculate stats for this specific day
