@@ -214,7 +214,8 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
         acc[dateKey].reach = Math.max(acc[dateKey].reach, dayData.reach || 0);
         acc[dateKey].conversions += dayData.conversions || 0;
         acc[dateKey].conversion_values += dayData.conversion_values || 0;
-        acc[dateKey].frequency = dayData.frequency || 0;
+        // Calculate frequency from impressions/reach rather than summing daily frequency
+        acc[dateKey].frequency = acc[dateKey].reach > 0 ? acc[dateKey].impressions / acc[dateKey].reach : (dayData.frequency || 0);
         
         return acc;
       }, {});
