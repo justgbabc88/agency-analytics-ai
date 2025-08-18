@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -1175,15 +1175,15 @@ export type Database = {
       }
       check_alert_thresholds: {
         Args: {
-          p_project_id: string
-          p_platform: string
           p_metric_type: string
           p_metric_value: number
+          p_platform: string
+          p_project_id: string
         }
         Returns: undefined
       }
       get_project_daily_metrics: {
-        Args: { p_project_id: string; p_start_date: string; p_end_date: string }
+        Args: { p_end_date: string; p_project_id: string; p_start_date: string }
         Returns: {
           date: string
           landing_page_name: string
@@ -1198,26 +1198,26 @@ export type Database = {
       }
       log_calendly_sync: {
         Args: {
-          p_project_id: string
-          p_sync_type: string
-          p_sync_status: string
-          p_events_processed?: number
-          p_events_created?: number
-          p_events_updated?: number
-          p_sync_duration_ms?: number
           p_error_message?: string
-          p_sync_range_start?: string
+          p_events_created?: number
+          p_events_processed?: number
+          p_events_updated?: number
+          p_project_id: string
+          p_sync_duration_ms?: number
           p_sync_range_end?: string
+          p_sync_range_start?: string
+          p_sync_status: string
+          p_sync_type: string
         }
         Returns: string
       }
       record_sync_metric: {
         Args: {
-          p_project_id: string
-          p_platform: string
+          p_metadata?: Json
           p_metric_type: string
           p_metric_value: number
-          p_metadata?: Json
+          p_platform: string
+          p_project_id: string
         }
         Returns: string
       }
