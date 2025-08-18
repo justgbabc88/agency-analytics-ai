@@ -62,6 +62,9 @@ verify_jwt = true
 [functions.track-event]
 verify_jwt = false
 
+[functions.secure-track-event]
+verify_jwt = false
+
 [functions.zoho-oauth]
 verify_jwt = false
 
