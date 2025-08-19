@@ -64,60 +64,50 @@ export const useProjects = () => {
 
   // Custom setter that also updates localStorage
   const setSelectedProjectIdWithPersistence = (projectId: string) => {
+    console.log('🔄 Project switching from', selectedProjectId, 'to', projectId);
     setSelectedProjectId(projectId);
     localStorage.setItem('selectedProjectId', projectId);
-    console.log('🔄 Project selected:', projectId);
     
     // Add a small delay to ensure state is updated before invalidating queries
     setTimeout(() => {
-      // Invalidate all project-specific queries using broader patterns to catch all variations
-      // This ensures all components refresh when switching projects
+      console.log('🔄 Starting query invalidation for project:', projectId);
+      
+      // Specifically invalidate the page stats queries first
+      queryClient.invalidateQueries({ queryKey: ['recent-events'] });
+      queryClient.invalidateQueries({ queryKey: ['event-stats'] });
+      
+      // Then invalidate all project-specific queries using broader patterns
       queryClient.invalidateQueries({ 
         predicate: (query) => {
           const queryKey = query.queryKey as string[];
           if (!queryKey || queryKey.length === 0) return false;
           
-          // Invalidate queries that contain project-specific data
-          const projectRelatedQueries = [
-            'recent-events',
-            'event-stats', 
-            'ghl-forms',
-            'ghl-submissions',
-            'ghl-sync-status',
-            'calendly-events',
-            'calendly-mappings',
-            'facebook-integrations',
-            'facebook-sync-status',
-            'project-integrations',
-            'tracking-events',
-            'attribution-data',
-            'zoho-deals',
-            'zoho-lead-source-filter',
-            'zoho-crm-data',
-            'project-data'
-          ];
-          
-          // Check if this query is project-related or contains a project ID
-          return projectRelatedQueries.some(queryType => 
-            queryKey.includes(queryType) || queryKey[0] === queryType
-          ) || queryKey.some(key => 
-            typeof key === 'string' && key.includes('project')
+          // Log which queries we're checking
+          const isProjectRelated = queryKey.some(key => 
+            typeof key === 'string' && (
+              key.includes('project') || 
+              key.includes('events') ||
+              key.includes('ghl-') ||
+              key.includes('calendly-') ||
+              key.includes('facebook-') ||
+              key.includes('zoho-')
+            )
           );
+          
+          if (isProjectRelated) {
+            console.log('🔄 Invalidating query:', queryKey);
+          }
+          
+          return isProjectRelated;
         }
       });
       
-      // Also clear any cached data to force fresh fetches
-      queryClient.removeQueries({ 
-        predicate: (query) => {
-          const queryKey = query.queryKey as string[];
-          return queryKey && queryKey.length > 1 && 
-                 (queryKey.includes('facebook-integrations') || 
-                  queryKey.includes('facebook-sync-status'));
-        }
-      });
+      // Force immediate refetch of critical queries
+      queryClient.refetchQueries({ queryKey: ['recent-events', projectId] });
+      queryClient.refetchQueries({ queryKey: ['event-stats', projectId] });
       
-      console.log('🔄 Invalidated and cleared all project-specific queries for immediate refresh');
-    }, 100);
+      console.log('🔄 Query invalidation completed for project:', projectId);
+    }, 50);
   };
 
   const createProject = useMutation({

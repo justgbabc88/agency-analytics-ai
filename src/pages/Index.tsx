@@ -64,7 +64,15 @@ const Index = () => {
   const { data: recentEvents, isLoading: eventsLoading, refetch: refetchEvents } = useQuery({
     queryKey: ['recent-events', selectedProjectId, dateRange],
     queryFn: async () => {
-      if (!selectedProjectId) return [];
+      if (!selectedProjectId) {
+        console.log('📊 No project selected for recent events');
+        return [];
+      }
+      
+      console.log('📊 Fetching recent events for project:', selectedProjectId, 'dateRange:', {
+        from: dateRange.from.toISOString(),
+        to: dateRange.to.toISOString()
+      });
       
       const { data, error } = await supabase
         .from('tracking_events')
@@ -75,7 +83,12 @@ const Index = () => {
         .order('created_at', { ascending: false })
         .limit(10000);
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error fetching recent events:', error);
+        throw error;
+      }
+      
+      console.log('✅ Fetched recent events:', data?.length || 0, 'events');
       return data || [];
     },
     enabled: !!selectedProjectId,
@@ -85,7 +98,12 @@ const Index = () => {
   const { data: eventStats } = useQuery({
     queryKey: ['event-stats', selectedProjectId, dateRange],
     queryFn: async () => {
-      if (!selectedProjectId) return { total: 0, types: {} };
+      if (!selectedProjectId) {
+        console.log('📊 No project selected for event stats');
+        return { total: 0, types: {} };
+      }
+      
+      console.log('📊 Fetching event stats for project:', selectedProjectId);
       
       const { data, error } = await supabase
         .from('tracking_events')
@@ -94,7 +112,10 @@ const Index = () => {
         .gte('created_at', dateRange.from.toISOString())
         .lte('created_at', dateRange.to.toISOString());
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error fetching event stats:', error);
+        throw error;
+      }
 
       const stats = data?.reduce((acc, event) => {
         acc.total = (acc.total || 0) + 1;
@@ -103,6 +124,7 @@ const Index = () => {
         return acc;
       }, {} as any);
 
+      console.log('✅ Fetched event stats:', { total: stats?.total || 0, types: Object.keys(stats?.types || {}).length });
       return stats || { total: 0, types: {} };
     },
     enabled: !!selectedProjectId,
