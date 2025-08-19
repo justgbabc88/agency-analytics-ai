@@ -1330,6 +1330,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      example_secure_function: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       get_project_daily_metrics: {
         Args: { p_end_date: string; p_project_id: string; p_start_date: string }
         Returns: {
