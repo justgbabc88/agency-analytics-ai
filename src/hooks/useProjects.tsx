@@ -67,6 +67,19 @@ export const useProjects = () => {
     setSelectedProjectId(projectId);
     localStorage.setItem('selectedProjectId', projectId);
     console.log('🔄 Project selected:', projectId);
+    
+    // Invalidate all project-specific queries to force immediate refresh
+    queryClient.invalidateQueries({ queryKey: ['recent-events'] });
+    queryClient.invalidateQueries({ queryKey: ['event-stats'] });
+    queryClient.invalidateQueries({ queryKey: ['ghl-forms'] });
+    queryClient.invalidateQueries({ queryKey: ['ghl-submissions'] });
+    queryClient.invalidateQueries({ queryKey: ['calendly-events'] });
+    queryClient.invalidateQueries({ queryKey: ['calendly-mappings'] });
+    queryClient.invalidateQueries({ queryKey: ['facebook-integrations'] });
+    queryClient.invalidateQueries({ queryKey: ['project-integrations'] });
+    queryClient.invalidateQueries({ queryKey: ['tracking-events'] });
+    queryClient.invalidateQueries({ queryKey: ['attribution-data'] });
+    console.log('🔄 Invalidated all project-specific queries for immediate refresh');
   };
 
   const createProject = useMutation({
