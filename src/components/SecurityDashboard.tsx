@@ -1,23 +1,27 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { 
   Shield, 
   AlertTriangle, 
+  CheckCircle, 
+  RefreshCw, 
   Eye, 
   Lock, 
-  Key, 
-  Activity,
   Database,
-  FileText,
-  RefreshCw
+  Activity,
+  Users,
+  Clock,
+  FileText
 } from "lucide-react";
 import { useAuth } from '@/hooks/useAuth';
 import { useSecurityMonitoring } from '@/hooks/useSecurityMonitoring';
 import { useSecureApiKeys } from '@/hooks/useSecureApiKeys';
+import { SecurityMetricsDashboard } from './SecurityMetricsDashboard';
+import { SecurityAlertCenter } from './SecurityAlertCenter';
 import { supabase } from '@/integrations/supabase/client';
 
 interface SecurityMetrics {
@@ -180,67 +184,14 @@ export const SecurityDashboard = () => {
         </Button>
       </div>
 
-      {/* Security Overview Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Risk Level</CardTitle>
-            {risk.icon}
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{risk.level}</div>
-            <div className="flex items-center mt-2">
-              <div className={`h-2 w-full bg-gray-200 rounded-full overflow-hidden`}>
-                <div 
-                  className={`h-full ${risk.color} transition-all duration-300`}
-                  style={{ width: `${metrics.riskScore}%` }}
-                />
-              </div>
-              <span className="text-xs text-muted-foreground ml-2">{metrics.riskScore}%</span>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Security Metrics Dashboard */}
+      <div className="mb-6">
+        <SecurityMetricsDashboard />
+      </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Security Events</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{metrics.totalEvents}</div>
-            <p className="text-xs text-muted-foreground">
-              {metrics.criticalAlerts} critical alerts
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Encrypted Keys</CardTitle>
-            <Key className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{metrics.encryptedKeys}</div>
-            <p className="text-xs text-muted-foreground">
-              Securely stored
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Monitoring</CardTitle>
-            <Database className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {metrics.activeMonitoring ? 'Active' : 'Inactive'}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Last audit: {metrics.lastAudit}
-            </p>
-          </CardContent>
-        </Card>
+      {/* Security Alert Center */}
+      <div className="mb-6">
+        <SecurityAlertCenter />
       </div>
 
       {/* Active Alerts */}

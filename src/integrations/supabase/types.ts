@@ -1257,6 +1257,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      detect_suspicious_tracking_activity: {
+        Args: {
+          p_client_ip?: unknown
+          p_project_id: string
+          p_session_id: string
+        }
+        Returns: undefined
+      }
       example_secure_function: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -1288,6 +1296,17 @@ export type Database = {
           utm_source: string
         }[]
       }
+      get_security_metrics: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          critical_events: number
+          failed_login_attempts: number
+          last_security_scan: string
+          recent_pii_access: number
+          suspicious_activity: number
+          total_pii_records: number
+        }[]
+      }
       get_user_agency_id: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -1306,6 +1325,19 @@ export type Database = {
           p_sync_type: string
         }
         Returns: string
+      }
+      log_enhanced_pii_access: {
+        Args: {
+          p_client_ip?: unknown
+          p_has_email?: boolean
+          p_has_name?: boolean
+          p_has_phone?: boolean
+          p_operation: string
+          p_record_id: string
+          p_table_name: string
+          p_user_id?: string
+        }
+        Returns: undefined
       }
       log_pii_access_attempt: {
         Args: {
@@ -1367,6 +1399,16 @@ export type Database = {
       }
       user_owns_project: {
         Args: { project_uuid: string }
+        Returns: boolean
+      }
+      validate_tracking_event_data: {
+        Args: {
+          p_contact_email?: string
+          p_contact_phone?: string
+          p_event_type: string
+          p_page_url: string
+          p_revenue_amount?: number
+        }
         Returns: boolean
       }
     }

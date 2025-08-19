@@ -56,6 +56,33 @@ serve(async (req) => {
       )
     }
 
+    // Enhanced validation using new validation function
+    const { error: validationError } = await supabaseClient.rpc('validate_tracking_event_data', {
+      p_event_type: event_type,
+      p_page_url: page_url,
+      p_contact_email: contact_email,
+      p_contact_phone: contact_phone,
+      p_revenue_amount: null // This function doesn't handle revenue
+    })
+
+    if (validationError) {
+      console.error('Enhanced validation failed:', validationError)
+      return new Response(
+        JSON.stringify({ error: 'Invalid tracking data format' }), 
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    // Check for suspicious activity patterns
+    await supabaseClient.rpc('detect_suspicious_tracking_activity', {
+      p_session_id: session_id,
+      p_project_id: project_id,
+      p_client_ip: clientIP !== 'unknown' ? clientIP : null
+    })
+
     // Check if this is anonymous tracking (no contact info)
     const hasContactInfo = contact_email || contact_phone || contact_name
     

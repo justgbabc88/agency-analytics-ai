@@ -164,6 +164,30 @@ serve(async (req) => {
         .eq('session_id', trackingData.sessionId)
     }
 
+    // Validate tracking data before processing
+    const { error: validationError } = await serviceSupabase.rpc('validate_tracking_event_data', {
+      p_event_type: trackingData.eventType,
+      p_page_url: trackingData.pageUrl,
+      p_contact_email: trackingData.contactInfo?.email,
+      p_contact_phone: trackingData.contactInfo?.phone,
+      p_revenue_amount: trackingData.revenue?.amount
+    })
+
+    if (validationError) {
+      console.error('Validation failed:', validationError)
+      return new Response(
+        JSON.stringify({ error: 'Invalid tracking data' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Check for suspicious activity patterns
+    await serviceSupabase.rpc('detect_suspicious_tracking_activity', {
+      p_session_id: trackingData.sessionId,
+      p_project_id: pixel.project_id,
+      p_client_ip: clientIP !== 'unknown' ? clientIP : null
+    })
+
     // Create tracking event - use service role client for contact info insertion
     const eventClient = (trackingData.contactInfo?.email || trackingData.contactInfo?.phone || trackingData.contactInfo?.name || trackingData.formData) 
       ? serviceSupabase  // Use service role for contact info (with audit logging via trigger)
