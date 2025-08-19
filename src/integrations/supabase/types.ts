@@ -1233,6 +1233,79 @@ export type Database = {
           },
         ]
       }
+      safe_attribution_data: {
+        Row: {
+          attributed_revenue: number | null
+          attribution_model: string | null
+          contact_email: string | null
+          contact_phone: string | null
+          conversion_date: string | null
+          created_at: string | null
+          event_id: string | null
+          id: string | null
+          project_id: string | null
+          session_id: string | null
+          updated_at: string | null
+          utm_campaign: string | null
+          utm_medium: string | null
+          utm_source: string | null
+        }
+        Insert: {
+          attributed_revenue?: number | null
+          attribution_model?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          conversion_date?: string | null
+          created_at?: string | null
+          event_id?: string | null
+          id?: string | null
+          project_id?: string | null
+          session_id?: string | null
+          updated_at?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Update: {
+          attributed_revenue?: number | null
+          attribution_model?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          conversion_date?: string | null
+          created_at?: string | null
+          event_id?: string | null
+          id?: string | null
+          project_id?: string | null
+          session_id?: string | null
+          updated_at?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attribution_data_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "tracking_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attribution_data_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attribution_data_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "tracking_sessions"
+            referencedColumns: ["session_id"]
+          },
+        ]
+      }
     }
     Functions: {
       aggregate_project_daily_metrics: {
@@ -1269,23 +1342,6 @@ export type Database = {
           landing_page_url: string
           total_page_views: number
           unique_visitors: number
-        }[]
-      }
-      get_safe_attribution_data: {
-        Args: { p_project_id?: string }
-        Returns: {
-          attributed_revenue: number
-          attribution_model: string
-          conversion_date: string
-          created_at: string
-          event_id: string
-          id: string
-          project_id: string
-          session_id: string
-          updated_at: string
-          utm_campaign: string
-          utm_medium: string
-          utm_source: string
         }[]
       }
       get_user_agency_id: {
