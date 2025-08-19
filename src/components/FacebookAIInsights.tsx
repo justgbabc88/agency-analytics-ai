@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 
 interface FacebookAIInsightsProps {
   dateRange?: { from: Date; to: Date };
+  projectId?: string;
 }
 
 interface AIInsight {
@@ -25,8 +26,8 @@ interface AIInsight {
   actionable: string[];
 }
 
-export const FacebookAIInsights = ({ dateRange }: FacebookAIInsightsProps) => {
-  const { facebookData, insights, isLoading } = useFacebookData({ dateRange });
+export const FacebookAIInsights = ({ dateRange, projectId }: FacebookAIInsightsProps) => {
+  const { facebookData, insights, isLoading } = useFacebookData({ dateRange, projectId });
   const [question, setQuestion] = useState('');
   const [chatHistory, setChatHistory] = useState<Array<{ type: 'user' | 'ai'; message: string; timestamp: Date }>>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);

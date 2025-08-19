@@ -68,38 +68,56 @@ export const useProjects = () => {
     localStorage.setItem('selectedProjectId', projectId);
     console.log('🔄 Project selected:', projectId);
     
-    // Invalidate all project-specific queries using broader patterns to catch all variations
-    // This ensures all components refresh when switching projects
-    queryClient.invalidateQueries({ 
-      predicate: (query) => {
-        const queryKey = query.queryKey as string[];
-        if (!queryKey || queryKey.length === 0) return false;
-        
-        // Invalidate queries that contain project-specific data
-        const projectRelatedQueries = [
-          'recent-events',
-          'event-stats', 
-          'ghl-forms',
-          'ghl-submissions',
-          'calendly-events',
-          'calendly-mappings',
-          'facebook-integrations',
-          'facebook-sync-status',
-          'project-integrations',
-          'tracking-events',
-          'attribution-data',
-          'zoho-deals',
-          'zoho-lead-source-filter'
-        ];
-        
-        // Check if this query is project-related
-        return projectRelatedQueries.some(queryType => 
-          queryKey.includes(queryType) || queryKey[0] === queryType
-        );
-      }
-    });
-    
-    console.log('🔄 Invalidated all project-specific queries for immediate refresh');
+    // Add a small delay to ensure state is updated before invalidating queries
+    setTimeout(() => {
+      // Invalidate all project-specific queries using broader patterns to catch all variations
+      // This ensures all components refresh when switching projects
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const queryKey = query.queryKey as string[];
+          if (!queryKey || queryKey.length === 0) return false;
+          
+          // Invalidate queries that contain project-specific data
+          const projectRelatedQueries = [
+            'recent-events',
+            'event-stats', 
+            'ghl-forms',
+            'ghl-submissions',
+            'ghl-sync-status',
+            'calendly-events',
+            'calendly-mappings',
+            'facebook-integrations',
+            'facebook-sync-status',
+            'project-integrations',
+            'tracking-events',
+            'attribution-data',
+            'zoho-deals',
+            'zoho-lead-source-filter',
+            'zoho-crm-data',
+            'project-data'
+          ];
+          
+          // Check if this query is project-related or contains a project ID
+          return projectRelatedQueries.some(queryType => 
+            queryKey.includes(queryType) || queryKey[0] === queryType
+          ) || queryKey.some(key => 
+            typeof key === 'string' && key.includes('project')
+          );
+        }
+      });
+      
+      // Also clear any cached data to force fresh fetches
+      queryClient.removeQueries({ 
+        predicate: (query) => {
+          const queryKey = query.queryKey as string[];
+          return queryKey && queryKey.length > 1 && 
+                 (queryKey.includes('facebook-integrations') || 
+                  queryKey.includes('facebook-sync-status'));
+        }
+      });
+      
+      console.log('🔄 Invalidated and cleared all project-specific queries for immediate refresh');
+    }, 100);
   };
 
   const createProject = useMutation({

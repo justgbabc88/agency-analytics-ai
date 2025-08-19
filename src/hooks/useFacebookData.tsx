@@ -48,9 +48,10 @@ interface UseFacebookDataProps {
   dateRange?: { from: Date; to: Date };
   campaignIds?: string[];
   adSetIds?: string[];
+  projectId?: string;
 }
 
-export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFacebookDataProps = {}) => {
+export const useFacebookData = ({ dateRange, campaignIds, adSetIds, projectId }: UseFacebookDataProps = {}) => {
   const { agency } = useAgency();
   const { getApiKeys } = useApiKeys();
   const { profile } = useUserProfile();
@@ -59,7 +60,7 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
 
   // First, get cached data immediately without any sync
   const { data: facebookData, isLoading, error } = useQuery({
-    queryKey: ['facebook-integrations', agency?.id],
+    queryKey: ['facebook-integrations', agency?.id, projectId],
     queryFn: async () => {
       if (!agency) return null;
       
@@ -153,7 +154,7 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
 
   // Background sync query - only runs when data is stale
   const { data: syncStatus } = useQuery({
-    queryKey: ['facebook-sync-status', agency?.id, dateRange?.from, dateRange?.to],
+    queryKey: ['facebook-sync-status', agency?.id, projectId, dateRange?.from, dateRange?.to],
     queryFn: async () => {
       if (!agency || !facebookData) return null;
       
@@ -216,10 +217,10 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds }: UseFaceboo
       console.log('Background sync completed, invalidating cache');
       // Small delay to ensure data is written to database
       setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['facebook-integrations', agency?.id] });
+        queryClient.invalidateQueries({ queryKey: ['facebook-integrations', agency?.id, projectId] });
       }, 1000);
     }
-  }, [syncStatus, agency?.id, queryClient]);
+  }, [syncStatus, agency?.id, projectId, queryClient]);
 
   // Default insights with proper typing
   const defaultInsights: FacebookInsights = {

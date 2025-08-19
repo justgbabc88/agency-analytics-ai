@@ -29,7 +29,8 @@ export const FacebookMetricsEnhanced = ({ dateRange, projectId }: FacebookMetric
   } = useFacebookData({ 
     dateRange, 
     campaignIds: selectedCampaignIds,
-    adSetIds: selectedAdSetIds 
+    adSetIds: selectedAdSetIds,
+    projectId
   });
 
   const handleRetrySyncAd = async () => {

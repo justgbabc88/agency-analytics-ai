@@ -36,7 +36,7 @@ interface ChartDataPoint {
 export const FacebookZohoAnalytics = ({ projectId, dateRange, zohoLeadSourceFilter }: FacebookZohoAnalyticsProps) => {
   const [loading, setLoading] = useState(false);
 
-  const { facebookData, insights } = useFacebookData({ dateRange });
+  const { facebookData, insights } = useFacebookData({ dateRange, projectId });
   
   // Use the same dailyInsights that FacebookMetrics uses for cost per lead
   const dailyInsights = facebookData?.daily_insights;

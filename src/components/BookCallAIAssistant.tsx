@@ -24,7 +24,7 @@ interface BookCallAIAssistantProps {
 export const BookCallAIAssistant = ({ projectId, dateRange, selectedCampaignIds = [], selectedFormIds = [], onFormSelectionChange }: BookCallAIAssistantProps) => {
   const { calendlyEvents } = useCalendlyData(projectId);
   const { metrics: formSubmissions } = useGHLFormSubmissions(projectId, dateRange, selectedFormIds);
-  const { facebookData } = useFacebookData({ dateRange, campaignIds: selectedCampaignIds });
+  const { facebookData } = useFacebookData({ dateRange, campaignIds: selectedCampaignIds, projectId });
   const { getUserTimezone } = useUserProfile();
   const { integrations } = useProjectIntegrations(projectId);
   

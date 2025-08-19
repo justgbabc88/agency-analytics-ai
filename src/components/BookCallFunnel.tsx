@@ -37,7 +37,7 @@ export const BookCallFunnel = ({ projectId, dateRange, selectedCampaignIds = [],
   const { getUserTimezone, profile } = useUserProfile();
   const { toast } = useToast();
   const { metrics: formSubmissions, loading: formSubmissionsLoading, refetch: refetchGHLData } = useGHLFormSubmissions(projectId, stableDateRange, selectedFormIds);
-  const { facebookData } = useFacebookData({ dateRange: stableDateRange, campaignIds: selectedCampaignIds });
+  const { facebookData } = useFacebookData({ dateRange: stableDateRange, campaignIds: selectedCampaignIds, projectId });
   
   // State for tracking events
   const [trackingEvents, setTrackingEvents] = useState<any[]>([]);

@@ -45,7 +45,8 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
   const { facebookData, isLoading, insights, campaigns, allCampaigns, metrics, adSets, daily_insights } = useFacebookData({ 
     dateRange, 
     campaignIds: activeCampaignIds,
-    adSetIds: activeAdSetIds
+    adSetIds: activeAdSetIds,
+    projectId
   });
   
   // Use daily_insights from the hook directly
