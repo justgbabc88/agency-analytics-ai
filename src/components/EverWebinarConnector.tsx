@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useApiKeys } from "@/hooks/useApiKeys";
-import { Video, ExternalLink, CheckCircle, AlertCircle, Key, Webhook, Calendar } from "lucide-react";
+import { Video, ExternalLink, CheckCircle, AlertCircle, Key, Calendar } from "lucide-react";
 
 interface EverWebinarConnectorProps {
   projectId?: string;
@@ -19,16 +19,12 @@ export const EverWebinarConnector = ({ projectId, isConnected = false, onConnect
   const { saveApiKeys, getApiKeys } = useApiKeys();
   const [isConnecting, setIsConnecting] = useState(false);
   const [apiKey, setApiKey] = useState('');
-  const [webhookUrl, setWebhookUrl] = useState('');
 
   const savedKeys = getApiKeys('everwebinar');
 
   useEffect(() => {
     if (savedKeys.api_key) {
       setApiKey(savedKeys.api_key);
-    }
-    if (savedKeys.webhook_url) {
-      setWebhookUrl(savedKeys.webhook_url);
     }
   }, [savedKeys]);
 
@@ -45,10 +41,9 @@ export const EverWebinarConnector = ({ projectId, isConnected = false, onConnect
     setIsConnecting(true);
     
     try {
-      // Save the API key and webhook URL
+      // Save the API key
       saveApiKeys('everwebinar', {
         api_key: apiKey.trim(),
-        webhook_url: webhookUrl.trim(),
         connected_at: new Date().toISOString(),
         project_id: projectId
       });
@@ -78,7 +73,6 @@ export const EverWebinarConnector = ({ projectId, isConnected = false, onConnect
       // Clear saved keys
       saveApiKeys('everwebinar', {});
       setApiKey('');
-      setWebhookUrl('');
 
       // Update connection status
       onConnectionChange?.(false);
@@ -167,7 +161,6 @@ export const EverWebinarConnector = ({ projectId, isConnected = false, onConnect
                   <li>Go to Settings → API Keys</li>
                   <li>Generate a new API key</li>
                   <li>Copy and paste the API key below</li>
-                  <li>Optionally, configure webhook URL for real-time updates</li>
                 </ol>
               </div>
 
@@ -181,20 +174,6 @@ export const EverWebinarConnector = ({ projectId, isConnected = false, onConnect
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
                   />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="webhook-url">Webhook URL (Optional)</Label>
-                  <Input
-                    id="webhook-url"
-                    type="url"
-                    placeholder="https://your-domain.com/webhook/everwebinar"
-                    value={webhookUrl}
-                    onChange={(e) => setWebhookUrl(e.target.value)}
-                  />
-                  <p className="text-xs text-gray-500">
-                    Configure this webhook URL in your EverWebinar settings for real-time data sync
-                  </p>
                 </div>
               </div>
 
@@ -216,14 +195,6 @@ export const EverWebinarConnector = ({ projectId, isConnected = false, onConnect
                 <p className="text-sm text-green-700">
                   Your EverWebinar account is connected and ready to sync webinar data.
                 </p>
-                {savedKeys.webhook_url && (
-                  <div className="mt-2">
-                    <p className="text-xs text-green-600">
-                      <Webhook className="h-3 w-3 inline mr-1" />
-                      Webhook configured for real-time updates
-                    </p>
-                  </div>
-                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
