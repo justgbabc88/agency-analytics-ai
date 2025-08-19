@@ -71,36 +71,18 @@ export const useProjects = () => {
     localStorage.setItem('selectedProjectId', projectId);
     
     // Force immediate invalidation and refetch with no delay
-    console.log('🔄 Starting IMMEDIATE query invalidation for project:', projectId);
+    console.log('🔄 Starting COMPREHENSIVE query invalidation for project:', projectId);
     
-    // Clear all existing caches for these query types
-    queryClient.removeQueries({ queryKey: ['recent-events'] });
-    queryClient.removeQueries({ queryKey: ['event-stats'] });
-    queryClient.removeQueries({ queryKey: ['ghl-forms'] });
-    queryClient.removeQueries({ queryKey: ['ghl-submissions'] });
-    queryClient.removeQueries({ queryKey: ['calendly-events'] });
-    queryClient.removeQueries({ queryKey: ['facebook-integrations'] });
-    queryClient.removeQueries({ queryKey: ['project-integrations'] });
+    // Clear ALL cached queries - be more aggressive
+    queryClient.clear();
     
-    console.log('🗑️ Cleared all cached queries for immediate refresh');
+    console.log('🗑️ Cleared ALL cached queries for complete refresh');
     
-    // Small delay to ensure state has propagated, then trigger fresh fetches
+    // Force page refresh approach - most reliable for project switching
     setTimeout(() => {
-      console.log('🔄 Triggering fresh queries for project:', projectId);
-      
-      // Force fresh queries for the new project
-      queryClient.fetchQuery({
-        queryKey: ['recent-events', projectId],
-        staleTime: 0, // Force fresh fetch
-      });
-      
-      queryClient.fetchQuery({
-        queryKey: ['event-stats', projectId], 
-        staleTime: 0, // Force fresh fetch
-      });
-      
-      console.log('✅ Fresh queries triggered for project:', projectId);
-    }, 100);
+      console.log('🔄 Forcing complete data refresh for project:', projectId);
+      window.location.reload();
+    }, 50);
   };
 
   const createProject = useMutation({
