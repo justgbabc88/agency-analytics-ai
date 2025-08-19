@@ -60,13 +60,41 @@ serve(async (req) => {
   }
 
   try {
+    // Use anon key instead of service role key for better security
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     )
 
     const trackingData: TrackingData = await req.json()
     console.log('Received tracking data:', trackingData)
+
+    // Get client IP for rate limiting and hashing
+    const clientIP = req.headers.get('x-forwarded-for') || 
+                     req.headers.get('x-real-ip') || 
+                     'unknown'
+    
+    // Create service role client for rate limiting check (this function requires elevated privileges)
+    const serviceSupabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
+
+    // Rate limiting - allow 100 requests per hour per IP
+    const rateLimitCheck = await serviceSupabase.rpc('check_rate_limit', {
+      p_identifier: clientIP,
+      p_endpoint: 'track-event',
+      p_max_requests: 100,
+      p_window_minutes: 60
+    })
+
+    if (rateLimitCheck.error || !rateLimitCheck.data) {
+      console.log('Rate limit exceeded for IP:', clientIP)
+      return new Response(
+        JSON.stringify({ error: 'Rate limit exceeded' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
     // Verify pixel exists and is active
     const { data: pixel, error: pixelError } = await supabase
@@ -84,10 +112,7 @@ serve(async (req) => {
       )
     }
 
-    // Get client IP for hashing
-    const clientIP = req.headers.get('x-forwarded-for') || 
-                     req.headers.get('x-real-ip') || 
-                     'unknown'
+    // Hash IP for session tracking
     const ipHash = clientIP !== 'unknown' ? await hashIP(clientIP) : null
 
     // Check if session exists, if not create it
@@ -139,8 +164,12 @@ serve(async (req) => {
         .eq('session_id', trackingData.sessionId)
     }
 
-    // Create tracking event
-    const { data: event, error: eventError } = await supabase
+    // Create tracking event - use service role client for contact info insertion
+    const eventClient = (trackingData.contactInfo?.email || trackingData.contactInfo?.phone || trackingData.contactInfo?.name || trackingData.formData) 
+      ? serviceSupabase  // Use service role for contact info (with audit logging via trigger)
+      : supabase        // Use anon key for anonymous tracking
+
+    const { data: event, error: eventError } = await eventClient
       .from('tracking_events')
       .insert({
         session_id: trackingData.sessionId,
@@ -169,7 +198,7 @@ serve(async (req) => {
 
     // If this is a conversion event with revenue, create attribution record using secure function
     if (trackingData.revenue?.amount && trackingData.revenue.amount > 0) {
-      const { error: attributionError } = await supabase
+      const { error: attributionError } = await serviceSupabase
         .rpc('secure_attribution_with_contact', {
           p_project_id: pixel.project_id,
           p_session_id: trackingData.sessionId,
