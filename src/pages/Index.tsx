@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Navbar } from "@/components/Navbar";
 import { LowTicketFunnel } from "@/components/LowTicketFunnel";
 import { BookCallFunnel } from "@/components/BookCallFunnel";
+import { WebinarFunnel } from "@/components/WebinarFunnel";
 import { ProjectIntegrationsPanel } from "@/components/ProjectIntegrationsPanel";
 import { FacebookAIInsights } from "@/components/FacebookAIInsights";
 import { BookCallAIAssistant } from "@/components/BookCallAIAssistant";
@@ -239,12 +240,7 @@ const Index = () => {
       case "high_ticket":
       case "webinar":
         return (
-          <div className="text-center py-12">
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              {selectedProject.funnel_type === "high_ticket" ? "High Ticket" : "Webinar"} Funnel
-            </h3>
-            <p className="text-gray-600">This funnel type is coming soon!</p>
-          </div>
+          <WebinarFunnel projectId={selectedProjectId} />
         );
       default:
         return (
@@ -463,6 +459,7 @@ const Index = () => {
               selectedFormIds={selectedFormIds}
               onFormSelectionChange={setSelectedFormIds}
               onGHLDataRefresh={refetchGHLData}
+              projectFunnelType={selectedProject?.funnel_type}
               zohoLeadSourceFilter={zohoLeadSourceFilter}
             />
           </TabsContent>

@@ -9,45 +9,16 @@ import { CalendlyConnector } from "./CalendlyConnector";
 import { GoHighLevelConnector } from "./GoHighLevelConnector";
 import { ZohoCRMConnector } from "./ZohoCRMConnector";
 import { ZohoDealsDisplay } from "./ZohoDealsDisplay";
-import { Settings, CheckCircle, XCircle, RefreshCw, BarChart3, ChevronDown, ChevronRight, Calendar, FormInput, Users } from "lucide-react";
+import { EverWebinarConnector } from "./EverWebinarConnector";
+import { Settings, CheckCircle, XCircle, RefreshCw, BarChart3, ChevronDown, ChevronRight, Calendar, FormInput, Users, Video } from "lucide-react";
 import { useState } from "react";
-
-const integrationPlatforms = [
-  { 
-    id: 'facebook', 
-    name: 'Facebook Ads', 
-    description: 'Facebook advertising data and analytics',
-    color: 'bg-blue-100 text-blue-700',
-    icon: BarChart3
-  },
-  { 
-    id: 'calendly', 
-    name: 'Calendly', 
-    description: 'Track scheduled calls and appointments',
-    color: 'bg-purple-100 text-purple-700',
-    icon: Calendar
-  },
-  { 
-    id: 'ghl', 
-    name: 'Go High Level', 
-    description: 'Track form submissions and leads',
-    color: 'bg-cyan-100 text-cyan-700',
-    icon: FormInput
-  },
-  { 
-    id: 'zoho_crm', 
-    name: 'Zoho CRM', 
-    description: 'Sync contacts, leads, and deals',
-    color: 'bg-red-100 text-red-700',
-    icon: Users
-  },
-];
 
 interface ProjectIntegrationsPanelProps {
   projectId?: string;
   selectedFormIds?: string[];
   onFormSelectionChange?: (formIds: string[]) => void;
   onGHLDataRefresh?: () => void; // Add GHL data refresh function
+  projectFunnelType?: string; // Add funnel type to show appropriate integrations
   zohoLeadSourceFilter?: {
     leadSources: string[];
     selectedLeadSources: string[];
@@ -59,9 +30,58 @@ interface ProjectIntegrationsPanelProps {
   };
 }
 
-export const ProjectIntegrationsPanel = ({ projectId, selectedFormIds = [], onFormSelectionChange, onGHLDataRefresh, zohoLeadSourceFilter }: ProjectIntegrationsPanelProps) => {
+export const ProjectIntegrationsPanel = ({ projectId, selectedFormIds = [], onFormSelectionChange, onGHLDataRefresh, projectFunnelType, zohoLeadSourceFilter }: ProjectIntegrationsPanelProps) => {
   const { integrations, updateIntegration } = useProjectIntegrations(projectId);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+
+  // Get integrations available for this project type
+  const getAvailableIntegrations = () => {
+    const baseIntegrations = [
+      { 
+        id: 'facebook', 
+        name: 'Facebook Ads', 
+        description: 'Facebook advertising data and analytics',
+        color: 'bg-blue-100 text-blue-700',
+        icon: BarChart3
+      },
+      { 
+        id: 'calendly', 
+        name: 'Calendly', 
+        description: 'Track scheduled calls and appointments',
+        color: 'bg-purple-100 text-purple-700',
+        icon: Calendar
+      },
+      { 
+        id: 'ghl', 
+        name: 'Go High Level', 
+        description: 'Track form submissions and leads',
+        color: 'bg-cyan-100 text-cyan-700',
+        icon: FormInput
+      },
+      { 
+        id: 'zoho_crm', 
+        name: 'Zoho CRM', 
+        description: 'Sync contacts, leads, and deals',
+        color: 'bg-red-100 text-red-700',
+        icon: Users
+      },
+    ];
+
+    // Add EverWebinar integration only for webinar projects
+    if (projectFunnelType === 'webinar') {
+      baseIntegrations.push({
+        id: 'everwebinar',
+        name: 'EverWebinar',
+        description: 'Webinar registrations and attendance tracking',
+        color: 'bg-purple-100 text-purple-700',
+        icon: Video
+      });
+    }
+
+    return baseIntegrations;
+  };
+
+  const integrationPlatforms = getAvailableIntegrations();
 
   const getIntegrationStatus = (platformId: string) => {
     const integration = integrations?.find(i => i.platform === platformId);
@@ -183,6 +203,18 @@ export const ProjectIntegrationsPanel = ({ projectId, selectedFormIds = [], onFo
             />
             {isConnected && <ZohoDealsDisplay projectId={projectId} zohoLeadSourceFilter={zohoLeadSourceFilter} />}
           </div>
+        );
+      case 'everwebinar':
+        return (
+          <EverWebinarConnector
+            projectId={projectId}
+            isConnected={isConnected}
+            onConnectionChange={(connected) => {
+              if (connected) {
+                handleToggleIntegration(platform.id, true);
+              }
+            }}
+          />
         );
       default:
         return null;

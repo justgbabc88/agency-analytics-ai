@@ -137,7 +137,21 @@ export const useProjects = () => {
   });
 
   const createDefaultIntegrations = async (projectId: string) => {
+    // Get the project to determine funnel type
+    const { data: project } = await supabase
+      .from('projects')
+      .select('funnel_type')
+      .eq('id', projectId)
+      .single();
+
+    // Base integrations for all project types
     const defaultPlatforms = ['facebook', 'google_sheets', 'clickfunnels'];
+    
+    // Add webinar-specific integrations
+    if (project?.funnel_type === 'webinar') {
+      defaultPlatforms.push('everwebinar');
+    }
+    
     const results = [];
     
     for (const platform of defaultPlatforms) {
