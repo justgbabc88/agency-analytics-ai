@@ -68,17 +68,37 @@ export const useProjects = () => {
     localStorage.setItem('selectedProjectId', projectId);
     console.log('🔄 Project selected:', projectId);
     
-    // Invalidate all project-specific queries to force immediate refresh
-    queryClient.invalidateQueries({ queryKey: ['recent-events'] });
-    queryClient.invalidateQueries({ queryKey: ['event-stats'] });
-    queryClient.invalidateQueries({ queryKey: ['ghl-forms'] });
-    queryClient.invalidateQueries({ queryKey: ['ghl-submissions'] });
-    queryClient.invalidateQueries({ queryKey: ['calendly-events'] });
-    queryClient.invalidateQueries({ queryKey: ['calendly-mappings'] });
-    queryClient.invalidateQueries({ queryKey: ['facebook-integrations'] });
-    queryClient.invalidateQueries({ queryKey: ['project-integrations'] });
-    queryClient.invalidateQueries({ queryKey: ['tracking-events'] });
-    queryClient.invalidateQueries({ queryKey: ['attribution-data'] });
+    // Invalidate all project-specific queries using broader patterns to catch all variations
+    // This ensures all components refresh when switching projects
+    queryClient.invalidateQueries({ 
+      predicate: (query) => {
+        const queryKey = query.queryKey as string[];
+        if (!queryKey || queryKey.length === 0) return false;
+        
+        // Invalidate queries that contain project-specific data
+        const projectRelatedQueries = [
+          'recent-events',
+          'event-stats', 
+          'ghl-forms',
+          'ghl-submissions',
+          'calendly-events',
+          'calendly-mappings',
+          'facebook-integrations',
+          'facebook-sync-status',
+          'project-integrations',
+          'tracking-events',
+          'attribution-data',
+          'zoho-deals',
+          'zoho-lead-source-filter'
+        ];
+        
+        // Check if this query is project-related
+        return projectRelatedQueries.some(queryType => 
+          queryKey.includes(queryType) || queryKey[0] === queryType
+        );
+      }
+    });
+    
     console.log('🔄 Invalidated all project-specific queries for immediate refresh');
   };
 
