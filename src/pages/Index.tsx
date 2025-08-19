@@ -60,7 +60,7 @@ const Index = () => {
   const zohoLeadSourceFilter = useZohoLeadSourceFilter(selectedProjectId || undefined);
   
   
-  // React Query hooks
+  // React Query hooks with enhanced debugging
   const { data: recentEvents, isLoading: eventsLoading, refetch: refetchEvents } = useQuery({
     queryKey: ['recent-events', selectedProjectId, dateRange],
     queryFn: async () => {
@@ -69,7 +69,7 @@ const Index = () => {
         return [];
       }
       
-      console.log('📊 Fetching recent events for project:', selectedProjectId, 'dateRange:', {
+      console.log('📊 [QUERY EXECUTING] Fetching recent events for project:', selectedProjectId, 'dateRange:', {
         from: dateRange.from.toISOString(),
         to: dateRange.to.toISOString()
       });
@@ -88,11 +88,12 @@ const Index = () => {
         throw error;
       }
       
-      console.log('✅ Fetched recent events:', data?.length || 0, 'events');
+      console.log('✅ [QUERY SUCCESS] Fetched recent events:', data?.length || 0, 'events for project:', selectedProjectId);
       return data || [];
     },
     enabled: !!selectedProjectId,
-    refetchInterval: 5000,
+    staleTime: 0, // Always refetch when project changes
+    gcTime: 0, // Don't cache results
   });
 
   const { data: eventStats } = useQuery({
@@ -103,7 +104,7 @@ const Index = () => {
         return { total: 0, types: {} };
       }
       
-      console.log('📊 Fetching event stats for project:', selectedProjectId);
+      console.log('📊 [QUERY EXECUTING] Fetching event stats for project:', selectedProjectId);
       
       const { data, error } = await supabase
         .from('tracking_events')
@@ -124,11 +125,16 @@ const Index = () => {
         return acc;
       }, {} as any);
 
-      console.log('✅ Fetched event stats:', { total: stats?.total || 0, types: Object.keys(stats?.types || {}).length });
+      console.log('✅ [QUERY SUCCESS] Fetched event stats:', { 
+        total: stats?.total || 0, 
+        types: Object.keys(stats?.types || {}).length,
+        project: selectedProjectId 
+      });
       return stats || { total: 0, types: {} };
     },
     enabled: !!selectedProjectId,
-    refetchInterval: 10000,
+    staleTime: 0, // Always refetch when project changes
+    gcTime: 0, // Don't cache results
   });
 
   // GHL form submissions data for refresh functionality
