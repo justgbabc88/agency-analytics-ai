@@ -1307,6 +1307,16 @@ export type Database = {
         }
         Returns: string
       }
+      log_pii_access_attempt: {
+        Args: {
+          p_additional_context?: Json
+          p_operation: string
+          p_record_id?: string
+          p_table_name: string
+          p_user_id?: string
+        }
+        Returns: undefined
+      }
       log_security_event: {
         Args: {
           p_action: string
