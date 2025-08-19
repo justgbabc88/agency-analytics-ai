@@ -1253,8 +1253,8 @@ export type Database = {
         Insert: {
           attributed_revenue?: number | null
           attribution_model?: string | null
-          contact_email?: never
-          contact_phone?: never
+          contact_email?: string | null
+          contact_phone?: string | null
           conversion_date?: string | null
           created_at?: string | null
           event_id?: string | null
@@ -1269,8 +1269,8 @@ export type Database = {
         Update: {
           attributed_revenue?: number | null
           attribution_model?: string | null
-          contact_email?: never
-          contact_phone?: never
+          contact_email?: string | null
+          contact_phone?: string | null
           conversion_date?: string | null
           created_at?: string | null
           event_id?: string | null

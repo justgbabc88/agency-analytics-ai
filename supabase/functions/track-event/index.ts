@@ -167,21 +167,20 @@ serve(async (req) => {
       )
     }
 
-    // If this is a conversion event with revenue, create attribution record
+    // If this is a conversion event with revenue, create attribution record using secure function
     if (trackingData.revenue?.amount && trackingData.revenue.amount > 0) {
       const { error: attributionError } = await supabase
-        .from('attribution_data')
-        .insert({
-          project_id: pixel.project_id,
-          session_id: trackingData.sessionId,
-          event_id: event.id,
-          contact_email: trackingData.contactInfo?.email,
-          contact_phone: trackingData.contactInfo?.phone,
-          attributed_revenue: trackingData.revenue.amount,
-          attribution_model: 'first_touch',
-          utm_source: session.utm_source,
-          utm_campaign: session.utm_campaign,
-          utm_medium: session.utm_medium,
+        .rpc('secure_attribution_with_contact', {
+          p_project_id: pixel.project_id,
+          p_session_id: trackingData.sessionId,
+          p_event_id: event.id,
+          p_contact_email: trackingData.contactInfo?.email,
+          p_contact_phone: trackingData.contactInfo?.phone,
+          p_attributed_revenue: trackingData.revenue.amount,
+          p_attribution_model: 'first_touch',
+          p_utm_source: session.utm_source,
+          p_utm_campaign: session.utm_campaign,
+          p_utm_medium: session.utm_medium,
         })
 
       if (attributionError) {
