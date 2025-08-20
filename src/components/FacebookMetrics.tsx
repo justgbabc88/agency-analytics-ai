@@ -376,7 +376,7 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
             {/* Spend Metric */}
             <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-lg p-3 border border-gray-100">
               <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
