@@ -87,10 +87,10 @@ export const CreateProjectModal = ({ onProjectCreated }: CreateProjectModalProps
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="funnel-type">Funnel Type</Label>
+            <Label htmlFor="funnel-type">Project Type</Label>
             <Select value={funnelType} onValueChange={setFunnelType} required>
               <SelectTrigger>
-                <SelectValue placeholder="Select funnel type" />
+                <SelectValue placeholder="Select project type" />
               </SelectTrigger>
               <SelectContent>
                 {funnelTypes.map((type) => (
