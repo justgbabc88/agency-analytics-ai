@@ -275,21 +275,25 @@ const Index = () => {
       <Navbar onDateChange={handleDateChange} />
       
       <div className="p-6">
-        <Tabs defaultValue="funnel" className="space-y-6">
+        <Tabs defaultValue={selectedProject?.funnel_type === 'ads_only' ? 'facebook' : 'funnel'} className="space-y-6">
           <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <TabsList className="grid w-full grid-cols-4 h-12">
-              <TabsTrigger value="funnel" className="flex items-center justify-center gap-2 h-10">
-                <BarChart3 className="h-4 w-4" />
-                <span className="hidden sm:inline">Stats</span>
-              </TabsTrigger>
+            <TabsList className={`grid w-full h-12 ${selectedProject?.funnel_type === 'ads_only' ? 'grid-cols-2' : 'grid-cols-4'}`}>
+              {selectedProject?.funnel_type !== 'ads_only' && (
+                <TabsTrigger value="funnel" className="flex items-center justify-center gap-2 h-10">
+                  <BarChart3 className="h-4 w-4" />
+                  <span className="hidden sm:inline">Stats</span>
+                </TabsTrigger>
+              )}
               <TabsTrigger value="facebook" className="flex items-center justify-center gap-2 h-10">
                 <Facebook className="h-4 w-4" />
                 <span className="hidden sm:inline">Facebook</span>
               </TabsTrigger>
-              <TabsTrigger value="tracking" className="flex items-center justify-center gap-2 h-10">
-                <Target className="h-4 w-4" />
-                <span className="hidden sm:inline">Tracking</span>
-              </TabsTrigger>
+              {selectedProject?.funnel_type !== 'ads_only' && (
+                <TabsTrigger value="tracking" className="flex items-center justify-center gap-2 h-10">
+                  <Target className="h-4 w-4" />
+                  <span className="hidden sm:inline">Tracking</span>
+                </TabsTrigger>
+              )}
               <TabsTrigger value="settings" className="flex items-center justify-center gap-2 h-10">
                 <Settings className="h-4 w-4" />
                 <span className="hidden sm:inline">Integrations</span>
@@ -297,9 +301,11 @@ const Index = () => {
             </TabsList>
           </div>
 
-          <TabsContent value="funnel" className="space-y-6">
-            {renderFunnelContent()}
-          </TabsContent>
+          {selectedProject?.funnel_type !== 'ads_only' && (
+            <TabsContent value="funnel" className="space-y-6">
+              {renderFunnelContent()}
+            </TabsContent>
+          )}
 
           <TabsContent value="facebook" className="space-y-6">
             <div className="flex justify-between items-center mb-4">
@@ -316,156 +322,158 @@ const Index = () => {
             />
           </TabsContent>
 
-          <TabsContent value="tracking" className="space-y-6">
-            {!selectedProjectId ? (
-              <Card>
-                <CardContent className="p-12 text-center">
-                  <Target className="h-16 w-16 mx-auto text-gray-400 mb-4" />
-                  <h2 className="text-xl font-semibold mb-2">Select a Project</h2>
-                  <p className="text-gray-600">
-                    Choose a project from the navbar to start tracking your marketing campaigns and conversions.
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              <Tabs defaultValue="setup" className="space-y-6">
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="setup" className="flex items-center gap-2">
-                    <Zap className="h-4 w-4" />
-                    Quick Setup
-                  </TabsTrigger>
-                  <TabsTrigger value="manage" className="flex items-center gap-2">
-                    <Activity className="h-4 w-4" />
-                    Manage Pixels
-                  </TabsTrigger>
-                  <TabsTrigger value="attribution" className="flex items-center gap-2">
-                    <Target className="h-4 w-4" />
-                    Attribution
-                  </TabsTrigger>
-                  <TabsTrigger value="events" className="flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4" />
-                    Recent Events
-                  </TabsTrigger>
-                </TabsList>
+          {selectedProject?.funnel_type !== 'ads_only' && (
+            <TabsContent value="tracking" className="space-y-6">
+              {!selectedProjectId ? (
+                <Card>
+                  <CardContent className="p-12 text-center">
+                    <Target className="h-16 w-16 mx-auto text-gray-400 mb-4" />
+                    <h2 className="text-xl font-semibold mb-2">Select a Project</h2>
+                    <p className="text-gray-600">
+                      Choose a project from the navbar to start tracking your marketing campaigns and conversions.
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Tabs defaultValue="setup" className="space-y-6">
+                  <TabsList className="grid w-full grid-cols-4">
+                    <TabsTrigger value="setup" className="flex items-center gap-2">
+                      <Zap className="h-4 w-4" />
+                      Quick Setup
+                    </TabsTrigger>
+                    <TabsTrigger value="manage" className="flex items-center gap-2">
+                      <Activity className="h-4 w-4" />
+                      Manage Pixels
+                    </TabsTrigger>
+                    <TabsTrigger value="attribution" className="flex items-center gap-2">
+                      <Target className="h-4 w-4" />
+                      Attribution
+                    </TabsTrigger>
+                    <TabsTrigger value="events" className="flex items-center gap-2">
+                      <BarChart3 className="h-4 w-4" />
+                      Recent Events
+                    </TabsTrigger>
+                  </TabsList>
 
-                <TabsContent value="setup">
-                  <PixelSetupWizard projectId={selectedProjectId} />
-                </TabsContent>
+                  <TabsContent value="setup">
+                    <PixelSetupWizard projectId={selectedProjectId} />
+                  </TabsContent>
 
-                <TabsContent value="manage">
-                  <TrackingPixelManager projectId={selectedProjectId} />
-                </TabsContent>
+                  <TabsContent value="manage">
+                    <TrackingPixelManager projectId={selectedProjectId} />
+                  </TabsContent>
 
-                <TabsContent value="attribution">
-                  <AttributionDashboard projectId={selectedProjectId} dateRange={dateRange} />
-                </TabsContent>
+                  <TabsContent value="attribution">
+                    <AttributionDashboard projectId={selectedProjectId} dateRange={dateRange} />
+                  </TabsContent>
 
-                <TabsContent value="events">
-                  <Card>
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between mb-6">
-                        <h3 className="text-lg font-semibold flex items-center gap-2">
-                          <BarChart3 className="h-5 w-5" />
-                          Event Statistics ({dateRange.from.toLocaleDateString()} - {dateRange.to.toLocaleDateString()})
-                        </h3>
-                        <Button onClick={handleRefreshEvents} variant="outline" size="sm">
-                          <RefreshCw className="h-4 w-4 mr-2" />
-                          Refresh
-                        </Button>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-blue-600">
-                            {eventStats?.total || 0}
-                          </div>
-                          <div className="text-sm text-gray-600">Total Events</div>
+                  <TabsContent value="events">
+                    <Card>
+                      <CardContent className="p-6">
+                        <div className="flex items-center justify-between mb-6">
+                          <h3 className="text-lg font-semibold flex items-center gap-2">
+                            <BarChart3 className="h-5 w-5" />
+                            Event Statistics ({dateRange.from.toLocaleDateString()} - {dateRange.to.toLocaleDateString()})
+                          </h3>
+                          <Button onClick={handleRefreshEvents} variant="outline" size="sm">
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Refresh
+                          </Button>
                         </div>
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-green-600">
-                            {Object.keys(eventStats?.types || {}).length}
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-blue-600">
+                              {eventStats?.total || 0}
+                            </div>
+                            <div className="text-sm text-gray-600">Total Events</div>
                           </div>
-                          <div className="text-sm text-gray-600">Event Types</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-purple-600">
-                            {recentEvents?.length || 0}
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-green-600">
+                              {Object.keys(eventStats?.types || {}).length}
+                            </div>
+                            <div className="text-sm text-gray-600">Event Types</div>
                           </div>
-                          <div className="text-sm text-gray-600">Recent Events</div>
-                        </div>
-                      </div>
-
-                      {eventStats?.types && Object.keys(eventStats.types).length > 0 && (
-                        <div className="space-y-2">
-                          <h4 className="font-medium">Event Types Breakdown:</h4>
-                          <div className="flex flex-wrap gap-2">
-                            {Object.entries(eventStats.types).map(([eventType, count]: [string, any]) => (
-                              <Badge key={eventType} className={getEventTypeColor(eventType)}>
-                                {formatEventType(eventType)}: {count}
-                              </Badge>
-                            ))}
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-purple-600">
+                              {recentEvents?.length || 0}
+                            </div>
+                            <div className="text-sm text-gray-600">Recent Events</div>
                           </div>
                         </div>
-                      )}
-                    </CardContent>
-                  </Card>
 
-                  <Card>
-                    <CardContent className="p-6">
-                      <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
-                        <Activity className="h-5 w-5" />
-                        Live Event Feed
-                      </h3>
-                      
-                      {eventsLoading ? (
-                        <div className="text-center py-8 text-muted-foreground">
-                          Loading events...
-                        </div>
-                      ) : recentEvents && recentEvents.length > 0 ? (
-                        <div className="space-y-3 max-h-96 overflow-y-auto">
-                          {recentEvents.map((event) => (
-                            <div key={event.id} className="flex items-center justify-between p-3 border rounded-lg">
-                              <div className="flex items-center space-x-3">
-                                <Badge className={getEventTypeColor(event.event_type)}>
-                                  {formatEventType(event.event_type)}
+                        {eventStats?.types && Object.keys(eventStats.types).length > 0 && (
+                          <div className="space-y-2">
+                            <h4 className="font-medium">Event Types Breakdown:</h4>
+                            <div className="flex flex-wrap gap-2">
+                              {Object.entries(eventStats.types).map(([eventType, count]: [string, any]) => (
+                                <Badge key={eventType} className={getEventTypeColor(eventType)}>
+                                  {formatEventType(eventType)}: {count}
                                 </Badge>
-                                <div>
-                                  <p className="font-medium">
-                                    {event.event_name || formatEventType(event.event_type)}
-                                  </p>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardContent className="p-6">
+                        <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
+                          <Activity className="h-5 w-5" />
+                          Live Event Feed
+                        </h3>
+                        
+                        {eventsLoading ? (
+                          <div className="text-center py-8 text-muted-foreground">
+                            Loading events...
+                          </div>
+                        ) : recentEvents && recentEvents.length > 0 ? (
+                          <div className="space-y-3 max-h-96 overflow-y-auto">
+                            {recentEvents.map((event) => (
+                              <div key={event.id} className="flex items-center justify-between p-3 border rounded-lg">
+                                <div className="flex items-center space-x-3">
+                                  <Badge className={getEventTypeColor(event.event_type)}>
+                                    {formatEventType(event.event_type)}
+                                  </Badge>
+                                  <div>
+                                    <p className="font-medium">
+                                      {event.event_name || formatEventType(event.event_type)}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                      {getPagePath(event.page_url)}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="text-right">
                                   <p className="text-sm text-muted-foreground">
-                                    {getPagePath(event.page_url)}
+                                    {new Date(event.created_at).toLocaleString()}
                                   </p>
+                                  {event.revenue_amount && (
+                                    <p className="text-sm font-medium text-green-600">
+                                      ${event.revenue_amount}
+                                    </p>
+                                  )}
                                 </div>
                               </div>
-                              <div className="text-right">
-                                <p className="text-sm text-muted-foreground">
-                                  {new Date(event.created_at).toLocaleString()}
-                                </p>
-                                {event.revenue_amount && (
-                                  <p className="text-sm font-medium text-green-600">
-                                    ${event.revenue_amount}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-center py-8">
-                          <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                          <h3 className="font-semibold mb-2">No Events Yet</h3>
-                          <p className="text-muted-foreground mb-4">
-                            Set up your tracking pixel and start collecting events to see them here.
-                          </p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
-            )}
-          </TabsContent>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8">
+                            <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                            <h3 className="font-semibold mb-2">No Events Yet</h3>
+                            <p className="text-muted-foreground mb-4">
+                              Set up your tracking pixel and start collecting events to see them here.
+                            </p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                </Tabs>
+              )}
+            </TabsContent>
+          )}
 
 
           <TabsContent value="settings" className="space-y-6">
