@@ -16,7 +16,7 @@ interface EverWebinarConnectorProps {
 
 export const EverWebinarConnector = ({ projectId, isConnected = false, onConnectionChange }: EverWebinarConnectorProps) => {
   const { toast } = useToast();
-  const { saveSecureApiKeys, getApiKeys } = useSecureApiKeys();
+  const { saveSecureApiKeys, getApiKeys } = useSecureApiKeys(projectId);
   const [isConnecting, setIsConnecting] = useState(false);
   const [apiKey, setApiKey] = useState('');
 

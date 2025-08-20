@@ -53,7 +53,7 @@ interface UseFacebookDataProps {
 
 export const useFacebookData = ({ dateRange, campaignIds, adSetIds, projectId }: UseFacebookDataProps = {}) => {
   const { agency } = useAgency();
-  const { getApiKeys } = useSecureApiKeys();
+  const { getApiKeys } = useSecureApiKeys(projectId);
   const { profile } = useUserProfile();
   const userTimezone = profile?.timezone || 'UTC';
   const queryClient = useQueryClient();

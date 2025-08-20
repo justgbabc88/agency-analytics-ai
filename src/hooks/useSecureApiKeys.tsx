@@ -17,7 +17,7 @@ interface ApiKeyValidationResult {
   warnings: string[];
 }
 
-export const useSecureApiKeys = () => {
+export const useSecureApiKeys = (projectId?: string) => {
   const { user } = useAuth();
   const { logSecurityEvent, logSensitiveOperation } = useSecurityAudit();
   const [apiKeys, setApiKeys] = useState<Record<string, Record<string, string>>>({});
@@ -117,7 +117,8 @@ export const useSecureApiKeys = () => {
       const { data: existingKeys } = await supabase
         .from('project_integration_data')
         .select('platform, data')
-        .eq('platform', 'api_keys_secure');
+        .eq('platform', 'api_keys_secure')
+        .eq('project_id', projectId || user.id);
 
       if (existingKeys && existingKeys.length > 0) {
         const secureData = existingKeys[0].data as Record<string, Record<string, string>>;
@@ -144,7 +145,7 @@ export const useSecureApiKeys = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, logSecurityEvent, decryptValue]);
+  }, [user, logSecurityEvent, decryptValue, projectId]);
 
   // Save secure API keys to Supabase
   const saveSecureApiKeys = useCallback(async (platform: string, keys: Record<string, string>) => {
@@ -168,7 +169,7 @@ export const useSecureApiKeys = () => {
       }
 
       // Log security event for API key save
-      logSensitiveOperation('api_keys_saved', 'api_credentials', platform);
+      logSensitiveOperation('api_keys_saved', 'api_credentials', null);
 
       // Encrypt keys
       const encryptedKeys: Record<string, string> = {};
@@ -194,7 +195,7 @@ export const useSecureApiKeys = () => {
         .from('project_integration_data')
         .upsert({
           platform: 'api_keys_secure',
-          project_id: user.id, // Using user ID as project ID for now
+          project_id: projectId || user.id, // Use provided project ID or fallback to user ID
           data: secureData,
           synced_at: new Date().toISOString()
         });
@@ -217,7 +218,7 @@ export const useSecureApiKeys = () => {
       });
       throw err;
     }
-  }, [user, apiKeys, validateApiKey, encryptValue, logSensitiveOperation, logSecurityEvent]);
+  }, [user, apiKeys, validateApiKey, encryptValue, logSensitiveOperation, logSecurityEvent, projectId]);
 
   // Get API keys for a platform
   const getApiKeys = useCallback((platform: string) => {
@@ -234,7 +235,7 @@ export const useSecureApiKeys = () => {
   const rotateApiKey = useCallback(async (platform: string, keyName: string) => {
     if (!user) return;
 
-    logSensitiveOperation('api_key_rotation_requested', 'api_credentials', `${platform}:${keyName}`);
+    logSensitiveOperation('api_key_rotation_requested', 'api_credentials', null);
     
     // In production, this would trigger a key rotation workflow
     console.warn(`API Key rotation requested for ${platform}:${keyName}. Please update the key manually.`);
@@ -244,7 +245,7 @@ export const useSecureApiKeys = () => {
   const clearAllApiKeys = useCallback(async () => {
     if (!user) return;
 
-    logSensitiveOperation('api_keys_cleared', 'api_credentials', 'all_platforms');
+    logSensitiveOperation('api_keys_cleared', 'api_credentials', null);
     
     setApiKeys({});
     
@@ -253,7 +254,7 @@ export const useSecureApiKeys = () => {
         .from('project_integration_data')
         .delete()
         .eq('platform', 'api_keys_secure')
-        .eq('project_id', user.id);
+        .eq('project_id', projectId || user.id);
     } catch (err) {
       console.error('Failed to clear secure storage:', err);
     }

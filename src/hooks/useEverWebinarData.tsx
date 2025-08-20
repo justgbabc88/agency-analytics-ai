@@ -32,7 +32,7 @@ interface EverWebinarData {
 }
 
 export const useEverWebinarData = (projectId: string) => {
-  const { getApiKeys } = useSecureApiKeys();
+  const { getApiKeys } = useSecureApiKeys(projectId);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 

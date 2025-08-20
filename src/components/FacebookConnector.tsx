@@ -20,10 +20,14 @@ interface AdAccount {
   currency: string;
 }
 
-export const FacebookConnector = () => {
+interface FacebookConnectorProps {
+  projectId?: string;
+}
+
+export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
   const { integrations, updateIntegration, syncIntegration } = useIntegrations();
   const queryClient = useQueryClient();
-  const { saveSecureApiKeys, getApiKeys } = useSecureApiKeys();
+  const { saveSecureApiKeys, getApiKeys } = useSecureApiKeys(projectId);
   const { toast } = useToast();
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
