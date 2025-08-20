@@ -407,6 +407,21 @@ export const FacebookMetrics = ({ dateRange, projectId, selectedCampaignIds, onC
               </div>
             </div>
 
+            {/* Reach Metric */}
+            <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-lg p-3 border border-emerald-100">
+              <div className="flex items-center gap-2 text-xs text-emerald-600 mb-1">
+                <Users className="h-3 w-3" />
+                Reach
+              </div>
+              <div className="text-lg font-bold text-emerald-800">
+                {formatNumber(insights.reach || 0)}
+              </div>
+              <div className={`flex items-center gap-1 text-xs mt-1 ${getChangeColor(calculatePercentageChange(insights.reach || 0, previousPeriodData.impressions * 0.7))}`}>
+                {getChangeIcon(calculatePercentageChange(insights.reach || 0, previousPeriodData.impressions * 0.7))}
+                <span>{calculatePercentageChange(insights.reach || 0, previousPeriodData.impressions * 0.7) > 0 ? '+' : ''}{calculatePercentageChange(insights.reach || 0, previousPeriodData.impressions * 0.7).toFixed(1)}%</span>
+              </div>
+            </div>
+
             {/* CTR (All) Metric */}
             <div className="bg-gradient-to-br from-zinc-50 to-zinc-100/50 rounded-lg p-3 border border-zinc-100">
               <div className="flex items-center gap-2 text-xs text-zinc-600 mb-1">

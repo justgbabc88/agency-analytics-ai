@@ -109,7 +109,7 @@ export const FacebookMetricsEnhanced = ({ dateRange, projectId }: FacebookMetric
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Spend</CardTitle>
@@ -125,6 +125,15 @@ export const FacebookMetricsEnhanced = ({ dateRange, projectId }: FacebookMetric
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{insights.impressions?.toLocaleString() || '0'}</div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Reach</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{insights.reach?.toLocaleString() || '0'}</div>
           </CardContent>
         </Card>
         
