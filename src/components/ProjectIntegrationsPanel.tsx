@@ -78,6 +78,11 @@ export const ProjectIntegrationsPanel = ({ projectId, selectedFormIds = [], onFo
       });
     }
 
+    // For ads_only projects, only show Facebook integration
+    if (projectFunnelType === 'ads_only') {
+      return baseIntegrations.filter(integration => integration.id === 'facebook');
+    }
+
     return baseIntegrations;
   };
 

@@ -1414,7 +1414,7 @@ export type Database = {
     }
     Enums: {
       campaign_status: "active" | "paused" | "completed" | "draft"
-      funnel_type: "low-ticket" | "webinar" | "book-call"
+      funnel_type: "low-ticket" | "webinar" | "book-call" | "ads_only"
       metric_type:
         | "impressions"
         | "clicks"
@@ -1552,7 +1552,7 @@ export const Constants = {
   public: {
     Enums: {
       campaign_status: ["active", "paused", "completed", "draft"],
-      funnel_type: ["low-ticket", "webinar", "book-call"],
+      funnel_type: ["low-ticket", "webinar", "book-call", "ads_only"],
       metric_type: [
         "impressions",
         "clicks",

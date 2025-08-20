@@ -30,6 +30,11 @@ export const CreateProjectModal = ({ onProjectCreated }: CreateProjectModalProps
       label: "Book A Call Funnel",
       description: "Landing Page → Booking → Sales Call"
     },
+    { 
+      value: "ads_only", 
+      label: "Ads Only",
+      description: "Facebook Ads tracking and integrations only"
+    },
   ];
 
   const handleSubmit = async (e: React.FormEvent) => {

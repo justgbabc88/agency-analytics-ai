@@ -4,9 +4,11 @@ import { LowTicketFunnel } from "@/components/LowTicketFunnel";
 import { BookCallFunnel } from "@/components/BookCallFunnel";
 import { WebinarFunnel } from "@/components/WebinarFunnel";
 import { ProjectIntegrationsPanel } from "@/components/ProjectIntegrationsPanel";
+import { IntegrationsPanel } from "@/components/IntegrationsPanel";
 import { FacebookAIInsights } from "@/components/FacebookAIInsights";
 import { BookCallAIAssistant } from "@/components/BookCallAIAssistant";
 import { FacebookMetrics } from "@/components/FacebookMetrics";
+import { FacebookMetricsEnhanced } from "@/components/FacebookMetricsEnhanced";
 import { PixelSetupWizard } from '@/components/PixelSetupWizard';
 import { TrackingPixelManager } from '@/components/TrackingPixelManager';
 import { AttributionDashboard } from '@/components/AttributionDashboard';
@@ -242,6 +244,18 @@ const Index = () => {
       case "webinar":
         return (
           <WebinarFunnel projectId={selectedProjectId} />
+        );
+      case "ads_only":
+        return (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <FacebookMetricsEnhanced
+                projectId={selectedProjectId}
+                dateRange={dateRange}
+              />
+              <IntegrationsPanel projectId={selectedProjectId} funnelType={selectedProject.funnel_type} />
+            </div>
+          </div>
         );
       default:
         return (
