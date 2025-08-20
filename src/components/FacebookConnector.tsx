@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { useIntegrations } from "@/hooks/useIntegrations";
 import { useQueryClient } from '@tanstack/react-query';
-import { useApiKeys } from "@/hooks/useApiKeys";
+import { useSecureApiKeys } from "@/hooks/useSecureApiKeys";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { BarChart3, ExternalLink, CheckCircle, AlertCircle, Link, Users, RefreshCw, ArrowUp, TestTube } from "lucide-react";
@@ -23,7 +23,7 @@ interface AdAccount {
 export const FacebookConnector = () => {
   const { integrations, updateIntegration, syncIntegration } = useIntegrations();
   const queryClient = useQueryClient();
-  const { saveApiKeys, getApiKeys } = useApiKeys();
+  const { saveSecureApiKeys, getApiKeys } = useSecureApiKeys();
   const { toast } = useToast();
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -149,7 +149,7 @@ export const FacebookConnector = () => {
 
             console.log('Successfully received access token, saving keys...');
 
-            saveApiKeys('facebook', {
+            saveSecureApiKeys('facebook', {
               access_token: tokenData.access_token,
               user_id: tokenData.user_id,
               user_name: tokenData.user_name,
@@ -309,7 +309,7 @@ export const FacebookConnector = () => {
         const firstAccountId = data.adAccounts[0].id;
         setSelectedAccount(firstAccountId);
         // Automatically save the first account
-        saveApiKeys('facebook', {
+        saveSecureApiKeys('facebook', {
           ...savedKeys,
           selected_ad_account_id: firstAccountId
         });
@@ -331,7 +331,7 @@ export const FacebookConnector = () => {
   const handleAdAccountChange = (accountId: string) => {
     setSelectedAccount(accountId);
     // Automatically save when selection changes
-    saveApiKeys('facebook', {
+    saveSecureApiKeys('facebook', {
       ...savedKeys,
       selected_ad_account_id: accountId
     });
@@ -362,7 +362,7 @@ export const FacebookConnector = () => {
       console.log('✅ Successfully updated integration status');
       console.log('🗑️ Clearing saved API keys and state...');
       
-      saveApiKeys('facebook', {});
+      saveSecureApiKeys('facebook', {});
       setAdAccounts([]);
       setSelectedAccount('');
 
