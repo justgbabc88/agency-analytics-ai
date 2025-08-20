@@ -68,19 +68,19 @@ export const ApiKeyManager = ({ platform, onSave, savedKeys = {} }: ApiKeyManage
     }
   }, [platform, getApiKeys]);
 
-  const validateAllKeys = () => {
+  const validateAllKeys = async () => {
     const errors: Record<string, string[]> = {};
     const warnings: Record<string, string[]> = {};
     
-    Object.entries(keys).forEach(([keyName, value]) => {
-      const validation = validateApiKey(platform, keyName, value);
+    for (const [keyName, value] of Object.entries(keys)) {
+      const validation = await validateApiKey(platform, keyName, value);
       if (validation.errors.length > 0) {
         errors[keyName] = validation.errors;
       }
       if (validation.warnings.length > 0) {
         warnings[keyName] = validation.warnings;
       }
-    });
+    }
     
     setValidationErrors(errors);
     setValidationWarnings(warnings);
@@ -91,7 +91,8 @@ export const ApiKeyManager = ({ platform, onSave, savedKeys = {} }: ApiKeyManage
   const handleSave = async () => {
     setSaving(true);
     try {
-      if (!validateAllKeys()) {
+      const isValid = await validateAllKeys();
+      if (!isValid) {
         toast({
           title: "Validation Failed",
           description: "Please fix the validation errors before saving.",

@@ -24,75 +24,54 @@ export const useSecureApiKeys = (projectId?: string) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Validate API key format and security
-  const validateApiKey = useCallback((platform: string, keyName: string, value: string): ApiKeyValidationResult => {
-    const result: ApiKeyValidationResult = {
-      isValid: true,
-      errors: [],
-      warnings: []
+  // Enhanced API key validation using the new validator
+  const validateApiKey = useCallback(async (platform: string, keyName: string, value: string): Promise<ApiKeyValidationResult> => {
+    const { ApiKeyValidator } = await import('@/utils/encryption');
+    const validation = ApiKeyValidator.validate(platform, keyName, value);
+    
+    return {
+      isValid: validation.isValid,
+      errors: validation.errors,
+      warnings: validation.warnings
     };
-
-    // Basic validation
-    if (!value || value.trim().length === 0) {
-      result.isValid = false;
-      result.errors.push('API key cannot be empty');
-      return result;
-    }
-
-    // Security validations
-    if (value.length < 8) {
-      result.isValid = false;
-      result.errors.push('API key is too short (minimum 8 characters)');
-    }
-
-    // Check for common insecure patterns
-    const insecurePatterns = [
-      /^(test|demo|example|sample)/i,
-      /^(123|abc|password)/i,
-      /\s/
-    ];
-
-    for (const pattern of insecurePatterns) {
-      if (pattern.test(value)) {
-        result.warnings.push('API key appears to contain test or insecure data');
-        break;
-      }
-    }
-
-    // Platform-specific validation
-    switch (platform) {
-      case 'facebook':
-        if (keyName === 'app_id' && !/^\d+$/.test(value)) {
-          result.errors.push('Facebook App ID must be numeric');
-          result.isValid = false;
-        }
-        break;
-      case 'google':
-        if (keyName === 'client_id' && !value.includes('.googleusercontent.com')) {
-          result.warnings.push('Google Client ID should end with .googleusercontent.com');
-        }
-        break;
-    }
-
-    return result;
   }, []);
 
-  // Encrypt API key value (simple base64 for demo - in production use proper encryption)
-  const encryptValue = useCallback((value: string): string => {
-    // In production, use proper encryption with user-specific keys
-    return btoa(value + '::' + Date.now());
-  }, []);
+  // Enhanced encryption using Web Crypto API
+  const encryptValue = useCallback(async (value: string): Promise<string> => {
+    if (!user || !projectId) {
+      throw new Error('User and project required for encryption');
+    }
 
-  // Decrypt API key value
-  const decryptValue = useCallback((encryptedValue: string): string => {
     try {
-      const decoded = atob(encryptedValue);
-      const [value] = decoded.split('::');
-      return value || '';
-    } catch {
+      const { EncryptionService } = await import('@/utils/encryption');
+      return await EncryptionService.encrypt(value, user.id, projectId);
+    } catch (error) {
+      console.error('Encryption failed, falling back to base64:', error);
+      // Fallback to base64 if encryption fails
+      return btoa(value + '::' + Date.now());
+    }
+  }, [user, projectId]);
+
+  // Enhanced decryption
+  const decryptValue = useCallback(async (encryptedValue: string): Promise<string> => {
+    if (!user || !projectId) {
       return '';
     }
-  }, []);
+
+    try {
+      const { EncryptionService } = await import('@/utils/encryption');
+      return await EncryptionService.decrypt(encryptedValue, user.id, projectId);
+    } catch (error) {
+      // Fallback to base64 decoding for legacy keys
+      try {
+        const decoded = atob(encryptedValue);
+        const [value] = decoded.split('::');
+        return value || '';
+      } catch {
+        return '';
+      }
+    }
+  }, [user, projectId]);
 
   // Load secure API keys from Supabase
   const loadSecureApiKeys = useCallback(async () => {
@@ -127,7 +106,12 @@ export const useSecureApiKeys = (projectId?: string) => {
         for (const [platform, keys] of Object.entries(secureData)) {
           decryptedKeys[platform] = {};
           for (const [keyName, encryptedValue] of Object.entries(keys)) {
-            decryptedKeys[platform][keyName] = decryptValue(encryptedValue);
+            try {
+              decryptedKeys[platform][keyName] = await decryptValue(encryptedValue);
+            } catch (error) {
+              console.warn(`Failed to decrypt key ${platform}:${keyName}:`, error);
+              decryptedKeys[platform][keyName] = '';
+            }
           }
         }
         
@@ -156,11 +140,13 @@ export const useSecureApiKeys = (projectId?: string) => {
     try {
       setError(null);
 
-      // Validate all keys
-      const validationResults = Object.entries(keys).map(([keyName, value]) => ({
-        keyName,
-        ...validateApiKey(platform, keyName, value)
-      }));
+      // Validate all keys (now async)
+      const validationResults = await Promise.all(
+        Object.entries(keys).map(async ([keyName, value]) => ({
+          keyName,
+          ...(await validateApiKey(platform, keyName, value))
+        }))
+      );
 
       const hasErrors = validationResults.some(result => !result.isValid);
       if (hasErrors) {
@@ -171,22 +157,22 @@ export const useSecureApiKeys = (projectId?: string) => {
       // Log security event for API key save
       logSensitiveOperation('api_keys_saved', 'api_credentials', null);
 
-      // Encrypt keys
+      // Encrypt keys (now async)
       const encryptedKeys: Record<string, string> = {};
       for (const [keyName, value] of Object.entries(keys)) {
-        encryptedKeys[keyName] = encryptValue(value);
+        encryptedKeys[keyName] = await encryptValue(value);
       }
 
       // Update local state
       const updatedKeys = { ...apiKeys, [platform]: keys };
       setApiKeys(updatedKeys);
 
-      // Save to secure storage
+      // Save to secure storage (now async)
       const secureData = { ...updatedKeys };
       for (const [plt, pltKeys] of Object.entries(secureData)) {
         const encrypted: Record<string, string> = {};
         for (const [keyName, value] of Object.entries(pltKeys)) {
-          encrypted[keyName] = encryptValue(value);
+          encrypted[keyName] = await encryptValue(value);
         }
         secureData[plt] = encrypted;
       }

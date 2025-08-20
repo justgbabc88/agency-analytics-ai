@@ -22,6 +22,7 @@ import { useSecurityMonitoring } from '@/hooks/useSecurityMonitoring';
 import { useSecureApiKeys } from '@/hooks/useSecureApiKeys';
 import { SecurityMetricsDashboard } from './SecurityMetricsDashboard';
 import { SecurityAlertCenter } from './SecurityAlertCenter';
+import { SecurityWarningBanner } from './SecurityWarningBanner';
 import { supabase } from '@/integrations/supabase/client';
 
 interface SecurityMetrics {
@@ -168,6 +169,9 @@ export const SecurityDashboard = () => {
 
   return (
     <div className="space-y-6">
+      {/* Security Warning Banner */}
+      <SecurityWarningBanner />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
