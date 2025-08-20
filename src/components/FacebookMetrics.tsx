@@ -10,7 +10,8 @@ import { FacebookCampaignFilter } from "./FacebookCampaignFilter";
 import { FacebookZohoAnalytics } from "./FacebookZohoAnalytics";
 
 import { BarChart3, TrendingUp, Users, DollarSign, MousePointer, Eye, ArrowUpRight, ArrowDownRight, Calendar } from "lucide-react";
-import { format, eachDayOfInterval, subDays, isWithinInterval, startOfDay } from "date-fns";
+import { format, eachDayOfInterval, isWithinInterval, startOfDay } from "date-fns";
+import { subDays } from "date-fns/subDays";
 import { toZonedTime } from "date-fns-tz";
 
 interface FacebookMetricsProps {

@@ -1,6 +1,7 @@
 
 import { useMemo } from 'react';
-import { startOfDay, endOfDay, subDays, isWithinInterval, format } from 'date-fns';
+import { startOfDay, endOfDay, isWithinInterval, format } from 'date-fns';
+import { subDays } from 'date-fns/subDays';
 import { toZonedTime } from 'date-fns-tz';
 import { filterCancelledEventsByDateRange } from '../utils/dateFiltering';
 

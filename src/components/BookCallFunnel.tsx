@@ -1,6 +1,7 @@
 import { useCalendlyData } from "@/hooks/useCalendlyData";
 import { useUserProfile } from "@/hooks/useUserProfile";
-import { format, subDays, startOfDay, endOfDay } from "date-fns";
+import { format, startOfDay, endOfDay } from "date-fns";
+import { subDays } from "date-fns/subDays";
 import { fromZonedTime, toZonedTime, formatInTimeZone } from "date-fns-tz";
 import { LandingPageMetrics } from "./LandingPageMetrics";
 import { CallStatsMetrics } from "./CallStatsMetrics";

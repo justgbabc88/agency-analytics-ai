@@ -1,7 +1,10 @@
 
 import React, { useState, useEffect } from "react";
 import { CalendarIcon, X } from "lucide-react";
-import { format, subDays, subWeeks, subMonths, startOfWeek, startOfMonth, startOfYear, startOfDay, endOfDay, addDays } from "date-fns";
+import { format, startOfWeek, startOfMonth, startOfYear, startOfDay, endOfDay, addDays } from "date-fns";
+import { subDays } from "date-fns/subDays";
+import { subWeeks } from "date-fns/subWeeks";
+import { subMonths } from "date-fns/subMonths";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";

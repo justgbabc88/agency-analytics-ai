@@ -20,7 +20,8 @@ import { BarChart3, Settings, MessageSquare, Target, TrendingUp, Facebook, Activ
 import { useProjects } from "@/hooks/useProjects";
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { subDays, startOfDay, endOfDay } from "date-fns";
+import { startOfDay, endOfDay } from "date-fns";
+import { subDays } from "date-fns/subDays";
 import { useGHLFormSubmissions } from "@/hooks/useGHLFormSubmissions";
 import { useZohoLeadSourceFilter } from "@/hooks/useZohoLeadSourceFilter";
 
