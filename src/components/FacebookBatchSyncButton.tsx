@@ -17,14 +17,44 @@ export const FacebookBatchSyncButton = ({ projectId }: FacebookBatchSyncButtonPr
     setIsLoading(true);
     
     try {
-      console.log("🔄 Starting manual Facebook batch sync for project:", projectId);
-      console.log("📡 Calling supabase function: facebook-batch-sync");
+      console.log("🔄 Starting manual Facebook sync for project:", projectId);
       
+      // First, get the Facebook integration data to get access token and ad account
+      console.log("📡 Fetching Facebook integration data...");
+      const { data: integrationData, error: integrationError } = await supabase
+        .from('project_integration_data')
+        .select('data')
+        .eq('project_id', projectId)
+        .eq('platform', 'facebook')
+        .maybeSingle();
+
+      if (integrationError) {
+        console.error("❌ Error fetching integration data:", integrationError);
+        throw new Error(`Failed to fetch Facebook credentials: ${integrationError.message}`);
+      }
+
+      if (!integrationData?.data) {
+        throw new Error('No Facebook integration data found. Please connect Facebook first.');
+      }
+
+      const fbData = integrationData.data as any;
+      if (!fbData.access_token) {
+        throw new Error('No Facebook access token found. Please reconnect Facebook.');
+      }
+
+      if (!fbData.selected_ad_account_id) {
+        throw new Error('No ad account selected. Please select an ad account first.');
+      }
+
+      console.log("📡 Calling sync function with credentials...");
       const { data, error } = await supabase.functions.invoke('sync-project-integrations', {
         body: { 
-          project_id: projectId,
+          projectId: projectId,
           platform: 'facebook',
-          source: 'manual_sync'
+          apiKeys: {
+            access_token: fbData.access_token,
+            selected_ad_account_id: fbData.selected_ad_account_id
+          }
         }
       });
 
