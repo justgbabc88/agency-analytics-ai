@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface FacebookBatchSyncButtonProps {
   projectId: string;
@@ -10,22 +11,30 @@ interface FacebookBatchSyncButtonProps {
 
 export const FacebookBatchSyncButton = ({ projectId }: FacebookBatchSyncButtonProps) => {
   const [isLoading, setIsLoading] = useState(false);
+  const queryClient = useQueryClient();
 
   const handleManualSync = async () => {
     setIsLoading(true);
     
     try {
       console.log("🔄 Starting manual Facebook batch sync for project:", projectId);
+      console.log("📡 Calling supabase function: facebook-batch-sync");
       
-      const { data, error } = await supabase.functions.invoke('facebook-batch-sync', {
-        body: { source: 'manual_sync', projectId }
+      const { data, error } = await supabase.functions.invoke('sync-project-integrations', {
+        body: { 
+          project_id: projectId,
+          platform: 'facebook',
+          source: 'manual_sync'
+        }
       });
+
+      console.log("📥 Function response:", { data, error });
 
       if (error) {
         console.error("❌ Manual sync error:", error);
         toast({
           title: "Sync Failed",
-          description: "Failed to sync Facebook data. Please try again.",
+          description: `Failed to sync Facebook data: ${error.message}`,
           variant: "destructive",
         });
         return;
@@ -33,9 +42,12 @@ export const FacebookBatchSyncButton = ({ projectId }: FacebookBatchSyncButtonPr
 
       console.log("✅ Manual sync completed:", data);
       
+      // Invalidate React Query cache to refresh Facebook data
+      queryClient.invalidateQueries({ queryKey: ['facebook-data', projectId] });
+      
       toast({
         title: "Sync Completed",
-        description: `Successfully synced Facebook data. ${data?.success_count || 0} integrations processed.`,
+        description: `Successfully synced Facebook data. Data will refresh automatically.`,
       });
       
     } catch (error) {
