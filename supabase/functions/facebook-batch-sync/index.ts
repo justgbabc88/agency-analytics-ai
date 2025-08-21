@@ -30,17 +30,15 @@ Deno.serve(async (req) => {
 
     console.log('🚀 Starting Facebook batch sync for all agencies...');
 
-    // Get all Facebook integrations that are connected
+    // Get all Facebook project integrations that are connected
     const { data: integrations, error: integrationsError } = await supabase
-      .from('integrations')
+      .from('project_integrations')
       .select(`
-        id,
-        agency_id,
-        platform,
-        agencies!fk_integrations_agency_id (
+        *,
+        projects (
           id,
           name,
-          user_id
+          agency_id
         )
       `)
       .eq('platform', 'facebook')
@@ -68,20 +66,20 @@ Deno.serve(async (req) => {
     // Process each integration
     for (const integration of integrations) {
       try {
-        console.log(`Syncing agency ${integration.agency_id}...`);
+        console.log(`Syncing project ${integration.project_id}...`);
 
-        // Get stored API keys for this agency
+        // Get stored API keys for this project
         const { data: apiKeyData, error: apiKeyError } = await supabase
-          .from('integration_data')
+          .from('project_integration_data')
           .select('data')
-          .eq('agency_id', integration.agency_id)
-          .eq('platform', 'facebook_api_keys')
+          .eq('project_id', integration.project_id)
+          .eq('platform', 'facebook')
           .order('synced_at', { ascending: false })
           .limit(1)
           .maybeSingle();
 
         if (apiKeyError || !apiKeyData?.data) {
-          console.log(`No API keys found for agency ${integration.agency_id}, skipping...`);
+          console.log(`No API keys found for project ${integration.project_id}, skipping...`);
           continue;
         }
 
@@ -90,7 +88,7 @@ Deno.serve(async (req) => {
         const adAccountId = apiKeys.selected_ad_account_id;
 
         if (!accessToken || !adAccountId) {
-          console.log(`Missing access token or ad account for agency ${integration.agency_id}, skipping...`);
+          console.log(`Missing access token or ad account for project ${integration.project_id}, skipping...`);
           continue;
         }
 
@@ -99,28 +97,30 @@ Deno.serve(async (req) => {
         
         // Store the synced data
         await supabase
-          .from('integration_data')
+          .from('project_integration_data')
           .upsert({
-            agency_id: integration.agency_id,
+            project_id: integration.project_id,
             platform: 'facebook',
             data: syncResult,
             synced_at: new Date().toISOString()
+          }, {
+            onConflict: 'project_id,platform'
           });
 
         // Update last sync timestamp
         await supabase
-          .from('integrations')
+          .from('project_integrations')
           .update({
             last_sync: new Date().toISOString(),
             is_connected: true
           })
           .eq('id', integration.id);
 
-        console.log(`✅ Successfully synced agency ${integration.agency_id}`);
+        console.log(`✅ Successfully synced project ${integration.project_id}`);
         successCount++;
         
         results.push({
-          agency_id: integration.agency_id,
+          project_id: integration.project_id,
           status: 'success',
           campaigns: syncResult.campaigns?.length || 0,
           adSets: syncResult.adsets?.length || 0
@@ -132,11 +132,11 @@ Deno.serve(async (req) => {
         }
 
       } catch (error) {
-        console.error(`❌ Error syncing agency ${integration.agency_id}:`, error);
+        console.error(`❌ Error syncing project ${integration.project_id}:`, error);
         errorCount++;
         
         results.push({
-          agency_id: integration.agency_id,
+          project_id: integration.project_id,
           status: 'error',
           error: error.message
         });
@@ -258,7 +258,7 @@ async function performBatchSync(accessToken: string, adAccountId: string): Promi
       );
       
       const { data: existingData } = await supabase
-        .from('integration_data')
+        .from('project_integration_data')
         .select('data')
         .eq('platform', 'facebook')
         .order('synced_at', { ascending: false })

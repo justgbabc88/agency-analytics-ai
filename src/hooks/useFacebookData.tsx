@@ -48,10 +48,10 @@ interface UseFacebookDataProps {
   dateRange?: { from: Date; to: Date };
   campaignIds?: string[];
   adSetIds?: string[];
-  projectId?: string;
+  projectId: string; // Make projectId required
 }
 
-export const useFacebookData = ({ dateRange, campaignIds, adSetIds, projectId }: UseFacebookDataProps = {}) => {
+export const useFacebookData = ({ dateRange, campaignIds, adSetIds, projectId }: UseFacebookDataProps) => {
   const { agency } = useAgency();
   const { getApiKeys } = useApiKeys();
   const { profile } = useUserProfile();
@@ -60,17 +60,17 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds, projectId }:
 
   // First, get cached data immediately without any sync
   const { data: facebookData, isLoading, error } = useQuery({
-    queryKey: ['facebook-integrations', agency?.id, projectId],
+    queryKey: ['facebook-integrations', projectId, dateRange?.from, dateRange?.to, campaignIds, adSetIds],
     queryFn: async () => {
-      if (!agency) return null;
+      if (!projectId) return null;
       
-      console.log('useFacebookData - Fetching cached data for agency:', agency.id);
+      console.log('useFacebookData - Fetching cached data for project:', projectId);
       
-      // First check if Facebook integration is connected
+      // First check if Facebook integration is connected for this project
       const { data: integration, error: integrationError } = await supabase
-        .from('integrations')
+        .from('project_integrations')
         .select('*')
-        .eq('agency_id', agency.id)
+        .eq('project_id', projectId)
         .eq('platform', 'facebook')
         .eq('is_connected', true)
         .maybeSingle();
@@ -87,9 +87,9 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds, projectId }:
 
       // Get the most recent cached data first
       const { data: syncedData, error: syncError } = await supabase
-        .from('integration_data')
+        .from('project_integration_data')
         .select('*')
-        .eq('agency_id', agency.id)
+        .eq('project_id', projectId)
         .eq('platform', 'facebook')
         .order('synced_at', { ascending: false })
         .limit(1)
@@ -102,9 +102,9 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds, projectId }:
 
       // Get fallback data with ad sets
       const { data: fallbackData } = await supabase
-        .from('integration_data')
+        .from('project_integration_data')
         .select('*')
-        .eq('agency_id', agency.id)
+        .eq('project_id', projectId)
         .eq('platform', 'facebook')
         .order('synced_at', { ascending: false })
         .limit(5);
@@ -147,16 +147,16 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds, projectId }:
 
       return null;
     },
-    enabled: !!agency,
+    enabled: !!projectId,
     staleTime: 2 * 60 * 1000, // Data is fresh for 2 minutes
     gcTime: 15 * 60 * 1000, // Keep in cache for 15 minutes
   });
 
   // Background sync query - only runs when data is stale
   const { data: syncStatus } = useQuery({
-    queryKey: ['facebook-sync-status', agency?.id, projectId, dateRange?.from, dateRange?.to],
+    queryKey: ['facebook-sync-status', projectId, dateRange?.from, dateRange?.to],
     queryFn: async () => {
-      if (!agency || !facebookData) return null;
+      if (!projectId || !facebookData) return null;
       
       const apiKeys = getApiKeys('facebook');
       if (!apiKeys.selected_ad_account_id || !apiKeys.access_token) {
@@ -187,7 +187,7 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds, projectId }:
               }
             })
           },
-          agencyId: agency.id
+          projectId: projectId
         };
 
         const syncResponse = await supabase.functions.invoke('sync-integrations', {
@@ -206,7 +206,7 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds, projectId }:
         return { synced: false, error };
       }
     },
-    enabled: !!agency && !!facebookData,
+    enabled: !!projectId && !!facebookData,
     staleTime: 5 * 60 * 1000, // Check for sync every 5 minutes
     retry: 1, // Only retry once to avoid overwhelming the API
   });
@@ -217,10 +217,10 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds, projectId }:
       console.log('Background sync completed, invalidating cache');
       // Small delay to ensure data is written to database
       setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['facebook-integrations', agency?.id, projectId] });
+        queryClient.invalidateQueries({ queryKey: ['facebook-integrations', projectId] });
       }, 1000);
     }
-  }, [syncStatus, agency?.id, projectId, queryClient]);
+  }, [syncStatus, projectId, queryClient]);
 
   // Default insights with proper typing
   const defaultInsights: FacebookInsights = {
@@ -242,7 +242,7 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds, projectId }:
     campaignIds,
     adSetIds,
     timestamp: new Date().toISOString(),
-    queryKey: ['facebook-integrations', agency?.id, dateRange?.from, dateRange?.to, campaignIds, adSetIds]
+    queryKey: ['facebook-integrations', projectId, dateRange?.from, dateRange?.to, campaignIds, adSetIds]
   });
 
   // Apply filtering logic to the cached data

@@ -7,7 +7,7 @@ const corsHeaders = {
 }
 
 interface DebugRequest {
-  agencyId: string
+  projectId: string
   accessToken: string
   adAccountId: string
 }
@@ -23,18 +23,18 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { agencyId, accessToken, adAccountId }: DebugRequest = await req.json()
+    const { projectId, accessToken, adAccountId }: DebugRequest = await req.json()
 
     console.log('=== FACEBOOK SYNC DEBUG START ===')
-    console.log(`Agency ID: ${agencyId}`)
+    console.log(`Project ID: ${projectId}`)
     console.log(`Ad Account: ${adAccountId}`)
 
     // 1. Check existing data
     console.log('--- Checking existing data ---')
     const { data: existingData, error: queryError } = await supabase
-      .from('integration_data')
+      .from('project_integration_data')
       .select('data, synced_at')
-      .eq('agency_id', agencyId)
+      .eq('project_id', projectId)
       .eq('platform', 'facebook')
       .order('synced_at', { ascending: false })
       .limit(1)

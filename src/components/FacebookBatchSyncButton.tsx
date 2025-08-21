@@ -4,17 +4,21 @@ import { RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
-export const FacebookBatchSyncButton = () => {
+interface FacebookBatchSyncButtonProps {
+  projectId: string;
+}
+
+export const FacebookBatchSyncButton = ({ projectId }: FacebookBatchSyncButtonProps) => {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleManualSync = async () => {
     setIsLoading(true);
     
     try {
-      console.log("🔄 Starting manual Facebook batch sync...");
+      console.log("🔄 Starting manual Facebook batch sync for project:", projectId);
       
       const { data, error } = await supabase.functions.invoke('facebook-batch-sync', {
-        body: { source: 'manual_sync' }
+        body: { source: 'manual_sync', projectId }
       });
 
       if (error) {

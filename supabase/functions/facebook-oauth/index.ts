@@ -25,7 +25,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { action, code, access_token, permission_level }: FacebookOAuthRequest = await req.json()
+    const { action, code, access_token, permission_level, projectId }: FacebookOAuthRequest = await req.json()
 
     console.log(`Facebook OAuth action: ${action}`)
 

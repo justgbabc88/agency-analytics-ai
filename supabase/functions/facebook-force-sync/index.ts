@@ -7,7 +7,7 @@ const corsHeaders = {
 }
 
 interface ForceFullSyncRequest {
-  agencyId: string
+  projectId: string
   accessToken: string
   adAccountId: string
 }
@@ -23,10 +23,10 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { agencyId, accessToken, adAccountId }: ForceFullSyncRequest = await req.json()
+    const { projectId, accessToken, adAccountId }: ForceFullSyncRequest = await req.json()
 
     console.log('=== FORCING FULL 30-DAY SYNC ===')
-    console.log(`Agency ID: ${agencyId}`)
+    console.log(`Project ID: ${projectId}`)
     console.log(`Ad Account: ${adAccountId}`)
 
     // Force a full 30-day sync by calling Facebook API directly
@@ -153,14 +153,14 @@ serve(async (req) => {
       synced_at: new Date().toISOString()
     }
 
-    // Store directly in database (merge with existing data)
-    console.log('Fetching existing data to merge...')
-    const { data: existingData } = await supabase
-      .from('integration_data')
+    // Retrieve existing data
+    console.log('📊 Checking for existing data...')
+    const { data: existingData, error: queryError } = await supabase
+      .from('project_integration_data')
       .select('data')
-      .eq('agency_id', agencyId)
+      .eq('project_id', projectId)
       .eq('platform', 'facebook')
-      .single()
+      .maybeSingle()
 
     let mergedInsights = sortedInsights
     let mergedCampaignInsights = campaignInsights
@@ -192,21 +192,22 @@ serve(async (req) => {
     syncResult.daily_insights = mergedInsights
     syncResult.campaign_insights = mergedCampaignInsights
 
-    console.log('Storing merged data in database...')
-    const { error: insertError } = await supabase
-      .from('integration_data')
+    // Store the updated data
+    console.log('💾 Storing updated data...')
+    const { error: upsertError } = await supabase
+      .from('project_integration_data')
       .upsert({
-        agency_id: agencyId,
+        project_id: projectId,
         platform: 'facebook',
         data: syncResult,
         synced_at: new Date().toISOString()
       }, {
-        onConflict: 'agency_id,platform'
+        onConflict: 'project_id,platform'
       })
 
-    if (insertError) {
-      console.error('Database insert error:', insertError)
-      throw insertError
+    if (upsertError) {
+      console.error('Database insert error:', upsertError)
+      throw upsertError
     }
 
     console.log('=== FORCE SYNC COMPLETE ===')
