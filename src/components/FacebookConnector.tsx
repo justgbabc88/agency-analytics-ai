@@ -93,7 +93,7 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
     }
   }, [isConnected, savedKeys.access_token, hasAdsPermissions]);
 
-  const handleFacebookAuth = async (permissionLevel: 'basic' | 'ads' = 'basic') => {
+  const handleFacebookAuth = async (permissionLevel: 'basic' | 'ads' = 'ads') => {
     const isUpgradeFlow = permissionLevel === 'ads';
     setIsConnecting(!isUpgradeFlow);
     setIsUpgrading(isUpgradeFlow);
@@ -183,11 +183,11 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
               if (permissionLevel === 'basic') {
                 toast({
                   title: "Connected Successfully",
-                  description: "Basic Facebook connection established. You can now test the connection to enable ads permission requests.",
+                  description: "Basic Facebook connection established. Click 'Upgrade Permissions' to enable ads data access.",
                 });
               } else {
                 toast({
-                  title: "Permissions Upgraded",
+                  title: "Facebook Connected",
                   description: "Facebook ads permissions have been granted. Loading ad accounts...",
                 });
               }
