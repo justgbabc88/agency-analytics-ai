@@ -298,19 +298,28 @@ async function performBatchSync(accessToken: string, adAccountId: string): Promi
 
   // Get detailed insights for campaigns (using chunked batch requests)
   let campaignInsights = [];
+  let dailyInsights = [];
+  
   if (campaigns.length > 0) {
-    console.log(`📊 Processing ${campaigns.length} campaigns in chunks of 10...`);
+    console.log(`📊 Processing ${campaigns.length} campaigns in chunks of 8...`);
     
-    // Split campaigns into chunks of 10 to reduce burst rate
-    const chunkSize = 10;
+    // Split campaigns into chunks of 8 to allow for both campaign and daily insights
+    const chunkSize = 8;
     for (let i = 0; i < campaigns.length; i += chunkSize) {
       const chunk = campaigns.slice(i, i + chunkSize);
       console.log(`Processing chunk ${Math.floor(i / chunkSize) + 1}/${Math.ceil(campaigns.length / chunkSize)} (${chunk.length} campaigns)`);
       
-      const campaignBatchRequests = chunk.map((campaign: any) => ({
-        method: 'GET',
-        relative_url: `${campaign.id}/insights?fields=impressions,clicks,spend,reach,conversions,conversion_values&date_preset=last_30d`
-      }));
+      // Create batch requests for both campaign insights and daily insights
+      const campaignBatchRequests = chunk.flatMap((campaign: any) => [
+        {
+          method: 'GET',
+          relative_url: `${campaign.id}/insights?fields=impressions,clicks,spend,reach,conversions,conversion_values&date_preset=last_30d`
+        },
+        {
+          method: 'GET',
+          relative_url: `${campaign.id}/insights?fields=impressions,clicks,spend,reach,conversions,conversion_values&time_range={'since':'30','until':'1'}&time_increment=1`
+        }
+      ]);
 
       const campaignBatchResponse = await fetchWithUsageCheck('https://graph.facebook.com/v18.0/', {
         method: 'POST', 
@@ -325,24 +334,46 @@ async function performBatchSync(accessToken: string, adAccountId: string): Promi
 
       if (campaignBatchResponse.ok) {
         const campaignBatchResults: BatchResponse[] = await campaignBatchResponse.json();
-        const chunkInsights = campaignBatchResults.map((result, index) => {
-          const campaignData = result.code === 200 ? JSON.parse(result.body).data?.[0] || {} : {};
-          return {
-            campaign_id: chunk[index].id,
-            campaign_name: chunk[index].name,
-            ...campaignData
-          };
-        });
-        campaignInsights.push(...chunkInsights);
+        
+        // Process results in pairs (campaign insights, daily insights)
+        for (let j = 0; j < chunk.length; j++) {
+          const campaign = chunk[j];
+          const campaignInsightIndex = j * 2;
+          const dailyInsightIndex = j * 2 + 1;
+          
+          // Process campaign insights
+          if (campaignBatchResults[campaignInsightIndex]?.code === 200) {
+            const campaignData = JSON.parse(campaignBatchResults[campaignInsightIndex].body).data?.[0] || {};
+            campaignInsights.push({
+              campaign_id: campaign.id,
+              campaign_name: campaign.name,
+              ...campaignData
+            });
+          }
+          
+          // Process daily insights
+          if (campaignBatchResults[dailyInsightIndex]?.code === 200) {
+            const dailyData = JSON.parse(campaignBatchResults[dailyInsightIndex].body).data || [];
+            const campaignDailyInsights = dailyData.map((day: any) => ({
+              campaign_id: campaign.id,
+              campaign_name: campaign.name,
+              date: day.date_start,
+              ...day
+            }));
+            dailyInsights.push(...campaignDailyInsights);
+          }
+        }
       }
       
       // Add delay between chunks to reduce burst rate (except for the last chunk)
       if (i + chunkSize < campaigns.length) {
-        console.log('⏱️  Waiting 1.5 seconds before next chunk...');
-        await sleep(1500);
+        console.log('⏱️  Waiting 2 seconds before next chunk...');
+        await sleep(2000);
       }
     }
   }
+  
+  console.log(`📈 Fetched daily insights: ${dailyInsights.length} data points across ${campaigns.length} campaigns`);
 
   // Calculate aggregated metrics
   const aggregatedMetrics = {
@@ -362,7 +393,7 @@ async function performBatchSync(accessToken: string, adAccountId: string): Promi
     insights: insights,
     campaign_insights: campaignInsights,
     aggregated_metrics: aggregatedMetrics,
-    daily_insights: [], // We'll keep this for compatibility but won't fetch daily data in batch sync
+    daily_insights: dailyInsights, // Now includes actual daily insights data
     sync_method: 'batch_api',
     synced_at: new Date().toISOString(),
     // Add metadata for better UX
@@ -370,6 +401,7 @@ async function performBatchSync(accessToken: string, adAccountId: string): Promi
     meta: {
       adSetsAvailable: enhancedAdSets.length > 0,
       campaignInsightsAvailable: campaignInsights.length > 0,
+      dailyInsightsAvailable: dailyInsights.length > 0,
       rateLimitHit: rateLimitHit,
       syncMethod: 'batch_api'
     }

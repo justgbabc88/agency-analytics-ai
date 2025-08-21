@@ -1,12 +1,14 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useFacebookData } from "@/hooks/useFacebookData";
 import { FacebookCampaignFilter } from "./FacebookCampaignFilter";
 import { FacebookBatchSyncButton } from "./FacebookBatchSyncButton";
 import { FacebookZohoAnalytics } from "./FacebookZohoAnalytics";
+import { ConversionChart } from "./ConversionChart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { CheckCircle, AlertTriangle } from "lucide-react";
+import { format } from "date-fns";
 
 interface FacebookMetricsEnhancedProps {
   dateRange?: { from: Date; to: Date };
@@ -32,6 +34,51 @@ export const FacebookMetricsEnhanced = ({ dateRange, projectId }: FacebookMetric
     adSetIds: selectedAdSetIds,
     projectId // Now required
   });
+
+  // Process daily data for charts
+  const chartData = React.useMemo(() => {
+    if (!facebookData?.daily_insights || facebookData.daily_insights.length === 0) {
+      return [];
+    }
+
+    // Group daily insights by date and aggregate metrics
+    const groupedByDate = facebookData.daily_insights.reduce((acc, insight) => {
+      const date = insight.date;
+      if (!acc[date]) {
+        acc[date] = {
+          date,
+          spend: 0,
+          impressions: 0,
+          clicks: 0,
+          reach: 0,
+          conversions: 0,
+          conversion_values: 0
+        };
+      }
+      
+      acc[date].spend += (Number(insight.spend) || 0);
+      acc[date].impressions += (Number(insight.impressions) || 0);
+      acc[date].clicks += (Number(insight.clicks) || 0);
+      acc[date].reach += (Number(insight.reach) || 0);
+      acc[date].conversions += (Number(insight.conversions) || 0);
+      acc[date].conversion_values += (Number(insight.conversion_values) || 0);
+      
+      return acc;
+    }, {} as Record<string, any>);
+
+    // Convert to array and sort by date
+    const sortedData = Object.values(groupedByDate).sort((a: any, b: any) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+
+    // Calculate derived metrics for each day
+    return sortedData.map((day: any) => ({
+      ...day,
+      ctr: day.impressions > 0 ? ((day.clicks / day.impressions) * 100) : 0,
+      cpc: day.clicks > 0 ? (day.spend / day.clicks) : 0,
+      date: format(new Date(day.date), 'MMM dd') // Use 'date' as the key the chart expects
+    }));
+  }, [facebookData?.daily_insights]);
 
   const handleRetrySyncAd = async () => {
     setIsRetrying(true);
@@ -155,6 +202,37 @@ export const FacebookMetricsEnhanced = ({ dateRange, projectId }: FacebookMetric
           </CardContent>
         </Card>
       </div>
+
+      {/* Daily Performance Charts */}
+      {chartData.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Daily Spend & Impressions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ConversionChart
+                data={chartData}
+                title="Daily Performance"
+                metrics={['spend', 'impressions']}
+              />
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Daily CTR & CPC</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ConversionChart
+                data={chartData}
+                title="Daily Efficiency"
+                metrics={['ctr', 'cpc']}
+              />
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Deal Performance */}
       <FacebookZohoAnalytics 
