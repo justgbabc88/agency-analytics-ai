@@ -98,8 +98,8 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
       loadAdAccounts();
     }
     
-    // Fix inconsistent state: if marked as connected but no access token, reset connection
-    if (isConnected && !savedKeys.access_token && Object.keys(savedKeys).length === 0) {
+    // Fix inconsistent state: if marked as connected but no access token exists at all
+    if (isConnected && !savedKeys.access_token && !hasSavedKeys) {
       console.log('🔧 Fixing inconsistent state: resetting Facebook connection...');
       
       // Create a simple wrapper to avoid TypeScript union type issues
