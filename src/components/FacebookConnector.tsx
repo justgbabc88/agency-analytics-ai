@@ -94,44 +94,11 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
   }, [savedKeys.selected_ad_account_id]);
 
   useEffect(() => {
-    console.log('🔄 Facebook useEffect - connection state check:', {
-      isConnected,
-      hasAccessToken: !!savedKeys.access_token,
-      hasAdsPermissions,
-      adAccountsLength: adAccounts.length
-    });
-    
     if (isConnected && savedKeys.access_token && hasAdsPermissions) {
-      console.log('📊 Loading Facebook ad accounts...');
       loadAdAccounts();
     }
     
-    // Fix inconsistent state: if marked as connected but no access token exists at all
-    if (isConnected && !savedKeys.access_token && !hasSavedKeys) {
-      console.log('🔧 Fixing inconsistent state: resetting Facebook connection...');
-      
-      // Create a simple wrapper to avoid TypeScript union type issues
-      const performUpdate = async () => {
-        try {
-          if (projectId) {
-            await projectIntegrations.updateIntegration.mutateAsync({ 
-              platform: 'facebook', 
-              isConnected: false 
-            });
-          } else {
-            await agencyIntegrations.updateIntegration.mutateAsync({ 
-              platform: 'facebook', 
-              isConnected: false 
-            });
-          }
-        } catch (error) {
-          console.error('Failed to reset connection state:', error);
-        }
-      };
-      
-      performUpdate();
-      return; // Exit early to prevent toast
-    }
+    // Don't perform any automatic resets - let user manually fix if needed
     
     // Only show permission detection issue if truly problematic (has token but no permissions)
     if (isConnected && savedKeys.access_token && !hasAdsPermissions) {
@@ -642,14 +609,6 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
                 )}
 
                 {/* Ad Account Selection - show if connected and has access token */}
-                {(() => {
-                  console.log('🔍 Ad Account Section - Render check:', {
-                    isConnected,
-                    hasAccessToken: !!savedKeys.access_token,
-                    shouldRender: isConnected && savedKeys.access_token
-                  });
-                  return null;
-                })()}
                 {isConnected && savedKeys.access_token && (
                   <div className="space-y-3 p-4 border rounded-lg bg-gray-50">
                     <div className="flex items-center justify-between">
