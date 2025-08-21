@@ -101,10 +101,27 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
     // Fix inconsistent state: if marked as connected but no access token, reset connection
     if (isConnected && !savedKeys.access_token && Object.keys(savedKeys).length === 0) {
       console.log('🔧 Fixing inconsistent state: resetting Facebook connection...');
-      updateIntegration.mutate({ 
-        platform: 'facebook', 
-        isConnected: false 
-      });
+      
+      // Create a simple wrapper to avoid TypeScript union type issues
+      const performUpdate = async () => {
+        try {
+          if (projectId) {
+            await projectIntegrations.updateIntegration.mutateAsync({ 
+              platform: 'facebook', 
+              isConnected: false 
+            });
+          } else {
+            await agencyIntegrations.updateIntegration.mutateAsync({ 
+              platform: 'facebook', 
+              isConnected: false 
+            });
+          }
+        } catch (error) {
+          console.error('Failed to reset connection state:', error);
+        }
+      };
+      
+      performUpdate();
       return; // Exit early to prevent toast
     }
     
