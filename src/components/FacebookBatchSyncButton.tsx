@@ -18,36 +18,7 @@ export const FacebookBatchSyncButton = ({ projectId, dateRange }: FacebookBatchS
     setIsLoading(true);
     
     try {
-      console.log("🔄 Starting manual Facebook sync for project:", projectId);
-      
-      // First, get the Facebook integration data to get access token and ad account
-      console.log("📡 Fetching Facebook integration data...");
-      const { data: integrationData, error: integrationError } = await supabase
-        .from('project_integration_data')
-        .select('data')
-        .eq('project_id', projectId)
-        .eq('platform', 'facebook')
-        .maybeSingle();
-
-      if (integrationError) {
-        console.error("❌ Error fetching integration data:", integrationError);
-        throw new Error(`Failed to fetch Facebook credentials: ${integrationError.message}`);
-      }
-
-      if (!integrationData?.data) {
-        throw new Error('No Facebook integration data found. Please connect Facebook first.');
-      }
-
-      const fbData = integrationData.data as any;
-      if (!fbData.access_token) {
-        throw new Error('No Facebook access token found. Please reconnect Facebook.');
-      }
-
-      if (!fbData.selected_ad_account_id) {
-        throw new Error('No ad account selected. Please select an ad account first.');
-      }
-
-      console.log("📡 Calling sync function with credentials...");
+      console.log('Starting Facebook batch sync for project:', projectId);
       
       // Convert date range to Facebook API format if provided
       let syncDateRange = undefined;
@@ -59,7 +30,7 @@ export const FacebookBatchSyncButton = ({ projectId, dateRange }: FacebookBatchS
       
       const { data, error } = await supabase.functions.invoke('facebook-batch-sync', {
         body: { 
-          projectId: projectId,
+          projectId,
           dateRange: syncDateRange
         }
       });
@@ -79,7 +50,7 @@ export const FacebookBatchSyncButton = ({ projectId, dateRange }: FacebookBatchS
       console.log("✅ Manual sync completed:", data);
       
       // Invalidate React Query cache to refresh Facebook data
-      queryClient.invalidateQueries({ queryKey: ['facebook-data', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['facebook-integrations', projectId] });
       
       toast({
         title: "Sync Completed",

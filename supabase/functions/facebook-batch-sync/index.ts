@@ -88,7 +88,15 @@ Deno.serve(async (req) => {
           .maybeSingle();
 
         if (apiKeyError || !apiKeyData?.data) {
-          console.log(`No API keys found for project ${integration.project_id}, skipping...`);
+          const errorMsg = `No API keys found for project ${integration.project_id}`;
+          console.log(errorMsg);
+          if (projectId) {
+            // If syncing a specific project, return error
+            return new Response(
+              JSON.stringify({ success: false, error: 'No Facebook integration data found. Please connect Facebook first.' }),
+              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
           continue;
         }
 
@@ -97,7 +105,15 @@ Deno.serve(async (req) => {
         const adAccountId = apiKeys.selected_ad_account_id;
 
         if (!accessToken || !adAccountId) {
-          console.log(`Missing access token or ad account for project ${integration.project_id}, skipping...`);
+          const errorMsg = `Missing access token or ad account for project ${integration.project_id}`;
+          console.log(errorMsg);
+          if (projectId) {
+            // If syncing a specific project, return error
+            return new Response(
+              JSON.stringify({ success: false, error: 'Missing Facebook access token or ad account. Please reconnect Facebook.' }),
+              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
           continue;
         }
 
