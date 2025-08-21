@@ -98,17 +98,26 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
       loadAdAccounts();
     }
     
-    // Only show permission detection issue if truly problematic
-    if (isConnected && !hasAdsPermissions && !savedKeys.access_token) {
-      console.log('🔧 Detected missing Facebook permissions, attempting auto-fix...');
-      // Only show error if connected but no access token at all
+    // Fix inconsistent state: if marked as connected but no access token, reset connection
+    if (isConnected && !savedKeys.access_token && Object.keys(savedKeys).length === 0) {
+      console.log('🔧 Fixing inconsistent state: resetting Facebook connection...');
+      updateIntegration.mutate({ 
+        platform: 'facebook', 
+        isConnected: false 
+      });
+      return; // Exit early to prevent toast
+    }
+    
+    // Only show permission detection issue if truly problematic (has token but no permissions)
+    if (isConnected && savedKeys.access_token && !hasAdsPermissions) {
+      console.log('🔧 Detected missing Facebook permissions...');
       toast({
-        title: "Permission Detection Issue",
-        description: "Your Facebook connection appears to be working but permissions aren't detected. Please reconnect to fix this.",
+        title: "Permission Detection Issue", 
+        description: "Your Facebook connection has limited permissions. Please reconnect to get ads access.",
         variant: "destructive"
       });
     }
-  }, [isConnected, savedKeys.access_token, hasAdsPermissions]);
+  }, [isConnected, savedKeys.access_token, hasAdsPermissions, updateIntegration]);
 
   const handleFacebookAuth = async (permissionLevel: 'basic' | 'ads' = 'ads') => {
     const isUpgradeFlow = permissionLevel === 'ads';
