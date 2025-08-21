@@ -94,7 +94,15 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
   }, [savedKeys.selected_ad_account_id]);
 
   useEffect(() => {
+    console.log('🔄 Facebook useEffect - connection state check:', {
+      isConnected,
+      hasAccessToken: !!savedKeys.access_token,
+      hasAdsPermissions,
+      adAccountsLength: adAccounts.length
+    });
+    
     if (isConnected && savedKeys.access_token && hasAdsPermissions) {
+      console.log('📊 Loading Facebook ad accounts...');
       loadAdAccounts();
     }
     
@@ -634,6 +642,14 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
                 )}
 
                 {/* Ad Account Selection - show if connected and has access token */}
+                {(() => {
+                  console.log('🔍 Ad Account Section - Render check:', {
+                    isConnected,
+                    hasAccessToken: !!savedKeys.access_token,
+                    shouldRender: isConnected && savedKeys.access_token
+                  });
+                  return null;
+                })()}
                 {isConnected && savedKeys.access_token && (
                   <div className="space-y-3 p-4 border rounded-lg bg-gray-50">
                     <div className="flex items-center justify-between">
