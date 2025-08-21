@@ -47,25 +47,34 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
 
   const isConnected = integrations?.find(i => i.platform === 'facebook')?.is_connected || false;
   const savedKeys = getApiKeys('facebook');
-  const hasAdsPermissions = savedKeys.permissions?.includes('ads_read') || savedKeys.access_token; // If we have access_token, assume ads permissions
+  
+  // Check for ads permissions more reliably
+  const hasAdsPermissions = Boolean(
+    savedKeys.access_token && (
+      savedKeys.permissions?.includes('ads_read') || 
+      savedKeys.permissions?.includes('ads_management') ||
+      Array.isArray(savedKeys.permissions) && savedKeys.permissions.length > 2 // More than just basic permissions
+    )
+  );
   
   // Detect if we have saved keys but DB shows disconnected (mismatch scenario)
   const hasSavedKeys = Object.keys(savedKeys).length > 0 && savedKeys.access_token;
   const hasConnectionMismatch = hasSavedKeys && !isConnected;
 
+  // Only show upgrade if truly connected but missing ads permissions
+  const shouldShowUpgrade = isConnected && savedKeys.access_token && !hasAdsPermissions;
+
   console.log('FacebookConnector - Current state:', {
     isConnected,
     hasAdsPermissions,
-    selectedAccount,
-    savedKeys: Object.keys(savedKeys),
+    shouldShowUpgrade,
+    savedKeysCount: Object.keys(savedKeys).length,
     permissions: savedKeys.permissions,
-    hasSavedKeys,
-    hasConnectionMismatch,
-    accessToken: savedKeys.access_token ? 'present' : 'missing'
+    hasAccessToken: !!savedKeys.access_token
   });
 
-  // Only show upgrade if truly needed (no access token and connected)
-  const shouldShowUpgrade = isConnected && !savedKeys.access_token;
+  // Only show upgrade if truly needed (connected but no ads access)
+  // const shouldShowUpgrade = isConnected && !savedKeys.access_token; // OLD BROKEN LOGIC
 
   useEffect(() => {
     // Load saved ad account selection
