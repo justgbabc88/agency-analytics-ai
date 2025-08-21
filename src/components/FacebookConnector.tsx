@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { BarChart3, ExternalLink, CheckCircle, AlertCircle, Link, Users, RefreshCw } from "lucide-react";
+import { BarChart3, ExternalLink, CheckCircle, AlertCircle, Link, Users, RefreshCw, Shield } from "lucide-react";
 import { FacebookBatchSyncButton } from "./FacebookBatchSyncButton";
 
 interface AdAccount {
@@ -262,14 +262,14 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
     }
   };
 
-  const handleFacebookAuth = async () => {
-    console.log('🔄 Starting Facebook authentication for project:', projectId);
+  const handleFacebookAuth = async (permissionLevel: 'basic' | 'ads' = 'ads') => {
+    console.log(`🔄 Starting Facebook authentication for project: ${projectId}, permission level: ${permissionLevel}`);
     setIsConnecting(true);
     
     try {
       console.log('📤 Calling facebook-oauth edge function...');
       const { data, error } = await supabase.functions.invoke('facebook-oauth', {
-        body: { action: 'initiate', permission_level: 'ads', projectId }
+        body: { action: 'initiate', permission_level: permissionLevel, projectId }
       });
 
       console.log('📥 Facebook OAuth response:', { data, error });
@@ -291,9 +291,13 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
         throw new Error('Popup was blocked. Please allow popups for this site.');
       }
       
+      const upgradeMessage = permissionLevel === 'ads' ? 
+        "Complete the authorization to upgrade permissions for ads access." :
+        "Complete the authorization in the popup window.";
+        
       toast({
         title: "Opening Facebook",
-        description: "Complete the authorization in the popup window.",
+        description: upgradeMessage,
       });
     } catch (error) {
       console.error('❌ Facebook auth failed:', error);
@@ -373,7 +377,7 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
         <div className="space-y-4">
           {!isConnected ? (
             <Button 
-              onClick={handleFacebookAuth}
+              onClick={() => handleFacebookAuth('ads')}
               disabled={isConnecting}
               className="w-full"
             >
@@ -426,16 +430,26 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
                 </div>
               )}
 
-              {/* No ads permissions warning */}
+              {/* No ads permissions warning with upgrade option */}
               {isConnected && !hasAdsPermissions && (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
                   <div className="flex items-center gap-2 text-yellow-700">
                     <AlertCircle className="h-4 w-4" />
                     <span className="text-sm font-medium">Limited Permissions</span>
                   </div>
-                  <p className="text-xs text-yellow-600 mt-1">
-                    This connection doesn't have ads management permissions. You may need to reconnect with elevated permissions to access ad accounts.
+                  <p className="text-xs text-yellow-600 mt-1 mb-3">
+                    This connection doesn't have ads management permissions. You need elevated permissions to access ad accounts and sync advertising data.
                   </p>
+                  <Button
+                    onClick={() => handleFacebookAuth('ads')}
+                    disabled={isConnecting}
+                    size="sm"
+                    variant="outline"
+                    className="bg-yellow-100 border-yellow-300 text-yellow-700 hover:bg-yellow-200"
+                  >
+                    <Shield className="h-3 w-3 mr-1" />
+                    {isConnecting ? "Upgrading..." : "Upgrade Permissions"}
+                  </Button>
                 </div>
               )}
 
