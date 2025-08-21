@@ -168,6 +168,10 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
                 isConnected: true 
               });
 
+              // Force refresh integrations immediately after successful update
+              queryClient.invalidateQueries({ queryKey: ['integrations'] });
+              queryClient.invalidateQueries({ queryKey: ['project-integrations'] });
+
               if (permissionLevel === 'basic') {
                 toast({
                   title: "Connected Successfully",
@@ -189,6 +193,7 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
               
               // Force refresh integrations to update UI
               queryClient.invalidateQueries({ queryKey: ['integrations'] });
+              queryClient.invalidateQueries({ queryKey: ['project-integrations'] });
               
               toast({
                 title: "Connection Successful",
