@@ -112,7 +112,7 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
   }, [isConnected, savedKeys.access_token, hasAdsPermissions, updateIntegration]);
 
   const handleFacebookAuth = async (permissionLevel: 'basic' | 'ads' = 'ads') => {
-    const isUpgradeFlow = permissionLevel === 'ads';
+    const isUpgradeFlow = permissionLevel === 'ads' && isConnected;
     setIsConnecting(!isUpgradeFlow);
     setIsUpgrading(isUpgradeFlow);
     
@@ -553,7 +553,7 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
             
             {!isConnected && !hasConnectionMismatch ? (
               <Button 
-                onClick={() => handleFacebookAuth('basic')}
+                onClick={() => handleFacebookAuth('ads')}
                 disabled={isConnecting}
                 className="w-full"
               >
