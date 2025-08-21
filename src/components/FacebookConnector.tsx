@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useIntegrations } from "@/hooks/useIntegrations";
+import { useProjectIntegrations } from "@/hooks/useProjectIntegrations";
 import { useQueryClient } from '@tanstack/react-query';
 import { useSecureApiKeys } from "@/hooks/useSecureApiKeys";
 import { useToast } from "@/hooks/use-toast";
@@ -25,7 +26,14 @@ interface FacebookConnectorProps {
 }
 
 export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
-  const { integrations, updateIntegration, syncIntegration } = useIntegrations();
+  const agencyIntegrations = useIntegrations();
+  const projectIntegrations = useProjectIntegrations(projectId);
+  
+  // Use project-level integrations if projectId is provided, otherwise use agency-level
+  const { integrations, updateIntegration, syncIntegration } = projectId 
+    ? projectIntegrations 
+    : agencyIntegrations;
+    
   const queryClient = useQueryClient();
   const { saveSecureApiKeys, getApiKeys } = useSecureApiKeys(projectId);
   const { toast } = useToast();
