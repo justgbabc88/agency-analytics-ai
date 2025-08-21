@@ -20,18 +20,10 @@ export const FacebookBatchSyncButton = ({ projectId, dateRange }: FacebookBatchS
     try {
       console.log('Starting Facebook batch sync for project:', projectId);
       
-      // Convert date range to Facebook API format if provided
-      let syncDateRange = undefined;
-      if (dateRange) {
-        const since = Math.ceil((Date.now() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24)).toString();
-        const until = Math.ceil((Date.now() - dateRange.to.getTime()) / (1000 * 60 * 60 * 24)).toString();
-        syncDateRange = { since, until };
-      }
-      
+      // Don't pass date range - always sync last 30 days
       const { data, error } = await supabase.functions.invoke('facebook-batch-sync', {
         body: { 
-          projectId,
-          dateRange: syncDateRange
+          projectId
         }
       });
 
