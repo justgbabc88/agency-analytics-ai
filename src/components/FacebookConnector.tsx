@@ -140,7 +140,20 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
       );
 
       if (!popup) {
-        throw new Error('Failed to open popup window. Please allow popups for this site.');
+        // Popup was blocked - provide user with manual option
+        const proceed = window.confirm(
+          'Popup was blocked by your browser. Would you like to open Facebook authentication in a new tab instead? You\'ll need to close the tab after authentication completes.'
+        );
+        
+        if (proceed) {
+          window.open(data.authUrl, '_blank');
+          toast({
+            title: "Authentication opened in new tab",
+            description: "Complete the Facebook authentication and close the tab when done. Then try connecting again.",
+            duration: 10000,
+          });
+        }
+        return;
       }
 
       let messageListenerActive = true;
