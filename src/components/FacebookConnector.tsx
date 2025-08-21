@@ -52,30 +52,45 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
   // Load project integration and data on mount
   useEffect(() => {
     const loadProjectIntegration = async () => {
-      if (!projectId) return;
+      if (!projectId) {
+        console.error('❌ FacebookConnector: No projectId provided');
+        return;
+      }
+      
+      console.log('🔍 Loading Facebook integration for project:', projectId);
       
       // Get project integration
-      const { data: integrationData } = await supabase
+      const { data: integrationData, error: integrationError } = await supabase
         .from('project_integrations')
         .select('*')
         .eq('project_id', projectId)
         .eq('platform', 'facebook')
         .maybeSingle();
       
-      setProjectIntegration(integrationData);
+      if (integrationError) {
+        console.error('❌ Error loading project integration:', integrationError);
+      } else {
+        console.log('✅ Project integration loaded:', integrationData);
+        setProjectIntegration(integrationData);
+      }
       
       // Get project integration data (saved keys)
-      const { data: keyData } = await supabase
+      const { data: keyData, error: keyError } = await supabase
         .from('project_integration_data')
         .select('data')
         .eq('project_id', projectId)
         .eq('platform', 'facebook')
         .maybeSingle();
       
-      setSavedKeys((keyData?.data as SavedKeys) || {});
-      
-      if (keyData?.data && typeof keyData.data === 'object' && 'selected_ad_account_id' in keyData.data) {
-        setSelectedAccount((keyData.data as SavedKeys).selected_ad_account_id || '');
+      if (keyError) {
+        console.error('❌ Error loading project integration data:', keyError);
+      } else {
+        console.log('✅ Project integration data loaded:', keyData);
+        setSavedKeys((keyData?.data as SavedKeys) || {});
+        
+        if (keyData?.data && typeof keyData.data === 'object' && 'selected_ad_account_id' in keyData.data) {
+          setSelectedAccount((keyData.data as SavedKeys).selected_ad_account_id || '');
+        }
       }
     };
     
@@ -83,26 +98,43 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
   }, [projectId]);
 
   const handleFacebookAuth = async () => {
+    console.log('🔄 Starting Facebook authentication for project:', projectId);
     setIsConnecting(true);
+    
     try {
+      console.log('📤 Calling facebook-oauth edge function...');
       const { data, error } = await supabase.functions.invoke('facebook-oauth', {
         body: { action: 'initiate', permission_level: 'ads', projectId }
       });
 
-      if (error || !data?.authUrl) {
-        throw new Error('Failed to initiate OAuth process');
+      console.log('📥 Facebook OAuth response:', { data, error });
+
+      if (error) {
+        console.error('❌ Facebook OAuth error:', error);
+        throw new Error(`OAuth error: ${error.message || 'Unknown error'}`);
       }
 
-      window.open(data.authUrl, 'facebook-oauth', 'width=600,height=700');
+      if (!data?.authUrl) {
+        console.error('❌ No authUrl in response:', data);
+        throw new Error('No authorization URL received from Facebook');
+      }
+
+      console.log('🌐 Opening Facebook OAuth URL:', data.authUrl);
+      const popup = window.open(data.authUrl, 'facebook-oauth', 'width=600,height=700');
+      
+      if (!popup) {
+        throw new Error('Popup was blocked. Please allow popups for this site.');
+      }
       
       toast({
         title: "Opening Facebook",
         description: "Complete the authorization in the popup window.",
       });
     } catch (error) {
+      console.error('❌ Facebook auth failed:', error);
       toast({
         title: "Connection Failed",
-        description: "Failed to connect to Facebook. Please try again.",
+        description: error.message || "Failed to connect to Facebook. Please try again.",
         variant: "destructive"
       });
     } finally {
