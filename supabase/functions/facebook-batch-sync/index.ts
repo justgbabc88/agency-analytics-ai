@@ -26,12 +26,17 @@ Deno.serve(async (req) => {
     const body = req.method === 'POST' ? await req.json() : {};
     const { projectId, dateRange } = body;
     
+    console.log('🚀 Starting Facebook batch sync...', { 
+      projectId, 
+      dateRange, 
+      bodyKeys: Object.keys(body || {}),
+      method: req.method 
+    });
+    
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
-
-    console.log('🚀 Starting Facebook batch sync...', { projectId, dateRange });
 
     // Get Facebook project integrations - either specific project or all connected ones
     let query = supabase
@@ -119,29 +124,45 @@ Deno.serve(async (req) => {
 
         // Perform batch sync using Facebook's batch API
         // Always sync the last 30 days of data regardless of UI date range
-        const today = new Date();
-        const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-        const yesterday = new Date(today.getTime() - 1 * 24 * 60 * 60 * 1000);
+        console.log('📅 Setting up date range for sync...');
         
-        const syncDateRange = {
-          since: thirtyDaysAgo.toISOString().split('T')[0], // YYYY-MM-DD format
-          until: yesterday.toISOString().split('T')[0]      // YYYY-MM-DD format
-        };
-        
-        console.log(`📅 Syncing Facebook data from ${syncDateRange.since} to ${syncDateRange.until}`);
-        const syncResult = await performBatchSync(accessToken, adAccountId, syncDateRange);
+        let syncResult;
+        try {
+          const today = new Date();
+          const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+          const yesterday = new Date(today.getTime() - 1 * 24 * 60 * 60 * 1000);
+          
+          const syncDateRange = {
+            since: thirtyDaysAgo.toISOString().split('T')[0], // YYYY-MM-DD format
+            until: yesterday.toISOString().split('T')[0]      // YYYY-MM-DD format
+          };
+          
+          console.log(`📅 Syncing Facebook data from ${syncDateRange.since} to ${syncDateRange.until}`);
+          syncResult = await performBatchSync(accessToken, adAccountId, syncDateRange);
+          console.log('✅ performBatchSync completed successfully');
+        } catch (syncError) {
+          console.error('❌ Error in performBatchSync:', syncError);
+          throw syncError;
+        }
         
         // Store the synced data
-        await supabase
-          .from('project_integration_data')
-          .upsert({
-            project_id: integration.project_id,
-            platform: 'facebook',
-            data: syncResult,
-            synced_at: new Date().toISOString()
-          }, {
-            onConflict: 'project_id,platform'
-          });
+        console.log('💾 Storing synced data...');
+        try {
+          await supabase
+            .from('project_integration_data')
+            .upsert({
+              project_id: integration.project_id,
+              platform: 'facebook',
+              data: syncResult,
+              synced_at: new Date().toISOString()
+            }, {
+              onConflict: 'project_id,platform'
+            });
+          console.log('✅ Data stored successfully');
+        } catch (storeError) {
+          console.error('❌ Error storing data:', storeError);
+          throw storeError;
+        }
 
         // Update last sync timestamp
         await supabase
@@ -195,8 +216,16 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('❌ Fatal error in batch sync:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        details: error.stack,
+        name: error.name
+      }),
       { 
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
