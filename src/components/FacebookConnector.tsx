@@ -32,6 +32,9 @@ interface SavedKeys {
   selected_ad_account_id?: string;
   selected_ad_account_name?: string;
   user_name?: string;
+  user_id?: string;
+  user_email?: string;
+  [key: string]: any; // Allow additional properties for Json compatibility
 }
 
 export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
@@ -96,6 +99,168 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
     
     loadProjectIntegration();
   }, [projectId]);
+
+  // Add OAuth callback message listener
+  useEffect(() => {
+    const handleMessage = async (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      
+      console.log('📩 Received message:', event.data);
+      
+      if (event.data.type === 'FACEBOOK_OAUTH_SUCCESS') {
+        console.log('🎉 Facebook OAuth success, exchanging code for token');
+        await handleOAuthCallback(event.data.code);
+      } else if (event.data.type === 'FACEBOOK_OAUTH_ERROR') {
+        console.error('❌ Facebook OAuth error:', event.data);
+        toast({
+          title: "Connection Failed",
+          description: event.data.errorDescription || "Failed to connect to Facebook",
+          variant: "destructive"
+        });
+        setIsConnecting(false);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [projectId]);
+
+  const handleOAuthCallback = async (code: string) => {
+    try {
+      console.log('🔄 Exchanging authorization code for access token');
+      
+      // Exchange code for access token
+      const { data, error } = await supabase.functions.invoke('facebook-oauth', {
+        body: { action: 'exchange', code, projectId }
+      });
+
+      if (error || !data?.access_token) {
+        throw new Error('Failed to exchange code for access token');
+      }
+
+      console.log('✅ Access token received, fetching ad accounts');
+
+      // Get ad accounts
+      await fetchAdAccounts(data.access_token);
+
+      // Save the integration data
+      const keysToSave: SavedKeys = {
+        access_token: data.access_token,
+        user_id: data.user_id,
+        user_name: data.user_name,
+        user_email: data.user_email,
+        permissions: data.permissions || []
+      };
+
+      await saveIntegrationData(keysToSave);
+
+      toast({
+        title: "Connected Successfully",
+        description: "Facebook account connected. Please select an ad account.",
+      });
+    } catch (error) {
+      console.error('❌ OAuth callback failed:', error);
+      toast({
+        title: "Connection Failed",
+        description: "Failed to complete Facebook connection",
+        variant: "destructive"
+      });
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  const fetchAdAccounts = async (accessToken: string) => {
+    try {
+      setIsLoadingAccounts(true);
+      console.log('📡 Fetching Facebook ad accounts');
+
+      const { data, error } = await supabase.functions.invoke('facebook-oauth', {
+        body: { action: 'get_ad_accounts', access_token: accessToken }
+      });
+
+      if (error || !data?.adAccounts) {
+        throw new Error('Failed to fetch ad accounts');
+      }
+
+      console.log('✅ Ad accounts fetched:', data.adAccounts);
+      setAdAccounts(data.adAccounts);
+    } catch (error) {
+      console.error('❌ Failed to fetch ad accounts:', error);
+      toast({
+        title: "Warning",
+        description: "Connected but failed to load ad accounts. You may need ads permissions.",
+        variant: "destructive"
+      });
+      setAdAccounts([]);
+    } finally {
+      setIsLoadingAccounts(false);
+    }
+  };
+
+  const saveIntegrationData = async (keys: SavedKeys) => {
+    try {
+      // Update or create project integration
+      await supabase
+        .from('project_integrations')
+        .upsert({
+          project_id: projectId,
+          platform: 'facebook',
+          is_connected: true,
+          last_sync: new Date().toISOString()
+        });
+
+      // Save integration data
+      await supabase
+        .from('project_integration_data')
+        .upsert({
+          project_id: projectId,
+          platform: 'facebook',
+          data: keys as any
+        });
+
+      setSavedKeys(keys);
+      setProjectIntegration({ is_connected: true });
+      
+      queryClient.invalidateQueries({ queryKey: ['facebook-integrations', projectId] });
+    } catch (error) {
+      console.error('❌ Failed to save integration data:', error);
+      throw error;
+    }
+  };
+
+  const handleAccountSelect = async (accountId: string) => {
+    try {
+      const selectedAdAccount = adAccounts.find(acc => acc.id === accountId);
+      
+      const updatedKeys: SavedKeys = {
+        ...savedKeys,
+        selected_ad_account_id: accountId,
+        selected_ad_account_name: selectedAdAccount?.name || ''
+      };
+
+      await supabase
+        .from('project_integration_data')
+        .update({ data: updatedKeys as any })
+        .eq('project_id', projectId)
+        .eq('platform', 'facebook');
+
+      setSavedKeys(updatedKeys);
+      setSelectedAccount(accountId);
+
+      toast({
+        title: "Ad Account Selected",
+        description: `Selected: ${selectedAdAccount?.name}`,
+      });
+    } catch (error) {
+      console.error('❌ Failed to save ad account selection:', error);
+      toast({
+        title: "Selection Failed",
+        description: "Failed to save ad account selection",
+        variant: "destructive"
+      });
+    }
+  };
 
   const handleFacebookAuth = async () => {
     console.log('🔄 Starting Facebook authentication for project:', projectId);
@@ -229,6 +394,57 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
                 <p className="text-sm text-gray-600">
                   Last sync: {new Date(projectIntegration.last_sync).toLocaleString()}
                 </p>
+              )}
+
+              {/* Ad Account Selection */}
+              {hasAdsPermissions && adAccounts.length > 0 && (
+                <div className="space-y-3">
+                  <Label htmlFor="ad-account-select">Select Ad Account</Label>
+                  <Select value={selectedAccount} onValueChange={handleAccountSelect}>
+                    <SelectTrigger>
+                      <SelectValue placeholder={isLoadingAccounts ? "Loading accounts..." : "Select an ad account"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {adAccounts.map((account) => (
+                        <SelectItem key={account.id} value={account.id}>
+                          <div className="flex items-center justify-between w-full">
+                            <span>{account.name}</span>
+                            <Badge variant="outline" className="ml-2">
+                              {account.currency}
+                            </Badge>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedAccount && (
+                    <div className="flex items-center gap-2 text-green-600">
+                      <CheckCircle className="h-3 w-3" />
+                      <span className="text-xs">Ad account selected</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* No ads permissions warning */}
+              {isConnected && !hasAdsPermissions && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <div className="flex items-center gap-2 text-yellow-700">
+                    <AlertCircle className="h-4 w-4" />
+                    <span className="text-sm font-medium">Limited Permissions</span>
+                  </div>
+                  <p className="text-xs text-yellow-600 mt-1">
+                    This connection doesn't have ads management permissions. You may need to reconnect with elevated permissions to access ad accounts.
+                  </p>
+                </div>
+              )}
+
+              {/* Loading ad accounts */}
+              {isLoadingAccounts && (
+                <div className="flex items-center gap-2 text-blue-600">
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  <span className="text-sm">Loading ad accounts...</span>
+                </div>
               )}
 
               <div className="flex gap-2">
