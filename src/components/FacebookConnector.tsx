@@ -48,12 +48,21 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
   const isConnected = integrations?.find(i => i.platform === 'facebook')?.is_connected || false;
   const savedKeys = getApiKeys('facebook');
   
-  // Check for ads permissions more reliably
+  // Check for ads permissions more reliably - fix permission detection
   const hasAdsPermissions = Boolean(
     savedKeys.access_token && (
-      savedKeys.permissions?.includes('ads_read') || 
-      savedKeys.permissions?.includes('ads_management') ||
-      Array.isArray(savedKeys.permissions) && savedKeys.permissions.length > 2 // More than just basic permissions
+      // Check if permissions array contains ads permissions
+      (Array.isArray(savedKeys.permissions) && (
+        savedKeys.permissions.includes('ads_read') || 
+        savedKeys.permissions.includes('ads_management')
+      )) ||
+      // Fallback: if permissions is a string or other format
+      (typeof savedKeys.permissions === 'string' && (
+        savedKeys.permissions.includes('ads_read') || 
+        savedKeys.permissions.includes('ads_management')
+      )) ||
+      // Last resort: check if we have any substantial permissions (not just basic)
+      (Array.isArray(savedKeys.permissions) && savedKeys.permissions.length >= 4)
     )
   );
   
@@ -89,11 +98,10 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
       loadAdAccounts();
     }
     
-    // Auto-fix missing permissions when we detect Facebook data is working
-    if (isConnected && !hasAdsPermissions && Object.keys(savedKeys).length === 0) {
+    // Only show permission detection issue if truly problematic
+    if (isConnected && !hasAdsPermissions && !savedKeys.access_token) {
       console.log('🔧 Detected missing Facebook permissions, attempting auto-fix...');
-      // If connected but no keys saved, it means permissions weren't stored properly
-      // This can happen after successful OAuth but failed key storage
+      // Only show error if connected but no access token at all
       toast({
         title: "Permission Detection Issue",
         description: "Your Facebook connection appears to be working but permissions aren't detected. Please reconnect to fix this.",
