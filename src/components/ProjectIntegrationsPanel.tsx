@@ -161,7 +161,7 @@ export const ProjectIntegrationsPanel = ({ projectId, selectedFormIds = [], onFo
     
     switch (platform.id) {
       case 'facebook':
-        return <FacebookConnector projectId={selectedProject.id} />;
+        return <FacebookConnector projectId={projectId!} />;
       case 'calendly':
         return (
           <CalendlyConnector

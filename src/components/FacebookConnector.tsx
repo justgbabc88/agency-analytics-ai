@@ -72,10 +72,10 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
         .eq('platform', 'facebook')
         .maybeSingle();
       
-      setSavedKeys(keyData?.data || {});
+      setSavedKeys((keyData?.data as SavedKeys) || {});
       
-      if (keyData?.data?.selected_ad_account_id) {
-        setSelectedAccount(keyData.data.selected_ad_account_id);
+      if (keyData?.data && typeof keyData.data === 'object' && 'selected_ad_account_id' in keyData.data) {
+        setSelectedAccount((keyData.data as SavedKeys).selected_ad_account_id || '');
       }
     };
     

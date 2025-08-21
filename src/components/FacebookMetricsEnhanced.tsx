@@ -10,7 +10,7 @@ import { CheckCircle, AlertTriangle } from "lucide-react";
 
 interface FacebookMetricsEnhancedProps {
   dateRange?: { from: Date; to: Date };
-  projectId?: string;
+  projectId: string; // Make projectId required
 }
 
 export const FacebookMetricsEnhanced = ({ dateRange, projectId }: FacebookMetricsEnhancedProps) => {
@@ -30,7 +30,7 @@ export const FacebookMetricsEnhanced = ({ dateRange, projectId }: FacebookMetric
     dateRange, 
     campaignIds: selectedCampaignIds,
     adSetIds: selectedAdSetIds,
-    projectId
+    projectId // Now required
   });
 
   const handleRetrySyncAd = async () => {
@@ -91,7 +91,7 @@ export const FacebookMetricsEnhanced = ({ dateRange, projectId }: FacebookMetric
             </Badge>
           )}
         </div>
-        <FacebookBatchSyncButton />
+        <FacebookBatchSyncButton projectId={projectId} />
       </div>
 
       {/* Filters */}
