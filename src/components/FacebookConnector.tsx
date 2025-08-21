@@ -360,7 +360,8 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="text-sm text-gray-600">
-          <p>Connect your Facebook Ads account to automatically pull advertising data and campaign metrics.</p>
+          <p>Connect your Facebook Ads account to automatically pull advertising data, campaign metrics, and insights.</p>
+          <p className="text-xs text-blue-600 mt-1">This will request permissions to access your ad accounts and campaign data.</p>
           <div className="flex items-center gap-2 text-blue-600 mt-2">
             <ExternalLink className="h-4 w-4" />
             <a 
@@ -382,7 +383,7 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
               className="w-full"
             >
               <Link className="h-4 w-4 mr-2" />
-              {isConnecting ? "Connecting..." : "Connect to Facebook"}
+              {isConnecting ? "Connecting..." : "Connect Facebook Ads"}
             </Button>
           ) : (
             <div className="space-y-4">
