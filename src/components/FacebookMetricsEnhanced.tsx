@@ -138,7 +138,7 @@ export const FacebookMetricsEnhanced = ({ dateRange, projectId }: FacebookMetric
             </Badge>
           )}
         </div>
-        <FacebookBatchSyncButton projectId={projectId} />
+        <FacebookBatchSyncButton projectId={projectId} dateRange={dateRange} />
       </div>
 
       {/* Filters */}

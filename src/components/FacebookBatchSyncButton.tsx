@@ -7,9 +7,10 @@ import { useQueryClient } from "@tanstack/react-query";
 
 interface FacebookBatchSyncButtonProps {
   projectId: string;
+  dateRange?: { from: Date; to: Date };
 }
 
-export const FacebookBatchSyncButton = ({ projectId }: FacebookBatchSyncButtonProps) => {
+export const FacebookBatchSyncButton = ({ projectId, dateRange }: FacebookBatchSyncButtonProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const queryClient = useQueryClient();
 
@@ -47,14 +48,19 @@ export const FacebookBatchSyncButton = ({ projectId }: FacebookBatchSyncButtonPr
       }
 
       console.log("📡 Calling sync function with credentials...");
-      const { data, error } = await supabase.functions.invoke('sync-project-integrations', {
+      
+      // Convert date range to Facebook API format if provided
+      let syncDateRange = undefined;
+      if (dateRange) {
+        const since = Math.ceil((Date.now() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24)).toString();
+        const until = Math.ceil((Date.now() - dateRange.to.getTime()) / (1000 * 60 * 60 * 24)).toString();
+        syncDateRange = { since, until };
+      }
+      
+      const { data, error } = await supabase.functions.invoke('facebook-batch-sync', {
         body: { 
           projectId: projectId,
-          platform: 'facebook',
-          apiKeys: {
-            access_token: fbData.access_token,
-            selected_ad_account_id: fbData.selected_ad_account_id
-          }
+          dateRange: syncDateRange
         }
       });
 

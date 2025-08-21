@@ -23,15 +23,18 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const body = req.method === 'POST' ? await req.json() : {};
+    const { projectId, dateRange } = body;
+    
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    console.log('🚀 Starting Facebook batch sync for all agencies...');
+    console.log('🚀 Starting Facebook batch sync...', { projectId, dateRange });
 
-    // Get all Facebook project integrations that are connected
-    const { data: integrations, error: integrationsError } = await supabase
+    // Get Facebook project integrations - either specific project or all connected ones
+    let query = supabase
       .from('project_integrations')
       .select(`
         *,
@@ -43,6 +46,12 @@ Deno.serve(async (req) => {
       `)
       .eq('platform', 'facebook')
       .eq('is_connected', true);
+    
+    if (projectId) {
+      query = query.eq('project_id', projectId);
+    }
+    
+    const { data: integrations, error: integrationsError } = await query;
 
     if (integrationsError) {
       console.error('Error fetching integrations:', integrationsError);
@@ -93,7 +102,8 @@ Deno.serve(async (req) => {
         }
 
         // Perform batch sync using Facebook's batch API
-        const syncResult = await performBatchSync(accessToken, adAccountId);
+        const syncDateRange = dateRange || { since: '30', until: '1' };
+        const syncResult = await performBatchSync(accessToken, adAccountId, syncDateRange);
         
         // Store the synced data
         await supabase
@@ -195,7 +205,7 @@ async function fetchWithUsageCheck(url: string, options: RequestInit) {
   return response;
 }
 
-async function performBatchSync(accessToken: string, adAccountId: string): Promise<any> {
+async function performBatchSync(accessToken: string, adAccountId: string, dateRange: { since: string; until: string } = { since: '30', until: '1' }): Promise<any> {
   console.log(`🔄 Starting batch sync for ad account ${adAccountId}`);
 
   // Create batch requests - this reduces API calls from 3+ to just 1!
@@ -317,7 +327,7 @@ async function performBatchSync(accessToken: string, adAccountId: string): Promi
         },
         {
           method: 'GET',
-          relative_url: `${campaign.id}/insights?fields=impressions,clicks,spend,reach,conversions,conversion_values&time_range={'since':'30','until':'1'}&time_increment=1`
+          relative_url: `${campaign.id}/insights?fields=impressions,clicks,spend,reach,conversions,conversion_values&time_range={'since':'${dateRange.since}','until':'${dateRange.until}'}&time_increment=1`
         }
       ]);
 
