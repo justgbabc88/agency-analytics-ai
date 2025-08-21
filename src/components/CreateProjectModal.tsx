@@ -30,11 +30,6 @@ export const CreateProjectModal = ({ onProjectCreated }: CreateProjectModalProps
       label: "Book A Call Funnel",
       description: "Landing Page → Booking → Sales Call"
     },
-    { 
-      value: "ads_only", 
-      label: "Ads Only",
-      description: "Facebook Ads tracking and integrations only"
-    },
   ];
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -87,10 +82,10 @@ export const CreateProjectModal = ({ onProjectCreated }: CreateProjectModalProps
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="funnel-type">Project Type</Label>
+            <Label htmlFor="funnel-type">Funnel Type</Label>
             <Select value={funnelType} onValueChange={setFunnelType} required>
               <SelectTrigger>
-                <SelectValue placeholder="Select project type" />
+                <SelectValue placeholder="Select funnel type" />
               </SelectTrigger>
               <SelectContent>
                 {funnelTypes.map((type) => (

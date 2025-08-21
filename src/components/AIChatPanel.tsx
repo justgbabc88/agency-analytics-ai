@@ -9,8 +9,7 @@ import { useState } from "react";
 
 import { useProjects } from "@/hooks/useProjects";
 import { supabase } from "@/integrations/supabase/client";
-import { startOfDay, endOfDay } from "date-fns";
-import { subDays } from "date-fns/subDays";
+import { subDays, startOfDay, endOfDay } from "date-fns";
 
 interface Message {
   id: string;

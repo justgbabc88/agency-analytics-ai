@@ -11,8 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { startOfDay, endOfDay } from 'date-fns';
-import { subDays } from 'date-fns/subDays';
+import { subDays, startOfDay, endOfDay } from 'date-fns';
 
 const Tracking = () => {
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');

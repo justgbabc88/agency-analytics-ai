@@ -1,292 +1,154 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.8'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-interface TrackingData {
-  pixelId: string;
-  sessionId: string;
-  eventType: string;
-  pageUrl: string;
-  eventName?: string;
-  utmSource?: string;
-  utmMedium?: string;
-  utmCampaign?: string;
-  utmTerm?: string;
-  utmContent?: string;
-  referrerUrl?: string;
-  userAgent?: string;
-  deviceType?: string;
-  browser?: string;
-  operatingSystem?: string;
-  contactEmail?: string;
-  contactPhone?: string;
-  contactName?: string;
-  formData?: any;
-  revenueAmount?: number;
-  currency?: string;
-  customData?: any;
-  timestamp?: string;
-}
-
-async function hashIP(ip: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(ip);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-Deno.serve(async (req) => {
+serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    // Initialize Supabase clients
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
 
-    const supabaseAnon = createClient(supabaseUrl, supabaseAnonKey);
-    const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
+    const { event_type, page_url, project_id, session_id, contact_email, contact_phone, contact_name, custom_data } = await req.json()
+    
+    // Get client IP for rate limiting
+    const clientIP = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
+    const userAgent = req.headers.get('user-agent') || 'unknown'
+    
+    console.log('Processing tracking event:', { event_type, project_id, clientIP })
 
-    const trackingData: TrackingData = await req.json();
-    console.log('Received enhanced tracking data:', JSON.stringify(trackingData, null, 2));
+    // Check rate limit (100 requests per hour per IP)
+    const { data: rateLimitOk } = await supabaseClient.rpc('check_rate_limit', {
+      p_identifier: clientIP,
+      p_endpoint: 'track-event',
+      p_max_requests: 100,
+      p_window_minutes: 60
+    })
 
-    // Get client IP for rate limiting and security logging
-    const clientIP = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
-    const hashedIP = await hashIP(clientIP);
-
-    // Validate tracking pixel exists and get project_id
-    const { data: pixelData, error: pixelError } = await supabaseAnon
-      .from('tracking_pixels')
-      .select('id, project_id, is_active')
-      .eq('pixel_id', trackingData.pixelId)
-      .single();
-
-    if (pixelError || !pixelData || !pixelData.is_active) {
-      console.error('Invalid or inactive pixel:', trackingData.pixelId);
-      
-      // Log security incident for invalid pixel access
-      await supabaseService.rpc('log_security_event', {
-        p_user_id: null,
-        p_action: 'invalid_pixel_access',
-        p_resource_type: 'tracking_pixels',
-        p_resource_id: null,
-        p_details: {
-          pixel_id: trackingData.pixelId,
-          client_ip: hashedIP,
-          user_agent: req.headers.get('user-agent'),
-          timestamp: new Date().toISOString()
-        },
-        p_severity: 'warning'
-      });
-
+    if (!rateLimitOk) {
+      console.log('Rate limit exceeded for IP:', clientIP)
       return new Response(
-        JSON.stringify({ error: 'Invalid pixel configuration' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    }
-
-    const projectId = pixelData.project_id;
-
-    // Enhanced rate limiting using new function
-    const { data: rateLimitCheck, error: rateLimitError } = await supabaseService.rpc(
-      'enhanced_tracking_rate_limit',
-      {
-        p_identifier: hashedIP,
-        p_project_id: projectId,
-        p_max_requests: 100,
-        p_window_minutes: 15
-      }
-    );
-
-    if (rateLimitError || !rateLimitCheck) {
-      console.error('Rate limit exceeded or error:', rateLimitError);
-      return new Response(
-        JSON.stringify({ error: 'Rate limit exceeded' }),
+        JSON.stringify({ error: 'Rate limit exceeded' }), 
         { 
           status: 429, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
-      );
+      )
     }
 
-    // Enhanced data validation using existing function
-    const hasContactData = !!(trackingData.contactEmail || trackingData.contactPhone || trackingData.contactName);
-    const hasRevenueData = !!(trackingData.revenueAmount && trackingData.revenueAmount > 0);
-
-    const { data: validationResult, error: validationError } = await supabaseService.rpc(
-      'validate_tracking_event_data',
-      {
-        p_event_type: trackingData.eventType,
-        p_page_url: trackingData.pageUrl,
-        p_contact_email: trackingData.contactEmail || null,
-        p_contact_phone: trackingData.contactPhone || null,
-        p_revenue_amount: trackingData.revenueAmount || null
-      }
-    );
-
-    if (validationError) {
-      console.error('Data validation failed:', validationError);
+    // Validate required fields
+    if (!event_type || !page_url || !project_id || !session_id) {
       return new Response(
-        JSON.stringify({ error: 'Invalid tracking data' }),
+        JSON.stringify({ error: 'Missing required fields' }), 
         { 
           status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
-      );
+      )
+    }
+
+    // Enhanced validation using new validation function
+    const { error: validationError } = await supabaseClient.rpc('validate_tracking_event_data', {
+      p_event_type: event_type,
+      p_page_url: page_url,
+      p_contact_email: contact_email,
+      p_contact_phone: contact_phone,
+      p_revenue_amount: null // This function doesn't handle revenue
+    })
+
+    if (validationError) {
+      console.error('Enhanced validation failed:', validationError)
+      return new Response(
+        JSON.stringify({ error: 'Invalid tracking data format' }), 
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
     }
 
     // Check for suspicious activity patterns
-    await supabaseService.rpc('detect_suspicious_tracking_activity', {
-      p_session_id: trackingData.sessionId,
-      p_project_id: projectId,
-      p_client_ip: clientIP
-    });
+    await supabaseClient.rpc('detect_suspicious_tracking_activity', {
+      p_session_id: session_id,
+      p_project_id: project_id,
+      p_client_ip: clientIP !== 'unknown' ? clientIP : null
+    })
 
-    // Check for existing session
-    let sessionExists = false;
-    const { data: existingSession } = await supabaseAnon
-      .from('tracking_sessions')
-      .select('id')
-      .eq('session_id', trackingData.sessionId)
-      .eq('project_id', projectId)
-      .single();
-
-    if (!existingSession) {
-      // Create new session with enhanced security validation
-      const sessionData = {
-        session_id: trackingData.sessionId,
-        project_id: projectId,
-        utm_source: trackingData.utmSource,
-        utm_medium: trackingData.utmMedium,
-        utm_campaign: trackingData.utmCampaign,
-        utm_term: trackingData.utmTerm,
-        utm_content: trackingData.utmContent,
-        referrer_url: trackingData.referrerUrl,
-        landing_page_url: trackingData.pageUrl,
-        ip_hash: hashedIP,
-        user_agent: trackingData.userAgent,
-        device_type: trackingData.deviceType,
-        browser: trackingData.browser,
-        operating_system: trackingData.operatingSystem,
-        first_visit_at: new Date(trackingData.timestamp || Date.now()),
-        last_activity_at: new Date(trackingData.timestamp || Date.now())
-      };
-
-      const { error: sessionError } = await supabaseAnon
-        .from('tracking_sessions')
-        .insert(sessionData);
-
-      if (sessionError) {
-        console.error('Error creating session:', sessionError);
-      }
-    } else {
-      // Update existing session activity
-      const { error: updateError } = await supabaseAnon
-        .from('tracking_sessions')
-        .update({ 
-          last_activity_at: new Date(trackingData.timestamp || Date.now())
-        })
-        .eq('session_id', trackingData.sessionId)
-        .eq('project_id', projectId);
-
-      if (updateError) {
-        console.error('Error updating session:', updateError);
-      }
+    // Check if this is anonymous tracking (no contact info)
+    const hasContactInfo = contact_email || contact_phone || contact_name
+    
+    // Log security event if contact info is being stored
+    if (hasContactInfo) {
+      await supabaseClient.rpc('log_security_event', {
+        p_user_id: null,
+        p_action: 'contact_data_tracked',
+        p_resource_type: 'tracking_events',
+        p_resource_id: null,
+        p_details: {
+          has_email: !!contact_email,
+          has_phone: !!contact_phone,
+          has_name: !!contact_name,
+          client_ip: clientIP,
+          user_agent: userAgent,
+          page_url: page_url
+        },
+        p_severity: 'warning'
+      })
     }
 
-    // Prepare event data
-    const eventData = {
-      session_id: trackingData.sessionId,
-      project_id: projectId,
-      event_type: trackingData.eventType,
-      event_name: trackingData.eventName,
-      page_url: trackingData.pageUrl,
-      contact_email: trackingData.contactEmail,
-      contact_phone: trackingData.contactPhone,
-      contact_name: trackingData.contactName,
-      form_data: trackingData.formData,
-      revenue_amount: trackingData.revenueAmount,
-      currency: trackingData.currency || 'USD',
-      custom_data: trackingData.customData,
-      event_timestamp: new Date(trackingData.timestamp || Date.now())
-    };
-
-    // Use service role client if contact information or form data is present
-    // This ensures proper PII handling and logging
-    const clientToUse = hasContactData || trackingData.formData ? supabaseService : supabaseAnon;
-    
-    const { data: eventResult, error: eventError } = await clientToUse
+    // Insert tracking event
+    const { data, error } = await supabaseClient
       .from('tracking_events')
-      .insert(eventData)
+      .insert([{
+        event_type,
+        page_url,
+        project_id,
+        session_id,
+        contact_email,
+        contact_phone,
+        contact_name,
+        custom_data: custom_data || {},
+        event_timestamp: new Date().toISOString()
+      }])
       .select()
-      .single();
 
-    if (eventError) {
-      console.error('Error creating tracking event:', eventError);
+    if (error) {
+      console.error('Database error:', error)
       return new Response(
-        JSON.stringify({ error: 'Failed to record event' }),
+        JSON.stringify({ error: 'Failed to store tracking event' }), 
         { 
           status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
-      );
+      )
     }
 
-    // Handle revenue attribution with enhanced security
-    if (hasRevenueData && eventResult) {
-      const { error: attributionError } = await supabaseService.rpc(
-        'secure_attribution_with_contact',
-        {
-          p_project_id: projectId,
-          p_session_id: trackingData.sessionId,
-          p_event_id: eventResult.id,
-          p_contact_email: trackingData.contactEmail || null,
-          p_contact_phone: trackingData.contactPhone || null,
-          p_attributed_revenue: trackingData.revenueAmount,
-          p_attribution_model: 'first_touch',
-          p_utm_source: trackingData.utmSource || null,
-          p_utm_campaign: trackingData.utmCampaign || null,
-          p_utm_medium: trackingData.utmMedium || null
-        }
-      );
-
-      if (attributionError) {
-        console.error('Error creating attribution:', attributionError);
-      }
-    }
-
-    console.log('✅ Enhanced secure tracking event recorded successfully');
+    console.log('Tracking event stored successfully:', data)
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        eventId: eventResult.id,
-        securityEnhanced: true 
-      }),
+      JSON.stringify({ success: true, event_id: data[0]?.id }), 
       { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
-    );
+    )
 
   } catch (error) {
-    console.error('Tracking error:', error);
+    console.error('Error in secure-track-event:', error)
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
+      JSON.stringify({ error: 'Internal server error' }), 
       { 
         status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
-    );
+    )
   }
-});
+})

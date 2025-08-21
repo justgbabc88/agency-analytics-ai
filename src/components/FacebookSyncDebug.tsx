@@ -3,12 +3,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useAgency } from '@/hooks/useAgency';
-import { useSecureApiKeys } from '@/hooks/useSecureApiKeys';
+import { useApiKeys } from '@/hooks/useApiKeys';
 import { useToast } from '@/hooks/use-toast';
 
 export const FacebookSyncDebug = () => {
   const { agency } = useAgency();
-  const { getApiKeys } = useSecureApiKeys();
+  const { getApiKeys } = useApiKeys();
   const { toast } = useToast();
 
   const runDebug = async () => {

@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { useSecureApiKeys } from "@/hooks/useSecureApiKeys";
+import { useApiKeys } from "@/hooks/useApiKeys";
 import { Video, ExternalLink, CheckCircle, AlertCircle, Key, Calendar } from "lucide-react";
 
 interface EverWebinarConnectorProps {
@@ -16,7 +16,7 @@ interface EverWebinarConnectorProps {
 
 export const EverWebinarConnector = ({ projectId, isConnected = false, onConnectionChange }: EverWebinarConnectorProps) => {
   const { toast } = useToast();
-  const { saveSecureApiKeys, getApiKeys } = useSecureApiKeys(projectId);
+  const { saveApiKeys, getApiKeys } = useApiKeys();
   const [isConnecting, setIsConnecting] = useState(false);
   const [apiKey, setApiKey] = useState('');
 
@@ -42,7 +42,7 @@ export const EverWebinarConnector = ({ projectId, isConnected = false, onConnect
     
     try {
       // Save the API key
-      saveSecureApiKeys('everwebinar', {
+      saveApiKeys('everwebinar', {
         api_key: apiKey.trim(),
         connected_at: new Date().toISOString(),
         project_id: projectId
@@ -71,7 +71,7 @@ export const EverWebinarConnector = ({ projectId, isConnected = false, onConnect
   const handleDisconnect = async () => {
     try {
       // Clear saved keys
-      saveSecureApiKeys('everwebinar', {});
+      saveApiKeys('everwebinar', {});
       setApiKey('');
 
       // Update connection status

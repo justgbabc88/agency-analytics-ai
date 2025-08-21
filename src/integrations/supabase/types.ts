@@ -1239,10 +1239,6 @@ export type Database = {
         Args: { p_project_id: string; target_date?: string }
         Returns: undefined
       }
-      anonymize_expired_pii: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
       check_alert_thresholds: {
         Args: {
           p_metric_type: string
@@ -1268,15 +1264,6 @@ export type Database = {
           p_session_id: string
         }
         Returns: undefined
-      }
-      enhanced_tracking_rate_limit: {
-        Args: {
-          p_identifier: string
-          p_max_requests?: number
-          p_project_id: string
-          p_window_minutes?: number
-        }
-        Returns: boolean
       }
       example_secure_function: {
         Args: Record<PropertyKey, never>
@@ -1427,7 +1414,7 @@ export type Database = {
     }
     Enums: {
       campaign_status: "active" | "paused" | "completed" | "draft"
-      funnel_type: "low-ticket" | "webinar" | "book-call" | "ads_only"
+      funnel_type: "low-ticket" | "webinar" | "book-call"
       metric_type:
         | "impressions"
         | "clicks"
@@ -1565,7 +1552,7 @@ export const Constants = {
   public: {
     Enums: {
       campaign_status: ["active", "paused", "completed", "draft"],
-      funnel_type: ["low-ticket", "webinar", "book-call", "ads_only"],
+      funnel_type: ["low-ticket", "webinar", "book-call"],
       metric_type: [
         "impressions",
         "clicks",

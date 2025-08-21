@@ -6,9 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useIntegrations } from "@/hooks/useIntegrations";
-import { useProjectIntegrations } from "@/hooks/useProjectIntegrations";
 import { useQueryClient } from '@tanstack/react-query';
-import { useSecureApiKeys } from "@/hooks/useSecureApiKeys";
+import { useApiKeys } from "@/hooks/useApiKeys";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { BarChart3, ExternalLink, CheckCircle, AlertCircle, Link, Users, RefreshCw, ArrowUp, TestTube } from "lucide-react";
@@ -21,21 +20,10 @@ interface AdAccount {
   currency: string;
 }
 
-interface FacebookConnectorProps {
-  projectId?: string;
-}
-
-export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
-  const agencyIntegrations = useIntegrations();
-  const projectIntegrations = useProjectIntegrations(projectId);
-  
-  // Use project-level integrations if projectId is provided, otherwise use agency-level
-  const { integrations, updateIntegration, syncIntegration } = projectId 
-    ? projectIntegrations 
-    : agencyIntegrations;
-    
+export const FacebookConnector = () => {
+  const { integrations, updateIntegration, syncIntegration } = useIntegrations();
   const queryClient = useQueryClient();
-  const { saveSecureApiKeys, getApiKeys } = useSecureApiKeys(projectId);
+  const { saveApiKeys, getApiKeys } = useApiKeys();
   const { toast } = useToast();
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -47,43 +35,25 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
 
   const isConnected = integrations?.find(i => i.platform === 'facebook')?.is_connected || false;
   const savedKeys = getApiKeys('facebook');
-  
-  // Check for ads permissions more reliably - fix permission detection
-  const hasAdsPermissions = Boolean(
-    savedKeys.access_token && (
-      // Check if permissions array contains ads permissions
-      (Array.isArray(savedKeys.permissions) && (
-        savedKeys.permissions.includes('ads_read') || 
-        savedKeys.permissions.includes('ads_management')
-      )) ||
-      // Fallback: if permissions is a string or other format
-      (typeof savedKeys.permissions === 'string' && (
-        savedKeys.permissions.includes('ads_read') || 
-        savedKeys.permissions.includes('ads_management')
-      )) ||
-      // Last resort: check if we have any substantial permissions (not just basic)
-      (Array.isArray(savedKeys.permissions) && savedKeys.permissions.length >= 4)
-    )
-  );
+  const hasAdsPermissions = savedKeys.permissions?.includes('ads_read') || savedKeys.access_token; // If we have access_token, assume ads permissions
   
   // Detect if we have saved keys but DB shows disconnected (mismatch scenario)
   const hasSavedKeys = Object.keys(savedKeys).length > 0 && savedKeys.access_token;
   const hasConnectionMismatch = hasSavedKeys && !isConnected;
 
-  // Only show upgrade if truly connected but missing ads permissions
-  const shouldShowUpgrade = isConnected && savedKeys.access_token && !hasAdsPermissions;
-
   console.log('FacebookConnector - Current state:', {
     isConnected,
     hasAdsPermissions,
-    shouldShowUpgrade,
-    savedKeysCount: Object.keys(savedKeys).length,
+    selectedAccount,
+    savedKeys: Object.keys(savedKeys),
     permissions: savedKeys.permissions,
-    hasAccessToken: !!savedKeys.access_token
+    hasSavedKeys,
+    hasConnectionMismatch,
+    accessToken: savedKeys.access_token ? 'present' : 'missing'
   });
 
-  // Only show upgrade if truly needed (connected but no ads access)
-  // const shouldShowUpgrade = isConnected && !savedKeys.access_token; // OLD BROKEN LOGIC
+  // Only show upgrade if truly needed (no access token and connected)
+  const shouldShowUpgrade = isConnected && !savedKeys.access_token;
 
   useEffect(() => {
     // Load saved ad account selection
@@ -98,21 +68,21 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
       loadAdAccounts();
     }
     
-    // Don't perform any automatic resets - let user manually fix if needed
-    
-    // Only show permission detection issue if truly problematic (has token but no permissions)
-    if (isConnected && savedKeys.access_token && !hasAdsPermissions) {
-      console.log('🔧 Detected missing Facebook permissions...');
+    // Auto-fix missing permissions when we detect Facebook data is working
+    if (isConnected && !hasAdsPermissions && Object.keys(savedKeys).length === 0) {
+      console.log('🔧 Detected missing Facebook permissions, attempting auto-fix...');
+      // If connected but no keys saved, it means permissions weren't stored properly
+      // This can happen after successful OAuth but failed key storage
       toast({
-        title: "Permission Detection Issue", 
-        description: "Your Facebook connection has limited permissions. Please reconnect to get ads access.",
+        title: "Permission Detection Issue",
+        description: "Your Facebook connection appears to be working but permissions aren't detected. Please reconnect to fix this.",
         variant: "destructive"
       });
     }
-  }, [isConnected, savedKeys.access_token, hasAdsPermissions, updateIntegration]);
+  }, [isConnected, savedKeys.access_token, hasAdsPermissions]);
 
-  const handleFacebookAuth = async (permissionLevel: 'basic' | 'ads' = 'ads') => {
-    const isUpgradeFlow = permissionLevel === 'ads' && isConnected;
+  const handleFacebookAuth = async (permissionLevel: 'basic' | 'ads' = 'basic') => {
+    const isUpgradeFlow = permissionLevel === 'ads';
     setIsConnecting(!isUpgradeFlow);
     setIsUpgrading(isUpgradeFlow);
     
@@ -141,20 +111,7 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
       );
 
       if (!popup) {
-        // Popup was blocked - provide user with manual option
-        const proceed = window.confirm(
-          'Popup was blocked by your browser. Would you like to open Facebook authentication in a new tab instead? You\'ll need to close the tab after authentication completes.'
-        );
-        
-        if (proceed) {
-          window.open(data.authUrl, '_blank');
-          toast({
-            title: "Authentication opened in new tab",
-            description: "Complete the Facebook authentication and close the tab when done. Then try connecting again.",
-            duration: 10000,
-          });
-        }
-        return;
+        throw new Error('Failed to open popup window. Please allow popups for this site.');
       }
 
       let messageListenerActive = true;
@@ -192,7 +149,7 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
 
             console.log('Successfully received access token, saving keys...');
 
-            saveSecureApiKeys('facebook', {
+            saveApiKeys('facebook', {
               access_token: tokenData.access_token,
               user_id: tokenData.user_id,
               user_name: tokenData.user_name,
@@ -207,18 +164,14 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
                 isConnected: true 
               });
 
-              // Force refresh integrations immediately after successful update
-              queryClient.invalidateQueries({ queryKey: ['integrations'] });
-              queryClient.invalidateQueries({ queryKey: ['project-integrations'] });
-
               if (permissionLevel === 'basic') {
                 toast({
                   title: "Connected Successfully",
-                  description: "Basic Facebook connection established. Click 'Upgrade Permissions' to enable ads data access.",
+                  description: "Basic Facebook connection established. You can now test the connection to enable ads permission requests.",
                 });
               } else {
                 toast({
-                  title: "Facebook Connected",
+                  title: "Permissions Upgraded",
                   description: "Facebook ads permissions have been granted. Loading ad accounts...",
                 });
               }
@@ -232,7 +185,6 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
               
               // Force refresh integrations to update UI
               queryClient.invalidateQueries({ queryKey: ['integrations'] });
-              queryClient.invalidateQueries({ queryKey: ['project-integrations'] });
               
               toast({
                 title: "Connection Successful",
@@ -357,7 +309,7 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
         const firstAccountId = data.adAccounts[0].id;
         setSelectedAccount(firstAccountId);
         // Automatically save the first account
-        saveSecureApiKeys('facebook', {
+        saveApiKeys('facebook', {
           ...savedKeys,
           selected_ad_account_id: firstAccountId
         });
@@ -379,7 +331,7 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
   const handleAdAccountChange = (accountId: string) => {
     setSelectedAccount(accountId);
     // Automatically save when selection changes
-    saveSecureApiKeys('facebook', {
+    saveApiKeys('facebook', {
       ...savedKeys,
       selected_ad_account_id: accountId
     });
@@ -410,7 +362,7 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
       console.log('✅ Successfully updated integration status');
       console.log('🗑️ Clearing saved API keys and state...');
       
-      saveSecureApiKeys('facebook', {});
+      saveApiKeys('facebook', {});
       setAdAccounts([]);
       setSelectedAccount('');
 
@@ -553,7 +505,7 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
             
             {!isConnected && !hasConnectionMismatch ? (
               <Button 
-                onClick={() => handleFacebookAuth('ads')}
+                onClick={() => handleFacebookAuth('basic')}
                 disabled={isConnecting}
                 className="w-full"
               >

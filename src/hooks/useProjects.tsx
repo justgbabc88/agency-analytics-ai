@@ -145,16 +145,11 @@ export const useProjects = () => {
       .single();
 
     // Base integrations for all project types
-    let defaultPlatforms = ['facebook', 'google_sheets', 'clickfunnels'];
+    const defaultPlatforms = ['facebook', 'google_sheets', 'clickfunnels'];
     
     // Add webinar-specific integrations
     if (project?.funnel_type === 'webinar') {
       defaultPlatforms.push('everwebinar');
-    }
-    
-    // For ads_only projects, only create Facebook integration
-    if (project?.funnel_type === 'ads_only') {
-      defaultPlatforms = ['facebook'];
     }
     
     const results = [];

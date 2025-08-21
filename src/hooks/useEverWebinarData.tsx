@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useSecureApiKeys } from './useSecureApiKeys';
+import { useApiKeys } from './useApiKeys';
 import { useToast } from './use-toast';
 
 interface EverWebinarEvent {
@@ -32,7 +32,7 @@ interface EverWebinarData {
 }
 
 export const useEverWebinarData = (projectId: string) => {
-  const { getApiKeys } = useSecureApiKeys(projectId);
+  const { getApiKeys } = useApiKeys();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 

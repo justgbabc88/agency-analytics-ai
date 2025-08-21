@@ -3,7 +3,7 @@ import React from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAgency } from './useAgency';
-import { useSecureApiKeys } from './useSecureApiKeys';
+import { useApiKeys } from './useApiKeys';
 import { useUserProfile } from './useUserProfile';
 import { format } from 'date-fns';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
@@ -53,7 +53,7 @@ interface UseFacebookDataProps {
 
 export const useFacebookData = ({ dateRange, campaignIds, adSetIds, projectId }: UseFacebookDataProps = {}) => {
   const { agency } = useAgency();
-  const { getApiKeys } = useSecureApiKeys(projectId);
+  const { getApiKeys } = useApiKeys();
   const { profile } = useUserProfile();
   const userTimezone = profile?.timezone || 'UTC';
   const queryClient = useQueryClient();

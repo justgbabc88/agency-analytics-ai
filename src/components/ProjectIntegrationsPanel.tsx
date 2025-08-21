@@ -78,11 +78,6 @@ export const ProjectIntegrationsPanel = ({ projectId, selectedFormIds = [], onFo
       });
     }
 
-    // For ads_only projects, only show Facebook integration
-    if (projectFunnelType === 'ads_only') {
-      return baseIntegrations.filter(integration => integration.id === 'facebook');
-    }
-
     return baseIntegrations;
   };
 
@@ -166,7 +161,7 @@ export const ProjectIntegrationsPanel = ({ projectId, selectedFormIds = [], onFo
     
     switch (platform.id) {
       case 'facebook':
-        return <FacebookConnector projectId={projectId} />;
+        return <FacebookConnector />;
       case 'calendly':
         return (
           <CalendlyConnector

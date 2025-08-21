@@ -1,8 +1,7 @@
 
 import React, { useState } from "react";
 import { CalendarIcon } from "lucide-react";
-import { format } from "date-fns";
-import { subDays } from "date-fns/subDays";
+import { format, subDays } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
