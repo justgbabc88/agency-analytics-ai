@@ -118,8 +118,20 @@ Deno.serve(async (req) => {
         }
 
         // Perform batch sync using Facebook's batch API
-        const syncDateRange = dateRange || { since: '30', until: '1' };
-        const syncResult = await performBatchSync(accessToken, adAccountId, syncDateRange);
+        // Convert relative date range to absolute dates for Facebook API
+        const defaultDateRange = { since: '30', until: '1' }; // Default to last 30 days
+        const effectiveDateRange = dateRange || defaultDateRange;
+        
+        const today = new Date();
+        const sinceDate = new Date(today.getTime() - parseInt(effectiveDateRange.since) * 24 * 60 * 60 * 1000);
+        const untilDate = new Date(today.getTime() - parseInt(effectiveDateRange.until) * 24 * 60 * 60 * 1000);
+        
+        const formattedDateRange = {
+          since: sinceDate.toISOString().split('T')[0], // YYYY-MM-DD format
+          until: untilDate.toISOString().split('T')[0]  // YYYY-MM-DD format
+        };
+        
+        const syncResult = await performBatchSync(accessToken, adAccountId, formattedDateRange);
         
         // Store the synced data
         await supabase
