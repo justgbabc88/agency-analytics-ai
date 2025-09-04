@@ -33,7 +33,18 @@ export const FacebookBatchSyncButton = ({ projectId, dateRange }: FacebookBatchS
         console.error("❌ Manual sync error:", error);
         toast({
           title: "Sync Failed",
-          description: `Failed to sync Facebook data: ${error.message}`,
+          description: error.message || "Failed to sync Facebook data",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Check if the response indicates an error (even if no error object)
+      if (data && !data.success && data.error) {
+        console.error("❌ Sync response error:", data);
+        toast({
+          title: "Sync Failed", 
+          description: data.error,
           variant: "destructive",
         });
         return;
