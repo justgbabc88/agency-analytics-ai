@@ -16,6 +16,21 @@ interface BatchResponse {
   body: string;
 }
 
+interface TokenRefreshResponse {
+  access_token: string;
+  expires_in: number;
+}
+
+interface FacebookError {
+  error: {
+    message: string;
+    type: string;
+    code: number;
+    error_subcode?: number;
+    fbtrace_id: string;
+  };
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -122,7 +137,7 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Perform batch sync using Facebook's batch API
+        // Perform batch sync using Facebook's batch API with retry logic
         // Always sync the last 30 days of data regardless of UI date range
         console.log('📅 Setting up date range for sync...');
         
@@ -138,11 +153,27 @@ Deno.serve(async (req) => {
           };
           
           console.log(`📅 Syncing Facebook data from ${syncDateRange.since} to ${syncDateRange.until}`);
-          syncResult = await performBatchSync(accessToken, adAccountId, syncDateRange);
+          
+          // Try sync with retry logic and token refresh
+          syncResult = await performBatchSyncWithRetry(
+            accessToken, 
+            adAccountId, 
+            syncDateRange,
+            integration.project_id,
+            supabase
+          );
           console.log('✅ performBatchSync completed successfully');
         } catch (syncError) {
           console.error('❌ Error in performBatchSync:', syncError);
-          throw syncError;
+          
+          // Try to get cached data as fallback
+          const fallbackData = await getCachedFacebookData(integration.project_id, supabase);
+          if (fallbackData) {
+            console.log('📦 Using cached data as fallback');
+            syncResult = { ...fallbackData, fromCache: true };
+          } else {
+            throw syncError;
+          }
         }
         
         // Store the synced data
@@ -238,6 +269,63 @@ function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+async function exponentialBackoff(attempt: number): Promise<void> {
+  const baseDelay = 1000; // 1 second
+  const maxDelay = 60000; // 60 seconds
+  const delay = Math.min(baseDelay * Math.pow(2, attempt), maxDelay);
+  console.log(`⏳ Backing off for ${delay}ms (attempt ${attempt + 1})`);
+  await sleep(delay);
+}
+
+async function validateToken(accessToken: string): Promise<boolean> {
+  try {
+    const response = await fetch(`https://graph.facebook.com/v18.0/me?access_token=${accessToken}`);
+    return response.ok;
+  } catch (error) {
+    console.error('Token validation failed:', error);
+    return false;
+  }
+}
+
+async function refreshFacebookToken(projectId: string, supabase: any): Promise<string | null> {
+  try {
+    console.log('🔄 Attempting to refresh Facebook token...');
+    
+    // In a real implementation, you would store refresh tokens and use them here
+    // For now, we'll return null to indicate manual reconnection is needed
+    console.log('⚠️ Token refresh not implemented - manual reconnection required');
+    return null;
+  } catch (error) {
+    console.error('Token refresh failed:', error);
+    return null;
+  }
+}
+
+async function getCachedFacebookData(projectId: string, supabase: any): Promise<any> {
+  try {
+    console.log('📦 Retrieving cached Facebook data...');
+    
+    const { data } = await supabase
+      .from('project_integration_data')
+      .select('data')
+      .eq('project_id', projectId)
+      .eq('platform', 'facebook')
+      .order('synced_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+      
+    if (data?.data) {
+      console.log('✅ Found cached data');
+      return data.data;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Failed to get cached data:', error);
+    return null;
+  }
+}
+
 async function fetchWithUsageCheck(url: string, options: RequestInit) {
   const response = await fetch(url, options);
   const headers = Object.fromEntries(response.headers.entries());
@@ -260,6 +348,79 @@ async function fetchWithUsageCheck(url: string, options: RequestInit) {
   return response;
 }
 
+function validateFacebookResponse(data: any): boolean {
+  // Basic validation of Facebook API response structure
+  if (!data) return false;
+  
+  // Check for Facebook error structure
+  if (data.error) {
+    console.error('Facebook API error:', data.error);
+    return false;
+  }
+  
+  return true;
+}
+
+async function performBatchSyncWithRetry(
+  accessToken: string, 
+  adAccountId: string, 
+  dateRange: { since: string; until: string },
+  projectId: string,
+  supabase: any,
+  maxRetries: number = 3
+): Promise<any> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      console.log(`🔄 Sync attempt ${attempt + 1}/${maxRetries}`);
+      
+      // Validate token before each attempt
+      const isTokenValid = await validateToken(accessToken);
+      if (!isTokenValid) {
+        console.warn('🔑 Token appears invalid, attempting refresh...');
+        const newToken = await refreshFacebookToken(projectId, supabase);
+        if (newToken) {
+          accessToken = newToken;
+          console.log('✅ Token refreshed successfully');
+        } else {
+          throw new Error('Token expired and refresh failed. Please reconnect Facebook.');
+        }
+      }
+      
+      const result = await performBatchSync(accessToken, adAccountId, dateRange);
+      
+      // Validate the response
+      if (!validateFacebookResponse(result)) {
+        throw new Error('Invalid Facebook API response structure');
+      }
+      
+      console.log(`✅ Sync successful on attempt ${attempt + 1}`);
+      return result;
+      
+    } catch (error) {
+      lastError = error as Error;
+      console.error(`❌ Sync attempt ${attempt + 1} failed:`, error);
+      
+      // Check if it's a rate limit error
+      if (error.message.includes('rate limit') || error.message.includes('429')) {
+        console.log('⏳ Rate limit detected, waiting longer...');
+        await sleep(30000); // Wait 30 seconds for rate limits
+      } else if (error.message.includes('token') || error.message.includes('401')) {
+        console.log('🔑 Token error detected');
+        // Token errors are handled above, don't retry without refresh
+        break;
+      } else if (attempt < maxRetries - 1) {
+        // Exponential backoff for other errors
+        await exponentialBackoff(attempt);
+      }
+    }
+  }
+  
+  // All retries failed
+  throw new Error(`Sync failed after ${maxRetries} attempts. Last error: ${lastError?.message}`);
+}
+
 async function performBatchSync(accessToken: string, adAccountId: string, dateRange: { since: string; until: string } = { since: '30', until: '1' }): Promise<any> {
   console.log(`🔄 Starting batch sync for ad account ${adAccountId}`);
 
@@ -279,7 +440,7 @@ async function performBatchSync(accessToken: string, adAccountId: string, dateRa
     }
   ];
 
-  // Make single batch API call to Facebook
+  // Make single batch API call to Facebook with error handling
   const batchResponse = await fetchWithUsageCheck('https://graph.facebook.com/v18.0/', {
     method: 'POST',
     headers: {
@@ -292,15 +453,78 @@ async function performBatchSync(accessToken: string, adAccountId: string, dateRa
   });
 
   if (!batchResponse.ok) {
-    throw new Error(`Facebook batch API error: ${batchResponse.status} ${batchResponse.statusText}`);
+    const errorText = await batchResponse.text();
+    console.error('Facebook batch API error details:', errorText);
+    
+    try {
+      const errorData = JSON.parse(errorText) as FacebookError;
+      if (errorData.error) {
+        throw new Error(`Facebook API error: ${errorData.error.message} (Code: ${errorData.error.code})`);
+      }
+    } catch (parseError) {
+      // Fallback to generic error if parsing fails
+      throw new Error(`Facebook batch API error: ${batchResponse.status} ${batchResponse.statusText}`);
+    }
   }
 
-  const batchResults: BatchResponse[] = await batchResponse.json();
-  console.log(`📦 Received ${batchResults.length} batch responses`);
-
-  // Parse batch responses
-  const campaigns = batchResults[0]?.code === 200 ? JSON.parse(batchResults[0].body).data || [] : [];
-  const insights = batchResults[2]?.code === 200 ? JSON.parse(batchResults[2].body).data?.[0] || {} : {};
+  let batchResults: BatchResponse[];
+  try {
+    batchResults = await batchResponse.json();
+    
+    // Validate batch results structure
+    if (!Array.isArray(batchResults)) {
+      throw new Error('Invalid batch response format: expected array');
+    }
+    
+    console.log(`📦 Received ${batchResults.length} batch responses`);
+    
+    // Log any individual batch errors
+    batchResults.forEach((result, index) => {
+      if (result.code !== 200) {
+        console.warn(`Batch request ${index} failed with code ${result.code}:`, result.body);
+      }
+    });
+    
+  } catch (parseError) {
+    throw new Error(`Failed to parse Facebook batch response: ${parseError.message}`);
+  }
+  // Parse batch responses with data validation
+  let campaigns = [];
+  let insights = {};
+  
+  // Parse campaigns with validation
+  if (batchResults[0]?.code === 200) {
+    try {
+      const campaignsData = JSON.parse(batchResults[0].body);
+      if (campaignsData.data && Array.isArray(campaignsData.data)) {
+        campaigns = campaignsData.data;
+        console.log(`✅ Successfully parsed ${campaigns.length} campaigns`);
+      } else {
+        console.warn('⚠️ Campaigns data has unexpected structure');
+      }
+    } catch (error) {
+      console.error('❌ Failed to parse campaigns data:', error);
+    }
+  } else {
+    console.warn(`⚠️ Campaigns request failed with code ${batchResults[0]?.code}`);
+  }
+  
+  // Parse insights with validation
+  if (batchResults[2]?.code === 200) {
+    try {
+      const insightsData = JSON.parse(batchResults[2].body);
+      if (insightsData.data && Array.isArray(insightsData.data)) {
+        insights = insightsData.data[0] || {};
+        console.log('✅ Successfully parsed insights data');
+      } else {
+        console.warn('⚠️ Insights data has unexpected structure');
+      }
+    } catch (error) {
+      console.error('❌ Failed to parse insights data:', error);
+    }
+  } else {
+    console.warn(`⚠️ Insights request failed with code ${batchResults[2]?.code}`);
+  }
 
   // Handle ad sets with rate limit awareness
   let adSets = [];
