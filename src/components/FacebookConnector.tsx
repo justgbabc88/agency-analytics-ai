@@ -44,6 +44,7 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(false);
   const [adAccounts, setAdAccounts] = useState<AdAccount[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<string>('');
+  const [isSavingAccount, setIsSavingAccount] = useState(false);
   
   // Project integration state
   const [projectIntegration, setProjectIntegration] = useState<ProjectIntegration | null>(null);
@@ -230,8 +231,12 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
   };
 
   const handleAccountSelect = async (accountId: string) => {
+    setIsSavingAccount(true);
+    console.log('🔄 Starting ad account selection for account:', accountId);
+    
     try {
       const selectedAdAccount = adAccounts.find(acc => acc.id === accountId);
+      console.log('✅ Found ad account details:', selectedAdAccount);
       
       const updatedKeys: SavedKeys = {
         ...savedKeys,
@@ -239,14 +244,55 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
         selected_ad_account_name: selectedAdAccount?.name || ''
       };
 
-      await supabase
-        .from('project_integration_data')
-        .update({ data: updatedKeys as any })
-        .eq('project_id', projectId)
-        .eq('platform', 'facebook');
+      console.log('📝 Saving updated keys to database:', updatedKeys);
 
+      // Use upsert instead of update to handle cases where no record exists
+      const { data, error } = await supabase
+        .from('project_integration_data')
+        .upsert({
+          project_id: projectId,
+          platform: 'facebook',
+          data: updatedKeys as any
+        })
+        .select();
+
+      if (error) {
+        console.error('❌ Database upsert error:', error);
+        throw new Error(`Database save failed: ${error.message}`);
+      }
+
+      console.log('✅ Database upsert successful:', data);
+
+      // Verify the save by immediately querying the database
+      console.log('🔍 Verifying ad account was saved...');
+      const { data: verifyData, error: verifyError } = await supabase
+        .from('project_integration_data')
+        .select('data')
+        .eq('project_id', projectId)
+        .eq('platform', 'facebook')
+        .single();
+
+      if (verifyError) {
+        console.error('❌ Verification query failed:', verifyError);
+        throw new Error(`Verification failed: ${verifyError.message}`);
+      }
+
+      const savedData = verifyData?.data as SavedKeys;
+      if (!savedData?.selected_ad_account_id || savedData.selected_ad_account_id !== accountId) {
+        console.error('❌ Verification failed - ad account not saved correctly:', {
+          expected: accountId,
+          actual: savedData?.selected_ad_account_id
+        });
+        throw new Error('Ad account selection was not saved correctly');
+      }
+
+      console.log('✅ Verification successful - ad account saved correctly:', savedData.selected_ad_account_id);
+
+      // Only update local state after successful database save and verification
       setSavedKeys(updatedKeys);
       setSelectedAccount(accountId);
+
+      console.log('✅ Ad account selection completed successfully');
 
       toast({
         title: "Ad Account Selected",
@@ -254,11 +300,20 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
       });
     } catch (error) {
       console.error('❌ Failed to save ad account selection:', error);
+      
+      // Reset local state if save failed
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      
       toast({
         title: "Selection Failed",
-        description: "Failed to save ad account selection",
+        description: `Failed to save ad account selection: ${errorMessage}`,
         variant: "destructive"
       });
+      
+      // Revert UI state on failure
+      setSelectedAccount('');
+    } finally {
+      setIsSavingAccount(false);
     }
   };
 
@@ -405,9 +460,13 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
               {hasAdsPermissions && adAccounts.length > 0 && (
                 <div className="space-y-3">
                   <Label htmlFor="ad-account-select">Select Ad Account</Label>
-                  <Select value={selectedAccount} onValueChange={handleAccountSelect}>
+                  <Select value={selectedAccount} onValueChange={handleAccountSelect} disabled={isSavingAccount}>
                     <SelectTrigger>
-                      <SelectValue placeholder={isLoadingAccounts ? "Loading accounts..." : "Select an ad account"} />
+                      <SelectValue placeholder={
+                        isSavingAccount ? "Saving selection..." : 
+                        isLoadingAccounts ? "Loading accounts..." : 
+                        "Select an ad account"
+                      } />
                     </SelectTrigger>
                     <SelectContent>
                       {adAccounts.map((account) => (
