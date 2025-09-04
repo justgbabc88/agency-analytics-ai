@@ -246,13 +246,15 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
 
       console.log('📝 Saving updated keys to database:', updatedKeys);
 
-      // Use upsert instead of update to handle cases where no record exists
+      // Use upsert with proper conflict resolution for existing records
       const { data, error } = await supabase
         .from('project_integration_data')
         .upsert({
           project_id: projectId,
           platform: 'facebook',
           data: updatedKeys as any
+        }, {
+          onConflict: 'project_id,platform'
         })
         .select();
 
