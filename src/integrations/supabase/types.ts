@@ -1462,6 +1462,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      setup_facebook_token_refresh_cron: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       setup_ghl_sync_cron: {
         Args: Record<PropertyKey, never>
         Returns: string
