@@ -190,7 +190,7 @@ export const useFacebookData = ({ dateRange, campaignIds, adSetIds, projectId }:
           projectId: projectId
         };
 
-        const syncResponse = await supabase.functions.invoke('sync-integrations', {
+        const syncResponse = await supabase.functions.invoke('sync-project-integrations', {
           body: syncPayload
         });
 
