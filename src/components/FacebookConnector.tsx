@@ -52,8 +52,16 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
   
   const isConnected = projectIntegration?.is_connected || false;
   const hasAdsPermissions = savedKeys.access_token && (
-    savedKeys.permissions?.includes('ads_read') || savedKeys.permissions?.includes('ads_management')
+    savedKeys.permissions?.includes('ads_read') || 
+    savedKeys.permissions?.includes('ads_management') ||
+    savedKeys.permissions?.includes('ads')
   );
+  
+  console.log('🔍 Permission check:', {
+    hasAccessToken: !!savedKeys.access_token,
+    permissions: savedKeys.permissions,
+    hasAdsPermissions
+  });
   
   // Load project integration and data on mount
   useEffect(() => {
