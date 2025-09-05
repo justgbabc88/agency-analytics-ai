@@ -1470,6 +1470,21 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      upsert_facebook_daily_insight: {
+        Args: {
+          p_campaign_id: string
+          p_campaign_name: string
+          p_clicks?: number
+          p_conversion_values?: number
+          p_conversions?: number
+          p_date: string
+          p_impressions?: number
+          p_project_id: string
+          p_reach?: number
+          p_spend?: number
+        }
+        Returns: string
+      }
       user_owns_project: {
         Args: { project_uuid: string }
         Returns: boolean

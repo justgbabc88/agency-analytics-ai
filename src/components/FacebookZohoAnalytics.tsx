@@ -89,7 +89,7 @@ export const FacebookZohoAnalytics = ({ projectId, dateRange, zohoLeadSourceFilt
       if (dealsOnDate.length > 0) {
         console.log(`FacebookZohoAnalytics - Date matching debug for ${isoDateStr}:`, {
           lookingFor: isoDateStr,
-          availableDates: dailyInsights.slice(0, 3).map(i => i.date || i.date_start),
+          availableDates: dailyInsights.slice(0, 3).map(i => i.date),
           foundInsight: !!facebookInsight,
           insightData: facebookInsight,
           spendFound: facebookInsight?.spend || 'No spend data'

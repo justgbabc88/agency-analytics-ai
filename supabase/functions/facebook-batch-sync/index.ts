@@ -211,6 +211,13 @@ Deno.serve(async (req) => {
               onConflict: 'project_id,platform'
             });
           console.log('✅ Data stored successfully');
+          
+          // Also store daily insights in the dedicated table
+          if (mergedData.daily_insights && mergedData.daily_insights.length > 0) {
+            console.log(`💾 Storing ${mergedData.daily_insights.length} daily insights to dedicated table...`);
+            await storeFacebookDailyInsights(supabase, integration.project_id, mergedData.daily_insights);
+            console.log('✅ Daily insights stored successfully');
+          }
         } catch (storeError) {
           console.error('❌ Error storing data:', storeError);
           throw storeError;
@@ -720,3 +727,49 @@ async function performBatchSync(accessToken: string, adAccountId: string, dateRa
   console.log(`✅ Batch sync completed for ad account ${adAccountId}`);
   return result;
 }
+
+// Helper function to store daily insights in the dedicated table
+async function storeFacebookDailyInsights(supabase: any, projectId: string, dailyInsights: any[]) {
+  try {
+    console.log(`📊 Processing ${dailyInsights.length} daily insights for project ${projectId}`);
+    
+    // Batch process insights (avoid too many individual calls)
+    const batchSize = 100;
+    let processed = 0;
+    
+    for (let i = 0; i < dailyInsights.length; i += batchSize) {
+      const batch = dailyInsights.slice(i, i + batchSize);
+      
+      // Use upsert function for each insight
+      for (const insight of batch) {
+        try {
+          await supabase.rpc('upsert_facebook_daily_insight', {
+            p_project_id: projectId,
+            p_campaign_id: insight.campaign_id,
+            p_campaign_name: insight.campaign_name || 'Unknown Campaign',
+            p_date: insight.date,
+            p_impressions: parseInt(insight.impressions || '0'),
+            p_clicks: parseInt(insight.clicks || '0'),
+            p_spend: parseFloat(insight.spend || '0'),
+            p_reach: parseInt(insight.reach || '0'),
+            p_conversions: parseInt(insight.conversions || '0'),
+            p_conversion_values: parseFloat(insight.conversion_values || '0')
+          });
+          processed++;
+        } catch (insightError) {
+          console.error(`⚠️ Failed to store insight for campaign ${insight.campaign_id} on ${insight.date}:`, insightError);
+          // Continue processing other insights
+        }
+      }
+      
+      // Small delay between batches
+      if (i + batchSize < dailyInsights.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+    
+    console.log(`✅ Successfully processed ${processed}/${dailyInsights.length} daily insights`);
+  } catch (error) {
+    console.error('❌ Error storing daily insights:', error);
+    throw error;
+  }
