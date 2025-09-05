@@ -118,16 +118,30 @@ async function handleExchangeCode(code: string, projectId: string, supabase: any
 
   const tokenData = await response.json()
   
-  // Get user info with basic permissions
+  // Immediately exchange for long-lived token
+  console.log('🔄 Exchanging for long-lived token...')
+  const longLivedToken = await exchangeForLongLivedToken(tokenData.access_token)
+  
+  // Use long-lived token if successful, otherwise fall back to short-lived
+  const finalTokenData = longLivedToken || tokenData
+  const isLongLived = !!longLivedToken
+  
+  console.log(`📅 Token type: ${isLongLived ? 'long-lived' : 'short-lived'}`)
+  if (finalTokenData.expires_in) {
+    const expiryDays = Math.floor(finalTokenData.expires_in / 86400)
+    console.log(`⏰ Token expires in ${expiryDays} days`)
+  }
+  
+  // Get user info with the final token
   const userResponse = await fetch(
-    `https://graph.facebook.com/v18.0/me?access_token=${tokenData.access_token}&fields=id,name,email`
+    `https://graph.facebook.com/v18.0/me?access_token=${finalTokenData.access_token}&fields=id,name,email`
   )
   
   const userData = await userResponse.json()
 
   // Check what permissions we actually have
   const permissionsResponse = await fetch(
-    `https://graph.facebook.com/v18.0/me/permissions?access_token=${tokenData.access_token}`
+    `https://graph.facebook.com/v18.0/me/permissions?access_token=${finalTokenData.access_token}`
   )
   
   const permissionsData = await permissionsResponse.json()
@@ -137,13 +151,15 @@ async function handleExchangeCode(code: string, projectId: string, supabase: any
 
   // Store the tokens in project_integration_data table
   const tokenPayload = {
-    access_token: tokenData.access_token,
-    token_type: tokenData.token_type,
+    access_token: finalTokenData.access_token,
+    token_type: finalTokenData.token_type,
     user_id: userData.id,
     user_name: userData.name,
     user_email: userData.email,
     permissions: grantedPermissions,
-    expires_in: tokenData.expires_in,
+    expires_in: finalTokenData.expires_in,
+    is_long_lived: isLongLived,
+    token_obtained_at: new Date().toISOString(),
     oauth_completed_at: new Date().toISOString()
   }
 
@@ -214,11 +230,13 @@ async function handleExchangeCode(code: string, projectId: string, supabase: any
       success: true,
       message: 'Facebook connected successfully',
       // Return only what's needed for immediate UI feedback
-      access_token: tokenData.access_token, // Still needed for immediate ad account fetching
+      access_token: finalTokenData.access_token,
       user_id: userData.id,
       user_name: userData.name,
       user_email: userData.email,
-      permissions: grantedPermissions
+      permissions: grantedPermissions,
+      is_long_lived: isLongLived,
+      expires_in: finalTokenData.expires_in
     }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   )
@@ -277,4 +295,53 @@ async function handleGetAdAccounts(accessToken: string) {
     }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   )
+}
+
+async function exchangeForLongLivedToken(shortLivedToken: string) {
+  const clientId = Deno.env.get('FACEBOOK_APP_ID')
+  const clientSecret = Deno.env.get('FACEBOOK_APP_SECRET')
+  
+  if (!clientId || !clientSecret) {
+    console.warn('Facebook app credentials not configured for long-lived token exchange')
+    return null
+  }
+
+  try {
+    const exchangeUrl = `https://graph.facebook.com/v18.0/oauth/access_token?` +
+      `grant_type=fb_exchange_token&` +
+      `client_id=${clientId}&` +
+      `client_secret=${clientSecret}&` +
+      `fb_exchange_token=${shortLivedToken}`
+
+    console.log('🔄 Attempting to exchange for long-lived token')
+
+    const response = await fetch(exchangeUrl, {
+      method: 'GET'
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.warn('⚠️ Long-lived token exchange failed:', errorText)
+      return null
+    }
+
+    const tokenData = await response.json()
+    
+    if (tokenData.error) {
+      console.warn('⚠️ Long-lived token exchange error:', tokenData.error)
+      return null
+    }
+
+    console.log(`✅ Successfully obtained long-lived token (expires in ${tokenData.expires_in} seconds)`)
+    
+    return {
+      access_token: tokenData.access_token,
+      token_type: tokenData.token_type || 'bearer',
+      expires_in: tokenData.expires_in
+    }
+
+  } catch (error) {
+    console.warn('⚠️ Long-lived token exchange error:', error)
+    return null
+  }
 }
