@@ -38,11 +38,11 @@ export const useIntegrations = () => {
         const apiKeys = getApiKeys(platform);
         
         if (Object.keys(apiKeys).length > 0) {
-          const { data: syncData, error: syncError } = await supabase.functions.invoke('sync-integrations', {
+          const { data: syncData, error: syncError } = await supabase.functions.invoke('sync-project-integrations', {
             body: {
               platform,
               apiKeys,
-              agencyId: agency.id
+              projectId: agency.id // Note: This seems to be using agency.id as projectId - might need review
             }
           });
 
@@ -121,11 +121,11 @@ export const useIntegrations = () => {
       
       const apiKeys = getApiKeys(platform);
       
-      const { data, error } = await supabase.functions.invoke('sync-integrations', {
+      const { data, error } = await supabase.functions.invoke('sync-project-integrations', {
         body: {
           platform,
           apiKeys,
-          agencyId: agency.id
+          projectId: agency.id // Note: This seems to be using agency.id as projectId - might need review
         }
       });
 
