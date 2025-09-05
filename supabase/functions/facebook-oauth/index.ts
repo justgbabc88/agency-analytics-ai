@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -12,6 +11,7 @@ interface FacebookOAuthRequest {
   code?: string
   access_token?: string
   permission_level?: 'basic' | 'ads'
+  projectId?: string
 }
 
 serve(async (req) => {
@@ -27,13 +27,16 @@ serve(async (req) => {
 
     const { action, code, access_token, permission_level, projectId }: FacebookOAuthRequest = await req.json()
 
-    console.log(`Facebook OAuth action: ${action}`)
+    console.log(`Facebook OAuth action: ${action}, projectId: ${projectId}`)
 
     switch (action) {
       case 'initiate':
         return handleInitiateAuth(permission_level || 'basic')
       case 'exchange':
-        return await handleExchangeCode(code!)
+        if (!projectId) {
+          throw new Error('projectId is required for token exchange')
+        }
+        return await handleExchangeCode(code!, projectId, supabase)
       case 'test_api':
         return await handleTestApiCall(access_token!)
       case 'upgrade_permissions':
@@ -86,7 +89,7 @@ function handleInitiateAuth(permissionLevel: 'basic' | 'ads' = 'basic') {
   )
 }
 
-async function handleExchangeCode(code: string) {
+async function handleExchangeCode(code: string, projectId: string, supabase: any) {
   const clientId = Deno.env.get('FACEBOOK_APP_ID')
   const clientSecret = Deno.env.get('FACEBOOK_APP_SECRET')
   const redirectUri = Deno.env.get('FACEBOOK_REDIRECT_URI')
@@ -132,10 +135,86 @@ async function handleExchangeCode(code: string) {
 
   console.log('Successfully exchanged code for access token with permissions:', grantedPermissions)
 
+  // Store the tokens in project_integration_data table
+  const tokenPayload = {
+    access_token: tokenData.access_token,
+    token_type: tokenData.token_type,
+    user_id: userData.id,
+    user_name: userData.name,
+    user_email: userData.email,
+    permissions: grantedPermissions,
+    expires_in: tokenData.expires_in,
+    oauth_completed_at: new Date().toISOString()
+  }
+
+  try {
+    console.log(`💾 Storing Facebook OAuth tokens for project ${projectId}`)
+    
+    // Get existing data to preserve any previous sync data
+    const { data: existingData } = await supabase
+      .from('project_integration_data')
+      .select('data')
+      .eq('project_id', projectId)
+      .eq('platform', 'facebook')
+      .maybeSingle()
+
+    // Merge with existing data if it exists
+    let mergedData = tokenPayload
+    if (existingData?.data) {
+      const existing = existingData.data as any
+      mergedData = {
+        ...existing, // Preserve existing sync data
+        ...tokenPayload // Override with new OAuth tokens
+      }
+      console.log('🔄 Merged new tokens with existing sync data')
+    }
+
+    const { error: storeError } = await supabase
+      .from('project_integration_data')
+      .upsert({
+        project_id: projectId,
+        platform: 'facebook',
+        data: mergedData,
+        synced_at: new Date().toISOString()
+      }, {
+        onConflict: 'project_id,platform'
+      })
+
+    if (storeError) {
+      console.error('❌ Failed to store tokens in database:', storeError)
+      throw new Error('Failed to store authentication tokens')
+    }
+
+    // Update project integration status
+    const { error: integrationError } = await supabase
+      .from('project_integrations')
+      .upsert({
+        project_id: projectId,
+        platform: 'facebook',
+        is_connected: true,
+        last_sync: new Date().toISOString()
+      }, {
+        onConflict: 'project_id,platform'
+      })
+
+    if (integrationError) {
+      console.error('❌ Failed to update integration status:', integrationError)
+      // Don't throw here, tokens are stored, this is secondary
+    }
+
+    console.log('✅ OAuth tokens stored successfully in database')
+  } catch (error) {
+    console.error('❌ Database operation failed:', error)
+    throw new Error('Failed to store authentication data')
+  }
+
+  // Return minimal data to client - they should use database for future operations
   return new Response(
     JSON.stringify({
-      access_token: tokenData.access_token,
-      token_type: tokenData.token_type,
+      success: true,
+      message: 'Facebook connected successfully',
+      // Return only what's needed for immediate UI feedback
+      access_token: tokenData.access_token, // Still needed for immediate ad account fetching
       user_id: userData.id,
       user_name: userData.name,
       user_email: userData.email,
