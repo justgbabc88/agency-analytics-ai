@@ -91,13 +91,54 @@ serve(async (req) => {
         throw new Error(`Unsupported platform: ${platform}`)
     }
 
+    // Before storing, get existing data to preserve credentials
+    const { data: existingData } = await supabase
+      .from('project_integration_data')
+      .select('data')
+      .eq('project_id', projectId)
+      .eq('platform', platform)
+      .maybeSingle()
+
+    // Merge existing credentials with new sync data
+    let mergedData = syncResult
+    if (existingData?.data) {
+      const existing = existingData.data as any
+      
+      // For Facebook, preserve authentication credentials
+      if (platform === 'facebook' && existing.access_token) {
+        mergedData = {
+          ...syncResult,
+          // Preserve authentication credentials
+          access_token: existing.access_token,
+          selected_ad_account_id: existing.selected_ad_account_id,
+          permissions: existing.permissions,
+          // Preserve other OAuth-related fields
+          user_id: existing.user_id,
+          expires_in: existing.expires_in
+        }
+        console.log('🔐 Preserved Facebook credentials during sync')
+      }
+      
+      // For other platforms, preserve any oauth tokens or credentials
+      if (existing.oauth_token || existing.refresh_token || existing.access_token) {
+        mergedData = {
+          ...syncResult,
+          oauth_token: existing.oauth_token,
+          refresh_token: existing.refresh_token,
+          access_token: existing.access_token,
+          ...mergedData
+        }
+        console.log(`🔐 Preserved ${platform} credentials during sync`)
+      }
+    }
+
     // Store the synced data in the project_integration_data table using upsert
     const { error: insertError } = await supabase
       .from('project_integration_data')
       .upsert({
         project_id: projectId,
         platform,
-        data: syncResult,
+        data: mergedData,
         synced_at: new Date().toISOString()
       }, {
         onConflict: 'project_id,platform'

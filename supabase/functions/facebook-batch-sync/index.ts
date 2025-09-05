@@ -171,15 +171,41 @@ Deno.serve(async (req) => {
           }
         }
         
-        // Store the synced data
+        // Store the synced data - preserve existing credentials
         console.log('💾 Storing synced data...');
         try {
+          // Get existing data to preserve credentials
+          const { data: existingRecord } = await supabase
+            .from('project_integration_data')
+            .select('data')
+            .eq('project_id', integration.project_id)
+            .eq('platform', 'facebook')
+            .maybeSingle();
+
+          // Merge existing credentials with new sync data
+          let mergedData = syncResult;
+          if (existingRecord?.data) {
+            const existing = existingRecord.data as any;
+            if (existing.access_token) {
+              mergedData = {
+                ...syncResult,
+                // Preserve authentication credentials
+                access_token: existing.access_token,
+                selected_ad_account_id: existing.selected_ad_account_id,
+                permissions: existing.permissions,
+                user_id: existing.user_id,
+                expires_in: existing.expires_in
+              };
+              console.log('🔐 Preserved Facebook credentials during batch sync');
+            }
+          }
+
           await supabase
             .from('project_integration_data')
             .upsert({
               project_id: integration.project_id,
               platform: 'facebook',
-              data: syncResult,
+              data: mergedData,
               synced_at: new Date().toISOString()
             }, {
               onConflict: 'project_id,platform'
