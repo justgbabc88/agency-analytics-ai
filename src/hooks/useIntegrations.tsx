@@ -3,12 +3,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useAgency } from './useAgency';
-import { useApiKeys } from './useApiKeys';
+import { useSecureApiKeys } from './useSecureApiKeys';
 
 export const useIntegrations = () => {
   const { user } = useAuth();
   const { agency } = useAgency();
-  const { getApiKeys } = useApiKeys();
+  const { getApiKeys } = useSecureApiKeys();
   const queryClient = useQueryClient();
 
   const { data: integrations, isLoading } = useQuery({

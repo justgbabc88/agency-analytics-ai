@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { ApiKeyMigrationNotice } from '@/components/ApiKeyMigrationNotice';
 
 const Integrations = () => {
   const navigate = useNavigate();
@@ -21,6 +22,8 @@ const Integrations = () => {
             Back to Dashboard
           </Button>
         </div>
+
+        <ApiKeyMigrationNotice />
 
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-center mb-4">Integrations</h1>
