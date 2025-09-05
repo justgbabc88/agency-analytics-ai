@@ -51,7 +51,9 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
   const [savedKeys, setSavedKeys] = useState<SavedKeys>({});
   
   const isConnected = projectIntegration?.is_connected || false;
-  const hasAdsPermissions = savedKeys.access_token && savedKeys.permissions?.includes('ads_read');
+  const hasAdsPermissions = savedKeys.access_token && (
+    savedKeys.permissions?.includes('ads_read') || savedKeys.permissions?.includes('ads_management')
+  );
   
   // Load project integration and data on mount
   useEffect(() => {
