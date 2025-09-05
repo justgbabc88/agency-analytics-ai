@@ -773,3 +773,4 @@ async function storeFacebookDailyInsights(supabase: any, projectId: string, dail
     console.error('❌ Error storing daily insights:', error);
     throw error;
   }
+}
