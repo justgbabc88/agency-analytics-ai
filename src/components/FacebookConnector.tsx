@@ -101,6 +101,18 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
     loadProjectIntegration();
   }, [projectId]);
 
+  // Re-fetch ad accounts if we have ads permissions but no accounts loaded
+  useEffect(() => {
+    const refetchAdAccountsIfNeeded = async () => {
+      if (hasAdsPermissions && adAccounts.length === 0 && !isLoadingAccounts && savedKeys.access_token) {
+        console.log('🔄 Re-fetching ad accounts since we have permissions but no accounts loaded');
+        await fetchAdAccounts(savedKeys.access_token);
+      }
+    };
+
+    refetchAdAccountsIfNeeded();
+  }, [hasAdsPermissions, adAccounts.length, isLoadingAccounts, savedKeys.access_token]);
+
   // Add OAuth callback message listener
   useEffect(() => {
     const handleMessage = async (event: MessageEvent) => {
@@ -312,7 +324,7 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
         variant: "destructive"
       });
       
-      // Revert UI state on failure
+      // Revert UI state on failure, but keep ad accounts loaded
       setSelectedAccount('');
     } finally {
       setIsSavingAccount(false);
