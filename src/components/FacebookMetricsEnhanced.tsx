@@ -3,6 +3,7 @@ import { useFacebookData } from "@/hooks/useFacebookData";
 import { FacebookCampaignFilter } from "./FacebookCampaignFilter";
 import { FacebookBatchSyncButton } from "./FacebookBatchSyncButton";
 import { FacebookZohoAnalytics } from "./FacebookZohoAnalytics";
+import { FacebookDataDiagnostic } from "./FacebookDataDiagnostic";
 import { ConversionChart } from "./ConversionChart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -267,6 +268,8 @@ export const FacebookMetricsEnhanced = ({ dateRange, projectId }: FacebookMetric
           </div>
         </CardContent>
       </Card>
+
+      <FacebookDataDiagnostic projectId={projectId} />
     </div>
   );
 };
