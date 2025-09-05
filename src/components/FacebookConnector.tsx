@@ -100,7 +100,9 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
         console.error('❌ Error loading project integration data:', keyError);
       } else {
         console.log('✅ Project integration data loaded:', keyData);
-        setSavedKeys((keyData?.data as SavedKeys) || {});
+        const savedData = (keyData?.data as SavedKeys) || {};
+        console.log('🔍 Saved keys data:', savedData);
+        setSavedKeys(savedData);
         
         if (keyData?.data && typeof keyData.data === 'object' && 'selected_ad_account_id' in keyData.data) {
           setSelectedAccount((keyData.data as SavedKeys).selected_ad_account_id || '');
