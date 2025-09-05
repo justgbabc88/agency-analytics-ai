@@ -57,12 +57,7 @@ Deno.serve(async (req) => {
     let query = supabase
       .from('project_integrations')
       .select(`
-        *,
-        projects (
-          id,
-          name,
-          agency_id
-        )
+        *
       `)
       .eq('platform', 'facebook')
       .eq('is_connected', true);
