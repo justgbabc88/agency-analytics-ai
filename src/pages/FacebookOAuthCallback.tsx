@@ -44,12 +44,12 @@ export const FacebookOAuthCallbackPage = () => {
         } catch (error) {
           console.error('Failed to send message to parent window:', error);
           // Fallback: redirect to integrations page
-          window.location.href = '/integrations?facebook_code=' + code;
+          window.location.href = '/?tab=facebook&facebook_code=' + code;
         }
       } else {
         console.log('Not a popup or opener closed, redirecting to integrations page');
         // If not a popup, redirect to integrations page with the code
-        navigate('/integrations?facebook_code=' + code);
+        navigate('/?tab=facebook&facebook_code=' + code);
       }
     } else if (error) {
       // Handle OAuth error
@@ -72,11 +72,11 @@ export const FacebookOAuthCallbackPage = () => {
         } catch (error) {
           console.error('Failed to send error message to parent window:', error);
           // Fallback: redirect to integrations page
-          window.location.href = '/integrations?error=' + error;
+          window.location.href = '/?tab=facebook&error=' + error;
         }
       } else {
         console.log('Not a popup or opener closed, redirecting to integrations page with error');
-        navigate('/integrations?error=' + error);
+        navigate('/?tab=facebook&error=' + error);
       }
     } else {
       // No code or error, redirect to home

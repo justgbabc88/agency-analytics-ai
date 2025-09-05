@@ -5,6 +5,7 @@ import { BookCallFunnel } from "@/components/BookCallFunnel";
 import { WebinarFunnel } from "@/components/WebinarFunnel";
 import { ProjectIntegrationsPanel } from "@/components/ProjectIntegrationsPanel";
 import { FacebookAIInsights } from "@/components/FacebookAIInsights";
+import { FacebookDataDiagnostic } from "@/components/FacebookDataDiagnostic";
 import { BookCallAIAssistant } from "@/components/BookCallAIAssistant";
 import { FacebookMetrics } from "@/components/FacebookMetrics";
 import { PixelSetupWizard } from '@/components/PixelSetupWizard';
@@ -33,6 +34,10 @@ interface FunnelProductConfig {
 }
 
 const Index = () => {
+  // Check URL params for Facebook OAuth redirect
+  const urlParams = new URLSearchParams(window.location.search);
+  const initialTab = urlParams.get('tab') || 'funnel';
+  
   // Initialize dateRange to last 7 days including today
   const [dateRange, setDateRange] = useState(() => {
     const today = new Date();
@@ -260,7 +265,7 @@ const Index = () => {
       <Navbar onDateChange={handleDateChange} />
       
       <div className="p-6">
-        <Tabs defaultValue="funnel" className="space-y-6">
+        <Tabs defaultValue={initialTab} className="space-y-6">
           <div className="bg-white border border-gray-200 rounded-lg p-6">
             <TabsList className="grid w-full grid-cols-4 h-12">
               <TabsTrigger value="funnel" className="flex items-center justify-center gap-2 h-10">
@@ -299,6 +304,13 @@ const Index = () => {
               selectedFormIds={selectedFormIds}
               zohoLeadSourceFilter={zohoLeadSourceFilter}
             />
+            
+            {/* Add Facebook Data Diagnostic */}
+            {selectedProjectId && (
+              <div className="mt-6">
+                <FacebookDataDiagnostic projectId={selectedProjectId} />
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="tracking" className="space-y-6">
