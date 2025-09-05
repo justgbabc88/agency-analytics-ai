@@ -518,6 +518,66 @@ export type Database = {
           },
         ]
       }
+      facebook_daily_insights: {
+        Row: {
+          campaign_id: string
+          campaign_name: string | null
+          clicks: number | null
+          conversion_values: number | null
+          conversions: number | null
+          cpc: number | null
+          cpm: number | null
+          created_at: string | null
+          ctr: number | null
+          date: string
+          frequency: number | null
+          id: string
+          impressions: number | null
+          project_id: string
+          reach: number | null
+          spend: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          campaign_id: string
+          campaign_name?: string | null
+          clicks?: number | null
+          conversion_values?: number | null
+          conversions?: number | null
+          cpc?: number | null
+          cpm?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          date: string
+          frequency?: number | null
+          id?: string
+          impressions?: number | null
+          project_id: string
+          reach?: number | null
+          spend?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          campaign_id?: string
+          campaign_name?: string | null
+          clicks?: number | null
+          conversion_values?: number | null
+          conversions?: number | null
+          cpc?: number | null
+          cpm?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          date?: string
+          frequency?: number | null
+          id?: string
+          impressions?: number | null
+          project_id?: string
+          reach?: number | null
+          spend?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       ghl_form_submissions: {
         Row: {
           contact_email: string | null
