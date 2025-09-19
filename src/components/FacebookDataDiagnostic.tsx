@@ -74,16 +74,32 @@ export const FacebookDataDiagnostic = ({ projectId }: FacebookDataDiagnosticProp
         return;
       }
 
-      const auth = authData?.data ? (authData.data as any)?.auth : null;
+      const auth = authData?.data as any;
       if (!auth || !auth.access_token) {
         addResult({ step: "2. Authentication Data", status: "error", message: "No Facebook access token found. Reconnection required." });
       } else {
-        addResult({ 
-          step: "2. Authentication Data", 
-          status: "success", 
-          message: `Access token found. Ad account: ${auth.selected_ad_account_name || 'Unknown'}`,
-          details: { hasToken: true, adAccount: auth.selected_ad_account_id }
-        });
+        // Fix integration status if token exists but integration shows as disconnected
+        if (!integration.is_connected && auth.access_token) {
+          await supabase
+            .from('project_integrations')
+            .update({ is_connected: true, last_sync: (authData as any)?.synced_at })
+            .eq('project_id', projectId)
+            .eq('platform', 'facebook');
+          
+          addResult({ 
+            step: "2. Authentication Data", 
+            status: "success", 
+            message: `Access token found and integration status fixed. Ad account: ${auth.selected_ad_account_id || 'Unknown'}`,
+            details: { hasToken: true, adAccount: auth.selected_ad_account_id, permissions: auth.permissions }
+          });
+        } else {
+          addResult({ 
+            step: "2. Authentication Data", 
+            status: "success", 
+            message: `Access token found. Ad account: ${auth.selected_ad_account_id || 'Unknown'}`,
+            details: { hasToken: true, adAccount: auth.selected_ad_account_id, permissions: auth.permissions }
+          });
+        }
       }
 
       // Step 3: Check daily insights data
@@ -121,20 +137,36 @@ export const FacebookDataDiagnostic = ({ projectId }: FacebookDataDiagnosticProp
       if (recentError) {
         addResult({ step: "4. Recent Sync Status", status: "error", message: `Error: ${recentError.message}` });
       } else if (recentData) {
-        const meta = recentData.data ? (recentData.data as any)?.meta : null;
-        const rateLimitHit = meta?.rateLimitHit;
-        const syncMethod = meta?.syncMethod;
+        const data = recentData.data as any;
+        const meta = data?.meta;
+        const rateLimitHit = data?.rate_limit_hit || meta?.rateLimitHit;
+        const syncMethod = meta?.syncMethod || data?.sync_method;
+        
+        // Check sync freshness
+        const syncDate = new Date(recentData.synced_at);
+        const hoursSinceSync = (Date.now() - syncDate.getTime()) / (1000 * 60 * 60);
+        
+        let status: 'success' | 'warning' | 'info' = 'info';
+        let message = `Last sync: ${recentData.synced_at}. Method: ${syncMethod || 'unknown'}. Rate limit hit: ${rateLimitHit ? 'Yes' : 'No'}`;
+        
+        if (rateLimitHit) {
+          status = 'warning';
+          message += '. This explains why no data is showing - Facebook is rate limiting API calls.';
+        } else if (hoursSinceSync > 24) {
+          status = 'warning';
+          message += `. Data is ${Math.round(hoursSinceSync)} hours old.`;
+        }
         
         addResult({ 
           step: "4. Recent Sync Status", 
-          status: rateLimitHit ? "warning" : "info", 
-          message: `Last sync: ${recentData.synced_at}. Method: ${syncMethod}. Rate limit hit: ${rateLimitHit ? 'Yes' : 'No'}`,
-          details: meta
+          status, 
+          message,
+          details: { meta, rateLimitHit, hoursSinceSync: Math.round(hoursSinceSync) }
         });
       }
 
       // Step 5: Test manual sync
-      if (auth?.access_token) {
+      if ((auth as any)?.access_token) {
         addResult({ step: "5. Testing Manual Sync", status: "info", message: "Attempting manual sync..." });
         
         const { data: syncResult, error: syncError } = await supabase.functions.invoke('facebook-batch-sync', {
