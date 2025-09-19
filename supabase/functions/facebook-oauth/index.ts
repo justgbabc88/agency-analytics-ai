@@ -74,12 +74,16 @@ function handleInitiateAuth(permissionLevel: 'basic' | 'ads' = 'basic') {
   
   const scopes = permissionLevel === 'basic' ? basicScopes : [...basicScopes, ...adsScopes]
   
+  // Generate secure state token with timestamp
+  const stateToken = `${crypto.randomUUID()}_${Date.now()}`
+  
   const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?` +
     `client_id=${clientId}&` +
     `redirect_uri=${encodeURIComponent(redirectUri)}&` +
     `scope=${encodeURIComponent(scopes.join(','))}&` +
     `response_type=code&` +
-    `state=${crypto.randomUUID()}`
+    `auth_type=reauthenticate&` +
+    `state=${stateToken}`
 
   console.log(`Generated Facebook auth URL for ${permissionLevel} permissions`)
 
