@@ -64,7 +64,7 @@ export const FacebookDataDiagnostic = ({ projectId }: FacebookDataDiagnosticProp
       
       const { data: authData, error: authError } = await supabase
         .from('project_integration_data')
-        .select('data')
+        .select('data, synced_at')
         .eq('project_id', projectId)
         .eq('platform', 'facebook')
         .maybeSingle();
@@ -82,21 +82,21 @@ export const FacebookDataDiagnostic = ({ projectId }: FacebookDataDiagnosticProp
         if (!integration.is_connected && auth.access_token) {
           await supabase
             .from('project_integrations')
-            .update({ is_connected: true, last_sync: (authData as any)?.synced_at })
+            .update({ is_connected: true, last_sync: authData?.synced_at })
             .eq('project_id', projectId)
             .eq('platform', 'facebook');
           
           addResult({ 
             step: "2. Authentication Data", 
             status: "success", 
-            message: `Access token found and integration status fixed. Ad account: ${auth.selected_ad_account_id || 'Unknown'}`,
+            message: `✅ Access token found and integration status fixed! Ad account: ${auth.selected_ad_account_id || 'Unknown'}`,
             details: { hasToken: true, adAccount: auth.selected_ad_account_id, permissions: auth.permissions }
           });
         } else {
           addResult({ 
             step: "2. Authentication Data", 
             status: "success", 
-            message: `Access token found. Ad account: ${auth.selected_ad_account_id || 'Unknown'}`,
+            message: `✅ Access token found! Ad account: ${auth.selected_ad_account_id || 'Unknown'}`,
             details: { hasToken: true, adAccount: auth.selected_ad_account_id, permissions: auth.permissions }
           });
         }
