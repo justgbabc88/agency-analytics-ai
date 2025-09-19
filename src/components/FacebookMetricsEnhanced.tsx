@@ -4,6 +4,7 @@ import { FacebookCampaignFilter } from "./FacebookCampaignFilter";
 import { FacebookBatchSyncButton } from "./FacebookBatchSyncButton";
 import { FacebookZohoAnalytics } from "./FacebookZohoAnalytics";
 import { FacebookDataDiagnostic } from "./FacebookDataDiagnostic";
+import { FacebookRateLimitMonitor } from "./FacebookRateLimitMonitor";
 import { ConversionChart } from "./ConversionChart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -240,6 +241,9 @@ export const FacebookMetricsEnhanced = ({ dateRange, projectId }: FacebookMetric
         projectId={projectId}
         dateRange={dateRange}
       />
+
+      {/* Rate Limit Monitor */}
+      <FacebookRateLimitMonitor projectId={projectId} />
 
       {/* Data Status Info */}
       <Card>

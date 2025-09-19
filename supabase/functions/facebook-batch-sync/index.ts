@@ -354,23 +354,20 @@ async function getCachedFacebookData(projectId: string, supabase: any): Promise<
   }
 }
 
-async function fetchWithUsageCheck(url: string, options: RequestInit) {
+async function fetchWithEnhancedUsageCheck(url: string, options: RequestInit) {
   const response = await fetch(url, options);
-  const headers = Object.fromEntries(response.headers.entries());
-
-  try {
-    const usage = headers['x-ad-account-usage'] ? JSON.parse(headers['x-ad-account-usage']) : null;
-    const appUsage = headers['x-app-usage'] ? JSON.parse(headers['x-app-usage']) : null;
+  
+  // Check rate limit headers before processing response
+  const rateLimitInfo = await checkRateLimitHeaders(response);
+  
+  if (rateLimitInfo.isRateLimited) {
+    console.warn(`⚠️ Rate limit warning: ${rateLimitInfo.message} (${rateLimitInfo.usagePercentage}% used)`);
     
-    console.log('📊 Ad account usage:', usage);
-    console.log('📊 App usage:', appUsage);
-
-    if (usage && usage.call_count > 80000) {
-      console.warn('⏳ Approaching rate limit. Sleeping for 60 seconds...');
-      await sleep(60000);
+    // If we're very close to limits, proactively wait
+    if (rateLimitInfo.usagePercentage && rateLimitInfo.usagePercentage > 95) {
+      console.warn('🛑 Proactive rate limit protection: waiting 5 minutes...');
+      await sleep(300000);
     }
-  } catch (err) {
-    console.warn('Could not parse usage headers:', headers['x-ad-account-usage'], headers['x-app-usage']);
   }
 
   return response;
@@ -389,19 +386,87 @@ function validateFacebookResponse(data: any): boolean {
   return true;
 }
 
+interface RateLimitInfo {
+  isRateLimited: boolean;
+  retryAfter?: number;
+  usagePercentage?: number;
+  message?: string;
+}
+
+async function checkRateLimitHeaders(response: Response): Promise<RateLimitInfo> {
+  const headers = Object.fromEntries(response.headers.entries());
+  
+  try {
+    const usage = headers['x-ad-account-usage'] ? JSON.parse(headers['x-ad-account-usage']) : null;
+    const appUsage = headers['x-app-usage'] ? JSON.parse(headers['x-app-usage']) : null;
+    
+    console.log('📊 Rate limit usage:', { usage, appUsage });
+    
+    // Check if we're approaching limits
+    if (usage && usage.call_count > 90000) {
+      return {
+        isRateLimited: true,
+        retryAfter: 3600, // 1 hour
+        usagePercentage: (usage.call_count / 100000) * 100,
+        message: 'Approaching ad account call limit'
+      };
+    }
+    
+    if (appUsage && appUsage.call_count > 190) {
+      return {
+        isRateLimited: true,
+        retryAfter: 3600, // 1 hour  
+        usagePercentage: (appUsage.call_count / 200) * 100,
+        message: 'Approaching app rate limit'
+      };
+    }
+    
+    return { isRateLimited: false };
+    
+  } catch (err) {
+    console.warn('Could not parse rate limit headers:', err);
+    return { isRateLimited: false };
+  }
+}
+
+async function smartExponentialBackoff(attempt: number, isRateLimit: boolean = false): Promise<void> {
+  let delay: number;
+  
+  if (isRateLimit) {
+    // For rate limits, use longer delays
+    const rateLimitDelays = [30000, 60000, 300000, 900000]; // 30s, 1m, 5m, 15m
+    delay = rateLimitDelays[Math.min(attempt, rateLimitDelays.length - 1)];
+  } else {
+    // For other errors, use standard exponential backoff
+    const baseDelay = 2000; // 2 seconds
+    const maxDelay = 120000; // 2 minutes
+    delay = Math.min(baseDelay * Math.pow(2, attempt), maxDelay);
+  }
+  
+  console.log(`⏳ Smart backoff: waiting ${delay}ms (attempt ${attempt + 1}, isRateLimit: ${isRateLimit})`);
+  await sleep(delay);
+}
+
 async function performBatchSyncWithRetry(
   accessToken: string, 
   adAccountId: string, 
   dateRange: { since: string; until: string },
   projectId: string,
   supabase: any,
-  maxRetries: number = 3
+  maxRetries: number = 5
 ): Promise<any> {
   let lastError: Error | null = null;
+  let rateLimitInfo: RateLimitInfo = { isRateLimited: false };
   
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      console.log(`🔄 Sync attempt ${attempt + 1}/${maxRetries}`);
+      console.log(`🔄 Enhanced sync attempt ${attempt + 1}/${maxRetries}`);
+      
+      // If we detected rate limiting, wait before proceeding
+      if (rateLimitInfo.isRateLimited && attempt > 0) {
+        console.log(`⏳ Rate limit detected: ${rateLimitInfo.message}`);
+        await smartExponentialBackoff(attempt, true);
+      }
       
       // Validate token before each attempt
       const isTokenValid = await validateToken(accessToken);
@@ -423,30 +488,58 @@ async function performBatchSyncWithRetry(
         throw new Error('Invalid Facebook API response structure');
       }
       
-      console.log(`✅ Sync successful on attempt ${attempt + 1}`);
+      console.log(`✅ Enhanced sync successful on attempt ${attempt + 1}`);
       return result;
       
     } catch (error) {
       lastError = error as Error;
-      console.error(`❌ Sync attempt ${attempt + 1} failed:`, error);
+      console.error(`❌ Enhanced sync attempt ${attempt + 1} failed:`, error);
       
-      // Check if it's a rate limit error
-      if (error.message.includes('rate limit') || error.message.includes('429')) {
-        console.log('⏳ Rate limit detected, waiting longer...');
-        await sleep(30000); // Wait 30 seconds for rate limits
-      } else if (error.message.includes('token') || error.message.includes('401')) {
-        console.log('🔑 Token error detected');
-        // Token errors are handled above, don't retry without refresh
+      // Parse the error to understand if it's rate limiting
+      const errorMessage = error.message.toLowerCase();
+      const isRateLimit = errorMessage.includes('rate limit') || 
+                         errorMessage.includes('429') || 
+                         errorMessage.includes('user request limit reached') ||
+                         errorMessage.includes('too many calls');
+      
+      const isTokenError = errorMessage.includes('token') || 
+                          errorMessage.includes('401') || 
+                          errorMessage.includes('invalid_token');
+      
+      if (isRateLimit) {
+        rateLimitInfo = {
+          isRateLimited: true,
+          retryAfter: 3600,
+          message: 'Facebook API rate limit exceeded'
+        };
+        
+        // Log rate limit incident for monitoring
+        await supabase.from('sync_health_metrics').insert({
+          project_id: projectId,
+          platform: 'facebook',
+          metric_type: 'rate_limit_hit',
+          metric_value: attempt + 1,
+          metadata: { error_message: error.message, attempt }
+        });
+        
+      } else if (isTokenError) {
+        console.log('🔑 Token error detected, stopping retries');
         break;
-      } else if (attempt < maxRetries - 1) {
-        // Exponential backoff for other errors
-        await exponentialBackoff(attempt);
+      }
+      
+      // Only retry if we haven't exceeded max attempts
+      if (attempt < maxRetries - 1) {
+        await smartExponentialBackoff(attempt, isRateLimit);
       }
     }
   }
   
-  // All retries failed
-  throw new Error(`Sync failed after ${maxRetries} attempts. Last error: ${lastError?.message}`);
+  // All retries failed - provide helpful error message
+  const errorMsg = rateLimitInfo.isRateLimited 
+    ? `Facebook API rate limit exceeded. Please wait ${Math.round((rateLimitInfo.retryAfter || 3600) / 60)} minutes and try again.`
+    : `Sync failed after ${maxRetries} attempts. Last error: ${lastError?.message}`;
+    
+  throw new Error(errorMsg);
 }
 
 async function performBatchSync(accessToken: string, adAccountId: string, dateRange: { since: string; until: string } = { since: '30', until: '1' }): Promise<any> {
@@ -468,8 +561,8 @@ async function performBatchSync(accessToken: string, adAccountId: string, dateRa
     }
   ];
 
-  // Make single batch API call to Facebook with error handling
-  const batchResponse = await fetchWithUsageCheck('https://graph.facebook.com/v18.0/', {
+  // Make single batch API call to Facebook with enhanced error handling
+  const batchResponse = await fetchWithEnhancedUsageCheck('https://graph.facebook.com/v18.0/', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

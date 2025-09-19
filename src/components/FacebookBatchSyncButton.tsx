@@ -31,9 +31,23 @@ export const FacebookBatchSyncButton = ({ projectId, dateRange }: FacebookBatchS
 
       if (error) {
         console.error("❌ Manual sync error:", error);
+        
+        // Provide specific feedback for rate limiting
+        const errorMessage = error.message?.toLowerCase() || '';
+        let description = error.message || "Failed to sync Facebook data";
+        let title = "Sync Failed";
+        
+        if (errorMessage.includes('rate limit') || errorMessage.includes('429')) {
+          title = "Rate Limited";
+          description = "Facebook API rate limit reached. Please wait 1 hour and try again.";
+        } else if (errorMessage.includes('token') || errorMessage.includes('401')) {
+          title = "Authentication Error";
+          description = "Please reconnect your Facebook account.";
+        }
+        
         toast({
-          title: "Sync Failed",
-          description: error.message || "Failed to sync Facebook data",
+          title,
+          description,
           variant: "destructive",
         });
         return;
@@ -42,9 +56,23 @@ export const FacebookBatchSyncButton = ({ projectId, dateRange }: FacebookBatchS
       // Check if the response indicates an error (even if no error object)
       if (data && !data.success && data.error) {
         console.error("❌ Sync response error:", data);
+        
+        // Provide specific feedback for different error types
+        const errorMessage = data.error.toLowerCase();
+        let description = data.error;
+        let title = "Sync Failed";
+        
+        if (errorMessage.includes('rate limit') || errorMessage.includes('429')) {
+          title = "Rate Limited";
+          description = "Facebook API rate limit reached. Please wait 1 hour and try again.";
+        } else if (errorMessage.includes('token') || errorMessage.includes('401')) {
+          title = "Authentication Error";  
+          description = "Please reconnect your Facebook account.";
+        }
+        
         toast({
-          title: "Sync Failed", 
-          description: data.error,
+          title,
+          description,
           variant: "destructive",
         });
         return;

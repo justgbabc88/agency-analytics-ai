@@ -174,7 +174,22 @@ export const FacebookDataDiagnostic = ({ projectId }: FacebookDataDiagnosticProp
         });
 
         if (syncError) {
-          addResult({ step: "5. Manual Sync Test", status: "error", message: `Sync failed: ${syncError.message}` });
+          // Check if it's a rate limit error specifically
+          const errorMessage = syncError.message?.toLowerCase() || '';
+          if (errorMessage.includes('rate limit') || errorMessage.includes('429')) {
+            addResult({ 
+              step: "5. Manual Sync Test", 
+              status: "warning", 
+              message: "⏳ Rate limit detected - this is expected during high usage periods",
+              details: { 
+                rateLimited: true,
+                recommendation: "Wait 1 hour for rate limits to reset, then try again",
+                nextRetry: new Date(Date.now() + 3600000).toLocaleTimeString()
+              }
+            });
+          } else {
+            addResult({ step: "5. Manual Sync Test", status: "error", message: `Sync failed: ${syncError.message}` });
+          }
         } else {
           addResult({ 
             step: "5. Manual Sync Test", 
