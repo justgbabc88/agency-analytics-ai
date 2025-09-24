@@ -82,8 +82,7 @@ function handleInitiateAuth(permissionLevel: 'basic' | 'ads' = 'basic') {
     `redirect_uri=${encodeURIComponent(redirectUri)}&` +
     `scope=${encodeURIComponent(scopes.join(','))}&` +
     `response_type=code&` +
-    `auth_type=reauthenticate&` +
-    `force_login=true&` +
+    `auth_type=rerequest&` +
     `display=popup&` +
     `state=${stateToken}`
 
