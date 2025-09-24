@@ -351,7 +351,25 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
     setIsConnecting(true);
     
     try {
-      console.log('📤 Calling facebook-oauth edge function...');
+      // Step 1: Revoke existing permissions to ensure fresh authorization
+      console.log('🔄 Revoking existing Facebook permissions...');
+      toast({
+        title: "Preparing Fresh Connection",
+        description: "Clearing previous authorization to ensure fresh permissions...",
+      });
+
+      const { data: revokeData, error: revokeError } = await supabase.functions.invoke('facebook-oauth', {
+        body: { action: 'revoke_permissions', projectId }
+      });
+
+      if (revokeError) {
+        console.warn('⚠️ Permission revocation failed, continuing anyway:', revokeError);
+      } else {
+        console.log('✅ Permissions revoked successfully:', revokeData);
+      }
+
+      // Step 2: Initiate fresh OAuth flow
+      console.log('📤 Initiating fresh Facebook OAuth...');
       const { data, error } = await supabase.functions.invoke('facebook-oauth', {
         body: { action: 'initiate', permission_level: permissionLevel, projectId }
       });
@@ -376,7 +394,7 @@ export const FacebookConnector = ({ projectId }: FacebookConnectorProps) => {
       }
       
       const upgradeMessage = permissionLevel === 'ads' ? 
-        "Complete the authorization to upgrade permissions for ads access." :
+        "You'll be asked to authorize Facebook ads permissions. This ensures fresh account selection." :
         "Complete the authorization in the popup window.";
         
       toast({

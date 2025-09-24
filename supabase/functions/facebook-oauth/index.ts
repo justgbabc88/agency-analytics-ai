@@ -7,7 +7,7 @@ const corsHeaders = {
 }
 
 interface FacebookOAuthRequest {
-  action: 'initiate' | 'exchange' | 'get_ad_accounts' | 'upgrade_permissions' | 'test_api'
+  action: 'initiate' | 'exchange' | 'get_ad_accounts' | 'upgrade_permissions' | 'test_api' | 'revoke_permissions'
   code?: string
   access_token?: string
   permission_level?: 'basic' | 'ads'
@@ -43,6 +43,11 @@ serve(async (req) => {
         return handleInitiateAuth('ads')
       case 'get_ad_accounts':
         return await handleGetAdAccounts(access_token!)
+      case 'revoke_permissions':
+        if (!projectId) {
+          throw new Error('projectId is required for permission revocation')
+        }
+        return await handleRevokePermissions(projectId, supabase)
       default:
         throw new Error(`Unsupported action: ${action}`)
     }
@@ -300,6 +305,90 @@ async function handleGetAdAccounts(accessToken: string) {
     }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   )
+}
+
+async function handleRevokePermissions(projectId: string, supabase: any) {
+  try {
+    console.log(`🔄 Revoking Facebook permissions for project: ${projectId}`)
+
+    // Get stored access token for this project
+    const { data: integrationData, error: dataError } = await supabase
+      .from('project_integration_data')
+      .select('data')
+      .eq('project_id', projectId)
+      .eq('platform', 'facebook')
+      .single()
+
+    if (dataError || !integrationData?.data?.access_token) {
+      console.log('⚠️ No stored Facebook access token found, skipping revocation')
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: 'No existing permissions to revoke',
+          skipped: true 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const accessToken = integrationData.data.access_token
+
+    // Revoke the app authorization
+    const revokeUrl = `https://graph.facebook.com/v18.0/me/permissions?access_token=${accessToken}`
+    
+    const response = await fetch(revokeUrl, {
+      method: 'DELETE'
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.warn('⚠️ Failed to revoke Facebook permissions:', errorText)
+      // Don't fail the request - just log and continue
+    } else {
+      console.log('✅ Successfully revoked Facebook app authorization')
+    }
+
+    // Clear stored integration data
+    await supabase
+      .from('project_integration_data')
+      .delete()
+      .eq('project_id', projectId)
+      .eq('platform', 'facebook')
+
+    // Update integration status
+    await supabase
+      .from('project_integrations')
+      .update({ 
+        is_connected: false,
+        last_sync: null 
+      })
+      .eq('project_id', projectId)
+      .eq('platform', 'facebook')
+
+    console.log('✅ Cleared stored Facebook integration data')
+
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        message: 'Facebook permissions revoked successfully',
+        revoked: true 
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+
+  } catch (error) {
+    console.error('❌ Error revoking Facebook permissions:', error)
+    
+    // Even if revocation fails, continue - this ensures a clean slate
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        message: 'Prepared for fresh Facebook connection',
+        error: error.message 
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+  }
 }
 
 async function exchangeForLongLivedToken(shortLivedToken: string) {
